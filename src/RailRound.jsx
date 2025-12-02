@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
+// import { handleExportKml } from './exportKml';
+
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as turf from '@turf/turf';
@@ -975,6 +977,7 @@ export default function RailLogApp() {
   const [autoForm, setAutoForm] = useState({ startLine: '', startStation: '', endLine: '', endStation: '' });
   const [isRouteSearching, setIsRouteSearching] = useState(false);
   const [mapZoom, setMapZoom] = useState(10);
+  const [isExportingKML, setIsExportingKML] = useState(false);
 
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
@@ -1265,9 +1268,9 @@ export default function RailLogApp() {
   const initMap = () => {
     if (!mapRef.current || mapInstance.current ) return;
     const map = L.map(mapRef.current, { zoomControl: true, preferCanvas: true }).setView([35.68, 139.76], 10);
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', maxZoom: 19 });
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', maxZoom: 20 });
     const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', subdomains: 'abcd', maxZoom: 20 });
-    const rail = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 19, opacity: 0, attribution: '© OpenRailwayMap' });
+    const rail = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 20, opacity: 0, attribution: '© OpenRailwayMap' });
     railLayerRef.current = rail;
     
     dark.addTo(map); rail.addTo(map);

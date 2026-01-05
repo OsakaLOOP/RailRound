@@ -970,29 +970,28 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
   const vH = h + padY * 2;
 
   // Determine Aspect Ratio strategy
-  // We want visual aspect ratio of container ~ 2:1 (Width:Height)
-  // If content aspect ratio (w/h) < 2, we "stretch" it (preserveAspectRatio="none") to fill the 2:1 box.
-  // If content aspect ratio >= 2, we keep it as is (preserveAspectRatio="xMidYMid meet") inside the 2:1 box.
+  // 1. Normalize data to fill 100x50 (2:1) coordinate space
+  // 2. Calculate target visual ratio = max(2, actualRatio)
+  // 3. Size container to target ratio
+  // 4. Use preserveAspectRatio="none" to stretch the normalized 2:1 coords to the target ratio
 
   const contentRatio = vW / vH;
-  const shouldStretch = contentRatio < 2.0;
+  const visualRatio = Math.min(8, Math.max(2, contentRatio)); // Min 2:1, Max 8:1
+  const heightPx = 40;
+  const widthPx = heightPx * visualRatio;
 
   const project = (lat, lng) => {
-      // Input here is actually [rotY, rotX] from our previous step
-      // rotX maps to SVG x, rotY maps to SVG y (inverted)
-      // Wait, rotatedCoords stored as [ry, rx].
-      // So lat=ry, lng=rx.
-      const px = ((lng - vMinX) / vW) * 100; // 0- scale based on container? No, viewbox is abstract.
-      const py = 50 - ((lat - vMinY) / vH) * 50; // 0-50 scale (flip Y)
+      const px = ((lng - vMinX) / vW) * 100; // Map to 0-100
+      const py = 50 - ((lat - vMinY) / vH) * 50; // Map to 0-50
       return `${px},${py}`;
   };
 
   return (
-      <div className="w-36 shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-between pl-2">
-          <div className="w-24 h-12">
+      <div className="shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-end pl-2 gap-2" style={{ minWidth: '100px' }}>
+          <div style={{ width: widthPx, height: heightPx }}>
             <svg
                 viewBox="0 0 100 50"
-                preserveAspectRatio={shouldStretch ? "none" : "xMidYMid meet"}
+                preserveAspectRatio="none"
                 className="w-full h-full opacity-80"
             >
                 {rotatedCoords.map((item, idx) => (
@@ -1001,7 +1000,7 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
                         points={item.coords.map(pt => project(pt[0], pt[1])).join(' ')}
                         fill="none"
                         stroke={item.color || '#94a3b8'}
-                        strokeWidth={shouldStretch ? "4" : "3"}
+                        strokeWidth="4"
                         vectorEffect="non-scaling-stroke"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -1009,7 +1008,7 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
                 ))}
             </svg>
           </div>
-          <div className="text-[10px] font-bold text-gray-400 w-10 text-right">{Math.round(totalDist)}km</div>
+          <div className="text-[10px] font-bold text-gray-400 shrink-0 text-right">{Math.round(totalDist)}km</div>
       </div>
   );
 };

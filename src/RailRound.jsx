@@ -887,50 +887,112 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
       }
   });
 
-  if (allCoords.length === 0) return <div className="w-20 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">无预览</div>;
+  if (allCoords.length === 0) return <div className="w-28 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">无预览</div>;
 
-  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+  // Flattening Logic using PCA (Principal Component Analysis) approximation
+  // 1. Calculate Centroid
+  let sumLat = 0, sumLng = 0, count = 0;
   allCoords.forEach(item => {
       item.coords.forEach(pt => {
-           const [lat, lng] = pt;
-           if (lat < minLat) minLat = lat;
-           if (lat > maxLat) maxLat = lat;
-           if (lng < minLng) minLng = lng;
-           if (lng > maxLng) maxLng = lng;
+          sumLat += pt[0];
+          sumLng += pt[1];
+          count++;
+      });
+  });
+  if (count === 0) return null;
+  const cenLat = sumLat / count;
+  const cenLng = sumLng / count;
+
+  // 2. Calculate Covariance Matrix terms
+  let u20 = 0, u02 = 0, u11 = 0;
+  allCoords.forEach(item => {
+      item.coords.forEach(pt => {
+          const x = pt[1] - cenLng; // lng is x
+          const y = pt[0] - cenLat; // lat is y
+          u20 += x * x;
+          u02 += y * y;
+          u11 += x * y;
       });
   });
 
-  const width = 100, height = 100;
-  const latSpan = maxLat - minLat || 0.01;
-  const lngSpan = maxLng - minLng || 0.01;
-  // Padding 10%
-  const pLat = latSpan * 0.1;
-  const pLng = lngSpan * 0.1;
+  // 3. Principal Axis Angle
+  // theta is the angle of the main axis relative to X-axis
+  const theta = 0.5 * Math.atan2(2 * u11, u20 - u02);
+
+  // We want to rotate by -theta to align with X axis
+  const cosT = Math.cos(-theta);
+  const sinT = Math.sin(-theta);
+
+  // 4. Rotate and BBox
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const rotatedCoords = allCoords.map(item => ({
+      ...item,
+      coords: item.coords.map(pt => {
+          const x = pt[1] - cenLng;
+          const y = pt[0] - cenLat;
+          const rx = x * cosT - y * sinT;
+          const ry = x * sinT + y * cosT;
+          if (rx < minX) minX = rx;
+          if (rx > maxX) maxX = rx;
+          if (ry < minY) minY = ry;
+          if (ry > maxY) maxY = ry;
+          return [ry, rx]; // Keep as [y, x] format for consistency if needed, but projected is purely Cartesian
+      })
+  }));
+
+  const w = maxX - minX || 0.001;
+  const h = maxY - minY || 0.001;
+
+  // Padding
+  const padX = w * 0.1;
+  const padY = h * 0.1;
+
+  const vMinX = minX - padX;
+  const vMinY = minY - padY;
+  const vW = w + padX * 2;
+  const vH = h + padY * 2;
+
+  // Determine Aspect Ratio strategy
+  // We want visual aspect ratio of container ~ 2:1 (Width:Height)
+  // If content aspect ratio (w/h) < 2, we "stretch" it (preserveAspectRatio="none") to fill the 2:1 box.
+  // If content aspect ratio >= 2, we keep it as is (preserveAspectRatio="xMidYMid meet") inside the 2:1 box.
+
+  const contentRatio = vW / vH;
+  const shouldStretch = contentRatio < 2.0;
 
   const project = (lat, lng) => {
-      const x = ((lng - (minLng - pLng)) / (lngSpan + pLng * 2)) * width;
-      const y = height - ((lat - (minLat - pLat)) / (latSpan + pLat * 2)) * height;
-      return `${x},${y}`;
+      // Input here is actually [rotY, rotX] from our previous step
+      // rotX maps to SVG x, rotY maps to SVG y (inverted)
+      // Wait, rotatedCoords stored as [ry, rx].
+      // So lat=ry, lng=rx.
+      const px = ((lng - vMinX) / vW) * 100; // 0-100 scale
+      const py = 50 - ((lat - vMinY) / vH) * 50; // 0-50 scale (flip Y)
+      return `${px},${py}`;
   };
 
   return (
-      <div className="w-20 shrink-0 ml-2 border-l border-gray-50 flex flex-col items-center justify-center">
-          <div className="flex-1 w-full flex items-center justify-center">
-            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full max-h-[60px] opacity-80">
-                {allCoords.map((item, idx) => (
+      <div className="w-32 shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-between pl-2">
+          <div className="w-20 h-10">
+            <svg
+                viewBox="0 0 100 50"
+                preserveAspectRatio={shouldStretch ? "none" : "xMidYMid meet"}
+                className="w-full h-full opacity-80"
+            >
+                {rotatedCoords.map((item, idx) => (
                     <polyline
                         key={idx}
                         points={item.coords.map(pt => project(pt[0], pt[1])).join(' ')}
                         fill="none"
                         stroke={item.color || '#94a3b8'}
-                        strokeWidth="8"
+                        strokeWidth={shouldStretch ? "4" : "3"}
+                        vectorEffect="non-scaling-stroke"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                     />
                 ))}
             </svg>
           </div>
-          <div className="text-[10px] font-bold text-gray-400 mt-1">{Math.round(totalDist)} km</div>
+          <div className="text-[10px] font-bold text-gray-400 w-10 text-right">{Math.round(totalDist)}km</div>
       </div>
   );
 };

@@ -1373,12 +1373,6 @@ export default function RailRoundApp() {
       // 2. Load from IndexedDB First (Fast Path)
       let cachedFiles = [];
       try {
-          // Ideally we iterate keys, but here we might just assume we load what we have
-          // For simplicity, let's load everything in 'files' store? No, 'files' store might become huge.
-          // Wait, we need to know WHICH files to load. We need the manifest.
-          // But fetching manifest is network.
-          // Strategy: Load ALL cached files from IDB immediately.
-          // IndexedDB getAll is fast.
           const dbInstance = await db.open();
           const tx = dbInstance.transaction(db.STORE_FILES, 'readonly');
           const store = tx.objectStore(db.STORE_FILES);
@@ -1411,12 +1405,6 @@ export default function RailRoundApp() {
       }
       
       console.log(`[Autoload] 检查更新...`);
-
-      // We only want to fetch files that are NOT in cache or have changed (we don't have versioning yet, so assume name match = cached)
-      // Actually, to support "updating", we should probably just fetch everything if we want to be safe,
-      // OR implement a version check. For now, let's just fetch missing ones + maybe random refresh?
-      // Given "loading takes a second", we should trust the cache.
-      // A simple strategy: If we have ANY cached files, assume we are good for this session, UNLESS the manifest has new files.
 
       const cachedFileNames = new Set(cachedFiles.map(f => f.fileName));
       const missingFiles = geojsonFiles.filter(f => {

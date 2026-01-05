@@ -56,18 +56,12 @@ export async function onRequest(event) {
     let username = await DB.get(bindingKey);
 
     if (!username) {
-        // Registration / Binding
-        // Check if a user with this login already exists manually to avoid overwrite
-        // Strategy: Try `github_login`. If taken, try `github_login_id`.
 
         let candidateUsername = `github_${githubUser.login}`;
         let userKey = `user:${candidateUsername}`;
         let existingUser = await DB.get(userKey);
 
         if (existingUser) {
-            // Collision or previous manual registration with same name?
-            // If the existing user has NO github binding, we can't just take it.
-            // We append ID to be safe.
             candidateUsername = `github_${githubUser.login}_${githubUser.id}`;
             userKey = `user:${candidateUsername}`;
         }

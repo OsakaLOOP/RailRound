@@ -6,7 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as turf from '@turf/turf';
 // Quick import-time log to ensure the module loads when Vite imports it.
-try { console.log('[iconfixed] module loaded'); } catch (e) {}
+try { console.log('[iconfixed] module loaded'); } catch  {}
 import { 
   Train, Calendar, Navigation, Map as MapIcon, Layers, Upload, Plus, Edit2, Trash2, 
   PieChart, TrendingUp, MapPin, Save, X, Camera, MessageSquare, Move, Magnet, CheckCircle2, FilePlus, ArrowDown, Search, Building2, AlertTriangle, Loader2, Download, ListFilter,

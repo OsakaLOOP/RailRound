@@ -11,8 +11,8 @@ export async function onRequest(event) {
     return new Response("Missing code", { status: 400 });
   }
   try {
-    const CLIENT_ID = env.CLIENT_ID;
-    const CLIENT_SECRET = env.CLIENT_SECRET;
+    const CLIENT_ID = event.env.CLIENT_ID;
+    const CLIENT_SECRET = event.env.CLIENT_SECRET;
     
 
   if (!CLIENT_ID || !CLIENT_SECRET) {

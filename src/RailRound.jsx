@@ -1014,7 +1014,8 @@ export default function RailRoundApp() {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
   const pinsLayer = useRef(null);
-  const geoJsonLayer = useRef(null);
+  const baseLinesLayer = useRef(null);
+  const baseStationsLayer = useRef(null);
   const routeLayer = useRef(null);
 
   
@@ -1912,22 +1913,54 @@ export default function RailRoundApp() {
     dark.addTo(map); rail.addTo(map);
     L.control.layers({ "标准 (OSM)": osm, "暗色 (Dark)": dark }, { "铁道网 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);
     mapInstance.current = map;
-    geoJsonLayer.current = L.layerGroup().addTo(map);
-    routeLayer.current = L.layerGroup().addTo(map); // 新增：行程轨迹层
+
+    // 初始化图层（注意顺序影响 z-index）
+    baseLinesLayer.current = L.layerGroup(); // 初始不 addTo(map)，由 updateLayerVisibility 控制
+    baseStationsLayer.current = L.layerGroup().addTo(map); // 站点始终显示
+    routeLayer.current = L.layerGroup().addTo(map);
     pinsLayer.current = L.layerGroup().addTo(map);
 
-    const updateRailOpacity = () => {
+    const updateLayerVisibility = () => {
         const z = map.getZoom();
+
+        // 1. OpenRailwayMap Tiles Logic
         if (railLayerRef.current) {
-            // 如果缩放 >= 15，显示 0.7 透明度；否则完全隐藏
-            // 配合上面的 className，这会产生淡入淡出效果
             railLayerRef.current.setOpacity(z >= 15 ? 0.7 : (z>=12 ? 0.4 : 0) );
-        } 
-        setMapZoom(z); // 更新 React 状态
+        }
+
+        // 2. Base Lines Logic
+        // Low (<10): Hidden
+        // Mid (10 <= z < 12): Visible
+        // High (>=12): Hidden (ORM takes over)
+        const showBaseLines = z >= 10 && z < 12;
+        if (baseLinesLayer.current) {
+            if (showBaseLines) {
+                 if (!map.hasLayer(baseLinesLayer.current)) {
+                     // Insert at bottom to not cover stations/routes if possible,
+                     // though L.layerGroup order relies on insertion.
+                     // addTo puts it in overlay pane.
+                     // Leaflet vector layers don't strictly support z-index moving without logic,
+                     // but usually adding it last puts it on top.
+                     // We want lines BELOW stations.
+                     // Since stations are already added, adding lines now might put them ON TOP of stations in SVG order.
+                     // To fix this, we can use `bringToBack()` on the layer group if it supports it,
+                     // or rely on `map.addLayer`.
+                     // However, standard L.LayerGroup doesn't have bringToBack invoked on the group itself easily for all children?
+                     // Actually, we can just add it. The stations are transparent dots anyway.
+                     map.addLayer(baseLinesLayer.current);
+                     // Try to push lines to back if possible so they don't cover dots
+                     baseLinesLayer.current.invoke('bringToBack');
+                 }
+            } else {
+                 if (map.hasLayer(baseLinesLayer.current)) map.removeLayer(baseLinesLayer.current);
+            }
+        }
+
+        setMapZoom(z);
     };
 
-    map.on('zoomend', updateRailOpacity);
-    updateRailOpacity();
+    map.on('zoomend', updateLayerVisibility);
+    updateLayerVisibility(); // Init
 
     map.on('click', (e) => { if (pinMode !== 'idle' && editingPin) { let newPos = { lat: e.latlng.lat, lng: e.latlng.lng }; if (pinMode === 'snap') newPos = findNearestPointOnLine(railwayData, newPos.lat, newPos.lng); setEditingPin(prev => ({ ...prev, ...newPos })); } });
     if (geoData && geoData.features.length > 0) { renderBaseMap(geoData); renderTripRoutes(); }
@@ -1935,16 +1968,33 @@ export default function RailRoundApp() {
   };
 
   const renderBaseMap = (data) => {
-    if (!geoJsonLayer.current) return;
-    geoJsonLayer.current.clearLayers();
+    if (!baseLinesLayer.current || !baseStationsLayer.current) return;
+    baseLinesLayer.current.clearLayers();
+    baseStationsLayer.current.clearLayers();
+
+    // Render Lines
     L.geoJSON(data, {
-      style: { color: '#475569', weight: 1, opacity: 0.3 }, 
+      filter: (f) => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString',
+      style: { color: '#475569', weight: 1, opacity: 0.3 },
+      onEachFeature: (f, l) => f.properties.name && l.bindTooltip(f.properties.name)
+    }).addTo(baseLinesLayer.current);
+
+    // Render Stations
+    L.geoJSON(data, {
+      filter: (f) => f.properties.type === 'station',
       pointToLayer: (f, ll) => {
-          if (f.properties.type !== 'station') return null;
           return L.circleMarker(ll, { radius: 2, color: 'transparent', fillColor: '#64748b', fillOpacity: 0.5, weight: 0, className: 'station-dot' });
       },
       onEachFeature: (f, l) => f.properties.name && l.bindTooltip(f.properties.name)
-    }).addTo(geoJsonLayer.current);
+    }).addTo(baseStationsLayer.current);
+
+    // Refresh visibility state (in case data loaded at a zoom level where lines should be visible)
+    if (mapInstance.current) {
+        // Trigger the logic to ensure lines are added/removed correctly with new data content
+        // We can manually call fire 'zoomend' or just replicate the logic check.
+        // Re-firing zoomend is safest.
+        mapInstance.current.fire('zoomend');
+    }
   };
 
 

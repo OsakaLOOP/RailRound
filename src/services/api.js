@@ -67,5 +67,18 @@ export const api = {
         url += `&session_token=${encodeURIComponent(sessionToken)}`;
     }
     window.location.href = url;
+  },
+
+  async getOrCreateCardKey(token) {
+    const res = await fetch(`${API_BASE}/user/key`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to get card key');
+    return data.key;
   }
 };

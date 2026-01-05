@@ -13,7 +13,7 @@ export async function onRequest(event) {
 
   // GitHub OAuth
   if (provider === 'github') {
-      const clientId = globalThis.CLIENT_ID;
+      const clientId = env.CLIENT_ID;
       if (!clientId) {
           return new Response(JSON.stringify({ error: "Server Configuration Error: Missing CLIENT_ID" }), { status: 500, headers: { "Content-Type": "application/json" } });
       }

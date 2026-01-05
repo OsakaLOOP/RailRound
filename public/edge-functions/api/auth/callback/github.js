@@ -11,8 +11,8 @@ export async function onRequest(event) {
     return new Response("Missing code", { status: 400 });
   }
 
-  const CLIENT_ID = globalThis.CLIENT_ID;
-  const CLIENT_SECRET = globalThis.CLIENT_SEC;
+  const CLIENT_ID = env.CLIENT_ID;
+  const CLIENT_SECRET = env.CLIENT_SECRET;
 
   if (!CLIENT_ID || !CLIENT_SECRET) {
       return new Response(JSON.stringify({ error: "Server Configuration Error" }), { status: 500 });

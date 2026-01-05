@@ -10,7 +10,7 @@ try { console.log('[iconfixed] module loaded'); } catch (e) {}
 import { 
   Train, Calendar, Navigation, Map as MapIcon, Layers, Upload, Plus, Edit2, Trash2, 
   PieChart, TrendingUp, MapPin, Save, X, Camera, MessageSquare, Move, Magnet, CheckCircle2, FilePlus, ArrowDown, Search, Building2, AlertTriangle, Loader2, Download, Map, ListFilter,
-  LogOut, User
+  LogOut, User, Github
 } from 'lucide-react';
 import { LoginModal } from './components/LoginModal';
 import { api } from './services/api';
@@ -899,7 +899,7 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd }) 
     <button onClick={onAdd} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
   </div>
 );
-const StatsView = ({ trips, railwayData ,geoData}) => {
+const StatsView = ({ trips, railwayData ,geoData, user, userProfile }) => {
     const totalTrips = trips.length;
     const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
     const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
@@ -945,6 +945,30 @@ const StatsView = ({ trips, railwayData ,geoData}) => {
         });
     return (
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {user && (
+            <div className="bg-white p-4 rounded-xl shadow-sm border">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-xl font-bold text-gray-500 overflow-hidden">
+                        {userProfile?.bindings?.github?.avatar_url ? (
+                            <img src={userProfile.bindings.github.avatar_url} alt="Avatar" className="w-full h-full object-cover"/>
+                        ) : (
+                            user.username.charAt(0).toUpperCase()
+                        )}
+                    </div>
+                    <div>
+                        <div className="font-bold text-lg">{user.username}</div>
+                        <div className="text-xs text-gray-400 flex items-center gap-1">
+                            {userProfile?.bindings?.github ? (
+                                <span className="flex items-center gap-1 text-emerald-600"><Github size={12}/> GitHub 已绑定 ({userProfile.bindings.github.login})</span>
+                            ) : (
+                                <span>未绑定第三方账号</span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4"><div className="bg-white p-4 rounded-xl shadow-sm border text-center"><div className="text-xs text-gray-400 mb-1">记录数</div><div className="text-3xl font-bold text-gray-800">{totalTrips}</div></div><div className="bg-white p-4 rounded-xl shadow-sm border text-center"><div className="text-xs text-gray-400 mb-1">制霸路线</div><div className="text-3xl font-bold text-indigo-600">{uniqueLines}</div></div></div>
         <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-6 rounded-xl shadow-lg text-white">
             <div className="flex items-center justify-between mb-2"><h3 className="font-bold flex items-center gap-2"><TrendingUp size={18}/> 里程统计</h3><span className="text-xs bg-white/20 px-2 py-1 rounded">总距离</span></div>
@@ -968,6 +992,7 @@ export default function RailLogApp() {
   const [trips, setTrips] = useState([]); 
   const [pins, setPins] = useState([]); 
   const [user, setUser] = useState(null); // { token, username }
+  const [userProfile, setUserProfile] = useState(null); // Full user object (bindings etc)
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [companyDB, setCompanyDB] = useState({});
   const [leafletReady, setLeafletReady] = useState(false);
@@ -1051,6 +1076,8 @@ export default function RailLogApp() {
   const loadUserData = async (token, isInteractive = false) => {
     try {
       const cloudData = await api.getData(token);
+      setUserProfile(cloudData); // Store full profile including bindings
+
       let newTrips = cloudData.trips || [];
       let newPins = cloudData.pins || [];
 
@@ -1563,7 +1590,7 @@ export default function RailLogApp() {
 
       <div className="flex-1 relative overflow-hidden flex flex-col">
         {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
-        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} />}
+        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} />}
         <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
           <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
           <FabButton activeTab={activeTab} pinMode={pinMode} togglePinMode={togglePinMode} />

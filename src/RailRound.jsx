@@ -917,144 +917,10 @@ const FabButton = ({ activeTab, pinMode, togglePinMode }) => (
   <div className="absolute bottom-4 left-4 z-[400] flex flex-col gap-3">{activeTab === 'map' && (<button onClick={togglePinMode} className={`p-3 rounded-full shadow-lg transition-all transform hover:scale-105 ${pinMode==='idle'?'bg-white text-gray-700':pinMode==='free'?'bg-blue-500 text-white':'bg-indigo-600 text-white ring-4 ring-indigo-200'}`}>{pinMode === 'snap' ? <Magnet size={24} /> : <MapPin size={24} />}</button>)}</div>
 );
 
-const RouteSlice = ({ segments, segmentGeometries }) => {
-  const allCoords = [];
-  if (!segmentGeometries) return null;
-
-  let totalDist = 0;
-
-  segments.forEach(seg => {
-      const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
-      const geom = segmentGeometries.get(key);
-      if (geom && geom.coords) {
-          if (geom.isMulti) {
-              geom.coords.forEach(c => {
-                  allCoords.push({ coords: c, color: geom.color });
-                  if (turf) totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
-              });
-          } else {
-              allCoords.push({ coords: geom.coords, color: geom.color });
-              if (turf) totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
-          }
-      }
-  });
-
-  if (allCoords.length === 0) return <div className="w-28 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">无预览</div>;
-
-  // Flattening Logic using PCA (Principal Component Analysis) approximation
-  // 1. Calculate Centroid
-  let sumLat = 0, sumLng = 0, count = 0;
-  allCoords.forEach(item => {
-      item.coords.forEach(pt => {
-          sumLat += pt[0];
-          sumLng += pt[1];
-          count++;
-      });
-  });
-  if (count === 0) return null;
-  const cenLat = sumLat / count;
-  const cenLng = sumLng / count;
-
-  // 2. Calculate Covariance Matrix terms
-  let u20 = 0, u02 = 0, u11 = 0;
-  allCoords.forEach(item => {
-      item.coords.forEach(pt => {
-          const x = pt[1] - cenLng; // lng is x
-          const y = pt[0] - cenLat; // lat is y
-          u20 += x * x;
-          u02 += y * y;
-          u11 += x * y;
-      });
-  });
-
-  // 3. Principal Axis Angle
-  // theta is the angle of the main axis relative to X-axis
-  const theta = 0.5 * Math.atan2(2 * u11, u20 - u02);
-
-  // We want to rotate by -theta to align with X axis
-  const cosT = Math.cos(-theta);
-  const sinT = Math.sin(-theta);
-
-  // 4. Rotate and BBox
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  const rotatedCoords = allCoords.map(item => ({
-      ...item,
-      coords: item.coords.map(pt => {
-          const x = pt[1] - cenLng;
-          const y = pt[0] - cenLat;
-          const rx = x * cosT - y * sinT;
-          const ry = x * sinT + y * cosT;
-          if (rx < minX) minX = rx;
-          if (rx > maxX) maxX = rx;
-          if (ry < minY) minY = ry;
-          if (ry > maxY) maxY = ry;
-          return [ry, rx]; // Keep as [y, x] format for consistency if needed, but projected is purely Cartesian
-      })
-  }));
-
-  const w = maxX - minX || 0.001;
-  const h = maxY - minY || 0.001;
-
-  // Padding
-  const padX = w * 0.1;
-  const padY = h * 0.1;
-
-  const vMinX = minX - padX;
-  const vMinY = minY - padY;
-  const vW = w + padX * 2;
-  const vH = h + padY * 2;
-
-  // Determine Aspect Ratio strategy
-  // 1. Normalize data to fill 100x50 (2:1) coordinate space
-  // 2. Calculate target visual ratio = max(2, actualRatio)
-  // 3. Size container to target ratio
-  // 4. Use preserveAspectRatio="none" to stretch the normalized 2:1 coords to the target ratio
-
-  const contentRatio = vW / vH;
-  const visualRatio = Math.min(8, Math.max(2, contentRatio)); // Min 2:1, Max 8:1
-  const heightPx = 40;
-  const widthPx = heightPx * visualRatio;
-
-  const project = (lat, lng) => {
-      const px = ((lng - vMinX) / vW) * 100; // Map to 0-100
-      const py = 50 - ((lat - vMinY) / vH) * 50; // Map to 0-50
-      return `${px},${py}`;
-  };
-
-  return (
-      <div className="shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-end pl-2 gap-2" style={{ minWidth: '100px' }}>
-          <div style={{ width: widthPx, height: heightPx }}>
-            <svg
-                viewBox="0 0 100 50"
-                preserveAspectRatio="none"
-                className="w-full h-full opacity-80"
-            >
-                {rotatedCoords.map((item, idx) => (
-                    <polyline
-                        key={idx}
-                        points={item.coords.map(pt => project(pt[0], pt[1])).join(' ')}
-                        fill="none"
-                        stroke={item.color || '#94a3b8'}
-                        strokeWidth="4"
-                        vectorEffect="non-scaling-stroke"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                ))}
-            </svg>
-          </div>
-          <div className="text-[10px] font-bold text-gray-400 shrink-0 text-right">{Math.round(totalDist)}km</div>
-      </div>
-  );
-};
-
-// --- Refactored: Helper for Stats Calculation (Latest 5 + SVG Points) ---
-const calculateLatestStats = (trips, segmentGeometries, railwayData, geoData) => {
-    // 1. Basic Stats
-    const totalTrips = trips.length;
-    const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
-    const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
+// --- Shared Helper: Calculate Visualization Data ---
+const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData) => {
     let totalDist = 0;
+    const allCoords = [];
 
     // Helper to get or calc geometry on-the-fly
     const getGeometry = (seg) => {
@@ -1089,132 +955,184 @@ const calculateLatestStats = (trips, segmentGeometries, railwayData, geoData) =>
         return geom;
     };
 
-    // Calc total distance
-    if (turf) {
-        allSegments.forEach(seg => {
-            const geom = getGeometry(seg);
-            if (geom && geom.coords) {
-                if (geom.isMulti) {
-                    geom.coords.forEach(c => totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]]))));
-                } else {
-                    totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
-                }
+    segments.forEach(seg => {
+        const geom = getGeometry(seg);
+        if (geom && geom.coords) {
+            if (geom.isMulti) {
+                geom.coords.forEach(c => {
+                    allCoords.push({ coords: c, color: geom.color || '#94a3b8' });
+                    if(turf) totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
+                });
             } else {
-                 // Fallback Approx
-                const line = railwayData[seg.lineKey];
-                if (line) {
-                    const s1 = line.stations.find(st => st.id === seg.fromId);
-                    const s2 = line.stations.find(st => st.id === seg.toId);
-                    if (s1 && s2) totalDist += calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
-                }
+                allCoords.push({ coords: geom.coords, color: geom.color || '#94a3b8' });
+                if(turf) totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
             }
+        } else {
+             // Fallback Distance Approx
+            const line = railwayData ? railwayData[seg.lineKey] : null;
+            if (line) {
+                const s1 = line.stations.find(st => st.id === seg.fromId);
+                const s2 = line.stations.find(st => st.id === seg.toId);
+                if (s1 && s2) totalDist += calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
+            }
+        }
+    });
+
+    if (allCoords.length === 0) return { totalDist, visualPaths: [] };
+
+    // PCA & Projection Logic
+    let sumLat = 0, sumLng = 0, count = 0;
+    allCoords.forEach(item => {
+        item.coords.forEach(pt => {
+            sumLat += pt[0];
+            sumLng += pt[1];
+            count++;
         });
-    }
+    });
+
+    if (count === 0) return { totalDist, visualPaths: [] };
+
+    const cenLat = sumLat / count;
+    const cenLng = sumLng / count;
+
+    let u20 = 0, u02 = 0, u11 = 0;
+    allCoords.forEach(item => {
+        item.coords.forEach(pt => {
+            const x = pt[1] - cenLng;
+            const y = pt[0] - cenLat;
+            u20 += x * x;
+            u02 += y * y;
+            u11 += x * y;
+        });
+    });
+
+    const theta = 0.5 * Math.atan2(2 * u11, u20 - u02);
+    const cosT = Math.cos(-theta);
+    const sinT = Math.sin(-theta);
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+    // Helper to rotate a point
+    const rotate = (lat, lng) => {
+        const x = lng - cenLng;
+        const y = lat - cenLat;
+        const rx = x * cosT - y * sinT;
+        const ry = x * sinT + y * cosT;
+        return { rx, ry };
+    };
+
+    // 1. Calc BBox
+    allCoords.forEach(item => {
+        item.coords.forEach(pt => {
+            const { rx, ry } = rotate(pt[0], pt[1]);
+            if (rx < minX) minX = rx;
+            if (rx > maxX) maxX = rx;
+            if (ry < minY) minY = ry;
+            if (ry > maxY) maxY = ry;
+        });
+    });
+
+    const w = maxX - minX || 0.001;
+    const h = maxY - minY || 0.001;
+    const padX = w * 0.1;
+    const padY = h * 0.1;
+    const vMinX = minX - padX;
+    const vMinY = minY - padY;
+    const vW = w + padX * 2;
+    const vH = h + padY * 2;
+
+    const contentRatio = vW / vH;
+    const visualRatio = Math.min(8, Math.max(2, contentRatio));
+    const heightPx = 40;
+    const widthPx = heightPx * visualRatio;
+
+    // 2. Generate Paths
+    const visualPaths = allCoords.map(item => {
+        const pointsStr = item.coords.map(pt => {
+            const { rx, ry } = rotate(pt[0], pt[1]);
+            const px = ((rx - vMinX) / vW) * 100;
+            const py = 50 - ((ry - vMinY) / vH) * 50;
+            return `${px.toFixed(1)},${py.toFixed(1)}`;
+        }).join(' ');
+
+        return {
+            path: `M ${pointsStr.replace(/ /g, ' L ')}`, // SVG Path Command
+            polyline: pointsStr, // Legacy Polyline points
+            color: item.color
+        };
+    });
+
+    return { totalDist, visualPaths, widthPx, heightPx };
+};
+
+const RouteSlice = ({ segments, segmentGeometries, railwayData, geoData }) => {
+  const { visualPaths, totalDist, widthPx, heightPx } = useMemo(
+      () => getRouteVisualData(segments, segmentGeometries, railwayData, geoData),
+      [segments, segmentGeometries, railwayData, geoData]
+  );
+
+  if (visualPaths.length === 0) return <div className="w-28 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">无预览</div>;
+
+  return (
+      <div className="shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-end pl-2 gap-2" style={{ minWidth: '100px' }}>
+          <div style={{ width: widthPx, height: heightPx }}>
+            <svg
+                viewBox="0 0 100 50"
+                preserveAspectRatio="none"
+                className="w-full h-full opacity-80"
+            >
+                {visualPaths.map((item, idx) => (
+                    <path
+                        key={idx}
+                        d={item.path}
+                        fill="none"
+                        stroke={item.color || '#94a3b8'}
+                        strokeWidth="4"
+                        vectorEffect="non-scaling-stroke"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                ))}
+            </svg>
+          </div>
+          <div className="text-[10px] font-bold text-gray-400 shrink-0 text-right">{Math.round(totalDist)}km</div>
+      </div>
+  );
+};
+
+// --- Updated: Stats Calculation using Shared Helper ---
+const calculateLatestStats = (trips, segmentGeometries, railwayData, geoData) => {
+    // 1. Basic Stats
+    const totalTrips = trips.length;
+    const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
+    const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
+
+    // Calc total distance using helper (aggregating cached or on-the-fly)
+    const { totalDist: grandTotalDist } = getRouteVisualData(allSegments, segmentGeometries, railwayData, geoData);
 
     // 2. Latest 5
     const latest = trips.slice(0, 5).map(t => {
         const segs = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
         const lineNames = segs.map(s => s.lineKey.split(':').pop()).join(' → '); // Simplified Title
 
-        let tripDist = 0;
-        const allCoords = [];
+        const { totalDist, visualPaths } = getRouteVisualData(segs, segmentGeometries, railwayData, geoData);
 
-        // Collect Coords for SVG
-        segs.forEach(seg => {
-            const geom = getGeometry(seg);
-            if (geom && geom.coords) {
-                if (geom.isMulti) {
-                    geom.coords.forEach(c => {
-                         allCoords.push(c);
-                         if(turf) tripDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
-                    });
-                } else {
-                    allCoords.push(geom.coords);
-                    if(turf) tripDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
-                }
-            }
-        });
-
-        // Generate SVG Path (PCA Logic simplified reuse)
-        let svgPoints = "";
-        if (allCoords.length > 0) {
-            // Flatten all points ONLY for PCA calculation
-            let flatPoints = [];
-            allCoords.forEach(c => flatPoints.push(...c));
-
-            if (flatPoints.length > 1) {
-                // Centroid
-                let sumLat = 0, sumLng = 0;
-                flatPoints.forEach(p => { sumLat += p[0]; sumLng += p[1]; });
-                const cenLat = sumLat / flatPoints.length;
-                const cenLng = sumLng / flatPoints.length;
-
-                // Covariance
-                let u20 = 0, u02 = 0, u11 = 0;
-                flatPoints.forEach(pt => {
-                    const x = pt[1] - cenLng;
-                    const y = pt[0] - cenLat;
-                    u20 += x * x; u02 += y * y; u11 += x * y;
-                });
-                const theta = 0.5 * Math.atan2(2 * u11, u20 - u02);
-                const cosT = Math.cos(-theta);
-                const sinT = Math.sin(-theta);
-
-                // Rotate & BBox
-                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-                const projectPt = (pt) => {
-                    const x = pt[1] - cenLng;
-                    const y = pt[0] - cenLat;
-                    const rx = x * cosT - y * sinT;
-                    const ry = x * sinT + y * cosT;
-                    if (rx < minX) minX = rx; if (rx > maxX) maxX = rx;
-                    if (ry < minY) minY = ry; if (ry > maxY) maxY = ry;
-                    return [ry, rx];
-                };
-
-                // First pass: calc BBox
-                allCoords.forEach(line => line.forEach(pt => projectPt(pt)));
-
-                const w = maxX - minX || 0.001;
-                const h = maxY - minY || 0.001;
-
-                // Pad
-                const padX = w * 0.1; const padY = h * 0.1;
-                const vMinX = minX - padX; const vMinY = minY - padY;
-                const vW = w + padX * 2; const vH = h + padY * 2;
-
-                // Second pass: Generate Path String (Project to 0-100, 0-50 space)
-                const paths = allCoords.map(line => {
-                    const pts = line.map(pt => {
-                        const x = pt[1] - cenLng;
-                        const y = pt[0] - cenLat;
-                        const rx = x * cosT - y * sinT;
-                        const ry = x * sinT + y * cosT;
-
-                        const px = ((rx - vMinX) / vW) * 100;
-                        const py = 50 - ((ry - vMinY) / vH) * 50;
-                        return `${px.toFixed(1)},${py.toFixed(1)}`;
-                    });
-                    return "M" + pts.join(" L");
-                });
-
-                svgPoints = paths.join(" ");
-            }
-        }
+        // Combine all paths into one 'd' string for the card
+        const svgPoints = visualPaths.map(vp => vp.path).join(" ");
 
         return {
             id: t.id,
             date: t.date,
             title: lineNames,
-            dist: tripDist,
-            svg_points: svgPoints // Now actually an SVG Path 'd' string
+            dist: totalDist,
+            svg_points: svgPoints
         };
     });
 
     return {
         count: totalTrips,
         lines: uniqueLines,
-        dist: totalDist,
+        dist: grandTotalDist,
         latest: latest
     };
 };

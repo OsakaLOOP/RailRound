@@ -977,9 +977,12 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
 
   const contentRatio = vW / vH;
   const visualRatio = Math.min(10, Math.max(2, contentRatio)); // Min 2:1, Max 10:1
-  // Scale height based on number of segments (approx 36px per segment to match list visual)
-  const heightPx = Math.max(40, segments.length * 36);
+  // Scale height based on number of segments (approx 45px per segment to match list visual)
+  const heightPx = Math.max(45, segments.length * 45);
   const widthPx = heightPx * visualRatio;
+
+  // Debug log to trace why height might be small
+  // console.log(`RouteSlice: segments=${segments.length}, heightPx=${heightPx}, widthPx=${widthPx}`);
 
   const project = (lat, lng) => {
       const px = ((lng - vMinX) / vW) * 100; // Map to 0-100
@@ -989,7 +992,7 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
 
   return (
       <div className="shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-end pl-2 gap-2" style={{ minWidth: '100px' }}>
-          <div style={{ width: widthPx, height: heightPx, maxWidth: '240px' }}>
+          <div className="bg-slate-50/50 rounded" style={{ width: widthPx, height: heightPx, maxWidth: '240px' }}>
             <svg
                 viewBox="0 0 100 50"
                 preserveAspectRatio="none"

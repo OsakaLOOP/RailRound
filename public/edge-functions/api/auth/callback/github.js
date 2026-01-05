@@ -10,9 +10,10 @@ export async function onRequest(event) {
   if (!code) {
     return new Response("Missing code", { status: 400 });
   }
-
+  try {
     const CLIENT_ID = env.CLIENT_ID;
     const CLIENT_SECRET = env.CLIENT_SECRET;
+    
 
   if (!CLIENT_ID || !CLIENT_SECRET) {
       return new Response(JSON.stringify({ error: "Server Configuration Error" }), { status: 500 });
@@ -98,5 +99,9 @@ export async function onRequest(event) {
 
   } catch (e) {
     return new Response(JSON.stringify({ error: "Auth Failed", details: e.message }), { status: 500 });
+  }
+  
+  } catch {
+    return new Response(JSON.stringify({ error: "Server Configuration Error" }), { status: 500 });
   }
 }

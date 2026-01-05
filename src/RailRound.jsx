@@ -978,7 +978,7 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
   const contentRatio = vW / vH;
   const visualRatio = Math.min(10, Math.max(2, contentRatio)); // Min 2:1, Max 10:1
   // Scale height based on number of segments (approx 45px per segment to match list visual)
-  const heightPx = Math.max(45, segments.length * 45);
+  const heightPx = Math.max(45, (segments?.length || 1) * 45);
   const widthPx = heightPx * visualRatio;
 
   // Debug log to trace why height might be small
@@ -992,7 +992,10 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
 
   return (
       <div className="shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-end pl-2 gap-2" style={{ minWidth: '100px' }}>
-          <div className="bg-slate-50/50 rounded" style={{ width: widthPx, height: heightPx, maxWidth: '240px' }}>
+          <div className="bg-slate-50/50 rounded relative" style={{ width: widthPx, height: heightPx, maxWidth: '240px' }}>
+            <div className="absolute top-0 right-0 bg-red-600 text-white text-[9px] font-bold px-1 z-50 pointer-events-none opacity-80">
+                {segments?.length || 0}
+            </div>
             <svg
                 viewBox="0 0 100 50"
                 preserveAspectRatio="none"
@@ -2197,6 +2200,12 @@ export default function RailRoundApp() {
         <div className="flex items-center gap-2">
             {user ? (
                <div className="flex items-center gap-2">
+                  {!userProfile?.bindings?.github && (
+                     <button onClick={() => api.initiateOAuth('github')} className="bg-gray-800 hover:bg-black text-white p-2 rounded text-xs flex items-center gap-1 transition mr-2" title="绑定 GitHub">
+                         <Github size={14}/>
+                         <span className="hidden sm:inline">绑定</span>
+                     </button>
+                  )}
                   <span className="text-xs text-gray-300 hidden sm:inline">欢迎, {user.username}</span>
                   <button onClick={handleLogout} className="bg-slate-700 hover:bg-red-900 p-2 rounded text-xs flex items-center gap-1 transition">
                       <LogOut size={14}/><span className="hidden sm:inline">退出</span>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
-// import { handleExportKml } from './exportKml';
+import  buildKMLString  from './buildKml';
 
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -333,6 +333,7 @@ const getTransferableLines = (station, currentLineKey, railwayData, strictMode =
     });
     return Array.from(validLines);
 };
+
 
 const findRoute = (startLineKey, startStId, endLineKey, endStId, railwayData) => {
     if (!startLineKey || !endLineKey) return { error: "无效的起点或终点" };
@@ -865,7 +866,7 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd }) 
         <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center h-full">
             <Train size={48} className="opacity-20 mb-4"/>
             <p>暂无行程记录</p>
-            <p className="text-xs mt-2">点击下方按钮添加你的第一次旅程<br/>注意: 请先确认已导入 company_data 和 geojson</p>
+            <p className="text-xs mt-2">点击下方按钮添加你的第一次乗り鉄<br/>注意: 自定义线路可以导入 company_data 和 geojson</p>
         </div>
     ) : (
     trips.map(t => {
@@ -959,7 +960,7 @@ const MOCK_INITIAL_TRIPS = [];
 const MOCK_INITIAL_PINS = [];
 
 // --- 5. 主组件 ---
-export default function RailLogApp() {
+export default function RailRoundApp() {
   const [activeTab, setActiveTab] = useState('records');
   const [railwayData, setRailwayData] = useState({}); 
   const [trips, setTrips] = useState([]); 
@@ -985,7 +986,27 @@ export default function RailLogApp() {
   const geoJsonLayer = useRef(null);
   const routeLayer = useRef(null);
 
-  // 名称标准化与匹配帮助函数
+  
+  const readJsonFile = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target.result);
+        // 返回文件名(去后缀)和数据
+        resolve({ 
+            data: json, 
+            fileName: file.name.replace(/\.(json|geojson)$/i, "") 
+        });
+      } catch (err) {
+        reject(new Error(`文件 ${file.name} 解析失败`));
+      }
+    };
+    reader.onerror = () => reject(new Error(`读取文件 ${file.name} 错误`));
+    reader.readAsText(file);
+  });
+};
+
   const normalizeCompanyName = (s) => {
     if (!s && s !== 0) return '';
     try {
@@ -1020,61 +1041,174 @@ export default function RailLogApp() {
   // 自动加载 company_data.json 和所有 GeoJSON 文件（更稳健的解析与匹配）
   const autoLoadData = async () => {
     try {
-      // 1. 加载 company_data.json
-      console.log('[Autoload] 开始加载 company_data.json...');
-      const companyRes = await fetch('/company_data.json');
-      let companyData = null;
-      if (companyRes && companyRes.ok) {
-        // 解析为文本以处理潜在 BOM/编码问题
-        const txt = await companyRes.text();
-        const cleanup = txt.replace(/^\uFEFF/, '');
-        try { companyData = JSON.parse(cleanup); } catch (e) { console.warn('[Autoload] company_data.json 解析失败，尝试直接 res.json()', e); companyData = await companyRes.json().catch(() => null); }
-        if (companyData && typeof companyData === 'object') {
-          setCompanyDB(prev => ({ ...prev, ...companyData }));
-          try { window.__companyData = companyData; } catch(e){}
-          console.log('[Autoload] company_data.json 已加载，包含', Object.keys(companyData).length, '个公司');
-        } else {
-          console.warn('[Autoload] company_data.json 内容异常');
+      console.log('[Autoload] 正在初始化...');
+      
+      // 1. 先加载基础元数据 (Company DB)
+      let currentCompanyData = {};
+      try {
+        const companyRes = await fetch('/company_data.json');
+        if (companyRes.ok) {
+          const txt = await companyRes.text();
+          // 处理 BOM 头并解析
+          currentCompanyData = JSON.parse(txt.replace(/^\uFEFF/, ''));
+          
+          // 立即更新 State 和 Ref/Window，确保后续逻辑能立马读到
+          setCompanyDB(prev => ({ ...prev, ...currentCompanyData }));
+          window.__companyData = currentCompanyData; // 供后续同步逻辑使用
+          console.log(`[Autoload] 公司数据库加载完成: ${Object.keys(currentCompanyData).length} 条`);
         }
+      } catch (e) {
+        console.warn('[Autoload] company_data.json 加载失败或格式错误', e);
       }
 
-      // 2. 获取 geojson 目录下的所有文件
-      console.log('[Autoload] 开始加载 GeoJSON 文件...');
+      // 2. 获取 GeoJSON 文件列表
       const manifestRes = await fetch('/geojson_manifest.json').catch(() => null);
       let geojsonFiles = [];
       if (manifestRes && manifestRes.ok) {
         const manifest = await manifestRes.json();
         geojsonFiles = manifest.files || [];
-      } else {
-        geojsonFiles = [];
       }
 
-      // 构造 company 索引用于匹配文件名到 company_data 的键
-      const companyIndex = buildCompanyIndex(companyData || {});
+      if (geojsonFiles.length === 0) {
+        console.log('[Autoload] 未找到 GeoJSON 清单');
+        return;
+      }
 
-      // 3. 加载所有 GeoJSON 文件
-      let loadedCount = 0;
-      for (const fileName of geojsonFiles) {
+      console.log(`[Autoload] 发现 ${geojsonFiles.length} 个文件，开始并行下载...`);
+      
+      // 构建匹配索引
+      const companyIndex = buildCompanyIndex(currentCompanyData);
+
+      // 3. 并行下载所有 GeoJSON (网络层优化)
+      const downloadTasks = geojsonFiles.map(async (fileName) => {
         try {
           const fileNameWithExt = fileName.includes('.geojson') ? fileName : `${fileName}.geojson`;
           const res = await fetch(`/geojson/${fileNameWithExt}`);
-          if (res.ok) {
-            const json = await res.json();
-            const rawCompanyName = fileName.replace(/\.(geojson|json)$/i, '');
-            const matchedCompany = findBestCompanyKey(rawCompanyName, companyIndex);
-            processUploadedData(json, matchedCompany);
-            loadedCount++;
-            console.log(`[Autoload] 已加载 ${rawCompanyName} (匹配公司: ${matchedCompany})`);
-          }
-        } catch (err) {
-          console.warn(`[Autoload] 加载 ${fileName} 失败:`, err);
+          if (!res.ok) throw new Error(`Status ${res.status}`);
+          const json = await res.json();
+          
+          // 智能匹配公司名
+          const rawCompanyName = fileName.replace(/\.(geojson|json)$/i, '');
+          const matchedCompany = findBestCompanyKey(rawCompanyName, companyIndex);
+          
+          return { json, company: matchedCompany, fileName: rawCompanyName };
+        } catch (e) {
+          console.warn(`[Autoload] 跳过文件 ${fileName}:`, e.message);
+          return null;
         }
+      });
+
+      // 等待所有请求完成
+      const results = await Promise.all(downloadTasks);
+      const validResults = results.filter(r => r !== null);
+
+      if (validResults.length === 0) return;
+
+      console.log(`[Autoload] 下载完成 (${validResults.length} 个)，开始内存合并...`);
+
+      // 4. 内存数据处理 (逻辑层优化：避免 N+1 渲染)
+      // 使用临时变量，完全不触碰 React State
+      const newFeatures = [];
+      const railwayUpdates = {}; 
+
+      validResults.forEach(({ json, company: defaultCompany }) => {
+        if (!json.features) return;
+
+        // A. 增强 Feature 属性
+        const enriched = json.features.map(f => ({
+          ...f,
+          properties: {
+            ...f.properties,
+            company: f.properties.company || f.properties.operator || defaultCompany || "上传数据"
+          }
+        }));
+        newFeatures.push(...enriched);
+
+        // B. 构建 Railway 数据结构
+        enriched.forEach(f => {
+           const p = f.properties;
+           const comp = p.company; 
+           
+           // 辅助：确保线路对象存在
+           const ensureLineInTemp = (lineName, props) => {
+               const lineKey = `${comp}:${lineName}`;
+               if (!railwayUpdates[lineKey]) {
+                   // 优先从 window.__companyData 读取，因为它肯定是最新的
+                   const info = (window.__companyData && window.__companyData[comp]) || {};
+                   const icon = props.icon || info.logo || null;
+                   
+                   railwayUpdates[lineKey] = {
+                       meta: { 
+                           region: info.region || "未知", 
+                           type: info.type || "未知", 
+                           company: comp, 
+                           logo: info.logo, 
+                           icon 
+                       },
+                       stations: []
+                   };
+               } else if (props.icon && !railwayUpdates[lineKey].meta.icon) {
+                   railwayUpdates[lineKey].meta.icon = props.icon;
+               }
+               return lineKey;
+           };
+
+           if (p.type === 'line' && p.name) {
+               ensureLineInTemp(p.name, p);
+           } else if (p.type === 'station' && p.line && p.name && f.geometry?.coordinates) {
+               const lineKey = ensureLineInTemp(p.line, p);
+               const stations = railwayUpdates[lineKey].stations;
+               
+               if (!stations.find(s => s.name_ja === p.name)) {
+                   const stationId = p.id || `${comp}:${p.line}:${p.name}`;
+                   stations.push({ 
+                       id: stationId, 
+                       name_ja: p.name, 
+                       lat: f.geometry.coordinates[1], 
+                       lng: f.geometry.coordinates[0], 
+                       transfers: p.transfers || [] 
+                   });
+               }
+           }
+        });
+      });
+
+      // 5. 最终提交：只触发一次 State 更新 (渲染层优化)
+      // 使用函数式更新，确保合并到现有数据中（如果有的话）
+      if (newFeatures.length > 0) {
+          setGeoData(prev => ({ 
+              type: "FeatureCollection", 
+              features: [...prev.features, ...newFeatures] 
+          }));
       }
-      console.log(`[Autoload] 完成，共加载 ${loadedCount} 个 GeoJSON 文件`);
+
+      if (Object.keys(railwayUpdates).length > 0) {
+          setRailwayData(prev => {
+              const next = { ...prev };
+              Object.entries(railwayUpdates).forEach(([key, val]) => {
+                  if (!next[key]) {
+                      next[key] = val;
+                  } else {
+                      // 简单合并站点
+                      val.stations.forEach(s => {
+                          if (!next[key].stations.find(ex => ex.id === s.id)) {
+                              next[key].stations.push(s);
+                          }
+                      });
+                      if(val.meta.icon && !next[key].meta.icon) next[key].meta.icon = val.meta.icon;
+                  }
+              });
+              return next;
+          });
+      }
+
+      console.log('[Autoload] 初始化全部完成，应用就绪。');
+
     } catch (err) {
-      console.error('[Autoload] 自动加载失败:', err);
+      console.error('[Autoload] 致命错误:', err);
     }
   };
+
   useEffect(() => {
     setLeafletReady(true);
     autoLoadData();
@@ -1122,71 +1256,185 @@ export default function RailLogApp() {
     if (!silent) alert('公司数据库已更新');
   };
 
-  const handleFileUpload = (event) => {
+  const handleFileUpload = async(event) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      const fileName = file.name;
-      reader.onload = (e) => { try { const json = JSON.parse(e.target.result); const companyName = fileName.replace(/\.(geojson|json)$/i, ""); processUploadedData(json, companyName); } catch (err) { alert(`解析失败: ${fileName}`); } };
-      reader.readAsText(file);
-    });
-    event.target.value = ''; 
-  };
 
-  const processUploadedData = (json, defaultCompany) => {
-    if (!json.features) return;
-    // [IMPORTANT] 为所有 features 添加 company 信息，确保 GeoJSON 特性可被正确查询
-    const enrichedFeatures = json.features.map(f => ({
-      ...f,
-      properties: {
-        ...f.properties,
-        company: f.properties.company || f.properties.operator || defaultCompany || "上传数据"
-      }
-    }));
-    setGeoData(prev => ({ type: "FeatureCollection", features: [...prev.features, ...enrichedFeatures] }));
-    setRailwayData(prevData => {
-      const newData = { ...prevData };
-      const ensureLine = (name, props) => {
-        const company = props.operator || props.company || defaultCompany || "上传数据";
-        // 用 "company:line" 作为 key 确保唯一性
-        const lineKey = `${company}:${name}`;
-        if (!newData[lineKey]) {
-          const info = (typeof window !== 'undefined' && window.__companyData && window.__companyData[company]) || companyDB[company] || { region: "未知", type: "未知" };
-          const icon = props.icon || info.logo || null;
-          newData[lineKey] = { meta: { region: info.region, type: info.type, company, logo: info.logo, icon }, stations: [] };
-        } else if (props.icon && !newData[lineKey].meta.icon) { newData[lineKey].meta.icon = props.icon; }
-      };
-      json.features.forEach(f => {
-        const p = f.properties;
-        if (p.type === 'line' && p.name) ensureLine(p.name, p);
-        else if (p.type === 'station' && p.line && p.name && f.geometry?.coordinates) {
-          const company = p.company || p.operator || defaultCompany || "上传数据";
-          const lineKey = `${company}:${p.line}`;
-          ensureLine(p.line, p);
-          const stations = newData[lineKey].stations;
-          if (!stations.find(s => s.name_ja === p.name)) {
-              // station id 优先使用 GeoJSON 中已有的 id，否则构造 "company:line:station"
-              const stationId = p.id || `${company}:${p.line}:${p.name}`;
-              stations.push({ id: stationId, name_ja: p.name, lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], transfers: p.transfers || [] });
-          } else {
-             const s = stations.find(s => s.name_ja === p.name);
-             if(p.transfers && (!s.transfers || s.transfers.length === 0)) s.transfers = p.transfers;
+    const readTasks = Array.from(files).map(file => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const json = JSON.parse(e.target.result);
+            const companyName = file.name.replace(/\.(geojson|json)$/i, "");
+            resolve({ json, companyName });
+          } catch (err) {
+            console.error(`解析失败: ${file.name}`);
+            alert(`文件 ${file.name} 解析失败，已跳过`);
+            resolve(null); // 失败也 resolve null，不阻断其他文件
           }
-        }
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsText(file);
       });
-      return newData;
     });
+    try {
+      const results = await Promise.all(readTasks);
+      const validResults = results.filter(r => r !== null);
+
+      if (validResults.length === 0) return;
+
+      console.log(`[Upload] 读取完成，开始合并 ${validResults.length} 个文件的数据...`);
+
+      // 2. 内存预处理
+      const newFeatures = [];
+      const railwayUpdates = {};
+
+      validResults.forEach(({ json, companyName: defaultCompany }) => {
+        if (!json.features) return;
+
+        // A. 处理 Features
+        const enriched = json.features.map(f => ({
+          ...f,
+          properties: {
+            ...f.properties,
+            company: f.properties.company || f.properties.operator || defaultCompany || "上传数据"
+          }
+        }));
+        newFeatures.push(...enriched);
+
+        // B. 提取 RailwayData (构建站点和线路元数据)
+        enriched.forEach(f => {
+             const p = f.properties;
+             const comp = p.company; 
+             
+             const ensureLineInTemp = (lineName, props) => {
+                 const lineKey = `${comp}:${lineName}`;
+                 if (!railwayUpdates[lineKey]) {
+                     const info = (window.__companyData && window.__companyData[comp]) || companyDB[comp] || {};
+                     const icon = props.icon || info.logo || null;
+                     
+                     railwayUpdates[lineKey] = {
+                         meta: { 
+                             region: info.region || "未知", 
+                             type: info.type || "未知", 
+                             company: comp, 
+                             logo: info.logo, 
+                             icon 
+                         },
+                         stations: []
+                     };
+                 } else if (props.icon && !railwayUpdates[lineKey].meta.icon) {
+                     railwayUpdates[lineKey].meta.icon = props.icon;
+                 }
+                 return lineKey;
+             };
+
+             if (p.type === 'line' && p.name) {
+                 ensureLineInTemp(p.name, p);
+             } else if (p.type === 'station' && p.line && p.name && f.geometry?.coordinates) {
+                 const lineKey = ensureLineInTemp(p.line, p);
+                 const stations = railwayUpdates[lineKey].stations;
+                 
+                 if (!stations.find(s => s.name_ja === p.name)) {
+                     const stationId = p.id || `${comp}:${p.line}:${p.name}`;
+                     stations.push({ 
+                         id: stationId, 
+                         name_ja: p.name, 
+                         lat: f.geometry.coordinates[1], 
+                         lng: f.geometry.coordinates[0], 
+                         transfers: p.transfers || [] 
+                     });
+                 }
+             }
+        });
+      });
+
+      if (newFeatures.length > 0) {
+          setGeoData(prev => ({ 
+            type: "FeatureCollection", 
+            features: [...prev.features, ...newFeatures] 
+          }));
+      }
+
+      if (Object.keys(railwayUpdates).length > 0) {
+          setRailwayData(prev => {
+            const next = { ...prev };
+            Object.entries(railwayUpdates).forEach(([key, val]) => {
+                if (!next[key]) {
+                    next[key] = val;
+                } else {
+                    // 合并站点
+                    val.stations.forEach(s => {
+                        if (!next[key].stations.find(ex => ex.id === s.id)) {
+                            next[key].stations.push(s);
+                        }
+                    });
+                    // 合并 Icon
+                    if(val.meta.icon && !next[key].meta.icon) next[key].meta.icon = val.meta.icon;
+                }
+            });
+            return next;
+          });
+      }
+      
+      alert(`成功导入 ${validResults.length} 个文件！`);
+
+    } catch (err) {
+      console.error(err);
+      alert("文件处理过程中发生未知错误");
+    } finally {
+      // 清空 input 允许再次上传同名文件
+      event.target.value = '';
+    }
   };
   
+  const stationNameIndex = useMemo(() => {
+    if (!railwayData) return {};
+    
+    const index = {};
+    const lineKeys = Object.keys(railwayData);
+
+    // 遍历线路
+    for (let i = 0, len = lineKeys.length; i < len; i++) {
+      const lineKey = lineKeys[i];
+      const line = railwayData[lineKey];
+      const stations = line.stations;
+      
+      const company = line.meta?.company;
+
+      // 遍历站点
+      for (let j = 0, sLen = stations.length; j < sLen; j++) {
+        const s = stations[j];
+        const name = s.name_ja;
+
+        if (index[name] === undefined) {
+          index[name] = [];
+        }
+
+        index[name].push({
+          lineKey: lineKey,
+          id: s.id,
+          lat: s.lat,
+          lng: s.lng,
+          company: company // 预存公司
+        });
+      }
+    }
+    
+    // console.timeEnd('buildStationIndex');
+    return index;
+  }, [railwayData]);
+
+
   const handleExportUserData = () => {
       const linesUsed = new Set();
       const companiesUsed = new Set();
       trips.forEach(t => { (t.segments || []).forEach(s => { if(s.lineKey) { linesUsed.add(s.lineKey); const meta = railwayData[s.lineKey]?.meta; if(meta && meta.company) companiesUsed.add(meta.company); } }); });
-      const backupData = { meta: { version: 1, exportedAt: new Date().toISOString(), appName: "RailLog" }, dependencies: { lines: Array.from(linesUsed), companies: Array.from(companiesUsed) }, data: { trips: trips, pins: pins } };
+      const backupData = { meta: { version: 1, exportedAt: new Date().toISOString(), appName: "RailRound" }, dependencies: { lines: Array.from(linesUsed), companies: Array.from(companiesUsed) }, data: { trips: trips, pins: pins } };
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a'); link.href = url; link.download = `raillog_backup_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      const link = document.createElement('a'); link.href = url; link.download = `railround_backup_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
   const handleImportUserData = (event) => {
@@ -1196,7 +1444,7 @@ export default function RailLogApp() {
       reader.onload = (e) => {
           try {
               const backup = JSON.parse(e.target.result);
-              if (!backup.meta || backup.meta.appName !== "RailLog") { alert("无效的备份文件"); return; }
+              if (!backup.meta || (backup.meta.appName !== "RailRound" && backup.meta.appName !== "")) { alert("无效的备份文件"); return; }
               const missingLines = [];
               if (backup.dependencies && backup.dependencies.lines) { backup.dependencies.lines.forEach(lineKey => { if (!railwayData[lineKey]) missingLines.push(lineKey); }); }
               if (missingLines.length > 0) { const msg = `检测到缺少以下线路的基础数据，可能会导致显示异常：\n\n${missingLines.slice(0, 5).join(", ")}${missingLines.length > 5 ? '...' : ''}\n\n建议先去地图页面上传对应的 GeoJSON 文件。是否继续导入？`; if (!confirm(msg)) return; }
@@ -1208,6 +1456,92 @@ export default function RailLogApp() {
           } catch (err) { console.error(err); alert("文件解析失败"); }
       };
       reader.readAsText(file); event.target.value = '';
+  };
+
+  const handleExportKML = async () => {
+    if (isExportingKML) return;
+    setIsExportingKML(true);
+    
+    // 异步执行 KML 生成，防止阻塞主线程
+    setTimeout(async () => {
+        try {
+            if (trips.length === 0 || !geoData || !turf) {
+                alert("无行程记录或地图数据未加载。");
+                setIsExportingKML(false);
+                return;
+            }
+
+            const allPaths = [];
+            
+            // 循环所有行程，切割 GeoJSON 以获取准确坐标
+            trips.forEach(t => {
+                const tripName = `${t.date} - Trip ${t.id}`;
+                t.segments.forEach((seg, segIndex) => {
+                    const line = railwayData[seg.lineKey];
+                    if (!line) return;
+                    const s1 = line.stations.find(s => s.id === seg.fromId);
+                    const s2 = line.stations.find(s => s.id === seg.toId);
+                    if (!s1 || !s2) return;
+
+                    const parts = seg.lineKey.split(':');
+                    const company = parts[0];
+                    const lineName = parts.slice(1).join(':');
+
+                    const feature = geoData.features.find(f => 
+                        f.properties.type === 'line' && 
+                        f.properties.name === lineName && 
+                        f.properties.company === company
+                    );
+                    
+                    if (feature) {
+                        // 使用 Turf 切割路径
+                        const coords = sliceGeoJsonPath(feature, s1.lat, s1.lng, s2.lat, s2.lng);
+                        if (coords) {
+                            // KML 要求 [LNG, LAT, 0] 格式
+                            const kmlCoords = Array.isArray(coords[0]) && Array.isArray(coords[0][0])
+                                ? coords.flat().map(p => `${p[1]},${p[0]},0`).join(' ')
+                                : coords.map(p => `${p[1]},${p[0]},0`).join(' ');
+                            
+                            allPaths.push({
+                                name: `${tripName} Segment ${segIndex + 1}`,
+                                coordinates: kmlCoords,
+                                lineKey: seg.lineKey
+                            });
+                        }
+                    }
+                });
+            });
+
+            if (allPaths.length === 0) {
+                 alert("未找到可导出路径。");
+                 setIsExportingKML(false);
+                 return;
+            }
+
+            // 2. 构造 KML XML 字符串
+            const kmlString = buildKMLString(allPaths);
+            
+            // 3. 触发下载
+            const blob = new Blob([kmlString], { type: 'application/vnd.google-earth.kml+xml' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `RailRound_KML_export_${new Date().toISOString().slice(0, 10)}.kml`;
+            document.body.appendChild(link);
+            link.click();
+
+            setTimeout(() => {
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url); // 释放内存
+                setIsExportingKML(false);        // 关闭 Loading 状态
+            }, 2000); 
+
+        } catch (e) {
+            console.error("KML Export Error:", e);
+            alert("导出过程中发生错误。");
+            setIsExportingKML(false); // 发生错误也要关闭 Loading
+        }
+    }, 100); 
   };
 
   const handleSaveTrip = () => {
@@ -1248,7 +1582,7 @@ export default function RailLogApp() {
         const result = findRoute(startLine, startStation, endLine, endStation, railwayData);
         if (result.error) { setIsRouteSearching(false); alert(`无法规划: ${result.error}`); } 
         else { 
-            if(result.segments.length > 10) { setIsRouteSearching(false); alert("路径过长"); return; } 
+            if(result.segments.length > 20) { setIsRouteSearching(false); alert("路径过长"); return; } 
             setTripForm(prev => ({ ...prev, segments: result.segments })); setEditorMode('manual'); 
             setTimeout(() => setIsRouteSearching(false), 200);
         }
@@ -1310,6 +1644,7 @@ export default function RailLogApp() {
       onEachFeature: (f, l) => f.properties.name && l.bindTooltip(f.properties.name)
     }).addTo(geoJsonLayer.current);
   };
+
 
   const renderTripRoutes = () => {
     if (!routeLayer.current || !geoData || !geoData.features) return;
@@ -1401,9 +1736,12 @@ export default function RailLogApp() {
     <div className="flex flex-col h-screen bg-slate-100 font-sans text-slate-800 overflow-hidden">
       <style>{LEAFLET_CSS}</style>
       <header className="bg-slate-900 text-white p-4 shadow-md z-30 flex justify-between shrink-0">
-        <div className="flex items-center gap-2"><Train className="text-emerald-400"/> <span className="font-bold">RailLog</span></div>
+        <div className="flex items-center gap-2"><Train className="text-emerald-400"/> <span className="font-bold">RailRound</span></div>
         {activeTab !== 'map' ? (
            <div className="flex gap-2">
+               <button onClick={handleExportKML} className="cursor-pointer bg-emerald-700 hover:bg-emerald-600 p-2 rounded text-xs flex items-center gap-1 transition">
+                   <Download size={14}/><span className="hidden sm:inline">导出 KML</span>
+               </button>
                <button onClick={handleExportUserData} className="cursor-pointer bg-emerald-700 hover:bg-emerald-600 p-2 rounded text-xs flex items-center gap-1 transition">
                    <Download size={14}/><span className="hidden sm:inline">导出存档</span>
                </button>

@@ -1037,50 +1037,35 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
     <button onClick={onAdd} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
   </div>
 );
-const StatsView = ({ trips, railwayData ,geoData, user, userProfile }) => {
+const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeometries }) => {
     const totalTrips = trips.length;
     const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
     const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
     let totalDist = 0;
     let totalCost = 0;
     trips.forEach(t => totalCost += (t.cost || 0));
-        allSegments.forEach(seg => {
-            const line = railwayData[seg.lineKey];
-            if (!line) return;
-            const s1 = line.stations.find(st => st.id === seg.fromId);
-            const s2 = line.stations.find(st => st.id === seg.toId);
-            if (!s1 || !s2) return;
-            
-            let segDist = 0;
-            
-            // 从 lineKey (格式: "company:line") 中提取 company 和 lineName
-            const parts = seg.lineKey.split(':');
-            const company = parts[0];
-            const lineName = parts.slice(1).join(':');
-            
-            // 在 GeoJSON features 中查找匹配的线特性
-            const feature = geoData.features.find(f => 
-              f.properties.type === 'line' && 
-              f.properties.name === lineName && 
-              f.properties.company === company
-            );
-            
-            if (feature && turf) {
-                const coords = sliceGeoJsonPath(feature, s1.lat, s1.lng, s2.lat, s2.lng);
-                if (coords) {
-                    if (Array.isArray(coords[0]) && Array.isArray(coords[0][0])) {
-                      coords.forEach(c => { segDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]]))); });
-                    } else {
-                      segDist = turf.length(turf.lineString(coords.map(p => [p[1], p[0]])));
-                    }
-                } else {
-                    segDist = calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
-                }
+
+    if (segmentGeometries && turf) {
+      allSegments.forEach(seg => {
+        const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+        const geom = segmentGeometries.get(key);
+        if (geom && geom.coords) {
+            if (geom.isMulti) {
+                geom.coords.forEach(c => totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]]))));
             } else {
-                segDist = calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
+                totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
             }
-            totalDist += segDist;
-        });
+        } else {
+            // Fallback (Approx)
+            const line = railwayData[seg.lineKey];
+            if (line) {
+                const s1 = line.stations.find(st => st.id === seg.fromId);
+                const s2 = line.stations.find(st => st.id === seg.toId);
+                if (s1 && s2) totalDist += calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
+            }
+        }
+      });
+    }
     return (
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {user && (
@@ -2227,7 +2212,7 @@ export default function RailRoundApp() {
 
       <div className="flex-1 relative overflow-hidden flex flex-col">
         {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} segmentGeometries={segmentGeometries} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
-        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} />}
+        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} />}
         <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
           <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
           <FabButton activeTab={activeTab} pinMode={pinMode} togglePinMode={togglePinMode} />

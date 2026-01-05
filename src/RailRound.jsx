@@ -976,8 +976,9 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
   // 4. Use preserveAspectRatio="none" to stretch the normalized 2:1 coords to the target ratio
 
   const contentRatio = vW / vH;
-  const visualRatio = Math.min(8, Math.max(2, contentRatio)); // Min 2:1, Max 8:1
-  const heightPx = 40;
+  const visualRatio = Math.min(10, Math.max(2, contentRatio)); // Min 2:1, Max 10:1
+  // Scale height based on number of segments (approx 36px per segment to match list visual)
+  const heightPx = Math.max(40, segments.length * 36);
   const widthPx = heightPx * visualRatio;
 
   const project = (lat, lng) => {
@@ -988,7 +989,7 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
 
   return (
       <div className="shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-end pl-2 gap-2" style={{ minWidth: '100px' }}>
-          <div style={{ width: widthPx, height: heightPx }}>
+          <div style={{ width: widthPx, height: heightPx, maxWidth: '240px' }}>
             <svg
                 viewBox="0 0 100 50"
                 preserveAspectRatio="none"

@@ -31,8 +31,11 @@ export async function onRequest(event) {
     if (event.request.method === "GET") {
         const dataRaw = await DB.get(userKey);
         const data = dataRaw ? JSON.parse(dataRaw) : { trips: [], pins: [] };
-        // Return only what is needed for the frontend app (latest_5 is for the card api, but no harm returning it)
-        return new Response(JSON.stringify(data), { status: 200, headers });
+
+        // Security: Remove sensitive fields
+        const { password, ...safeData } = data;
+
+        return new Response(JSON.stringify(safeData), { status: 200, headers });
     }
 
     if (event.request.method === "POST") {

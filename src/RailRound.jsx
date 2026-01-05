@@ -1049,18 +1049,50 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
 };
 
 // --- Refactored: Helper for Stats Calculation (Latest 5 + SVG Points) ---
-const calculateLatestStats = (trips, segmentGeometries, railwayData) => {
+const calculateLatestStats = (trips, segmentGeometries, railwayData, geoData) => {
     // 1. Basic Stats
     const totalTrips = trips.length;
     const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
     const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
     let totalDist = 0;
 
+    // Helper to get or calc geometry on-the-fly
+    const getGeometry = (seg) => {
+        const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+        let geom = segmentGeometries ? segmentGeometries.get(key) : null;
+
+        // Fallback: If not in cache but we have geoData, try to slice it now
+        if ((!geom || !geom.coords) && geoData && railwayData) {
+            const line = railwayData[seg.lineKey];
+            if (line) {
+                const s1 = line.stations.find(st => st.id === seg.fromId);
+                const s2 = line.stations.find(st => st.id === seg.toId);
+                if (s1 && s2) {
+                    const parts = seg.lineKey.split(':');
+                    const company = parts[0];
+                    const lineName = parts.slice(1).join(':');
+                    const feature = geoData.features.find(f =>
+                        f.properties.type === 'line' &&
+                        f.properties.name === lineName &&
+                        f.properties.company === company
+                    );
+                    if (feature) {
+                        const coords = sliceGeoJsonPath(feature, s1.lat, s1.lng, s2.lat, s2.lng);
+                        if (coords) {
+                            const isMulti = Array.isArray(coords[0]) && Array.isArray(coords[0][0]);
+                            geom = { coords, isMulti };
+                        }
+                    }
+                }
+            }
+        }
+        return geom;
+    };
+
     // Calc total distance
-    if (turf && segmentGeometries) {
+    if (turf) {
         allSegments.forEach(seg => {
-            const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
-            const geom = segmentGeometries.get(key);
+            const geom = getGeometry(seg);
             if (geom && geom.coords) {
                 if (geom.isMulti) {
                     geom.coords.forEach(c => totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]]))));
@@ -1068,7 +1100,7 @@ const calculateLatestStats = (trips, segmentGeometries, railwayData) => {
                     totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
                 }
             } else {
-                 // Fallback
+                 // Fallback Approx
                 const line = railwayData[seg.lineKey];
                 if (line) {
                     const s1 = line.stations.find(st => st.id === seg.fromId);
@@ -1089,8 +1121,7 @@ const calculateLatestStats = (trips, segmentGeometries, railwayData) => {
 
         // Collect Coords for SVG
         segs.forEach(seg => {
-            const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
-            const geom = segmentGeometries ? segmentGeometries.get(key) : null;
+            const geom = getGeometry(seg);
             if (geom && geom.coords) {
                 if (geom.isMulti) {
                     geom.coords.forEach(c => {
@@ -1104,10 +1135,10 @@ const calculateLatestStats = (trips, segmentGeometries, railwayData) => {
             }
         });
 
-        // Generate SVG Points (PCA Logic simplified reuse)
+        // Generate SVG Path (PCA Logic simplified reuse)
         let svgPoints = "";
         if (allCoords.length > 0) {
-            // Flatten all points
+            // Flatten all points ONLY for PCA calculation
             let flatPoints = [];
             allCoords.forEach(c => flatPoints.push(...c));
 
@@ -1131,7 +1162,7 @@ const calculateLatestStats = (trips, segmentGeometries, railwayData) => {
 
                 // Rotate & BBox
                 let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-                const rotated = flatPoints.map(pt => {
+                const projectPt = (pt) => {
                     const x = pt[1] - cenLng;
                     const y = pt[0] - cenLat;
                     const rx = x * cosT - y * sinT;
@@ -1139,7 +1170,10 @@ const calculateLatestStats = (trips, segmentGeometries, railwayData) => {
                     if (rx < minX) minX = rx; if (rx > maxX) maxX = rx;
                     if (ry < minY) minY = ry; if (ry > maxY) maxY = ry;
                     return [ry, rx];
-                });
+                };
+
+                // First pass: calc BBox
+                allCoords.forEach(line => line.forEach(pt => projectPt(pt)));
 
                 const w = maxX - minX || 0.001;
                 const h = maxY - minY || 0.001;
@@ -1149,12 +1183,22 @@ const calculateLatestStats = (trips, segmentGeometries, railwayData) => {
                 const vMinX = minX - padX; const vMinY = minY - padY;
                 const vW = w + padX * 2; const vH = h + padY * 2;
 
-                // Project to 0-100, 0-50 space
-                svgPoints = rotated.map(pt => {
-                    const px = ((pt[1] - vMinX) / vW) * 100;
-                    const py = 50 - ((pt[0] - vMinY) / vH) * 50;
-                    return `${px.toFixed(1)},${py.toFixed(1)}`; // Optimize precision
-                }).join(' ');
+                // Second pass: Generate Path String (Project to 0-100, 0-50 space)
+                const paths = allCoords.map(line => {
+                    const pts = line.map(pt => {
+                        const x = pt[1] - cenLng;
+                        const y = pt[0] - cenLat;
+                        const rx = x * cosT - y * sinT;
+                        const ry = x * sinT + y * cosT;
+
+                        const px = ((rx - vMinX) / vW) * 100;
+                        const py = 50 - ((ry - vMinY) / vH) * 50;
+                        return `${px.toFixed(1)},${py.toFixed(1)}`;
+                    });
+                    return "M" + pts.join(" L");
+                });
+
+                svgPoints = paths.join(" ");
             }
         }
 
@@ -1163,7 +1207,7 @@ const calculateLatestStats = (trips, segmentGeometries, railwayData) => {
             date: t.date,
             title: lineNames,
             dist: tripDist,
-            svg_points: svgPoints
+            svg_points: svgPoints // Now actually an SVG Path 'd' string
         };
     });
 
@@ -2194,7 +2238,7 @@ export default function RailRoundApp() {
 
     // Sync to Cloud
     if (user) {
-       const latest5 = calculateLatestStats(finalTrips, segmentGeometries, railwayData);
+       const latest5 = calculateLatestStats(finalTrips, segmentGeometries, railwayData, geoData);
        api.saveData(user.token, finalTrips, pins, latest5).catch(e => alert('云端保存失败: ' + e.message));
     }
 
@@ -2212,7 +2256,7 @@ export default function RailRoundApp() {
           const newTrips = trips.filter(t => t.id !== id);
           setTrips(newTrips);
           if (user) {
-             const latest5 = calculateLatestStats(newTrips, segmentGeometries, railwayData);
+             const latest5 = calculateLatestStats(newTrips, segmentGeometries, railwayData, geoData);
              api.saveData(user.token, newTrips, pins, latest5).catch(e => alert('云端同步失败'));
           }
       }

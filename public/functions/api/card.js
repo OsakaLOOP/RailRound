@@ -1,7 +1,6 @@
 export async function onRequest(event) {
     const url = new URL(event.request.url);
     const key = url.searchParams.get("key");
-    const userParam = url.searchParams.get("user"); // Legacy support fallback (optional, can be removed for strict mode)
 
     // SVG Headers
     const headers = {
@@ -12,7 +11,7 @@ export async function onRequest(event) {
 
     const errorSvg = (msg) => new Response(`<svg width="600" height="300" xmlns="http://www.w3.org/2000/svg"><text x="300" y="150" text-anchor="middle" fill="#ef4444" font-family="sans-serif">${msg}</text></svg>`, { headers });
 
-    if (!key && !userParam) {
+    if (!key) {
         return errorSvg("Key missing");
     }
 
@@ -20,12 +19,8 @@ export async function onRequest(event) {
         const DB = globalThis.RAILROUND_KV;
         if (!DB) return errorSvg("KV Error");
 
-        let username = userParam;
-
-        if (key) {
-            username = await DB.get(`card_key:${key}`);
-            if (!username) return errorSvg("Invalid Key");
-        }
+        const username = await DB.get(`card_key:${key}`);
+        if (!username) return errorSvg("Invalid Key");
 
         const userKey = `user:${username}`;
         const dataRaw = await DB.get(userKey);
@@ -137,8 +132,8 @@ export async function onRequest(event) {
             const y = idx * rowH;
             let points = trip.svg_points || "";
 
-            // Simple sanitization: allow only digits, commas, spaces, dots, and minus signs
-            points = points.replace(/[^0-9, .\-]/g, '');
+            // Simple sanitization: allow only digits, commas, spaces, dots, minus signs, M, and L (for paths)
+            points = points.replace(/[^0-9, .\-ML]/g, '');
 
             svgContent += `
                 <g transform="translate(0, ${y})">
@@ -154,7 +149,7 @@ export async function onRequest(event) {
                          <!-- Graph Box Border (optional) -->
                          <!-- <rect width="100" height="30" fill="none" stroke="${glassBorder}" rx="4"/> -->
                          <svg width="100" height="30" viewBox="0 0 100 50" preserveAspectRatio="none">
-                            <polyline points="${points}" class="line-path" vector-effect="non-scaling-stroke"/>
+                            <path d="${points}" class="line-path" vector-effect="non-scaling-stroke"/>
                          </svg>
                     </g>
 

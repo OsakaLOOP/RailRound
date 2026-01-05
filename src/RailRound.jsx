@@ -1277,11 +1277,17 @@ export default function RailRoundApp() {
 
       // 3. Network Fetch (Background Update)
       const manifestRes = await fetch('/geojson_manifest.json').catch(() => null);
-      if (!manifestRes || !manifestRes.ok) return;
+      if (!manifestRes || !manifestRes.ok) {
+          console.warn('[Autoload] 无法获取 manifest, 跳过更新检查');
+          return;
+      }
       const manifest = await manifestRes.json();
       const geojsonFiles = manifest.files || [];
 
-      if (geojsonFiles.length === 0) return;
+      if (geojsonFiles.length === 0) {
+          console.log('[Autoload] manifest 为空');
+          return;
+      }
       
       console.log(`[Autoload] 检查更新...`);
 
@@ -1332,103 +1338,8 @@ export default function RailRoundApp() {
           processGeoJsonBatch(validResults);
           console.log(`[Autoload] 新增数据已应用。`);
       }
-      return;
-
-      // Original Logic Removed/Refactored above.
-
-      /*
-      validResults.forEach(({ json, company: defaultCompany }) => {
-        if (!json.features) return;
-
-        // A. 增强 Feature 属性
-        const enriched = json.features.map(f => ({
-          ...f,
-          properties: {
-            ...f.properties,
-            company: f.properties.company || f.properties.operator || defaultCompany || "上传数据"
-          }
-        }));
-        newFeatures.push(...enriched);
-
-        // B. 构建 Railway 数据结构
-        enriched.forEach(f => {
-           const p = f.properties;
-           const comp = p.company; 
-           
-           // 辅助：确保线路对象存在
-           const ensureLineInTemp = (lineName, props) => {
-               const lineKey = `${comp}:${lineName}`;
-               if (!railwayUpdates[lineKey]) {
-                   // 优先从 window.__companyData 读取，因为它肯定是最新的
-                   const info = (window.__companyData && window.__companyData[comp]) || {};
-                   const icon = props.icon || info.logo || null;
-                   
-                   railwayUpdates[lineKey] = {
-                       meta: { 
-                           region: info.region || "未知", 
-                           type: info.type || "未知", 
-                           company: comp, 
-                           logo: info.logo, 
-                           icon 
-                       },
-                       stations: []
-                   };
-               } else if (props.icon && !railwayUpdates[lineKey].meta.icon) {
-                   railwayUpdates[lineKey].meta.icon = props.icon;
-               }
-               return lineKey;
-           };
-
-           if (p.type === 'line' && p.name) {
-               ensureLineInTemp(p.name, p);
-           } else if (p.type === 'station' && p.line && p.name && f.geometry?.coordinates) {
-               const lineKey = ensureLineInTemp(p.line, p);
-               const stations = railwayUpdates[lineKey].stations;
-               
-               if (!stations.find(s => s.name_ja === p.name)) {
-                   const stationId = p.id || `${comp}:${p.line}:${p.name}`;
-                   stations.push({ 
-                       id: stationId, 
-                       name_ja: p.name, 
-                       lat: f.geometry.coordinates[1], 
-                       lng: f.geometry.coordinates[0], 
-                       transfers: p.transfers || [] 
-                   });
-               }
-           }
-        });
-      });
-
-      // 5. 最终提交：只触发一次 State 更新 (渲染层优化)
-      // 使用函数式更新，确保合并到现有数据中（如果有的话）
-      if (newFeatures.length > 0) {
-          setGeoData(prev => ({ 
-              type: "FeatureCollection", 
-              features: [...prev.features, ...newFeatures] 
-          }));
-      }
-
-      if (Object.keys(railwayUpdates).length > 0) {
-          setRailwayData(prev => {
-              const next = { ...prev };
-              Object.entries(railwayUpdates).forEach(([key, val]) => {
-                  if (!next[key]) {
-                      next[key] = val;
-                  } else {
-                      // 简单合并站点
-                      val.stations.forEach(s => {
-                          if (!next[key].stations.find(ex => ex.id === s.id)) {
-                              next[key].stations.push(s);
-                          }
-                      });
-                      if(val.meta.icon && !next[key].meta.icon) next[key].meta.icon = val.meta.icon;
-                  }
-              });
-              return next;
-          });
-      }
-
       console.log('[Autoload] 初始化全部完成，应用就绪。');
+      return;
 
     } catch (err) {
       console.error('[Autoload] 致命错误:', err);

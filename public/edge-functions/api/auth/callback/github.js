@@ -101,7 +101,7 @@ export async function onRequest(event) {
     return new Response(JSON.stringify({ error: "Auth Failed", details: e.message }), { status: 500 });
   }
   
-  } catch {
-    return new Response(JSON.stringify({ error: "Server Configuration Error" }), { status: 500 });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: "Server Configuration Error" , details: e.message}), { status: 500 });
   }
 }

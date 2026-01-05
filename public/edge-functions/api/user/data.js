@@ -10,7 +10,7 @@ export async function onRequest(event) {
     return new Response(null, { headers });
   }
 
-  const DB = globalThis.RAILROUND_KV;
+  const DB = event.env.RAILROUND_KV;
   if (!DB) return new Response(JSON.stringify({ error: "KV Missing" }), { status: 500, headers });
 
   // Auth check

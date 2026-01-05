@@ -24,7 +24,7 @@ export async function onRequest(event) {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers });
   }
 
-  const DB = globalThis.RAILROUND_KV;
+  const DB = event.env.RAILROUND_KV;
   if (!DB) return new Response(JSON.stringify({ error: "KV Missing" }), { status: 500, headers });
 
   try {

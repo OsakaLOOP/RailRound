@@ -11,8 +11,8 @@ export async function onRequest(event) {
     return new Response("Missing code", { status: 400 });
   }
 
-  const CLIENT_ID = globalThis.CLIENT_ID;
-  const CLIENT_SECRET = globalThis.CLIENT_SEC;
+  const CLIENT_ID = event.env.CLIENT_ID;
+  const CLIENT_SECRET = event.env.CLIENT_SEC;
 
   if (!CLIENT_ID || !CLIENT_SECRET) {
       return new Response(JSON.stringify({ error: "Server Configuration Error" }), { status: 500 });
@@ -49,7 +49,7 @@ export async function onRequest(event) {
     const githubUser = await userResponse.json();
 
     // 3. Database Logic
-    const DB = globalThis.RAILROUND_KV;
+    const DB = event.env.RAILROUND_KV;
     if (!DB) throw new Error("KV Missing");
 
     const bindingKey = `binding:github:${githubUser.id}`;

@@ -9,7 +9,7 @@ import * as turf from '@turf/turf';
 try { console.log('[iconfixed] module loaded'); } catch (e) {}
 import { 
   Train, Calendar, Navigation, Map as MapIcon, Layers, Upload, Plus, Edit2, Trash2, 
-  PieChart, TrendingUp, MapPin, Save, X, Camera, MessageSquare, Move, Magnet, CheckCircle2, FilePlus, ArrowDown, Search, Building2, AlertTriangle, Loader2, Download, Map, ListFilter,
+  PieChart, TrendingUp, MapPin, Save, X, Camera, MessageSquare, Move, Magnet, CheckCircle2, FilePlus, ArrowDown, Search, Building2, AlertTriangle, Loader2, Download, ListFilter,
   LogOut, User, Github
 } from 'lucide-react';
 import { LoginModal } from './components/LoginModal';
@@ -596,7 +596,7 @@ const LineSelector = ({ isOpen, onClose, onSelect, railwayData, allowedLines }) 
         <div className="fixed inset-0 z-[600] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
             <div className="bg-white w-full max-w-2xl max-h-[85vh] h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up ring-1 ring-black/5" onClick={e => e.stopPropagation()}>
                 <div className="p-4 border-b bg-gray-50 flex justify-between items-center shrink-0">
-                    <h3 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Map size={20}/> 选择线路</h3>
+                    <h3 className="font-bold text-lg flex items-center gap-2 text-gray-800"><MapIcon size={20}/> 选择线路</h3>
                     <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
                 </div>
                 <div className="flex border-b bg-white shrink-0">

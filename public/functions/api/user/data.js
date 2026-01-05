@@ -1,66 +1,60 @@
 export async function onRequest(event) {
   const headers = {
-    "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization"
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Content-Type": "application/json"
   };
 
   if (event.request.method === "OPTIONS") {
     return new Response(null, { headers });
   }
 
-  const DB = globalThis.RAILROUND_KV;
-  if (!DB) return new Response(JSON.stringify({ error: "KV Missing" }), { status: 500, headers });
-
-  // Auth check
-  const authHeader = event.request.headers.get("Authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
-  }
-
-  const token = authHeader.split(" ")[1];
-  const sessionKey = `session:${token}`;
-
   try {
-    const username = await DB.get(sessionKey);
+    const DB = globalThis.RAILROUND_KV;
+    if (!DB) throw new Error("KV Missing");
+
+    const authHeader = event.request.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
+    }
+    const token = authHeader.split(" ")[1];
+
+    // Verify Session
+    const username = await DB.get(`session:${token}`);
     if (!username) {
-        return new Response(JSON.stringify({ error: "Invalid or expired token" }), { status: 401, headers });
+        return new Response(JSON.stringify({ error: "Invalid Token" }), { status: 401, headers });
     }
 
     const userKey = `user:${username}`;
-    let rawUserData = await DB.get(userKey);
-
-    if (!rawUserData) {
-        return new Response(JSON.stringify({ error: "User data corrupted" }), { status: 404, headers });
-    }
-
-    let userData = typeof rawUserData === 'string' ? JSON.parse(rawUserData) : rawUserData;
 
     if (event.request.method === "GET") {
-        // Return only data, remove sensitive info like password
-        const { password, ...safeData } = userData;
-        return new Response(JSON.stringify(safeData), { headers });
+        const dataRaw = await DB.get(userKey);
+        const data = dataRaw ? JSON.parse(dataRaw) : { trips: [], pins: [] };
+        // Return only what is needed for the frontend app (latest_5 is for the card api, but no harm returning it)
+        return new Response(JSON.stringify(data), { status: 200, headers });
     }
-    else if (event.request.method === "POST") {
+
+    if (event.request.method === "POST") {
         const body = await event.request.json();
+        const { trips, pins, latest_5 } = body;
 
-        // Update trips and pins
-        // We do a merge strategy or overwrite?
-        // Plan said "Merge/Overwrite". Let's assume the client sends the full new state for simplicity and consistency with the current frontend app logic which holds full state.
+        // Fetch existing to preserve other fields (like password, bindings)
+        const existingRaw = await DB.get(userKey);
+        const existing = existingRaw ? JSON.parse(existingRaw) : {};
 
-        if (body.trips) userData.trips = body.trips;
-        if (body.pins) userData.pins = body.pins;
+        const newData = {
+            ...existing,
+            trips: trips || existing.trips || [],
+            pins: pins || existing.pins || [],
+            latest_5: latest_5 || existing.latest_5 || null // Store the pre-calculated card data
+        };
 
-        // Update timestamp
-        userData.updated_at = new Date().toISOString();
-
-        await DB.put(userKey, JSON.stringify(userData));
-
-        return new Response(JSON.stringify({ success: true }), { headers });
+        await DB.put(userKey, JSON.stringify(newData));
+        return new Response(JSON.stringify({ success: true }), { status: 200, headers });
     }
 
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers });
+    return new Response(JSON.stringify({ error: "Method Not Allowed" }), { status: 405, headers });
 
   } catch (e) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers });

@@ -1,24 +1,25 @@
 export async function onRequest(event) {
-  const url = new URL(event.request.url);
-  const code = url.searchParams.get("code");
-  const error = url.searchParams.get("error");
-
-  if (error) {
-    return new Response(JSON.stringify({ error }), { status: 400 });
-  }
-
-  if (!code) {
-    return new Response("Missing code", { status: 400 });
-  }
-
-  const CLIENT_ID = env.CLIENT_ID;
-  const CLIENT_SECRET = env.CLIENT_SECRET;
-
-  if (!CLIENT_ID || !CLIENT_SECRET) {
-      return new Response(JSON.stringify({ error: "Server Configuration Error" }), { status: 500 });
-  }
-
   try {
+    const url = new URL(event.request.url);
+    const code = url.searchParams.get("code");
+    const error = url.searchParams.get("error");
+
+    if (error) {
+      return new Response(JSON.stringify({ error }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+
+    if (!code) {
+      return new Response(JSON.stringify({ error: "Missing code" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+
+    // Access env inside try block to catch ReferenceErrors if env is missing
+    const CLIENT_ID = env.CLIENT_ID;
+    const CLIENT_SECRET = env.CLIENT_SECRET;
+
+    if (!CLIENT_ID || !CLIENT_SECRET) {
+      return new Response(JSON.stringify({ error: "Server Configuration Error" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
+
     // 1. Exchange code for access token
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
@@ -40,8 +41,8 @@ export async function onRequest(event) {
     // 2. Fetch User Info
     const userResponse = await fetch('https://api.github.com/user', {
       headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'User-Agent': 'RailRound-EdgeFunction'
+        'Authorization': `Bearer ${accessToken}`,
+        'User-Agent': 'RailRound-EdgeFunction'
       }
     });
 
@@ -56,41 +57,84 @@ export async function onRequest(event) {
     let username = await DB.get(bindingKey);
 
     if (!username) {
-        // Registration / Binding
-        // Check if a user with this login already exists manually to avoid overwrite
-        // Strategy: Try `github_login`. If taken, try `github_login_id`.
+      // Registration / Binding
+      let candidateUsername = `github_${githubUser.login}`;
+      let userKey = `user:${candidateUsername}`;
+      let existingUserStr = await DB.get(userKey);
+      let recover = false;
 
-        let candidateUsername = `github_${githubUser.login}`;
-        let userKey = `user:${candidateUsername}`;
-        let existingUser = await DB.get(userKey);
-
-        if (existingUser) {
-            // Collision or previous manual registration with same name?
-            // If the existing user has NO github binding, we can't just take it.
-            // We append ID to be safe.
-            candidateUsername = `github_${githubUser.login}_${githubUser.id}`;
-            userKey = `user:${candidateUsername}`;
+      if (existingUserStr) {
+        // Collision or previous registration?
+        try {
+          const existingUser = JSON.parse(existingUserStr);
+          if (existingUser.bindings && existingUser.bindings.github && existingUser.bindings.github.id === githubUser.id) {
+            // It's the same user! The binding key was lost. Recover it.
+            recover = true;
+          }
+        } catch (e) {
+          // Ignore parse error, treat as collision
         }
 
-        username = candidateUsername;
+        if (!recover) {
+          // Real collision, switch to ID-based username
+          candidateUsername = `github_${githubUser.login}_${githubUser.id}`;
+          userKey = `user:${candidateUsername}`;
 
-        const userData = {
-            username,
-            created_at: new Date().toISOString(),
-            bindings: {
-                github: {
-                    id: githubUser.id,
-                    login: githubUser.login,
-                    avatar_url: githubUser.avatar_url,
-                    name: githubUser.name
+          // Double check if THIS exists (paranoia check / recovering ID-based user)
+          existingUserStr = await DB.get(userKey);
+          if (existingUserStr) {
+             try {
+                const existingUser = JSON.parse(existingUserStr);
+                if (existingUser.bindings && existingUser.bindings.github && existingUser.bindings.github.id === githubUser.id) {
+                    recover = true;
+                } else {
+                    throw new Error("Username collision for backup name");
                 }
-            },
-            trips: [],
-            pins: []
-        };
+             } catch (e) {
+                if (e.message === "Username collision for backup name") throw e;
+                // If parse error here, maybe we should overwrite?
+                // But safer to assume collision.
+                throw new Error("Username collision for backup name (corrupt data)");
+             }
+          }
+        }
+      }
 
-        await DB.put(userKey, JSON.stringify(userData));
-        await DB.put(bindingKey, username);
+      username = candidateUsername;
+
+      // If we are recovering, we don't need to overwrite the user data, just the binding.
+      // But updating the user data (e.g. avatar) is good practice.
+      // So we always put.
+
+      const userData = {
+        username,
+        created_at: new Date().toISOString(),
+        bindings: {
+          github: {
+            id: githubUser.id,
+            login: githubUser.login,
+            avatar_url: githubUser.avatar_url,
+            name: githubUser.name
+          }
+        },
+        trips: [],
+        pins: []
+      };
+
+      // Merge with existing data if we are recovering to not lose trips?
+      // "recover" flag means we found a user that IS us.
+      if (recover && existingUserStr) {
+          try {
+             const existing = JSON.parse(existingUserStr);
+             userData.created_at = existing.created_at || userData.created_at;
+             userData.trips = existing.trips || [];
+             userData.pins = existing.pins || [];
+             // Update bindings and generic info
+          } catch(e) {}
+      }
+
+      await DB.put(userKey, JSON.stringify(userData));
+      await DB.put(bindingKey, username);
     }
 
     // 4. Create Session
@@ -102,6 +146,6 @@ export async function onRequest(event) {
     return Response.redirect(`${url.origin}/?token=${token}&username=${username}`, 302);
 
   } catch (e) {
-    return new Response(JSON.stringify({ error: "Auth Failed", details: e.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: "Auth Failed", details: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 }

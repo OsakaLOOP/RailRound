@@ -50,8 +50,22 @@ export const api = {
     return data;
   },
 
-  initiateOAuth(provider) {
-    // For now, this just opens the placeholder URL
-    window.location.href = `${API_BASE}/auth/oauth?provider=${provider}`;
+  async completeGithubRegistration(username, password, reg_token) {
+    const res = await fetch(`${API_BASE}/auth/complete_github_register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, reg_token })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Registration failed');
+    return data;
+  },
+
+  initiateOAuth(provider, sessionToken = null) {
+    let url = `${API_BASE}/auth/oauth?provider=${provider}`;
+    if (sessionToken) {
+        url += `&session_token=${encodeURIComponent(sessionToken)}`;
+    }
+    window.location.href = url;
   }
 };

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { LoginModal } from './components/LoginModal';
 import { api } from './services/api';
+import { db } from './utils/db';
 
 // --- 1. 样式与配置 ---
 const LEAFLET_CSS = `
@@ -1174,57 +1175,168 @@ export default function RailRoundApp() {
       } catch (e) {
         console.warn('[Autoload] company_data.json 加载失败或格式错误', e);
       }
-
-      // 2. 获取 GeoJSON 文件列表
-      const manifestRes = await fetch('/geojson_manifest.json').catch(() => null);
-      let geojsonFiles = [];
-      if (manifestRes && manifestRes.ok) {
-        const manifest = await manifestRes.json();
-        geojsonFiles = manifest.files || [];
-      }
-
-      if (geojsonFiles.length === 0) {
-        console.log('[Autoload] 未找到 GeoJSON 清单');
-        return;
-      }
-
-      console.log(`[Autoload] 发现 ${geojsonFiles.length} 个文件，开始并行下载...`);
-      
-      // 构建匹配索引
       const companyIndex = buildCompanyIndex(currentCompanyData);
 
-      // 3. 并行下载所有 GeoJSON (网络层优化)
-      const downloadTasks = geojsonFiles.map(async (fileName) => {
+      // --- SWR Caching Logic for GeoJSON ---
+
+      // Helper to process a list of {json, company} objects into features/railwayData
+      // Added companyData explicitly to avoid closure staleness issues with currentCompanyData
+      const processGeoJsonBatch = (items, companyData = currentCompanyData) => {
+          const newFeatures = [];
+          const railwayUpdates = {};
+
+          items.forEach(({ json, company: defaultCompany }) => {
+            if (!json.features) return;
+            // A. 增强 Feature 属性
+            const enriched = json.features.map(f => ({
+              ...f,
+              properties: {
+                ...f.properties,
+                company: f.properties.company || f.properties.operator || defaultCompany || "上传数据"
+              }
+            }));
+            newFeatures.push(...enriched);
+
+            // B. 构建 Railway 数据结构
+            enriched.forEach(f => {
+               const p = f.properties;
+               const comp = p.company;
+
+               const ensureLineInTemp = (lineName, props) => {
+                   const lineKey = `${comp}:${lineName}`;
+                   if (!railwayUpdates[lineKey]) {
+                       const info = (companyData && companyData[comp]) || {};
+                       const icon = props.icon || info.logo || null;
+                       railwayUpdates[lineKey] = {
+                           meta: { region: info.region || "未知", type: info.type || "未知", company: comp, logo: info.logo, icon },
+                           stations: []
+                       };
+                   } else if (props.icon && !railwayUpdates[lineKey].meta.icon) {
+                       railwayUpdates[lineKey].meta.icon = props.icon;
+                   }
+                   return lineKey;
+               };
+
+               if (p.type === 'line' && p.name) {
+                   ensureLineInTemp(p.name, p);
+               } else if (p.type === 'station' && p.line && p.name && f.geometry?.coordinates) {
+                   const lineKey = ensureLineInTemp(p.line, p);
+                   const stations = railwayUpdates[lineKey].stations;
+                   if (!stations.find(s => s.name_ja === p.name)) {
+                       const stationId = p.id || `${comp}:${p.line}:${p.name}`;
+                       stations.push({ id: stationId, name_ja: p.name, lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], transfers: p.transfers || [] });
+                   }
+               }
+            });
+          });
+
+          // Update State
+          if (newFeatures.length > 0) {
+              setGeoData(prev => ({ type: "FeatureCollection", features: [...prev.features, ...newFeatures] }));
+          }
+          if (Object.keys(railwayUpdates).length > 0) {
+              setRailwayData(prev => {
+                  const next = { ...prev };
+                  Object.entries(railwayUpdates).forEach(([key, val]) => {
+                      if (!next[key]) next[key] = val;
+                      else {
+                          val.stations.forEach(s => { if (!next[key].stations.find(ex => ex.id === s.id)) next[key].stations.push(s); });
+                          if(val.meta.icon && !next[key].meta.icon) next[key].meta.icon = val.meta.icon;
+                      }
+                  });
+                  return next;
+              });
+          }
+      };
+
+      // 2. Load from IndexedDB First (Fast Path)
+      let cachedFiles = [];
+      try {
+          // Ideally we iterate keys, but here we might just assume we load what we have
+          // For simplicity, let's load everything in 'files' store? No, 'files' store might become huge.
+          // Wait, we need to know WHICH files to load. We need the manifest.
+          // But fetching manifest is network.
+          // Strategy: Load ALL cached files from IDB immediately.
+          // IndexedDB getAll is fast.
+          const dbInstance = await db.open();
+          const tx = dbInstance.transaction(db.STORE_FILES, 'readonly');
+          const store = tx.objectStore(db.STORE_FILES);
+          const req = store.getAll(); // Get all values
+          cachedFiles = await new Promise((resolve) => {
+              req.onsuccess = () => resolve(req.result || []);
+              req.onerror = () => resolve([]);
+          });
+
+          if (cachedFiles.length > 0) {
+              console.log(`[Autoload] 从缓存加载了 ${cachedFiles.length} 个文件`);
+              processGeoJsonBatch(cachedFiles);
+          }
+      } catch (e) {
+          console.warn('[Autoload] Cache read failed', e);
+      }
+
+      // 3. Network Fetch (Background Update)
+      const manifestRes = await fetch('/geojson_manifest.json').catch(() => null);
+      if (!manifestRes || !manifestRes.ok) return;
+      const manifest = await manifestRes.json();
+      const geojsonFiles = manifest.files || [];
+
+      if (geojsonFiles.length === 0) return;
+      
+      console.log(`[Autoload] 检查更新...`);
+
+      // We only want to fetch files that are NOT in cache or have changed (we don't have versioning yet, so assume name match = cached)
+      // Actually, to support "updating", we should probably just fetch everything if we want to be safe,
+      // OR implement a version check. For now, let's just fetch missing ones + maybe random refresh?
+      // Given "loading takes a second", we should trust the cache.
+      // A simple strategy: If we have ANY cached files, assume we are good for this session, UNLESS the manifest has new files.
+
+      const cachedFileNames = new Set(cachedFiles.map(f => f.fileName));
+      const missingFiles = geojsonFiles.filter(f => {
+          const name = f.replace(/\.(geojson|json)$/i, '');
+          return !cachedFileNames.has(name);
+      });
+
+      if (missingFiles.length === 0) {
+          console.log('[Autoload] 所有文件已缓存，无需下载。');
+          return;
+      }
+
+      console.log(`[Autoload] 发现 ${missingFiles.length} 个新文件，开始下载...`);
+
+      const downloadTasks = missingFiles.map(async (fileName) => {
         try {
           const fileNameWithExt = fileName.includes('.geojson') ? fileName : `${fileName}.geojson`;
           const res = await fetch(`/geojson/${fileNameWithExt}`);
           if (!res.ok) throw new Error(`Status ${res.status}`);
           const json = await res.json();
-          
-          // 智能匹配公司名
           const rawCompanyName = fileName.replace(/\.(geojson|json)$/i, '');
           const matchedCompany = findBestCompanyKey(rawCompanyName, companyIndex);
           
-          return { json, company: matchedCompany, fileName: rawCompanyName };
+          const dataItem = { json, company: matchedCompany, fileName: rawCompanyName };
+
+          // Save to Cache
+          db.set(db.STORE_FILES, rawCompanyName, dataItem).catch(e => console.warn('Cache write failed', e));
+
+          return dataItem;
         } catch (e) {
           console.warn(`[Autoload] 跳过文件 ${fileName}:`, e.message);
           return null;
         }
       });
 
-      // 等待所有请求完成
       const results = await Promise.all(downloadTasks);
       const validResults = results.filter(r => r !== null);
 
-      if (validResults.length === 0) return;
+      if (validResults.length > 0) {
+          processGeoJsonBatch(validResults);
+          console.log(`[Autoload] 新增数据已应用。`);
+      }
+      return;
 
-      console.log(`[Autoload] 下载完成 (${validResults.length} 个)，开始内存合并...`);
+      // Original Logic Removed/Refactored above.
 
-      // 4. 内存数据处理 (逻辑层优化：避免 N+1 渲染)
-      // 使用临时变量，完全不触碰 React State
-      const newFeatures = [];
-      const railwayUpdates = {}; 
-
+      /*
       validResults.forEach(({ json, company: defaultCompany }) => {
         if (!json.features) return;
 
@@ -1330,7 +1442,133 @@ export default function RailRoundApp() {
 
   useEffect(() => { if (activeTab === 'map' && leafletReady) setTimeout(initMap, 100); }, [activeTab, leafletReady]);
   useEffect(() => { if (mapInstance.current && leafletReady && geoData) renderBaseMap(geoData); }, [geoData, leafletReady]);
-  useEffect(() => { if (mapInstance.current && leafletReady && geoData) renderTripRoutes(); }, [trips, geoData, leafletReady,mapZoom]);
+  const [segmentGeometries, setSegmentGeometries] = useState(new Map()); // Key -> { coords, color, isMulti, fallback }
+  const [tripSegmentsGeometry, setTripSegmentsGeometry] = useState([]);
+
+  // Async Logic to load/calc geometries
+  useEffect(() => {
+    // 1. Identify segments needed
+    const allSegments = trips.flatMap(t => t.segments || []);
+    const uniqueKeys = new Set();
+    const needed = allSegments.filter(seg => {
+        if (!seg.lineKey || !seg.fromId || !seg.toId) return false;
+        const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+        uniqueKeys.add(key);
+        // Only fetch if not already in memory cache
+        return !segmentGeometries.has(key);
+    });
+
+    if (needed.length === 0) {
+        // Just rebuild the list for rendering using cache
+        const geometryList = allSegments.map(seg => {
+            const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+            const cached = segmentGeometries.get(key);
+            const line = railwayData[seg.lineKey];
+            const s1 = line?.stations.find(s => s.id === seg.fromId);
+            const s2 = line?.stations.find(s => s.id === seg.toId);
+            const name1 = s1?.name_ja || seg.fromId;
+            const name2 = s2?.name_ja || seg.toId;
+
+            if (cached) {
+                return {
+                    id: seg.id || key,
+                    popup: `${seg.lineKey}: ${name1} → ${name2}`,
+                    ...cached
+                };
+            }
+            return null;
+        }).filter(Boolean);
+        setTripSegmentsGeometry(geometryList);
+        return;
+    }
+
+    // 2. Fetch/Calc missing segments
+    const fetchMissing = async () => {
+        const newCache = new Map(segmentGeometries);
+        let updated = false;
+
+        for (const seg of needed) {
+            const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+
+            // Check IDB
+            let data = await db.get(db.STORE_SEGMENTS, key).catch(() => null);
+
+            if (!data) {
+                // Not in IDB, try calculate
+                if (!geoData || !geoData.features) continue; // Wait for GeoData
+
+                const line = railwayData[seg.lineKey];
+                if (!line) continue;
+                const s1 = line.stations.find(s => s.id === seg.fromId);
+                const s2 = line.stations.find(s => s.id === seg.toId);
+                if (!s1 || !s2) continue;
+
+                const parts = seg.lineKey.split(':');
+                const company = parts[0];
+                const lineName = parts.slice(1).join(':');
+
+                const feature = geoData.features.find(f =>
+                    f.properties.type === 'line' &&
+                    f.properties.name === lineName &&
+                    f.properties.company === company
+                );
+
+                let coords = null;
+                let color = '#38bdf8';
+                let isMulti = false;
+                let fallback = false;
+
+                if (feature) {
+                    color = feature.properties.stroke || '#38bdf8';
+                    const latLngs = sliceGeoJsonPath(feature, s1.lat, s1.lng, s2.lat, s2.lng);
+                    if (latLngs) {
+                        coords = latLngs;
+                        if (Array.isArray(latLngs[0]) && Array.isArray(latLngs[0][0])) isMulti = true;
+                    }
+                }
+
+                // Fallback Logic (same as before)
+                if (!coords) {
+                     fallback = true;
+                     const routeCoords = [];
+                     const startIdx = line.stations.findIndex(st => st.id === seg.fromId);
+                     const endIdx = line.stations.findIndex(st => st.id === seg.toId);
+                     if (startIdx !== -1 && endIdx !== -1) {
+                         const step = startIdx <= endIdx ? 1 : -1;
+                         for (let i = startIdx; i !== endIdx + step; i += step) {
+                            if (i >= 0 && i < line.stations.length) routeCoords.push([line.stations[i].lat, line.stations[i].lng]);
+                         }
+                         if (routeCoords.length > 1) { coords = routeCoords; fallback = false; }
+                     }
+                }
+                if (!coords) { coords = [[s1.lat, s1.lng], [s2.lat, s2.lng]]; fallback = true; }
+
+                data = { coords, color, isMulti, fallback };
+                // Save to IDB
+                await db.set(db.STORE_SEGMENTS, key, data);
+            }
+
+            if (data) {
+                newCache.set(key, data);
+                updated = true;
+            }
+        }
+
+        if (updated) {
+            setSegmentGeometries(newCache);
+        }
+    };
+
+    fetchMissing();
+
+  }, [trips, geoData, railwayData, segmentGeometries]);
+
+  useEffect(() => {
+      if (mapInstance.current && leafletReady && tripSegmentsGeometry) {
+          renderTripRoutes();
+      }
+  }, [tripSegmentsGeometry, leafletReady, mapZoom]);
+
   useEffect(() => { if (mapInstance.current && leafletReady && !isDraggingRef.current) renderPins(); }, [pins, editingPin, pinMode, leafletReady]);
 
   useEffect(() => {
@@ -1800,65 +2038,29 @@ export default function RailRoundApp() {
 
 
   const renderTripRoutes = () => {
-    if (!routeLayer.current || !geoData || !geoData.features) return;
+    if (!routeLayer.current || !tripSegmentsGeometry) return;
     routeLayer.current.clearLayers();
 
     // Dynamic weight based on zoom
     const zoomWeight = mapZoom < 8 ? 2 : mapZoom < 12 ? 4 : mapZoom < 15 ? 6 : 9;
 
-    const allSegments = trips.flatMap(t => t.segments || []);
-    allSegments.forEach(seg => {
-        const line = railwayData[seg.lineKey];
-        if (!line) return;
-        const s1 = line.stations.find(s => s.id === seg.fromId);
-        const s2 = line.stations.find(s => s.id === seg.toId);
-        if (!s1 || !s2) return;
+    tripSegmentsGeometry.forEach(seg => {
+        const { coords, color, popup, isMulti, fallback } = seg;
+        const options = {
+            color,
+            weight: zoomWeight,
+            opacity: 0.9,
+            lineCap: 'round',
+            smoothFactor: 0.2,
+            dashArray: fallback ? '5, 10' : null
+        };
 
-        // 从 lineKey (格式: "company:line") 中提取 company 和 lineName
-        const parts = seg.lineKey.split(':');
-        const company = parts[0];
-        const lineName = parts.slice(1).join(':');
-
-        // 在 GeoJSON features 中查找匹配的线特性（需要同时检查 company 和 line name）
-        const feature = geoData.features.find(f => 
-          f.properties.type === 'line' && 
-          f.properties.name === lineName && 
-          f.properties.company === company
-        );
-        
-        if (feature) {
-            const latLngs = sliceGeoJsonPath(feature, s1.lat, s1.lng, s2.lat, s2.lng);
-            if (latLngs) {
-                if (Array.isArray(latLngs[0]) && Array.isArray(latLngs[0][0])) {
-                    // MultiLineString case (for loops)
-                    latLngs.forEach(segmentCoords => {
-                        L.polyline(segmentCoords, { color: feature.properties.stroke || '#38bdf8', weight: zoomWeight, opacity: 0.9, lineCap: 'round' , smoothFactor: 0.2 }).bindPopup(`${seg.lineKey}: ${s1.name_ja} → ${s2.name_ja}`).addTo(routeLayer.current);
-                    });
-                } else {
-                    // Normal case
-                    L.polyline(latLngs, { color: feature.properties.stroke || '#38bdf8', weight: zoomWeight, opacity: 0.9, lineCap: 'round' , smoothFactor: 0.2 }).bindPopup(`${seg.lineKey}: ${s1.name_ja} → ${s2.name_ja}`).addTo(routeLayer.current);
-                }
-            } else {
-                 // Fallback: 如果 Turf.js 切分失败，则绘制直线
-                 L.polyline([[s1.lat, s1.lng], [s2.lat, s2.lng]], { color: '#38bdf8', weight: 3, dashArray: '5, 10', opacity: 0.6 }).addTo(routeLayer.current);
-            }
+        if (isMulti) {
+            coords.forEach(part => {
+                L.polyline(part, options).bindPopup(popup).addTo(routeLayer.current);
+            });
         } else {
-            // 找不到 GeoJSON 特性：使用从 railwayData 中的站点坐标绘制完整路径
-            const routeCoords = [];
-            const startIdx = line.stations.findIndex(st => st.id === seg.fromId);
-            const endIdx = line.stations.findIndex(st => st.id === seg.toId);
-            const step = startIdx <= endIdx ? 1 : -1;
-            for (let i = startIdx; i !== endIdx + step; i += step) {
-              if (i >= 0 && i < line.stations.length) {
-                routeCoords.push([line.stations[i].lat, line.stations[i].lng]);
-              }
-            }
-            if (routeCoords.length > 1) {
-              L.polyline(routeCoords, { color: '#38bdf8', weight: zoomWeight, opacity: 0.9, lineCap: 'round', smoothFactor: 0.2 }).bindPopup(`${seg.lineKey}: ${s1.name_ja} → ${s2.name_ja}`).addTo(routeLayer.current);
-            } else {
-              // 最后的回退：直线
-              L.polyline([[s1.lat, s1.lng], [s2.lat, s2.lng]], { color: '#38bdf8', weight: 3, dashArray: '5, 10', opacity: 0.6 }).addTo(routeLayer.current);
-            }
+             L.polyline(coords, options).bindPopup(popup).addTo(routeLayer.current);
         }
     });
   };

@@ -920,8 +920,25 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
   const theta = 0.5 * Math.atan2(2 * u11, u20 - u02);
 
   // We want to rotate by -theta to align with X axis
-  const cosT = Math.cos(-theta);
-  const sinT = Math.sin(-theta);
+  // Also ensure Left-to-Right flow: check start vs end X
+  let cosT = Math.cos(-theta);
+  let sinT = Math.sin(-theta);
+
+  // Check flow direction using the first segment's start/end
+  // (Approximation using first available point vs last)
+  const firstItem = allCoords[0];
+  const lastItem = allCoords[allCoords.length - 1];
+  const startPt = firstItem.coords[0];
+  const endPt = lastItem.coords[lastItem.coords.length - 1];
+
+  const sx = (startPt[1] - cenLng) * cosT - (startPt[0] - cenLat) * sinT;
+  const ex = (endPt[1] - cenLng) * cosT - (endPt[0] - cenLat) * sinT;
+
+  if (sx > ex) {
+      // Goes Right-to-Left, flip 180 (negate both components)
+      cosT = -cosT;
+      sinT = -sinT;
+  }
 
   // 4. Rotate and BBox
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -965,14 +982,14 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
       // rotX maps to SVG x, rotY maps to SVG y (inverted)
       // Wait, rotatedCoords stored as [ry, rx].
       // So lat=ry, lng=rx.
-      const px = ((lng - vMinX) / vW) * 100; // 0-100 scale
+      const px = ((lng - vMinX) / vW) * 100; // 0- scale based on container? No, viewbox is abstract.
       const py = 50 - ((lat - vMinY) / vH) * 50; // 0-50 scale (flip Y)
       return `${px},${py}`;
   };
 
   return (
-      <div className="w-32 shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-between pl-2">
-          <div className="w-20 h-10">
+      <div className="w-36 shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-between pl-2">
+          <div className="w-24 h-12">
             <svg
                 viewBox="0 0 100 50"
                 preserveAspectRatio={shouldStretch ? "none" : "xMidYMid meet"}

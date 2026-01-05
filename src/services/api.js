@@ -36,14 +36,14 @@ export const api = {
     return data;
   },
 
-  async saveData(token, trips, pins) {
+  async saveData(token, trips, pins, latest_5) {
     const res = await fetch(`${API_BASE}/user/data`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ trips, pins })
+      body: JSON.stringify({ trips, pins, latest_5 })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to save data');

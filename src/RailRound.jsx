@@ -1048,6 +1048,162 @@ const RouteSlice = ({ segments, segmentGeometries }) => {
   );
 };
 
+// --- Refactored: Helper for Stats Calculation (Latest 5 + SVG Points) ---
+const calculateLatestStats = (trips, segmentGeometries, railwayData) => {
+    // 1. Basic Stats
+    const totalTrips = trips.length;
+    const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
+    const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
+    let totalDist = 0;
+
+    // Calc total distance
+    if (turf && segmentGeometries) {
+        allSegments.forEach(seg => {
+            const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+            const geom = segmentGeometries.get(key);
+            if (geom && geom.coords) {
+                if (geom.isMulti) {
+                    geom.coords.forEach(c => totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]]))));
+                } else {
+                    totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                }
+            } else {
+                 // Fallback
+                const line = railwayData[seg.lineKey];
+                if (line) {
+                    const s1 = line.stations.find(st => st.id === seg.fromId);
+                    const s2 = line.stations.find(st => st.id === seg.toId);
+                    if (s1 && s2) totalDist += calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
+                }
+            }
+        });
+    }
+
+    // 2. Latest 5
+    const latest = trips.slice(0, 5).map(t => {
+        const segs = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
+        const lineNames = segs.map(s => s.lineKey.split(':').pop()).join(' → '); // Simplified Title
+
+        let tripDist = 0;
+        const allCoords = [];
+
+        // Collect Coords for SVG
+        segs.forEach(seg => {
+            const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+            const geom = segmentGeometries ? segmentGeometries.get(key) : null;
+            if (geom && geom.coords) {
+                if (geom.isMulti) {
+                    geom.coords.forEach(c => {
+                         allCoords.push(c);
+                         if(turf) tripDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
+                    });
+                } else {
+                    allCoords.push(geom.coords);
+                    if(turf) tripDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                }
+            }
+        });
+
+        // Generate SVG Points (PCA Logic simplified reuse)
+        let svgPoints = "";
+        if (allCoords.length > 0) {
+            // Flatten all points
+            let flatPoints = [];
+            allCoords.forEach(c => flatPoints.push(...c));
+
+            if (flatPoints.length > 1) {
+                // Centroid
+                let sumLat = 0, sumLng = 0;
+                flatPoints.forEach(p => { sumLat += p[0]; sumLng += p[1]; });
+                const cenLat = sumLat / flatPoints.length;
+                const cenLng = sumLng / flatPoints.length;
+
+                // Covariance
+                let u20 = 0, u02 = 0, u11 = 0;
+                flatPoints.forEach(pt => {
+                    const x = pt[1] - cenLng;
+                    const y = pt[0] - cenLat;
+                    u20 += x * x; u02 += y * y; u11 += x * y;
+                });
+                const theta = 0.5 * Math.atan2(2 * u11, u20 - u02);
+                const cosT = Math.cos(-theta);
+                const sinT = Math.sin(-theta);
+
+                // Rotate & BBox
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                const rotated = flatPoints.map(pt => {
+                    const x = pt[1] - cenLng;
+                    const y = pt[0] - cenLat;
+                    const rx = x * cosT - y * sinT;
+                    const ry = x * sinT + y * cosT;
+                    if (rx < minX) minX = rx; if (rx > maxX) maxX = rx;
+                    if (ry < minY) minY = ry; if (ry > maxY) maxY = ry;
+                    return [ry, rx];
+                });
+
+                const w = maxX - minX || 0.001;
+                const h = maxY - minY || 0.001;
+
+                // Pad
+                const padX = w * 0.1; const padY = h * 0.1;
+                const vMinX = minX - padX; const vMinY = minY - padY;
+                const vW = w + padX * 2; const vH = h + padY * 2;
+
+                // Project to 0-100, 0-50 space
+                svgPoints = rotated.map(pt => {
+                    const px = ((pt[1] - vMinX) / vW) * 100;
+                    const py = 50 - ((pt[0] - vMinY) / vH) * 50;
+                    return `${px.toFixed(1)},${py.toFixed(1)}`; // Optimize precision
+                }).join(' ');
+            }
+        }
+
+        return {
+            id: t.id,
+            date: t.date,
+            title: lineNames,
+            dist: tripDist,
+            svg_points: svgPoints
+        };
+    });
+
+    return {
+        count: totalTrips,
+        lines: uniqueLines,
+        dist: totalDist,
+        latest: latest
+    };
+};
+
+const GithubCardModal = ({ isOpen, onClose, username }) => {
+    if (!isOpen || !username) return null;
+    const url = `${window.location.origin}/api/card?user=${username}`;
+    const md = `[![RailRound Stats](${url})](${window.location.origin})`;
+
+    return (
+        <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+            <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-lg flex items-center gap-2"><Github size={20}/> GitHub Profile Decoration</h3>
+                    <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
+                </div>
+                <div className="space-y-4">
+                    <div className="bg-gray-100 p-4 rounded-lg flex justify-center">
+                        <img src={url} alt="Preview" className="max-w-full shadow-sm rounded border border-gray-200" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Markdown Code (Copy to README)</label>
+                        <div className="relative">
+                            <textarea readOnly className="w-full p-3 border rounded-lg bg-slate-50 font-mono text-xs text-slate-600 h-20 resize-none outline-none focus:ring-2 focus:ring-blue-500" value={md} onClick={e => e.target.select()} />
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="w-full bg-slate-800 text-white py-2 rounded-lg font-bold">Close</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, segmentGeometries }) => (
   <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4">
     {trips.length === 0 ? (
@@ -1088,7 +1244,7 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
     <button onClick={onAdd} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
   </div>
 );
-const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeometries }) => {
+const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeometries, onOpenCard }) => {
     const totalTrips = trips.length;
     const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
     const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
@@ -1120,7 +1276,7 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeom
     return (
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {user && (
-            <div className="bg-white p-4 rounded-xl shadow-sm border">
+            <div className="bg-white p-4 rounded-xl shadow-sm border relative">
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-xl font-bold text-gray-500 overflow-hidden">
                         {userProfile?.bindings?.github?.avatar_url ? (
@@ -1140,6 +1296,11 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeom
                         </div>
                     </div>
                 </div>
+                {userProfile?.bindings?.github && (
+                   <button onClick={() => onOpenCard(user.username)} className="absolute right-4 top-4 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                       <Github size={14}/> 装饰代码
+                   </button>
+                )}
             </div>
         )}
 
@@ -1184,6 +1345,7 @@ export default function RailRoundApp() {
   const [isRouteSearching, setIsRouteSearching] = useState(false);
   const [mapZoom, setMapZoom] = useState(10);
   const [isExportingKML, setIsExportingKML] = useState(false);
+  const [cardModalUser, setCardModalUser] = useState(null);
 
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
@@ -2010,7 +2172,8 @@ export default function RailRoundApp() {
 
     // Sync to Cloud
     if (user) {
-       api.saveData(user.token, finalTrips, pins).catch(e => alert('云端保存失败: ' + e.message));
+       const latest5 = calculateLatestStats(finalTrips, segmentGeometries, railwayData);
+       api.saveData(user.token, finalTrips, pins, latest5).catch(e => alert('云端保存失败: ' + e.message));
     }
 
     setIsTripEditing(false); setEditingTripId(null); 
@@ -2027,7 +2190,8 @@ export default function RailRoundApp() {
           const newTrips = trips.filter(t => t.id !== id);
           setTrips(newTrips);
           if (user) {
-             api.saveData(user.token, newTrips, pins).catch(e => alert('云端同步失败'));
+             const latest5 = calculateLatestStats(newTrips, segmentGeometries, railwayData);
+             api.saveData(user.token, newTrips, pins, latest5).catch(e => alert('云端同步失败'));
           }
       }
   };
@@ -2270,7 +2434,7 @@ export default function RailRoundApp() {
 
       <div className="flex-1 relative overflow-hidden flex flex-col">
         {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} segmentGeometries={segmentGeometries} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
-        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} />}
+        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} onOpenCard={setCardModalUser} />}
         <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
           <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
           <FabButton activeTab={activeTab} pinMode={pinMode} togglePinMode={togglePinMode} />
@@ -2281,6 +2445,7 @@ export default function RailRoundApp() {
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />
       <GithubRegisterModal isOpen={isGithubRegisterOpen} onClose={() => setIsGithubRegisterOpen(false)} regToken={githubRegToken} onLoginSuccess={handleLoginSuccess} />
+      <GithubCardModal isOpen={!!cardModalUser} username={cardModalUser} onClose={() => setCardModalUser(null)} />
 
       {/* Line Selector */}
       <LineSelector isOpen={false} onClose={() => {}} onSelect={() => {}} railwayData={railwayData} /> 

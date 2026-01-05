@@ -864,9 +864,9 @@ const FabButton = ({ activeTab, pinMode, togglePinMode }) => (
   <div className="absolute bottom-4 left-4 z-[400] flex flex-col gap-3">{activeTab === 'map' && (<button onClick={togglePinMode} className={`p-3 rounded-full shadow-lg transition-all transform hover:scale-105 ${pinMode==='idle'?'bg-white text-gray-700':pinMode==='free'?'bg-blue-500 text-white':'bg-indigo-600 text-white ring-4 ring-indigo-200'}`}>{pinMode === 'snap' ? <Magnet size={24} /> : <MapPin size={24} />}</button>)}</div>
 );
 const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd }) => (
-  <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24">
+  <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4">
     {trips.length === 0 ? (
-        <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center h-full">
+        <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
             <Train size={48} className="opacity-20 mb-4"/>
             <p>暂无行程记录</p>
             <p className="text-xs mt-2">点击下方按钮添加你的第一次乗り鉄<br/>注意: 自定义线路可以导入 company_data 和 geojson</p>

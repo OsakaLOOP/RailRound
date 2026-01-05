@@ -1175,9 +1175,24 @@ const calculateLatestStats = (trips, segmentGeometries, railwayData) => {
     };
 };
 
-const GithubCardModal = ({ isOpen, onClose, username }) => {
-    if (!isOpen || !username) return null;
-    const url = `${window.location.origin}/api/card?user=${username}`;
+const GithubCardModal = ({ isOpen, onClose, user }) => {
+    const [cardKey, setCardKey] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        if (isOpen && user && !cardKey) {
+            setLoading(true);
+            api.getOrCreateCardKey(user.token)
+                .then(setCardKey)
+                .catch(err => setError(err.message))
+                .finally(() => setLoading(false));
+        }
+    }, [isOpen, user]);
+
+    if (!isOpen || !user) return null;
+
+    const url = cardKey ? `${window.location.origin}/api/card?key=${cardKey}` : '';
     const md = `[![RailRound Stats](${url})](${window.location.origin})`;
 
     return (
@@ -1187,18 +1202,25 @@ const GithubCardModal = ({ isOpen, onClose, username }) => {
                     <h3 className="font-bold text-lg flex items-center gap-2"><Github size={20}/> GitHub Profile Decoration</h3>
                     <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
                 </div>
-                <div className="space-y-4">
-                    <div className="bg-gray-100 p-4 rounded-lg flex justify-center">
-                        <img src={url} alt="Preview" className="max-w-full shadow-sm rounded border border-gray-200" />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">Markdown Code (Copy to README)</label>
-                        <div className="relative">
-                            <textarea readOnly className="w-full p-3 border rounded-lg bg-slate-50 font-mono text-xs text-slate-600 h-20 resize-none outline-none focus:ring-2 focus:ring-blue-500" value={md} onClick={e => e.target.select()} />
+
+                {loading ? (
+                    <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-blue-500"/></div>
+                ) : error ? (
+                    <div className="p-4 bg-red-50 text-red-500 rounded-lg">{error}</div>
+                ) : (
+                    <div className="space-y-4">
+                        <div className="bg-slate-100 p-4 rounded-lg flex justify-center overflow-hidden">
+                            <img src={url} alt="Preview" className="max-w-full shadow-sm rounded" />
                         </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Markdown Code (Copy to README)</label>
+                            <div className="relative">
+                                <textarea readOnly className="w-full p-3 border rounded-lg bg-slate-50 font-mono text-xs text-slate-600 h-20 resize-none outline-none focus:ring-2 focus:ring-blue-500" value={md} onClick={e => e.target.select()} />
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="w-full bg-slate-800 text-white py-2 rounded-lg font-bold">Close</button>
                     </div>
-                    <button onClick={onClose} className="w-full bg-slate-800 text-white py-2 rounded-lg font-bold">Close</button>
-                </div>
+                )}
             </div>
         </div>
     );
@@ -1297,7 +1319,7 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeom
                     </div>
                 </div>
                 {userProfile?.bindings?.github && (
-                   <button onClick={() => onOpenCard(user.username)} className="absolute right-4 top-4 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                   <button onClick={() => onOpenCard(user)} className="absolute right-4 top-4 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                        <Github size={14}/> 装饰代码
                    </button>
                 )}
@@ -2445,7 +2467,7 @@ export default function RailRoundApp() {
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />
       <GithubRegisterModal isOpen={isGithubRegisterOpen} onClose={() => setIsGithubRegisterOpen(false)} regToken={githubRegToken} onLoginSuccess={handleLoginSuccess} />
-      <GithubCardModal isOpen={!!cardModalUser} username={cardModalUser} onClose={() => setCardModalUser(null)} />
+      <GithubCardModal isOpen={!!cardModalUser} user={cardModalUser} onClose={() => setCardModalUser(null)} />
 
       {/* Line Selector */}
       <LineSelector isOpen={false} onClose={() => {}} onSelect={() => {}} railwayData={railwayData} /> 

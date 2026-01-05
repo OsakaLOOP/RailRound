@@ -1,6 +1,7 @@
 export async function onRequest(event) {
     const url = new URL(event.request.url);
-    const username = url.searchParams.get("user");
+    const key = url.searchParams.get("key");
+    const userParam = url.searchParams.get("user"); // Legacy support fallback (optional, can be removed for strict mode)
 
     // SVG Headers
     const headers = {
@@ -9,30 +10,32 @@ export async function onRequest(event) {
         "Access-Control-Allow-Origin": "*"
     };
 
-    if (!username) {
-        return new Response('<svg width="400" height="200" xmlns="http://www.w3.org/2000/svg"><text x="10" y="20">User not found</text></svg>', { headers });
+    const errorSvg = (msg) => new Response(`<svg width="600" height="300" xmlns="http://www.w3.org/2000/svg"><text x="300" y="150" text-anchor="middle" fill="#ef4444" font-family="sans-serif">${msg}</text></svg>`, { headers });
+
+    if (!key && !userParam) {
+        return errorSvg("Key missing");
     }
 
     try {
         const DB = globalThis.RAILROUND_KV;
-        if (!DB) return new Response('<svg width="400" height="200" xmlns="http://www.w3.org/2000/svg"><text x="10" y="20">KV Error</text></svg>', { headers });
+        if (!DB) return errorSvg("KV Error");
+
+        let username = userParam;
+
+        if (key) {
+            username = await DB.get(`card_key:${key}`);
+            if (!username) return errorSvg("Invalid Key");
+        }
 
         const userKey = `user:${username}`;
         const dataRaw = await DB.get(userKey);
 
         if (!dataRaw) {
-             return new Response('<svg width="400" height="200" xmlns="http://www.w3.org/2000/svg"><text x="50%" y="50%" text-anchor="middle" font-family="sans-serif">User data not found</text></svg>', { headers });
+             return errorSvg("User data not found");
         }
 
         const data = JSON.parse(dataRaw);
         const stats = data.latest_5 || { count: 0, dist: 0, lines: 0, latest: [] };
-
-        // --- SVG Generation ---
-        // Width: 800px (standard github readme width is flexible, but 800 is good for high-dpi)
-        // Height: Variable based on items? Let's fix to a card size.
-        // Layout:
-        // Top: Header + Summary Stats (Trips, Lines, KM)
-        // Body: List of 5 trips with Mini-Map
 
         const esc = (str) => {
             if (!str) return "";
@@ -44,87 +47,130 @@ export async function onRequest(event) {
                 .replace(/'/g, '&apos;');
         };
 
-        const cardWidth = 500;
-        const headerHeight = 100;
-        const rowHeight = 60;
-        const totalHeight = headerHeight + (stats.latest.length * rowHeight) + 20;
+        // --- SVG Generation (Glassmorphism) ---
+        // 1:2 Ratio -> 600x300
+        const cardWidth = 600;
+        const cardHeight = 300;
+
+        // Colors
+        const glassBg = "rgba(15, 23, 42, 0.6)"; // Slate-900 with opacity
+        const glassBorder = "rgba(255, 255, 255, 0.1)";
+        const textColor = "#e2e8f0"; // Slate-200
+        const labelColor = "#94a3b8"; // Slate-400
+        const accentColor = "#2dd4bf"; // Teal-400
 
         const styles = `
-            .bg { fill: #0f172a; }
-            .card { fill: #1e293b; rx: 12px; }
-            .text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #e2e8f0; }
-            .label { font-size: 10px; fill: #94a3b8; font-weight: bold; text-transform: uppercase; }
-            .value { font-size: 18px; font-weight: bold; fill: #38bdf8; }
-            .trip-title { font-size: 12px; font-weight: bold; fill: #f8fafc; }
-            .trip-date { font-size: 10px; fill: #64748b; }
-            .trip-dist { font-size: 10px; fill: #cbd5e1; font-family: monospace; }
-            .line-path { fill: none; stroke: #38bdf8; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-            .grid-line { stroke: #334155; stroke-width: 1; }
+            .bg { fill: ${glassBg}; stroke: ${glassBorder}; stroke-width: 1px; }
+            .text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: ${textColor}; }
+            .label { font-size: 10px; fill: ${labelColor}; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+            .value { font-size: 20px; font-weight: 800; fill: #f1f5f9; }
+            .trip-title { font-size: 11px; font-weight: 600; fill: #f8fafc; }
+            .trip-date { font-size: 9px; fill: ${labelColor}; }
+            .trip-dist { font-size: 9px; fill: ${labelColor}; font-family: monospace; }
+            .line-path { fill: none; stroke: ${accentColor}; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+            .separator { stroke: ${glassBorder}; stroke-width: 1; }
+        `;
+
+        // Icon SVG (Lucide Train Standard)
+        const iconSvg = `
+            <g transform="translate(${cardWidth - 40}, 20) scale(1)">
+                <path d="M4 14c0-5.5 4.5-10 10-10s10 4.5 10 10v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6z" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 14h16" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M12 4v10" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="m8 19-2 3" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="m16 19 2 3" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M9 15h.01" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M15 15h.01" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </g>
         `;
 
         let svgContent = `
-            <svg width="${cardWidth}" height="${totalHeight}" viewBox="0 0 ${cardWidth} ${totalHeight}" xmlns="http://www.w3.org/2000/svg">
+            <svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" xmlns="http://www.w3.org/2000/svg">
             <style>${styles}</style>
-            <rect width="100%" height="100%" class="bg" rx="16"/>
 
-            <!-- Header Stats -->
-            <g transform="translate(20, 20)">
-                <text x="0" y="15" class="text" style="font-size: 14px; font-weight: bold; fill: #cbd5e1;">${esc(username)}'s RailRound</text>
+            <!-- Glass Background -->
+            <rect x="2" y="2" width="${cardWidth-4}" height="${cardHeight-4}" rx="16" class="bg"/>
 
-                <g transform="translate(0, 40)">
+            <!-- Header Section (Top Left) -->
+            <text x="24" y="36" class="text" style="font-size: 16px; font-weight: bold; letter-spacing: -0.5px;">${esc(username)}'s RailRound</text>
+            ${iconSvg}
+
+            <line x1="24" y1="56" x2="${cardWidth-24}" y2="56" class="separator"/>
+
+            <!-- Stats Grid (Middle) -->
+            <g transform="translate(24, 75)">
+                <!-- Count -->
+                <g>
                     <text x="0" y="0" class="label">Trips</text>
-                    <text x="0" y="20" class="value">${stats.count}</text>
+                    <text x="0" y="24" class="value">${stats.count}</text>
+                </g>
+                <line x1="70" y1="0" x2="70" y2="30" class="separator"/>
 
-                    <text x="80" y="0" class="label">Lines</text>
-                    <text x="80" y="20" class="value" style="fill: #818cf8;">${stats.lines}</text>
+                <!-- Lines -->
+                <g transform="translate(100, 0)">
+                    <text x="0" y="0" class="label">Lines</text>
+                    <text x="0" y="24" class="value" style="fill: #818cf8;">${stats.lines}</text>
+                </g>
+                <line x1="170" y1="0" x2="170" y2="30" class="separator"/>
 
-                    <text x="160" y="0" class="label">Distance</text>
-                    <text x="160" y="20" class="value" style="fill: #34d399;">${Math.round(stats.dist)}<tspan font-size="10" fill="#64748b" dx="2">km</tspan></text>
+                <!-- Distance -->
+                <g transform="translate(200, 0)">
+                    <text x="0" y="0" class="label">Distance</text>
+                    <text x="0" y="24" class="value" style="fill: #34d399;">${Math.round(stats.dist)}<tspan font-size="12" fill="${labelColor}" dx="2">km</tspan></text>
                 </g>
             </g>
 
-            <!-- Brand Icon -->
-            <g transform="translate(${cardWidth - 60}, 20)">
-               <path d="M4 14c0-5.5 4.5-10 10-10s10 4.5 10 10v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6z" fill="none" stroke="#2dd4bf" stroke-width="2"/>
-               <circle cx="9" cy="24" r="2" fill="#2dd4bf"/>
-               <circle cx="19" cy="24" r="2" fill="#2dd4bf"/>
-               <path d="M14 4v10" stroke="#2dd4bf" stroke-width="2"/>
-            </g>
+            <line x1="24" y1="120" x2="${cardWidth-24}" y2="120" class="separator"/>
 
-            <!-- List -->
-            <g transform="translate(0, ${headerHeight})">
+            <!-- Recent Trips List (Bottom) -->
+            <g transform="translate(24, 140)">
+                <text x="0" y="0" class="label" style="opacity: 0.7">Recent Activity</text>
+
+                <g transform="translate(0, 15)">
         `;
 
-        stats.latest.forEach((trip, idx) => {
-            const y = idx * rowHeight;
-            const points = trip.svg_points || "";
-            // Mini Map SVG (100x40 coordinate space in a 80x30 box)
+        // Render up to 3 items to fit 300px height comfortably
+        const displayLimit = 3;
+        const rowH = 45;
+
+        stats.latest.slice(0, displayLimit).forEach((trip, idx) => {
+            const y = idx * rowH;
+            let points = trip.svg_points || "";
+
+            // Simple sanitization: allow only digits, commas, spaces, dots, and minus signs
+            points = points.replace(/[^0-9, .\-]/g, '');
 
             svgContent += `
-                <g transform="translate(20, ${y})">
-                    <!-- Line & Dots -->
-                    <line x1="10" y1="12" x2="10" y2="48" stroke="#334155" stroke-width="1" stroke-dasharray="2,2"/>
-                    <circle cx="10" cy="30" r="4" fill="#1e293b" stroke="#64748b" stroke-width="2"/>
+                <g transform="translate(0, ${y})">
+                    <!-- Dot -->
+                    <circle cx="4" cy="20" r="3" fill="#1e293b" stroke="${labelColor}" stroke-width="1.5"/>
 
-                    <!-- Content -->
-                    <text x="30" y="25" class="trip-title">${esc(trip.title)}</text>
-                    <text x="30" y="40" class="trip-date">${esc(trip.date)}</text>
+                    <!-- Text Info -->
+                    <text x="20" y="16" class="trip-title">${esc(trip.title)}</text>
+                    <text x="20" y="30" class="trip-date">${esc(trip.date)}</text>
 
-                    <!-- Mini Graph -->
-                    <g transform="translate(${cardWidth - 120}, 10)">
-                        <rect width="80" height="40" fill="#0f172a" rx="4" stroke="#1e293b"/>
-                        <svg width="80" height="40" viewBox="0 0 100 50" preserveAspectRatio="none">
+                    <!-- Mini Graph Container -->
+                    <g transform="translate(${cardWidth - 160}, 5)">
+                         <!-- Graph Box Border (optional) -->
+                         <!-- <rect width="100" height="30" fill="none" stroke="${glassBorder}" rx="4"/> -->
+                         <svg width="100" height="30" viewBox="0 0 100 50" preserveAspectRatio="none">
                             <polyline points="${points}" class="line-path" vector-effect="non-scaling-stroke"/>
-                        </svg>
+                         </svg>
                     </g>
 
                     <!-- Dist -->
-                    <text x="${cardWidth - 130}" y="35" text-anchor="end" class="trip-dist">${Math.round(trip.dist)} km</text>
+                    <text x="${cardWidth - 55}" y="25" text-anchor="end" class="trip-dist">${Math.round(trip.dist)} km</text>
                 </g>
             `;
         });
 
+        // If list is empty
+        if (stats.latest.length === 0) {
+             svgContent += `<text x="0" y="30" class="label">No trips recorded yet.</text>`;
+        }
+
         svgContent += `
+                </g>
             </g>
             </svg>
         `;
@@ -132,6 +178,6 @@ export async function onRequest(event) {
         return new Response(svgContent, { headers });
 
     } catch (e) {
-        return new Response(`<svg width="400" height="50" xmlns="http://www.w3.org/2000/svg"><text x="10" y="30" fill="red">${e.message}</text></svg>`, { headers });
+        return errorSvg(e.message);
     }
 }

@@ -1022,13 +1022,29 @@ export default function RailLogApp() {
     return name; // fallback to original
   };
 
-  // 检查登录状态
+  // 检查登录状态 (包含处理 OAuth 回调)
   useEffect(() => {
-    const token = localStorage.getItem('rail_token');
-    const username = localStorage.getItem('rail_username');
-    if (token && username) {
-      setUser({ token, username });
-      loadUserData(token);
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('token');
+    const usernameFromUrl = urlParams.get('username');
+
+    if (tokenFromUrl && usernameFromUrl) {
+        // Handle OAuth Login
+        setUser({ token: tokenFromUrl, username: usernameFromUrl });
+        localStorage.setItem('rail_token', tokenFromUrl);
+        localStorage.setItem('rail_username', usernameFromUrl);
+        loadUserData(tokenFromUrl, true);
+
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+        // Handle Local Storage Login
+        const token = localStorage.getItem('rail_token');
+        const username = localStorage.getItem('rail_username');
+        if (token && username) {
+          setUser({ token, username });
+          loadUserData(token);
+        }
     }
   }, []);
 

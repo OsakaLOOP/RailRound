@@ -16,6 +16,58 @@ import { LoginModal } from './components/LoginModal';
 import { api } from './services/api';
 import { db } from './utils/db';
 
+const GithubRegisterModal = ({ isOpen, onClose, regToken, onLoginSuccess }) => {
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState(null);
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError(null);
+        setLoading(true);
+        try {
+            const data = await api.completeGithubRegistration(username, password, regToken);
+            onLoginSuccess(data);
+            onClose();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 animate-slide-up">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2"><Github size={24}/> 完成注册</h3>
+                    <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
+                </div>
+                <div className="mb-4 text-sm text-gray-500">
+                    欢迎使用 GitHub 登录！请设置您的用户名和密码以完成账户创建。
+                </div>
+                {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2"><AlertTriangle size={16}/> {error}</div>}
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">用户名</label>
+                        <input type="text" required className="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all outline-none" value={username} onChange={e => setUsername(e.target.value)} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">密码</label>
+                        <input type="password" required className="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all outline-none" value={password} onChange={e => setPassword(e.target.value)} />
+                    </div>
+                    <button type="submit" disabled={loading} className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold hover:bg-black transition-colors disabled:opacity-50 flex justify-center">
+                        {loading ? <Loader2 className="animate-spin"/> : '创建账户'}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 // --- 1. 样式与配置 ---
 const LEAFLET_CSS = `
   .leaflet-container { width: 100%; height: 100%; z-index: 0; background: #222; }
@@ -1083,7 +1135,7 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeom
                             {userProfile?.bindings?.github ? (
                                 <span className="flex items-center gap-1 text-emerald-600"><Github size={12}/> GitHub 已绑定 ({userProfile.bindings.github.login})</span>
                             ) : (
-                                <button onClick={() => api.initiateOAuth('github')} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white rounded text-xs font-bold hover:bg-black transition-colors"><Github size={12}/> 绑定 GitHub</button>
+                                <button onClick={() => api.initiateOAuth('github', user?.token)} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white rounded text-xs font-bold hover:bg-black transition-colors"><Github size={12}/> 绑定 GitHub</button>
                             )}
                         </div>
                     </div>
@@ -1116,6 +1168,8 @@ export default function RailRoundApp() {
   const [user, setUser] = useState(null); // { token, username }
   const [userProfile, setUserProfile] = useState(null); // Full user object (bindings etc)
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isGithubRegisterOpen, setIsGithubRegisterOpen] = useState(false);
+  const [githubRegToken, setGithubRegToken] = useState(null);
   const [companyDB, setCompanyDB] = useState({});
   const [leafletReady, setLeafletReady] = useState(false);
   const [geoData, setGeoData] = useState({ type: "FeatureCollection", features: [] });
@@ -1195,6 +1249,8 @@ export default function RailRoundApp() {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('token');
     const usernameFromUrl = urlParams.get('username');
+    const regTokenFromUrl = urlParams.get('reg_token');
+    const status = urlParams.get('status');
 
     if (tokenFromUrl && usernameFromUrl) {
         // Handle OAuth Login
@@ -1205,6 +1261,12 @@ export default function RailRoundApp() {
 
         // Clean URL
         window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (regTokenFromUrl) {
+        // Handle GitHub Registration
+        setGithubRegToken(regTokenFromUrl);
+        setIsGithubRegisterOpen(true);
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
     } else {
         // Handle Local Storage Login
         const token = localStorage.getItem('rail_token');
@@ -1212,6 +1274,15 @@ export default function RailRoundApp() {
         if (token && username) {
           setUser({ token, username });
           loadUserData(token);
+        }
+    }
+
+    if (status === 'bound_success') {
+        alert("GitHub 绑定成功！");
+        window.history.replaceState({}, document.title, window.location.pathname);
+        // Refresh profile if logged in
+        if (localStorage.getItem('rail_token')) {
+            loadUserData(localStorage.getItem('rail_token'));
         }
     }
   }, []);
@@ -2209,6 +2280,7 @@ export default function RailRoundApp() {
       <TripEditor isOpen={isTripEditing} onClose={() => setIsTripEditing(false)} isEditing={!!editingTripId} form={tripForm} setForm={setTripForm} onSave={handleSaveTrip} railwayData={railwayData} editorMode={editorMode} setEditorMode={setEditorMode} autoForm={autoForm} setAutoForm={setAutoForm} onAutoSearch={handleAutoRouteSearch} isRouteSearching={isRouteSearching} />
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />
+      <GithubRegisterModal isOpen={isGithubRegisterOpen} onClose={() => setIsGithubRegisterOpen(false)} regToken={githubRegToken} onLoginSuccess={handleLoginSuccess} />
 
       {/* Line Selector */}
       <LineSelector isOpen={false} onClose={() => {}} onSelect={() => {}} railwayData={railwayData} /> 

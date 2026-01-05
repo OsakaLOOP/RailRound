@@ -9,8 +9,11 @@ import * as turf from '@turf/turf';
 try { console.log('[iconfixed] module loaded'); } catch (e) {}
 import { 
   Train, Calendar, Navigation, Map as MapIcon, Layers, Upload, Plus, Edit2, Trash2, 
-  PieChart, TrendingUp, MapPin, Save, X, Camera, MessageSquare, Move, Magnet, CheckCircle2, FilePlus, ArrowDown, Search, Building2, AlertTriangle, Loader2, Download, Map, ListFilter
+  PieChart, TrendingUp, MapPin, Save, X, Camera, MessageSquare, Move, Magnet, CheckCircle2, FilePlus, ArrowDown, Search, Building2, AlertTriangle, Loader2, Download, Map, ListFilter,
+  LogOut, User
 } from 'lucide-react';
+import { LoginModal } from './components/LoginModal';
+import { api } from './services/api';
 
 // --- 1. 样式与配置 ---
 const LEAFLET_CSS = `
@@ -964,6 +967,8 @@ export default function RailLogApp() {
   const [railwayData, setRailwayData] = useState({}); 
   const [trips, setTrips] = useState([]); 
   const [pins, setPins] = useState([]); 
+  const [user, setUser] = useState(null); // { token, username }
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [companyDB, setCompanyDB] = useState({});
   const [leafletReady, setLeafletReady] = useState(false);
   const [geoData, setGeoData] = useState({ type: "FeatureCollection", features: [] });
@@ -1015,6 +1020,72 @@ export default function RailLogApp() {
       if (keyNorm.startsWith(n) || n.startsWith(keyNorm)) return companyIndex[keyNorm];
     }
     return name; // fallback to original
+  };
+
+  // 检查登录状态
+  useEffect(() => {
+    const token = localStorage.getItem('rail_token');
+    const username = localStorage.getItem('rail_username');
+    if (token && username) {
+      setUser({ token, username });
+      loadUserData(token);
+    }
+  }, []);
+
+  const loadUserData = async (token, isInteractive = false) => {
+    try {
+      const cloudData = await api.getData(token);
+      let newTrips = cloudData.trips || [];
+      let newPins = cloudData.pins || [];
+
+      if (isInteractive && (trips.length > 0 || pins.length > 0)) {
+         // Merge Strategy
+         if (confirm("检测到本地有数据，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)")) {
+             // Merge
+             // Use Map to deduplicate by ID
+             const tripMap = new Map();
+             newTrips.forEach(t => tripMap.set(t.id, t));
+             trips.forEach(t => tripMap.set(t.id, t)); // Local overwrites cloud if conflict? Or vice versa. Usually local is fresher if just edited.
+             newTrips = Array.from(tripMap.values());
+
+             const pinMap = new Map();
+             newPins.forEach(p => pinMap.set(p.id, p));
+             pins.forEach(p => pinMap.set(p.id, p));
+             newPins = Array.from(pinMap.values());
+
+             // Sync back the merged result to cloud immediately
+             if (token) {
+                api.saveData(token, newTrips, newPins).catch(e => console.error("Merge sync failed", e));
+             }
+         }
+      }
+
+      setTrips(newTrips.sort((a,b) => b.date.localeCompare(a.date)));
+      setPins(newPins);
+      console.log('User data loaded');
+    } catch (e) {
+      console.error('Failed to load user data:', e);
+      if (e.message.includes('Unauthorized')) {
+        handleLogout();
+      }
+    }
+  };
+
+  const handleLoginSuccess = (data) => {
+    setUser({ token: data.token, username: data.username });
+    localStorage.setItem('rail_token', data.token);
+    localStorage.setItem('rail_username', data.username);
+    // 加载数据
+    loadUserData(data.token, true);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('rail_token');
+    localStorage.removeItem('rail_username');
+    // 可选：清空本地数据
+    // setTrips([]);
+    // setPins([]);
   };
 
   // 自动加载 company_data.json 和所有 GeoJSON 文件（更稳健的解析与匹配）
@@ -1228,7 +1299,14 @@ export default function RailLogApp() {
     const newTripsToAdd = groupedTrips.map((segs, index) => ({ id: Date.now() + index, date: tripForm.date, cost: index === 0 ? (tripForm.cost || 0) : 0, suicaBalance: null, memo: tripForm.memo, segments: segs, lineKey: segs[0].lineKey, fromId: segs[0].fromId, toId: segs[segs.length-1].toId }));
     let nextTrips = [...trips];
     if (editingTripId) { nextTrips = nextTrips.filter(t => t.id !== editingTripId); }
-    setTrips([...newTripsToAdd, ...nextTrips].sort((a,b) => b.date.localeCompare(a.date)));
+    const finalTrips = [...newTripsToAdd, ...nextTrips].sort((a,b) => b.date.localeCompare(a.date));
+    setTrips(finalTrips);
+
+    // Sync to Cloud
+    if (user) {
+       api.saveData(user.token, finalTrips, pins).catch(e => alert('云端保存失败: ' + e.message));
+    }
+
     setIsTripEditing(false); setEditingTripId(null); 
     setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [], cost: 0 });
   };
@@ -1238,7 +1316,15 @@ export default function RailLogApp() {
     setTripForm(JSON.parse(JSON.stringify(formState))); setEditingTripId(trip.id); setIsTripEditing(true);
   };
   
-  const handleDeleteTrip = (id) => { if (confirm('确认删除?')) setTrips(prev => prev.filter(t => t.id !== id)); };
+  const handleDeleteTrip = (id) => {
+      if (confirm('确认删除?')) {
+          const newTrips = trips.filter(t => t.id !== id);
+          setTrips(newTrips);
+          if (user) {
+             api.saveData(user.token, newTrips, pins).catch(e => alert('云端同步失败'));
+          }
+      }
+  };
   
   const handleAutoRouteSearch = () => {
     const { startLine, startStation, endLine, endStation } = autoForm;
@@ -1261,8 +1347,32 @@ export default function RailLogApp() {
     else { setPinMode('idle'); setEditingPin(null); }
   };
   const createTempPin = () => { if (!mapInstance.current) return; const c = mapInstance.current.getCenter(); setEditingPin({ id: 'temp', lat: c.lat, lng: c.lng, type: 'photo', color: COLOR_PALETTE[0], isTemp: true }); mapInstance.current.panBy([0, 150]); };
-  const savePin = () => { if (!editingPin) return; const newPin = { ...editingPin, id: editingPin.isTemp ? Date.now() : editingPin.id }; delete newPin.isTemp; setPins(prev => editingPin.isTemp ? [...prev, newPin] : prev.map(p => p.id === newPin.id ? newPin : p)); setEditingPin(null); setPinMode('idle'); };
-  const deletePin = (id) => { if(confirm('删除?')) { setPins(prev => prev.filter(p => p.id !== id)); if (editingPin?.id === id) setEditingPin(null); } };
+  const savePin = () => {
+      if (!editingPin) return;
+      const newPin = { ...editingPin, id: editingPin.isTemp ? Date.now() : editingPin.id };
+      delete newPin.isTemp;
+
+      const newPins = editingPin.isTemp ? [...pins, newPin] : pins.map(p => p.id === newPin.id ? newPin : p);
+      setPins(newPins);
+
+      if (user) {
+         api.saveData(user.token, trips, newPins).catch(e => console.error('Pin sync failed', e));
+      }
+
+      setEditingPin(null);
+      setPinMode('idle');
+  };
+  const deletePin = (id) => {
+      if(confirm('删除?')) {
+          const newPins = pins.filter(p => p.id !== id);
+          setPins(newPins);
+          if (editingPin?.id === id) setEditingPin(null);
+
+          if (user) {
+            api.saveData(user.token, trips, newPins).catch(e => console.error('Pin sync failed', e));
+          }
+      }
+  };
  
   const railLayerRef = useRef(null); 
   const initMap = () => {
@@ -1402,22 +1512,37 @@ export default function RailLogApp() {
       <style>{LEAFLET_CSS}</style>
       <header className="bg-slate-900 text-white p-4 shadow-md z-30 flex justify-between shrink-0">
         <div className="flex items-center gap-2"><Train className="text-emerald-400"/> <span className="font-bold">RailLog</span></div>
-        {activeTab !== 'map' ? (
-           <div className="flex gap-2">
-               <button onClick={handleExportUserData} className="cursor-pointer bg-emerald-700 hover:bg-emerald-600 p-2 rounded text-xs flex items-center gap-1 transition">
-                   <Download size={14}/><span className="hidden sm:inline">导出存档</span>
+        <div className="flex items-center gap-2">
+            {user ? (
+               <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-300 hidden sm:inline">欢迎, {user.username}</span>
+                  <button onClick={handleLogout} className="bg-slate-700 hover:bg-red-900 p-2 rounded text-xs flex items-center gap-1 transition">
+                      <LogOut size={14}/><span className="hidden sm:inline">退出</span>
+                  </button>
+               </div>
+            ) : (
+               <button onClick={() => setIsLoginOpen(true)} className="bg-blue-600 hover:bg-blue-500 p-2 rounded text-xs flex items-center gap-1 transition font-bold">
+                   <User size={14}/><span className="hidden sm:inline">登录 / 注册</span>
                </button>
-               <label className="cursor-pointer bg-slate-700 hover:bg-slate-600 p-2 rounded text-xs flex items-center gap-1 transition">
-                   <Upload size={14}/><span className="hidden sm:inline">导入存档</span>
-                   <input type="file" accept=".json" className="hidden" onChange={handleImportUserData}/>
-               </label>
-           </div>
-        ) : (
-          <div className="flex gap-2">
-              <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition"><Building2 size={14}/><span className="hidden sm:inline">上传公司数据</span><input type="file" accept=".json" className="hidden" onChange={handleCompanyUpload}/></label>
-              <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition"><FilePlus size={14}/><span className="hidden sm:inline">添加 GeoJSON</span><input type="file" multiple accept=".geojson,.json" className="hidden" onChange={handleFileUpload}/></label>
-          </div>
-        )}
+            )}
+
+            {activeTab !== 'map' ? (
+            <div className="flex gap-2 ml-2 border-l border-slate-700 pl-2">
+                <button onClick={handleExportUserData} className="cursor-pointer bg-emerald-900/50 hover:bg-emerald-800 p-2 rounded text-xs flex items-center gap-1 transition">
+                    <Download size={14}/>
+                </button>
+                <label className="cursor-pointer bg-slate-800/50 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition">
+                    <Upload size={14}/>
+                    <input type="file" accept=".json" className="hidden" onChange={handleImportUserData}/>
+                </label>
+            </div>
+            ) : (
+            <div className="flex gap-2 ml-2 border-l border-slate-700 pl-2">
+                <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition"><Building2 size={14}/><span className="hidden sm:inline">数据</span><input type="file" accept=".json" className="hidden" onChange={handleCompanyUpload}/></label>
+                <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition"><FilePlus size={14}/><span className="hidden sm:inline">地图</span><input type="file" multiple accept=".geojson,.json" className="hidden" onChange={handleFileUpload}/></label>
+            </div>
+            )}
+        </div>
       </header>
 
       <div className="flex-1 relative overflow-hidden flex flex-col">
@@ -1430,6 +1555,9 @@ export default function RailLogApp() {
         </div>
       </div>
       <TripEditor isOpen={isTripEditing} onClose={() => setIsTripEditing(false)} isEditing={!!editingTripId} form={tripForm} setForm={setTripForm} onSave={handleSaveTrip} railwayData={railwayData} editorMode={editorMode} setEditorMode={setEditorMode} autoForm={autoForm} setAutoForm={setAutoForm} onAutoSearch={handleAutoRouteSearch} isRouteSearching={isRouteSearching} />
+
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />
+
       {/* Line Selector */}
       <LineSelector isOpen={false} onClose={() => {}} onSelect={() => {}} railwayData={railwayData} /> 
       <nav className="bg-white border-t p-2 flex justify-around shrink-0 pb-safe z-30">

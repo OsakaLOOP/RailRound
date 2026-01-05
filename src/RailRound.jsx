@@ -864,7 +864,78 @@ const PinEditor = ({ editingPin, setEditingPin, pinMode, setPinMode, deletePin, 
 const FabButton = ({ activeTab, pinMode, togglePinMode }) => (
   <div className="absolute bottom-4 left-4 z-[400] flex flex-col gap-3">{activeTab === 'map' && (<button onClick={togglePinMode} className={`p-3 rounded-full shadow-lg transition-all transform hover:scale-105 ${pinMode==='idle'?'bg-white text-gray-700':pinMode==='free'?'bg-blue-500 text-white':'bg-indigo-600 text-white ring-4 ring-indigo-200'}`}>{pinMode === 'snap' ? <Magnet size={24} /> : <MapPin size={24} />}</button>)}</div>
 );
-const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd }) => (
+
+const RouteSlice = ({ segments, segmentGeometries }) => {
+  const allCoords = [];
+  if (!segmentGeometries) return null;
+
+  let totalDist = 0;
+
+  segments.forEach(seg => {
+      const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+      const geom = segmentGeometries.get(key);
+      if (geom && geom.coords) {
+          if (geom.isMulti) {
+              geom.coords.forEach(c => {
+                  allCoords.push({ coords: c, color: geom.color });
+                  if (turf) totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
+              });
+          } else {
+              allCoords.push({ coords: geom.coords, color: geom.color });
+              if (turf) totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+          }
+      }
+  });
+
+  if (allCoords.length === 0) return <div className="w-20 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">无预览</div>;
+
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+  allCoords.forEach(item => {
+      item.coords.forEach(pt => {
+           const [lat, lng] = pt;
+           if (lat < minLat) minLat = lat;
+           if (lat > maxLat) maxLat = lat;
+           if (lng < minLng) minLng = lng;
+           if (lng > maxLng) maxLng = lng;
+      });
+  });
+
+  const width = 100, height = 100;
+  const latSpan = maxLat - minLat || 0.01;
+  const lngSpan = maxLng - minLng || 0.01;
+  // Padding 10%
+  const pLat = latSpan * 0.1;
+  const pLng = lngSpan * 0.1;
+
+  const project = (lat, lng) => {
+      const x = ((lng - (minLng - pLng)) / (lngSpan + pLng * 2)) * width;
+      const y = height - ((lat - (minLat - pLat)) / (latSpan + pLat * 2)) * height;
+      return `${x},${y}`;
+  };
+
+  return (
+      <div className="w-20 shrink-0 ml-2 border-l border-gray-50 flex flex-col items-center justify-center">
+          <div className="flex-1 w-full flex items-center justify-center">
+            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full max-h-[60px] opacity-80">
+                {allCoords.map((item, idx) => (
+                    <polyline
+                        key={idx}
+                        points={item.coords.map(pt => project(pt[0], pt[1])).join(' ')}
+                        fill="none"
+                        stroke={item.color || '#94a3b8'}
+                        strokeWidth="8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                ))}
+            </svg>
+          </div>
+          <div className="text-[10px] font-bold text-gray-400 mt-1">{Math.round(totalDist)} km</div>
+      </div>
+  );
+};
+
+const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, segmentGeometries }) => (
   <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4">
     {trips.length === 0 ? (
         <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
@@ -885,14 +956,17 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd }) 
                 <button onClick={(e) => { e.stopPropagation(); onDelete(t.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
             </div>
           </div>
-          <div className="space-y-2 relative">{segments.length > 1 && <div className="absolute left-[5px] top-2 bottom-2 w-0.5 bg-gray-200 z-0"></div>}
-            {segments.map((seg, idx) => {
-                const line = railwayData[seg.lineKey];
-                const icon = line?.meta?.icon;
-                const getSt = (id) => line?.stations.find(s=>s.id===id)?.name_ja || id;
-                return (
-                <div key={idx} className="relative z-10 flex flex-col text-sm"><div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-white shadow-sm shrink-0"></div>{icon && <img src={icon} alt="" className="line-icon" />}<span className="font-bold text-emerald-700 text-xs">{seg.lineKey}</span></div><div className="pl-5 font-medium text-gray-700">{getSt(seg.fromId)} <span className="text-gray-300 mx-1">→</span> {getSt(seg.toId)}</div></div>
-            )})}
+          <div className="flex flex-row">
+            <div className="flex-1 space-y-2 relative">{segments.length > 1 && <div className="absolute left-[5px] top-2 bottom-2 w-0.5 bg-gray-200 z-0"></div>}
+                {segments.map((seg, idx) => {
+                    const line = railwayData[seg.lineKey];
+                    const icon = line?.meta?.icon;
+                    const getSt = (id) => line?.stations.find(s=>s.id===id)?.name_ja || id;
+                    return (
+                    <div key={idx} className="relative z-10 flex flex-col text-sm"><div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-white shadow-sm shrink-0"></div>{icon && <img src={icon} alt="" className="line-icon" />}<span className="font-bold text-emerald-700 text-xs">{seg.lineKey}</span></div><div className="pl-5 font-medium text-gray-700">{getSt(seg.fromId)} <span className="text-gray-300 mx-1">→</span> {getSt(seg.toId)}</div></div>
+                )})}
+            </div>
+            <RouteSlice segments={segments} segmentGeometries={segmentGeometries} />
           </div>
           {t.memo && <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded mt-3">{t.memo}</div>}
         </div>
@@ -963,7 +1037,7 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile }) => {
                             {userProfile?.bindings?.github ? (
                                 <span className="flex items-center gap-1 text-emerald-600"><Github size={12}/> GitHub 已绑定 ({userProfile.bindings.github.login})</span>
                             ) : (
-                                <span>未绑定第三方账号</span>
+                                <button onClick={() => api.initiateOAuth('github')} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white rounded text-xs font-bold hover:bg-black transition-colors"><Github size={12}/> 绑定 GitHub</button>
                             )}
                         </div>
                     </div>
@@ -2090,7 +2164,7 @@ export default function RailRoundApp() {
       </header>
 
       <div className="flex-1 relative overflow-hidden flex flex-col">
-        {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
+        {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} segmentGeometries={segmentGeometries} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
         {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} />}
         <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
           <div ref={mapRef} style={{ width: '100%', height: '100%' }} />

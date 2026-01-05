@@ -9,8 +9,11 @@ import * as turf from '@turf/turf';
 try { console.log('[iconfixed] module loaded'); } catch (e) {}
 import { 
   Train, Calendar, Navigation, Map as MapIcon, Layers, Upload, Plus, Edit2, Trash2, 
-  PieChart, TrendingUp, MapPin, Save, X, Camera, MessageSquare, Move, Magnet, CheckCircle2, FilePlus, ArrowDown, Search, Building2, AlertTriangle, Loader2, Download, Map, ListFilter
+  PieChart, TrendingUp, MapPin, Save, X, Camera, MessageSquare, Move, Magnet, CheckCircle2, FilePlus, ArrowDown, Search, Building2, AlertTriangle, Loader2, Download, Map, ListFilter,
+  LogOut, User, Github
 } from 'lucide-react';
+import { LoginModal } from './components/LoginModal';
+import { api } from './services/api';
 
 // --- 1. 样式与配置 ---
 const LEAFLET_CSS = `
@@ -897,7 +900,7 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd }) 
     <button onClick={onAdd} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
   </div>
 );
-const StatsView = ({ trips, railwayData ,geoData}) => {
+const StatsView = ({ trips, railwayData ,geoData, user, userProfile }) => {
     const totalTrips = trips.length;
     const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
     const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
@@ -943,6 +946,30 @@ const StatsView = ({ trips, railwayData ,geoData}) => {
         });
     return (
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {user && (
+            <div className="bg-white p-4 rounded-xl shadow-sm border">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-xl font-bold text-gray-500 overflow-hidden">
+                        {userProfile?.bindings?.github?.avatar_url ? (
+                            <img src={userProfile.bindings.github.avatar_url} alt="Avatar" className="w-full h-full object-cover"/>
+                        ) : (
+                            user.username.charAt(0).toUpperCase()
+                        )}
+                    </div>
+                    <div>
+                        <div className="font-bold text-lg">{user.username}</div>
+                        <div className="text-xs text-gray-400 flex items-center gap-1">
+                            {userProfile?.bindings?.github ? (
+                                <span className="flex items-center gap-1 text-emerald-600"><Github size={12}/> GitHub 已绑定 ({userProfile.bindings.github.login})</span>
+                            ) : (
+                                <span>未绑定第三方账号</span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4"><div className="bg-white p-4 rounded-xl shadow-sm border text-center"><div className="text-xs text-gray-400 mb-1">记录数</div><div className="text-3xl font-bold text-gray-800">{totalTrips}</div></div><div className="bg-white p-4 rounded-xl shadow-sm border text-center"><div className="text-xs text-gray-400 mb-1">制霸路线</div><div className="text-3xl font-bold text-indigo-600">{uniqueLines}</div></div></div>
         <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-6 rounded-xl shadow-lg text-white">
             <div className="flex items-center justify-between mb-2"><h3 className="font-bold flex items-center gap-2"><TrendingUp size={18}/> 里程统计</h3><span className="text-xs bg-white/20 px-2 py-1 rounded">总距离</span></div>
@@ -965,6 +992,9 @@ export default function RailRoundApp() {
   const [railwayData, setRailwayData] = useState({}); 
   const [trips, setTrips] = useState([]); 
   const [pins, setPins] = useState([]); 
+  const [user, setUser] = useState(null); // { token, username }
+  const [userProfile, setUserProfile] = useState(null); // Full user object (bindings etc)
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [companyDB, setCompanyDB] = useState({});
   const [leafletReady, setLeafletReady] = useState(false);
   const [geoData, setGeoData] = useState({ type: "FeatureCollection", features: [] });
@@ -1036,6 +1066,90 @@ export default function RailRoundApp() {
       if (keyNorm.startsWith(n) || n.startsWith(keyNorm)) return companyIndex[keyNorm];
     }
     return name; // fallback to original
+  };
+
+  // 检查登录状态 (包含处理 OAuth 回调)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('token');
+    const usernameFromUrl = urlParams.get('username');
+
+    if (tokenFromUrl && usernameFromUrl) {
+        // Handle OAuth Login
+        setUser({ token: tokenFromUrl, username: usernameFromUrl });
+        localStorage.setItem('rail_token', tokenFromUrl);
+        localStorage.setItem('rail_username', usernameFromUrl);
+        loadUserData(tokenFromUrl, true);
+
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+        // Handle Local Storage Login
+        const token = localStorage.getItem('rail_token');
+        const username = localStorage.getItem('rail_username');
+        if (token && username) {
+          setUser({ token, username });
+          loadUserData(token);
+        }
+    }
+  }, []);
+
+  const loadUserData = async (token, isInteractive = false) => {
+    try {
+      const cloudData = await api.getData(token);
+      setUserProfile(cloudData); // Store full profile including bindings
+
+      let newTrips = cloudData.trips || [];
+      let newPins = cloudData.pins || [];
+
+      if (isInteractive && (trips.length > 0 || pins.length > 0)) {
+         // Merge Strategy
+         if (confirm("检测到本地有数据，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)")) {
+             // Merge
+             // Use Map to deduplicate by ID
+             const tripMap = new Map();
+             newTrips.forEach(t => tripMap.set(t.id, t));
+             trips.forEach(t => tripMap.set(t.id, t)); // Local overwrites cloud if conflict? Or vice versa. Usually local is fresher if just edited.
+             newTrips = Array.from(tripMap.values());
+
+             const pinMap = new Map();
+             newPins.forEach(p => pinMap.set(p.id, p));
+             pins.forEach(p => pinMap.set(p.id, p));
+             newPins = Array.from(pinMap.values());
+
+             // Sync back the merged result to cloud immediately
+             if (token) {
+                api.saveData(token, newTrips, newPins).catch(e => console.error("Merge sync failed", e));
+             }
+         }
+      }
+
+      setTrips(newTrips.sort((a,b) => b.date.localeCompare(a.date)));
+      setPins(newPins);
+      console.log('User data loaded');
+    } catch (e) {
+      console.error('Failed to load user data:', e);
+      if (e.message.includes('Unauthorized')) {
+        handleLogout();
+      }
+    }
+  };
+
+  const handleLoginSuccess = (data) => {
+    setUser({ token: data.token, username: data.username });
+    localStorage.setItem('rail_token', data.token);
+    localStorage.setItem('rail_username', data.username);
+    // 加载数据
+    loadUserData(data.token, true);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('rail_token');
+    localStorage.removeItem('rail_username');
+    // 可选：清空本地数据
+    // setTrips([]);
+    // setPins([]);
   };
 
   // 自动加载 company_data.json 和所有 GeoJSON 文件（更稳健的解析与匹配）
@@ -1562,7 +1676,14 @@ export default function RailRoundApp() {
     const newTripsToAdd = groupedTrips.map((segs, index) => ({ id: Date.now() + index, date: tripForm.date, cost: index === 0 ? (tripForm.cost || 0) : 0, suicaBalance: null, memo: tripForm.memo, segments: segs, lineKey: segs[0].lineKey, fromId: segs[0].fromId, toId: segs[segs.length-1].toId }));
     let nextTrips = [...trips];
     if (editingTripId) { nextTrips = nextTrips.filter(t => t.id !== editingTripId); }
-    setTrips([...newTripsToAdd, ...nextTrips].sort((a,b) => b.date.localeCompare(a.date)));
+    const finalTrips = [...newTripsToAdd, ...nextTrips].sort((a,b) => b.date.localeCompare(a.date));
+    setTrips(finalTrips);
+
+    // Sync to Cloud
+    if (user) {
+       api.saveData(user.token, finalTrips, pins).catch(e => alert('云端保存失败: ' + e.message));
+    }
+
     setIsTripEditing(false); setEditingTripId(null); 
     setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [], cost: 0 });
   };
@@ -1572,7 +1693,15 @@ export default function RailRoundApp() {
     setTripForm(JSON.parse(JSON.stringify(formState))); setEditingTripId(trip.id); setIsTripEditing(true);
   };
   
-  const handleDeleteTrip = (id) => { if (confirm('确认删除?')) setTrips(prev => prev.filter(t => t.id !== id)); };
+  const handleDeleteTrip = (id) => {
+      if (confirm('确认删除?')) {
+          const newTrips = trips.filter(t => t.id !== id);
+          setTrips(newTrips);
+          if (user) {
+             api.saveData(user.token, newTrips, pins).catch(e => alert('云端同步失败'));
+          }
+      }
+  };
   
   const handleAutoRouteSearch = () => {
     const { startLine, startStation, endLine, endStation } = autoForm;
@@ -1595,8 +1724,32 @@ export default function RailRoundApp() {
     else { setPinMode('idle'); setEditingPin(null); }
   };
   const createTempPin = () => { if (!mapInstance.current) return; const c = mapInstance.current.getCenter(); setEditingPin({ id: 'temp', lat: c.lat, lng: c.lng, type: 'photo', color: COLOR_PALETTE[0], isTemp: true }); mapInstance.current.panBy([0, 150]); };
-  const savePin = () => { if (!editingPin) return; const newPin = { ...editingPin, id: editingPin.isTemp ? Date.now() : editingPin.id }; delete newPin.isTemp; setPins(prev => editingPin.isTemp ? [...prev, newPin] : prev.map(p => p.id === newPin.id ? newPin : p)); setEditingPin(null); setPinMode('idle'); };
-  const deletePin = (id) => { if(confirm('删除?')) { setPins(prev => prev.filter(p => p.id !== id)); if (editingPin?.id === id) setEditingPin(null); } };
+  const savePin = () => {
+      if (!editingPin) return;
+      const newPin = { ...editingPin, id: editingPin.isTemp ? Date.now() : editingPin.id };
+      delete newPin.isTemp;
+
+      const newPins = editingPin.isTemp ? [...pins, newPin] : pins.map(p => p.id === newPin.id ? newPin : p);
+      setPins(newPins);
+
+      if (user) {
+         api.saveData(user.token, trips, newPins).catch(e => console.error('Pin sync failed', e));
+      }
+
+      setEditingPin(null);
+      setPinMode('idle');
+  };
+  const deletePin = (id) => {
+      if(confirm('删除?')) {
+          const newPins = pins.filter(p => p.id !== id);
+          setPins(newPins);
+          if (editingPin?.id === id) setEditingPin(null);
+
+          if (user) {
+            api.saveData(user.token, trips, newPins).catch(e => console.error('Pin sync failed', e));
+          }
+      }
+  };
  
   const railLayerRef = useRef(null); 
   const initMap = () => {
@@ -1737,30 +1890,45 @@ export default function RailRoundApp() {
       <style>{LEAFLET_CSS}</style>
       <header className="bg-slate-900 text-white p-4 shadow-md z-30 flex justify-between shrink-0">
         <div className="flex items-center gap-2"><Train className="text-emerald-400"/> <span className="font-bold">RailRound</span></div>
-        {activeTab !== 'map' ? (
-           <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+            {user ? (
+               <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-300 hidden sm:inline">欢迎, {user.username}</span>
+                  <button onClick={handleLogout} className="bg-slate-700 hover:bg-red-900 p-2 rounded text-xs flex items-center gap-1 transition">
+                      <LogOut size={14}/><span className="hidden sm:inline">退出</span>
+                  </button>
+               </div>
+            ) : (
+               <button onClick={() => setIsLoginOpen(true)} className="bg-blue-600 hover:bg-blue-500 p-2 rounded text-xs flex items-center gap-1 transition font-bold">
+                   <User size={14}/><span className="hidden sm:inline">登录 / 注册</span>
+               </button>
+            )}
+
+            {activeTab !== 'map' ? (
+            <div className="flex gap-2 ml-2 border-l border-slate-700 pl-2">
                <button onClick={handleExportKML} className="cursor-pointer bg-emerald-700 hover:bg-emerald-600 p-2 rounded text-xs flex items-center gap-1 transition">
                    <Download size={14}/><span className="hidden sm:inline">导出 KML</span>
                </button>
-               <button onClick={handleExportUserData} className="cursor-pointer bg-emerald-700 hover:bg-emerald-600 p-2 rounded text-xs flex items-center gap-1 transition">
-                   <Download size={14}/><span className="hidden sm:inline">导出存档</span>
-               </button>
-               <label className="cursor-pointer bg-slate-700 hover:bg-slate-600 p-2 rounded text-xs flex items-center gap-1 transition">
-                   <Upload size={14}/><span className="hidden sm:inline">导入存档</span>
-                   <input type="file" accept=".json" className="hidden" onChange={handleImportUserData}/>
-               </label>
-           </div>
-        ) : (
-          <div className="flex gap-2">
-              <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition"><Building2 size={14}/><span className="hidden sm:inline">上传公司数据</span><input type="file" accept=".json" className="hidden" onChange={handleCompanyUpload}/></label>
-              <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition"><FilePlus size={14}/><span className="hidden sm:inline">添加 GeoJSON</span><input type="file" multiple accept=".geojson,.json" className="hidden" onChange={handleFileUpload}/></label>
-          </div>
-        )}
+                <button onClick={handleExportUserData} className="cursor-pointer bg-emerald-900/50 hover:bg-emerald-800 p-2 rounded text-xs flex items-center gap-1 transition">
+                    <Download size={14}/>
+                </button>
+                <label className="cursor-pointer bg-slate-800/50 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition">
+                    <Upload size={14}/>
+                    <input type="file" accept=".json" className="hidden" onChange={handleImportUserData}/>
+                </label>
+            </div>
+            ) : (
+            <div className="flex gap-2 ml-2 border-l border-slate-700 pl-2">
+                <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition"><Building2 size={14}/><span className="hidden sm:inline">数据</span><input type="file" accept=".json" className="hidden" onChange={handleCompanyUpload}/></label>
+                <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition"><FilePlus size={14}/><span className="hidden sm:inline">地图</span><input type="file" multiple accept=".geojson,.json" className="hidden" onChange={handleFileUpload}/></label>
+            </div>
+            )}
+        </div>
       </header>
 
       <div className="flex-1 relative overflow-hidden flex flex-col">
         {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
-        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} />}
+        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} />}
         <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
           <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
           <FabButton activeTab={activeTab} pinMode={pinMode} togglePinMode={togglePinMode} />
@@ -1768,6 +1936,9 @@ export default function RailRoundApp() {
         </div>
       </div>
       <TripEditor isOpen={isTripEditing} onClose={() => setIsTripEditing(false)} isEditing={!!editingTripId} form={tripForm} setForm={setTripForm} onSave={handleSaveTrip} railwayData={railwayData} editorMode={editorMode} setEditorMode={setEditorMode} autoForm={autoForm} setAutoForm={setAutoForm} onAutoSearch={handleAutoRouteSearch} isRouteSearching={isRouteSearching} />
+
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />
+
       {/* Line Selector */}
       <LineSelector isOpen={false} onClose={() => {}} onSelect={() => {}} railwayData={railwayData} /> 
       <nav className="bg-white border-t p-2 flex justify-around shrink-0 pb-safe z-30">

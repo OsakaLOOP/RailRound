@@ -43,32 +43,32 @@ export async function onRequest(event) {
         };
 
         // --- SVG Generation (Glassmorphism) ---
-        // 1:2 Ratio -> 600x300
+        // Dimensions optimized for 5 items: ~340px height
         const cardWidth = 600;
-        const cardHeight = 300;
+        const cardHeight = 340;
 
-        // Colors
+        // Colors (Solid text for better readability)
         const glassBg = "rgba(15, 23, 42, 0.6)"; // Slate-900 with opacity
         const glassBorder = "rgba(255, 255, 255, 0.1)";
-        const textColor = "#e2e8f0"; // Slate-200
-        const labelColor = "#94a3b8"; // Slate-400
+        const textColor = "#ffffff"; // White for maximum contrast
+        const labelColor = "#94a3b8"; // Slate-400 for labels
         const accentColor = "#2dd4bf"; // Teal-400
 
         const styles = `
             .bg { fill: ${glassBg}; stroke: ${glassBorder}; stroke-width: 1px; }
             .text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: ${textColor}; }
             .label { font-size: 10px; fill: ${labelColor}; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
-            .value { font-size: 20px; font-weight: 800; fill: #f1f5f9; }
-            .trip-title { font-size: 11px; font-weight: 600; fill: #f8fafc; }
+            .value { font-size: 20px; font-weight: 800; fill: ${textColor}; }
+            .trip-title { font-size: 11px; font-weight: 600; fill: ${textColor}; }
             .trip-date { font-size: 9px; fill: ${labelColor}; }
             .trip-dist { font-size: 9px; fill: ${labelColor}; font-family: monospace; }
             .line-path { fill: none; stroke: ${accentColor}; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
             .separator { stroke: ${glassBorder}; stroke-width: 1; }
         `;
 
-        // Icon SVG (Lucide Train Standard)
+        // Icon SVG (Lucide Train Standard) placed at top right
         const iconSvg = `
-            <g transform="translate(${cardWidth - 40}, 20) scale(1)">
+            <g transform="translate(${cardWidth - 40}, 24) scale(1)">
                 <path d="M4 14c0-5.5 4.5-10 10-10s10 4.5 10 10v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6z" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M4 14h16" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M12 4v10" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -86,46 +86,53 @@ export async function onRequest(event) {
             <!-- Glass Background -->
             <rect x="2" y="2" width="${cardWidth-4}" height="${cardHeight-4}" rx="16" class="bg"/>
 
-            <!-- Header Section (Top Left) -->
-            <text x="24" y="36" class="text" style="font-size: 16px; font-weight: bold; letter-spacing: -0.5px;">${esc(username)}'s RailRound</text>
+            <!-- Header Section -->
+            <text x="24" y="44" class="text" style="font-size: 18px; font-weight: 800; letter-spacing: -0.5px;">${esc(username)}'s RailRound</text>
             ${iconSvg}
 
-            <line x1="24" y1="56" x2="${cardWidth-24}" y2="56" class="separator"/>
-
-            <!-- Stats Grid (Middle) -->
+            <!-- Stats Grid (Top Right, shifted left of icon) -->
             <g transform="translate(24, 75)">
-                <!-- Count -->
-                <g>
-                    <text x="0" y="0" class="label">Trips</text>
-                    <text x="0" y="24" class="value">${stats.count}</text>
-                </g>
-                <line x1="70" y1="0" x2="70" y2="30" class="separator"/>
-
-                <!-- Lines -->
-                <g transform="translate(100, 0)">
-                    <text x="0" y="0" class="label">Lines</text>
-                    <text x="0" y="24" class="value" style="fill: #818cf8;">${stats.lines}</text>
-                </g>
-                <line x1="170" y1="0" x2="170" y2="30" class="separator"/>
-
-                <!-- Distance -->
-                <g transform="translate(200, 0)">
-                    <text x="0" y="0" class="label">Distance</text>
-                    <text x="0" y="24" class="value" style="fill: #34d399;">${Math.round(stats.dist)}<tspan font-size="12" fill="${labelColor}" dx="2">km</tspan></text>
-                </g>
+                <!-- Stats moved to header line to save vertical space? Or kept below?
+                     User said "placing the stats split on the right".
+                     Let's move them up to y=20 relative to header or keep in separate row but compressed.
+                     Let's try putting them on the same visual "block" but aligned.
+                -->
             </g>
 
-            <line x1="24" y1="120" x2="${cardWidth-24}" y2="120" class="separator"/>
+            <!-- Redesigned Stats (Aligned Right) -->
+            <g transform="translate(240, 24)">
+               <!-- Trips -->
+               <g transform="translate(0, 0)">
+                  <text x="0" y="0" class="label">Trips</text>
+                  <text x="0" y="20" class="value">${stats.count}</text>
+                  <line x1="50" y1="2" x2="50" y2="22" class="separator"/>
+               </g>
+
+               <!-- Lines -->
+               <g transform="translate(70, 0)">
+                  <text x="0" y="0" class="label">Lines</text>
+                  <text x="0" y="20" class="value" style="fill: #818cf8;">${stats.lines}</text>
+                  <line x1="50" y1="2" x2="50" y2="22" class="separator"/>
+               </g>
+
+               <!-- Distance -->
+               <g transform="translate(140, 0)">
+                  <text x="0" y="0" class="label">Distance</text>
+                  <text x="0" y="20" class="value" style="fill: #34d399;">${Math.round(stats.dist)}<tspan font-size="12" fill="${labelColor}" dx="2">km</tspan></text>
+               </g>
+            </g>
+
+            <line x1="24" y1="70" x2="${cardWidth-24}" y2="70" class="separator"/>
 
             <!-- Recent Trips List (Bottom) -->
-            <g transform="translate(24, 140)">
+            <g transform="translate(24, 90)">
                 <text x="0" y="0" class="label" style="opacity: 0.7">Recent Activity</text>
 
                 <g transform="translate(0, 15)">
         `;
 
-        // Render up to 3 items to fit 300px height comfortably
-        const displayLimit = 3;
+        // Render up to 5 items
+        const displayLimit = 5;
         const rowH = 45;
 
         stats.latest.slice(0, displayLimit).forEach((trip, idx) => {
@@ -146,8 +153,6 @@ export async function onRequest(event) {
 
                     <!-- Mini Graph Container -->
                     <g transform="translate(${cardWidth - 160}, 5)">
-                         <!-- Graph Box Border (optional) -->
-                         <!-- <rect width="100" height="30" fill="none" stroke="${glassBorder}" rx="4"/> -->
                          <svg width="100" height="30" viewBox="0 0 100 50" preserveAspectRatio="none">
                             <path d="${points}" class="line-path" vector-effect="non-scaling-stroke"/>
                          </svg>

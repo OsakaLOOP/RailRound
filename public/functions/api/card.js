@@ -68,14 +68,14 @@ export async function onRequest(event) {
 
         // Icon SVG (Lucide Train Standard)
         const iconSvg = `
-            <g transform="translate(${cardWidth - 40}, 20) scale(1)">
-                <path d="M4 14c0-5.5 4.5-10 10-10s10 4.5 10 10v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6z" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M4 14h16" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12 4v10" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="m8 19-2 3" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="m16 19 2 3" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M9 15h.01" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M15 15h.01" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <g transform="translate(${cardWidth - 48}, 20)" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+                <rect width="16" height="16" x="4" y="3" rx="2"/>
+                <path d="M4 11h16"/>
+                <path d="M12 3v8"/>
+                <path d="m8 19-2 3"/>
+                <path d="m18 22-2-3"/>
+                <path d="M8 15h.01"/>
+                <path d="M16 15h.01"/>
             </g>
         `;
 

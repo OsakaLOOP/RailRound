@@ -40,7 +40,7 @@ export async function onRequest(event) {
 
     if (event.request.method === "POST") {
         const body = await event.request.json();
-        const { trips, pins, latest_5 } = body;
+        const { trips, pins, latest_5, version } = body;
 
         // Fetch existing to preserve other fields (like password, bindings)
         const existingRaw = await DB.get(userKey);
@@ -50,7 +50,8 @@ export async function onRequest(event) {
             ...existing,
             trips: trips || existing.trips || [],
             pins: pins || existing.pins || [],
-            latest_5: latest_5 || existing.latest_5 || null // Store the pre-calculated card data
+            latest_5: latest_5 || existing.latest_5 || null, // Store the pre-calculated card data
+            version: version || existing.version || null
         };
 
         await DB.put(userKey, JSON.stringify(newData));

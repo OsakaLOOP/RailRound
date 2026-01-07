@@ -16,6 +16,9 @@ import { LoginModal } from './components/LoginModal';
 import { api } from './services/api';
 import { db } from './utils/db';
 
+const CURRENT_VERSION = 0.30;
+const MIN_SUPPORTED_VERSION = 0.0;
+
 const GithubRegisterModal = ({ isOpen, onClose, regToken, onLoginSuccess }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -1458,7 +1461,7 @@ export default function RailLOOPApp() {
 
              // Sync back the merged result to cloud immediately
              if (token) {
-                api.saveData(token, newTrips, newPins).catch(e => console.error("Merge sync failed", e));
+                api.saveData(token, newTrips, newPins, null, CURRENT_VERSION).catch(e => console.error("Merge sync failed", e));
              }
          }
       }
@@ -2158,7 +2161,7 @@ export default function RailLOOPApp() {
     // Sync to Cloud
     if (user) {
        const latest5 = calculateLatestStats(finalTrips, segmentGeometries, railwayData, geoData);
-       api.saveData(user.token, finalTrips, pins, latest5).catch(e => alert('云端保存失败: ' + e.message));
+       api.saveData(user.token, finalTrips, pins, latest5, CURRENT_VERSION).catch(e => alert('云端保存失败: ' + e.message));
     }
 
     setIsTripEditing(false); setEditingTripId(null); 
@@ -2176,7 +2179,7 @@ export default function RailLOOPApp() {
           setTrips(newTrips);
           if (user) {
              const latest5 = calculateLatestStats(newTrips, segmentGeometries, railwayData, geoData);
-             api.saveData(user.token, newTrips, pins, latest5).catch(e => alert('云端同步失败'));
+             api.saveData(user.token, newTrips, pins, latest5, CURRENT_VERSION).catch(e => alert('云端同步失败'));
           }
       }
   };
@@ -2211,7 +2214,7 @@ export default function RailLOOPApp() {
       setPins(newPins);
 
       if (user) {
-         api.saveData(user.token, trips, newPins).catch(e => console.error('Pin sync failed', e));
+         api.saveData(user.token, trips, newPins, null, CURRENT_VERSION).catch(e => console.error('Pin sync failed', e));
       }
 
       setEditingPin(null);
@@ -2224,7 +2227,7 @@ export default function RailLOOPApp() {
           if (editingPin?.id === id) setEditingPin(null);
 
           if (user) {
-            api.saveData(user.token, trips, newPins).catch(e => console.error('Pin sync failed', e));
+            api.saveData(user.token, trips, newPins, null, CURRENT_VERSION).catch(e => console.error('Pin sync failed', e));
           }
       }
   };

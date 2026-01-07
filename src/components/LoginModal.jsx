@@ -1,10 +1,95 @@
 import React, { useState, useEffect } from 'react';
-import { X, LogIn, UserPlus, Github, Mail, Globe } from 'lucide-react';
+import { X, LogIn, UserPlus, Github, Mail } from 'lucide-react';
 import { api } from '../services/api';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 
-// Dependencies: react-markdown, remark-gfm are required.
+// Custom Markdown Renderer to ensure consistent styling without dependencies
+const renderMarkdown = (text) => {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  const elements = [];
+  let listBuffer = [];
+  let currentIndent = 0; // 0 for H1, 1 for H2, 2 for H3... used for indentation
+
+  const flushList = () => {
+    if (listBuffer.length > 0) {
+      elements.push(
+        <ul key={`ul-${elements.length}`} className={`list-disc list-inside mb-4 pl-4 space-y-1 text-gray-600 ${currentIndent === 1 ? 'ml-4' : currentIndent === 2 ? 'ml-8' : ''}`}>
+          {listBuffer.map((item, i) => (
+            <li key={i} dangerouslySetInnerHTML={{ __html: parseLinks(item) }} />
+          ))}
+        </ul>
+      );
+      listBuffer = [];
+    }
+  };
+
+  const parseLinks = (str) => {
+    // Replace [text](url) with <a ...> using callback to check for "CR200J"
+    return str.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
+      const isGreen = text.includes('CR200J') || url.includes('CR200J');
+      const classes = isGreen
+        ? "text-emerald-600 hover:text-emerald-800 hover:underline transition-colors font-medium"
+        : "text-blue-600 hover:text-blue-800 hover:underline transition-colors font-medium";
+
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="${classes}">${text}</a>`;
+    });
+  };
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushList();
+      return;
+    }
+
+    if (trimmed.startsWith('- ')) {
+      listBuffer.push(trimmed.substring(2));
+    } else {
+      flushList();
+
+      if (trimmed.startsWith('# ')) {
+        currentIndent = 0;
+        elements.push(
+          <h1 key={index} className="text-2xl font-bold text-center my-6 text-gray-800">
+            {trimmed.substring(2)}
+          </h1>
+        );
+      } else if (trimmed.startsWith('## ')) {
+        currentIndent = 1;
+        elements.push(
+          <h2 key={index} className="text-xl font-bold mt-6 mb-3 pb-2 border-b border-gray-200 text-gray-800 ml-4">
+            {trimmed.substring(3)}
+          </h2>
+        );
+      } else if (trimmed.startsWith('### ')) {
+        currentIndent = 2;
+        elements.push(
+          <h3 key={index} className="text-lg font-bold mt-4 mb-2 text-gray-800 ml-8">
+            {trimmed.substring(4)}
+          </h3>
+        );
+      } else if (trimmed.startsWith('> ')) {
+        // Blockquotes inherit indentation
+        const indentClass = currentIndent === 1 ? 'ml-4' : currentIndent === 2 ? 'ml-8' : '';
+        elements.push(
+          <blockquote key={index} className={`border-l-4 border-gray-300 pl-4 py-2 my-4 bg-gray-50 text-gray-600 italic rounded-r ${indentClass}`}>
+            {trimmed.substring(2)}
+          </blockquote>
+        );
+      } else {
+        // Paragraph - inherit indentation
+        const indentClass = currentIndent === 1 ? 'ml-4' : currentIndent === 2 ? 'ml-8' : '';
+        elements.push(
+          <p key={index} className={`mb-4 leading-relaxed text-gray-600 ${indentClass}`} dangerouslySetInnerHTML={{ __html: parseLinks(trimmed) }} />
+        );
+      }
+    }
+  });
+  flushList();
+
+  return elements;
+};
 
 export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -56,7 +141,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
       <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-slide-up h-[80vh] md:h-[600px]" onClick={e => e.stopPropagation()}>
 
         {/* Left: Login Form */}
-        <div className="w-full md:w-[40%] p-8 flex flex-col justify-center border-b md:border-b-0 md:border-r border-gray-100 relative">
+        <div className="w-full md:w-[40%] p-8 flex flex-col justify-center border-b md:border-b-0 md:border-r border-gray-100 relative bg-white z-10">
              <button onClick={onClose} className="absolute top-4 left-4 md:hidden"><X className="text-gray-400 hover:text-gray-600"/></button>
             <div className="mb-8">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2 mb-2">
@@ -164,12 +249,8 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
-                <article className="prose prose-sm prose-slate max-w-none prose-headings:font-bold prose-h1:text-center prose-h1:text-2xl prose-h1:text-gray-800 prose-p:text-gray-600 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {readmeContent}
-                    </ReactMarkdown>
-                </article>
+            <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
+                {renderMarkdown(readmeContent)}
             </div>
 
             <div className="p-4 border-t bg-white/50 backdrop-blur text-center text-xs text-gray-400 shrink-0">

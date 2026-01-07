@@ -10,6 +10,10 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 
 如果你是一個剛剛被傳送至此的星際搭車客 (或者不受歡迎的 [JR](https://www.jr-odekake.net) 鐵道迷)，請務必遵循以下生存守則：
 
+- **記錄行程**: 在首頁點擊「記錄新行程」，支持公司/線路選擇或自動規劃。
+- **地圖模式**: 可視化查看您的足跡，支持上傳 GeoJSON 地圖文件。
+- **GitHub 掛件**: 綁定 GitHub 帳號後，可生成動態 SVG 卡片展示在您的個人主頁。
+
 * **存在與持久性 (The Persistence)**
     本服務不設立傳統的「帳戶」概念。當你訪問時，我們會基於瀏覽器 [LocalStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) 為你生成一個 [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier)。
     * **關於 Bypass 的警告**：請務必定時備份本地存儲，或者至少登陸帳號，綁定 [GitHub](https://github.com) 就更好了 (雖然這和存儲沒有更多關係，但是可以用於 Socializing)。雖然我們在邏輯上基於「線路/車站名稱和 ID」進行了深度綁定，擁有 **12 個 9** 的理論數據可靠性 (這甚至高於 CDN 的承諾)。這意味著，即便 [沃貢人](https://hitchhikers.fandom.com/wiki/Vogons) (或者 [JR 北海道](https://www.jrhokkaido.co.jp)) 為了建設一條新的新幹線聯絡線 (這不太可能) 而決定殘酷地廢線某些物理設施 (這絕對可能)，只要車站 ID 還在，你的記錄就不會隨版本更迭而失效。但如果你清空了緩存且沒綁定帳號，數據就會像被拋入 [全視角漩渦](https://hitchhikers.fandom.com/wiki/Total_Perspective_Vortex) 一樣消失。
@@ -30,11 +34,16 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 
 在使用本服務前，請知曉以下條款。這些條款像銀河系行政規劃圖一樣不可更改，但通常被放在沒人看的地下室裡。
 
+我們收集以下信息，僅用於提供對應服務：
+- 用戶名與加密後的密碼。
+- 您主動記錄的行程數據與圖釘信息。
+- 通過 GitHub 登入時的公開資料（頭像、暱稱）。
+
 * **與不可名狀的 py 交易**
     本服務的架構站在無數巨人的肩膀上，以及一些處於灰色地帶的努力：
     * **基礎設施**：感謝 **[EdgeOne](https://cloud.tencent.com/product/teo)** 提供了 Serverless 計算節點和 Pages CDN。
     * **特別鳴謝**：**[閑魚](https://2.taobao.com)**。正是在這個混亂而有效率的市場裡，我們以 10r 的低廉價格搞到了一個伺服器 Token，成功繞過了家用寬帶備案那如同沃貢官僚主義般的繁瑣限制，讓早期的原型機得以在物理世界呼吸。雖然後來為了穩定遷移到了 Pages，但這筆交易將永載史冊。
-    * **數據源**：**[國土交通省 (MLIT)](https://www.mlit.go.jp)**、**[ODPT](https://www.odpt.org)**、**[Ekidata](https://ekidata.jp)** 和 **[LOD](https://lod.org)**。(見開源協議)
+    * **數據源**：**[國土交通省 (MLIT)](https://www.mlit.go.jp)**、**[ODPT](https://www.odpt.org)**、**[Ekidata](https://ekidata.jp)** 和 **[鉄道駅LOD](https://uedayou.net/jrslod/)**。(見開源協議)
 
 * **關於「山手線」的拓撲悖論 (The Yamanote Paradox)**
     * **現象**：你可能會發現，地圖上的 **[山手線](https://zh.wikipedia.org/zh-tw/%E5%B1%B1%E6%89%8B%E7%B7%9A)** 並不是一個閉合的環，而是一個從品川經新宿到田端的「C」字形。
@@ -62,7 +71,7 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 #### Phase 1: 基礎生存 (Earning Rice for Fufu)
 1.  **Badge 系統大重構**：生成獨立的 Hash 列表用於公開展示，不再強迫用戶暴露自己的鑑權 Key。同時支持生成不同版本的 Badge，以滿足不同星球物種的審美，或者你想保存每一次無意義的出入國記錄。
 2.  **數據庫大清洗**：修復線路數據庫。雖然你可以手動選擇或者導入自己的 [GeoJSON](https://geojson.org)，但我們為了大多數用戶需要手動把那些在 GIS 定義裡斷開的線路 (比如那個山手線 C 字) 在視覺上焊起來，畢竟人類喜歡圓的東西。
-3.  **Ekidata 大引入**：引入換乘數據，讓路徑規劃看起來不那麼像是在擲骰子，或者 [西園寺](https://www.youtube.com/@SAIONJI_O) 和 [スーツ旅行](https://www.youtube.com/@SuitTravel) 的 **大回り乘車罰遊戲**。
+3.  **Ekidata 大引入**：引入換乘數據，讓路徑規劃看起來不那麼像是在擲骰子，或者 [西園寺](https://www.youtube.com/@saionjichannel) 和 [スーツ旅行](https://www.youtube.com/@SuitTravel) 的 **大回り乘車罰遊戲**。
 4.  **資源大開發**：將引用的 CDN 線路圖標本地化，防止上游服務商因為我們白嫖太多而切斷圖片供應，或者被牆。
 
 #### Phase 2: 引擎升級 (Improving the Drive)
@@ -98,6 +107,6 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 * **Geospatial Data**: Sourced from **[MLIT](https://www.mlit.go.jp/kokudoseisaku/gis/)** (Ministry of Land, Infrastructure, Transport and Tourism) - National Land Numerical Information.
     * *License*: [MLIT Standard Terms of Use](https://www.mlit.go.jp/kokudoseisaku/gis/terms.html) (CC BY 4.0 compatible).
 * **Station Data**: **[Ekidata.jp](https://ekidata.jp)**.
-* **Linked Open Data**: **[LOD Challenge](https://lodc.jp)** datasets.
+* **Linked Open Data**: **[LOD Challenge](https://uedayou.net/jrslod/)** datasets.
 
 > *Note: While RailLOOP itself is open source, the map data and railway icons cached locally are subject to their original copyright holders' terms.*

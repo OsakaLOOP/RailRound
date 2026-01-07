@@ -61,10 +61,10 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             <div className="mb-8">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2 mb-2">
                     {isRegistering ? <UserPlus className="text-emerald-600"/> : <LogIn className="text-blue-600"/>}
-                    {isRegistering ? '注册新账号' : '登录 RailRound'}
+                    {isRegistering ? '注册新账号' : '登录 RailLOOP'}
                 </h2>
                 <p className="text-sm text-gray-500">
-                    {isRegistering ? '开启你的铁道制霸之旅' : '欢迎回来，指挥官'}
+                    {isRegistering ? '开启你的铁道制霸之旅' : '欢迎回来，铁道迷'}
                 </p>
             </div>
 

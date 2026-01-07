@@ -8,6 +8,10 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 
 『[銀河鉄道ファン・ガイド](https://ja.wikipedia.org/wiki/%E9%8A%80%E6%B2%B3%E3%83%92%E3%83%83%E3%83%81%E3%83%8F%E3%82%A4%E3%82%AF%E3%83%BB%E3%82%AC%E3%82%A4%E3%83%89)』における **RailLOOP** の定義は以下の通りです：これはほぼ完全に「タダ乗り」(Freeloader) 精神によって駆動され、[Serverless](https://en.wikipedia.org/wiki/Serverless_computing) / [Edge-function](https://en.wikipedia.org/wiki/Edge_computing) アーキテクチャに基づいた、忠実かつ多様で、**汎オタク精神** に溢れた旅鉄記録装置です。それは複雑な工学的奇跡のように見えますが、実際にはその大部分が [WD-40™](https://www.wd40.com)、祈り、そして無料利用枠 (本当に多いですが、システムの誤検知とスクリプトキディには警戒が必要です) によって維持されています。
 
+- **旅程を記録**: ホーム画面で「新しい旅程を記録」をクリック。鉄道事業者/路線の選択、または自動計画をサポート。
+- **マップモード**: 足跡を可視化。GeoJSON 地図ファイルのアップロードをサポート。
+- **GitHub Widget**: GitHub アカウント連携後、個人プロフィールに表示可能な動的 SVG カードを生成。
+
 もしあなたがここに転送されてきたばかりの星間ヒッチハイカー (あるいは歓迎されてない「**[厄介鉄](https://dic.nicovideo.jp/a/%E5%8E%84%E4%BB%8B%E9%89%84)**」と呼ばれる JR 鉄道ファン) なら、以下の生存規則を必ず遵守してください：
 
 * **実存と永続性 (The Persistence)**
@@ -30,11 +34,16 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 
 本サービスを利用する前に、以下の条項を承知しておいてください。これらの条項は銀河バイパス建設予定図のように変更不可能ですが、通常は誰も見掛けてない地下室に置かれています。
 
+当サービスは、以下の情報をサービスの提供のみを目的として収集します：    
+- ユーザー名と暗号化されたパスワード。
+- ユーザーが能動的に記録した旅程データとピン情報。
+- GitHub ログイン時の公開プロフィール (アバター、ニックネーム)。
+
 * **名状しがたい裏取引**
     本サービスのアーキテクチャは無数の巨人の肩の上、そしていくつかのグレーゾーンの努力の上に成り立っています：
     * **インフラ**: Serverless 計算ノードと Pages CDN を提供してくれた **[EdgeOne](https://cloud.tencent.com/product/teo)** に感謝します。
     * **Special Thanks**: **[閑魚 (Xianyu)](https://2.taobao.com)**。この混沌としつつも効率的な市場で、私たちは 10 人民元という低価格でサーバー Token を入手し、ヴォゴンの官僚主義のような家庭用ブロードバンド登録の煩雑な制限を回避し、初期のプロトタイプを物理世界で呼吸させることに成功しました。後に安定性のために Pages に移行しましたが、この取引は歴史に刻まれるでしょう。
-    * **データソース**: **[国土交通省 (MLIT)](https://www.mlit.go.jp)**、**[ODPT](https://www.odpt.org)**、**[駅データ.jp](https://ekidata.jp)**、そして **[LOD](https://lod.org)**。(オープンソースライセンス参照)
+    * **データソース**: **[国土交通省 (MLIT)](https://www.mlit.go.jp)**、**[ODPT](https://www.odpt.org)**、**[駅データ.jp](https://ekidata.jp)**、そして **[鉄道駅LOD](https://uedayou.net/jrslod/)**。(オープンソースライセンス参照)
 
 * **「山手線」のトポロジーパラドックス (The Yamanote Paradox)**
     * **現象**: 地図上の **[山手線](https://ja.wikipedia.org/wiki/%E5%B1%B1%E6%89%8B%E7%B7%9A)** が閉じた環状線ではなく、品川から新宿を経由して田端に至る「C」の字形であることに気づくかもしれません。
@@ -62,7 +71,7 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 #### Phase 1: 基礎生存 (Earning Rice for Fufu)
 1.  **Badge システムの大規模リファクタリング**: 公開表示用の独立した Hash リストを生成し、ユーザーに認証 Key を晒すことを強制しないようにします。同時に、異なる惑星の種族の美的感覚を満たすため、あるいは無意味な出入国記録をすべて保存したい人のために、異なるバージョンの Badge 生成をサポートします。
 2.  **データベースの大掃除**: 路線データベースの修復。手動で独自の [GeoJSON](https://geojson.org) を選択またはインポートすることもできますが、大多数のユーザーのために、GIS 定義で途切れている路線 (例の山手線の C の字など) を視覚的に溶接する必要があります。結局のところ、人類は丸いものが好きなのです。
-3.  **駅データの導入**: 乗換データを導入し、経路探索がサイコロ振りのように見えないようにします。あるいは [西園寺](https://www.youtube.com/@SAIONJI_O) や [スーツ旅行](https://www.youtube.com/@SuitTravel) の **大回り乗車罰ゲーム** (Omawari Penalty Game) のようにならないように。
+3.  **駅データの導入**: 乗換データを導入し、経路探索がサイコロ振りのように見えないようにします。あるいは [西園寺](https://www.youtube.com/@saionjichannel) や [スーツ旅行](https://www.youtube.com/@SuitTravel) の **大回り乗車罰ゲーム** (Omawari Penalty Game) のようにならないように。
 4.  **リソース開発**: 引用している CDN の路線アイコンをローカライズし、タダ乗りのしすぎで上流のプロバイダーに画像の供給を断たれたり、ファイアウォールに遮断されたりするのを防ぎます。
 
 #### Phase 2: エンジンのアップグレード (Improving the Drive)
@@ -98,6 +107,6 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 * **Geospatial Data**: Sourced from **[MLIT](https://www.mlit.go.jp/kokudoseisaku/gis/)** (国土交通省) - National Land Numerical Information.
     * *License*: [MLIT Standard Terms of Use](https://www.mlit.go.jp/kokudoseisaku/gis/terms.html) (CC BY 4.0 compatible).
 * **Station Data**: **[Ekidata.jp](https://ekidata.jp)**.
-* **Linked Open Data**: **[LOD Challenge](https://lodc.jp)** datasets.
+* **Linked Open Data**: **[JRSLOD](https://uedayou.net/jrslod/)** datasets.
 
 > *Note: While RailLOOP itself is open source, the map data and railway icons cached locally are subject to their original copyright holders' terms.*

@@ -10,6 +10,10 @@ The *[Railfan's Guide to the Galaxy](https://en.wikipedia.org/wiki/The_Hitchhike
 
 If you are an interstellar hitchhiker who has just been beamed here (or an unpopular [JR](https://www.jr-odekake.net) rail fan), please ensure you follow these survival rules:
 
+- **Record Journey**: Click "Record New Trip" on the homepage. Supports selection by Operator/Line or automatic routing.
+- **Map Mode**: Visualize your footprints. Supports uploading custom GeoJSON map files.
+- **GitHub Widget**: After binding your GitHub account, generate a dynamic SVG card to display on your personal profile.
+
 * **The Persistence**
     This service does not establish a traditional concept of "Accounts". When you visit, we generate a [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier) based on your browser's [LocalStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage).
     * **Warning regarding Bypasses**: Please adhere to regular local storage backups, or at least log in and bind your [GitHub](https://github.com) account (although this has little to do with storage, it is good for Socializing). Although we are logically deeply bound based on "Line/Station Names and IDs", possessing a theoretical data reliability of **12 Nines** (which is even higher than the CDN's promise). This means that even if the [Vogons](https://hitchhikers.fandom.com/wiki/Vogons) (or [JR Hokkaido](https://www.jrhokkaido.co.jp)) decide to brutally abolish certain physical facilities to build a new Shinkansen bypass (highly unlikely) or for other reasons (absolutely likely), as long as the Station ID remains, your records will not expire with version updates. However, if you clear your cache without binding an account, your data will vanish just like the [Earth](https://hitchhikers.fandom.com/wiki/Earth) (Disambiguation: [The Earth - Supercomputer](https://hitchhikers.fandom.com/wiki/Earth), not [The Earth - Planet](https://en.wikipedia.org/wiki/Earth)).
@@ -30,11 +34,16 @@ If you are an interstellar hitchhiker who has just been beamed here (or an unpop
 
 Before using this service, please be aware of the following terms. These terms are as unchangeable as a Galactic Hyperspace Planning Map, but are usually kept in a basement where no one looks.
 
+We collect the following information solely for the purpose of providing the corresponding services:
+- Username and encrypted password.
+- Trip data and pin information you actively record.
+- Public profile information (avatar, nickname) accessed via GitHub login.
+
 * **Shady Deals & Acknowledgements**
     The architecture of this service stands on the shoulders of giants, as well as some efforts in the grey area:
     * **Infrastructure**: Thanks to **[EdgeOne](https://cloud.tencent.com/product/teo)** for providing Serverless compute nodes and Pages CDN.
     * **Special Thanks**: **[Xianyu](https://2.taobao.com)**. It was in this chaotic yet efficient marketplace that we procured a server Token for the low price of 10 RMB, successfully bypassing the Vogon-bureaucracy-like restrictions of residential broadband registration, allowing early prototypes to breathe in the physical world. Although we later migrated to Pages for stability, this transaction will go down in history.
-    * **Data Sources**: **[MLIT](https://www.mlit.go.jp)**, **[ODPT](https://www.odpt.org)**, **[Ekidata](https://ekidata.jp)**, and **[LOD](https://lod.org)**. (See Open Source License)
+    * **Data Sources**: **[MLIT](https://www.mlit.go.jp)**, **[ODPT](https://www.odpt.org)**, **[Ekidata](https://ekidata.jp)**, and **[JRSLOD](https://uedayou.net/jrslod/)**. (See Open Source License)
 
 * **The Yamanote Paradox**
     * **Phenomenon**: You may notice that the **[Yamanote Line](https://en.wikipedia.org/wiki/Yamanote_Line)** on the map is not a closed loop, but a "C" shape from Shinagawa via Shinjuku to Tabata.
@@ -62,7 +71,7 @@ The following is our plan to make sense of this chaotic and crowded universe, or
 #### Phase 1: Basic Survival (Earning Rice for Fufu)
 1.  **Badge System Refactoring**: Generate independent Hash lists for public display, no longer forcing users to expose their authentication Keys. Also supports generating different versions of Badges to satisfy the aesthetics of different planetary species, or if you want to save every meaningless entry/exit record.
 2.  **The Great Database Purge**: Fix the railway line database. Although you can manually select or import your own [GeoJSON](https://geojson.org), we need to manually weld those lines that are broken in GIS definitions (like that Yamanote "C") visually for the sake of most users, after all, humans like round things.
-3.  **The Great Ekidata Introduction**: Introduce transfer data so that route planning doesn't look like dice rolling, or a "[Great Round Trip Penalty Game](https://en.wikipedia.org/wiki/Omawari_train_ride)" by [Saionji](https://www.youtube.com/@SAIONJI_O) and [Suits Travel](https://www.youtube.com/@SuitTravel).
+3.  **The Great Ekidata Introduction**: Introduce transfer data so that route planning doesn't look like dice rolling, or a "[Great Round Trip Penalty Game](https://en.wikipedia.org/wiki/Omawari_train_ride)" by [Saionji](https://www.youtube.com/@saionjichannel) and [Suits Travel](https://www.youtube.com/@SuitTravel).
 4.  **Resource Development**: Localize referenced CDN line icons to prevent upstream providers from cutting off image supplies due to our excessive freeloading, or being blocked by firewalls.
 
 #### Phase 2: Improving the Drive
@@ -98,6 +107,6 @@ This service cites and displays data in accordance with the terms of use of the 
 * **Geospatial Data**: Sourced from **[MLIT](https://www.mlit.go.jp/kokudoseisaku/gis/)** (Ministry of Land, Infrastructure, Transport and Tourism) - National Land Numerical Information.
     * *License*: [MLIT Standard Terms of Use](https://www.mlit.go.jp/kokudoseisaku/gis/terms.html) (CC BY 4.0 compatible).
 * **Station Data**: **[Ekidata.jp](https://ekidata.jp)**.
-* **Linked Open Data**: **[LOD Challenge](https://lodc.jp)** datasets.
+* **Linked Open Data**: **[JRSLOD](https://uedayou.net/jrslod/)** datasets.
 
 > *Note: While RailLOOP itself is open source, the map data and railway icons cached locally are subject to their original copyright holders' terms.*

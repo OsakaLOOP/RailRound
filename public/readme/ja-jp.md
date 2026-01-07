@@ -15,7 +15,6 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 もしあなたがここに転送されてきたばかりの星間ヒッチハイカー (あるいは歓迎されてない「**[厄介鉄](https://dic.nicovideo.jp/a/%E5%8E%84%E4%BB%8B%E9%89%84)**」と呼ばれる JR 鉄道ファン) なら、以下の生存規則を必ず遵守してください：
 
 - **実存と永続性 (The Persistence)**
-    本サービスには伝統的な「アカウント」の概念が存在しません。アクセス時に、ブラウザの [LocalStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) に基づいて [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier) を生成します。
     - **Bypass に関する警告**: 必ずローカルストレージの定期バックアップを行うか、少なくともアカウントにログインし、[GitHub](https://github.com) と連携することをお勧めします (ストレージとはあまり関係ありませんが、Socializing には役立ちます)。論理的には「路線/駅名と ID」に基づいて深くバインドされており、**12 ナイン (99.9999999999%)** という理論上のデータ信頼性を持っています (これは CDN の保証すら上回ります)。つまり、たとえ [ヴォゴン人](https://hitchhikers.fandom.com/wiki/Vogons) (あるいは [JR 北海道](https://www.jrhokkaido.co.jp)) が新しい新幹線連絡線を建設するために (ありえませんが)、特定の物理的施設を残酷にも廃線にすることを決定したとしても (これは絶対にありえます)、駅 ID が存在する限り、あなたの記録がバージョン更新によって無効になることはありません。しかし、キャッシュをクリアし、かつアカウント連携をしていない場合、データはかつての地球 (曖昧さ回避: [The Earth - Supercomputer](https://hitchhikers.fandom.com/wiki/Earth), not [The Earth - Planet](https://en.wikipedia.org/wiki/Earth)) と同様に消失します。
 
 - **可用性の哲学 (The Probability)**

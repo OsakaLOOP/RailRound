@@ -15,7 +15,6 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 - **GitHub 掛件**: 綁定 GitHub 帳號後，可生成動態 SVG 卡片展示在您的個人主頁。
 
 - **存在與持久性 (The Persistence)**
-    本服務不設立傳統的「帳戶」概念。當你訪問時，我們會基於瀏覽器 [LocalStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) 為你生成一個 [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier)。
     - **關於 Bypass 的警告**：請務必定時備份本地存儲，或者至少登陸帳號，綁定 [GitHub](https://github.com) 就更好了 (雖然這和存儲沒有更多關係，但是可以用於 Socializing)。雖然我們在邏輯上基於「線路/車站名稱和 ID」進行了深度綁定，擁有 **12 個 9** 的理論數據可靠性 (這甚至高於 CDN 的承諾)。這意味著，即便 [沃貢人](https://hitchhikers.fandom.com/wiki/Vogons) (或者 [JR 北海道](https://www.jrhokkaido.co.jp)) 為了建設一條新的新幹線聯絡線 (這不太可能) 而決定殘酷地廢線某些物理設施 (這絕對可能)，只要車站 ID 還在，你的記錄就不會隨版本更迭而失效。但如果你清空了緩存且沒綁定帳號，數據就會像被拋入 [全視角漩渦](https://hitchhikers.fandom.com/wiki/Total_Perspective_Vortex) 一樣消失。
 
 - **可用性之哲學 (The Probability)**

@@ -1,4 +1,4 @@
-# RailLOOP - 个人向け旅び鉄手帳
+# RailLOOP - 个人向け旅铁手账
 
 Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 

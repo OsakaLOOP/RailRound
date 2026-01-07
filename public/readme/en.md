@@ -14,18 +14,18 @@ If you are an interstellar hitchhiker who has just been beamed here (or an unpop
 - **Map Mode**: Visualize your footprints. Supports uploading custom GeoJSON map files.
 - **GitHub Widget**: After binding your GitHub account, generate a dynamic SVG card to display on your personal profile.
 
-* **The Persistence**
+- **The Persistence**
     This service does not establish a traditional concept of "Accounts". When you visit, we generate a [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier) based on your browser's [LocalStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage).
-    * **Warning regarding Bypasses**: Please adhere to regular local storage backups, or at least log in and bind your [GitHub](https://github.com) account (although this has little to do with storage, it is good for Socializing). Although we are logically deeply bound based on "Line/Station Names and IDs", possessing a theoretical data reliability of **12 Nines** (which is even higher than the CDN's promise). This means that even if the [Vogons](https://hitchhikers.fandom.com/wiki/Vogons) (or [JR Hokkaido](https://www.jrhokkaido.co.jp)) decide to brutally abolish certain physical facilities to build a new Shinkansen bypass (highly unlikely) or for other reasons (absolutely likely), as long as the Station ID remains, your records will not expire with version updates. However, if you clear your cache without binding an account, your data will vanish just like the [Earth](https://hitchhikers.fandom.com/wiki/Earth) (Disambiguation: [The Earth - Supercomputer](https://hitchhikers.fandom.com/wiki/Earth), not [The Earth - Planet](https://en.wikipedia.org/wiki/Earth)).
+    - **Warning regarding Bypasses**: Please adhere to regular local storage backups, or at least log in and bind your [GitHub](https://github.com) account (although this has little to do with storage, it is good for Socializing). Although we are logically deeply bound based on "Line/Station Names and IDs", possessing a theoretical data reliability of **12 Nines** (which is even higher than the CDN's promise). This means that even if the [Vogons](https://hitchhikers.fandom.com/wiki/Vogons) (or [JR Hokkaido](https://www.jrhokkaido.co.jp)) decide to brutally abolish certain physical facilities to build a new Shinkansen bypass (highly unlikely) or for other reasons (absolutely likely), as long as the Station ID remains, your records will not expire with version updates. However, if you clear your cache without binding an account, your data will vanish just like the [Earth](https://hitchhikers.fandom.com/wiki/Earth) (Disambiguation: [The Earth - Supercomputer](https://hitchhikers.fandom.com/wiki/Earth), not [The Earth - Planet](https://en.wikipedia.org/wiki/Earth)).
 
-* **The Probability**
-    * **The Truth about 12 Nines**: Please note that this ridiculously high availability figure belongs to our freeloaded CDN provider ([EdgeOne](https://cloud.tencent.com/product/teo)), not the code quality of this service. This means the server almost never goes down, but it **does not** guarantee that the code logic running on top of it won't act like an [Infinite Improbability Drive](https://hitchhikers.fandom.com/wiki/Infinite_Improbability_Drive), suddenly turning your route planning into a green trash can running at 200 km/h.
+- **The Probability**
+    - **The Truth about 12 Nines**: Please note that this ridiculously high availability figure belongs to our freeloaded CDN provider ([EdgeOne](https://cloud.tencent.com/product/teo)), not the code quality of this service. This means the server almost never goes down, but it **does not** guarantee that the code logic running on top of it won't act like an [Infinite Improbability Drive](https://hitchhikers.fandom.com/wiki/Infinite_Improbability_Drive), suddenly turning your route planning into a green trash can running at 200 km/h.
 
-* **Image Availability (Existentialism)**
+- **Image Availability (Existentialism)**
     * Just as the entry on "[Matcha](https://en.wikipedia.org/wiki/Matcha)" (Tea) in the Guide often causes the ship's computer to crash, this service **does not provide image hosting**.
     * If you wish to display your selfie with the Shinkansen [Doctor Yellow](https://en.wikipedia.org/wiki/Doctor_Yellow) (no one cares about the former), please **figure it out yourself** ([S3](https://aws.amazon.com/s3), [R2](https://www.cloudflare.com/developer-platform/r2), or some ancient Weibo external link technology), and manually paste the URL. This is regarded as a screening mechanism for core players—only those who truly know how to survive in the digital wasteland deserve thoughts, dignity, records, and images.
 
-* **Badges (Social Status Symbols)**
+- **Badges (Social Status Symbols)**
     * We have developed a **GitHub Readme Badge**. This is a dynamic [SVG](https://www.w3.org/Graphics/SVG/) designed to show off to other carbon-based lifeforms how much non-renewable time you have wasted on the rails of this planet, or to find similar conspecifics ([Otokonoko](https://en.wikipedia.org/wiki/Otokonoko)) with absolutely no hope of reproduction.
 
 ---
@@ -39,20 +39,20 @@ We collect the following information solely for the purpose of providing the cor
 - Trip data and pin information you actively record.
 - Public profile information (avatar, nickname) accessed via GitHub login.
 
-* **Shady Deals & Acknowledgements**
+- **Shady Deals & Acknowledgements**
     The architecture of this service stands on the shoulders of giants, as well as some efforts in the grey area:
-    * **Infrastructure**: Thanks to **[EdgeOne](https://cloud.tencent.com/product/teo)** for providing Serverless compute nodes and Pages CDN.
-    * **Special Thanks**: **[Xianyu](https://2.taobao.com)**. It was in this chaotic yet efficient marketplace that we procured a server Token for the low price of 10 RMB, successfully bypassing the Vogon-bureaucracy-like restrictions of residential broadband registration, allowing early prototypes to breathe in the physical world. Although we later migrated to Pages for stability, this transaction will go down in history.
-    * **Data Sources**: **[MLIT](https://www.mlit.go.jp)**, **[ODPT](https://www.odpt.org)**, **[Ekidata](https://ekidata.jp)**, and **[JRSLOD](https://uedayou.net/jrslod/)**. (See Open Source License)
+    - **Infrastructure**: Thanks to **[EdgeOne](https://cloud.tencent.com/product/teo)** for providing Serverless compute nodes and Pages CDN.
+    - **Special Thanks**: **[Xianyu](https://2.taobao.com)**. It was in this chaotic yet efficient marketplace that we procured a server Token for the low price of 10 RMB, successfully bypassing the Vogon-bureaucracy-like restrictions of residential broadband registration, allowing early prototypes to breathe in the physical world. Although we later migrated to Pages for stability, this transaction will go down in history.
+    - **Data Sources**: **[MLIT](https://www.mlit.go.jp)**, **[ODPT](https://www.odpt.org)**, **[Ekidata](https://ekidata.jp)**, and **[JRSLOD](https://uedayou.net/jrslod/)**. (See Open Source License)
 
-* **The Yamanote Paradox**
-    * **Phenomenon**: You may notice that the **[Yamanote Line](https://en.wikipedia.org/wiki/Yamanote_Line)** on the map is not a closed loop, but a "C" shape from Shinagawa via Shinjuku to Tabata.
-    * **Explanation**: Please do not submit Bug reports to us. In the legal definition of the Ministry of Land, Infrastructure, Transport and Tourism (and most strict [GIS](https://www.esri.com/en-us/what-is-gis/overview) databases), **"The Yamanote Line" as a legal entity is indeed just that "C" shape**. The remaining parts borrow tracks from the [Tokaido Main Line](https://en.wikipedia.org/wiki/Tokaido_Main_Line) and the [Tohoku Main Line](https://en.wikipedia.org/wiki/Tohoku_Main_Line).
-    * **Conclusion**: If the current frontend rendering looks like a broken ring, that is not a Bug; it is respect for bureaucratic legal reality (of course, it might also be because our logic for separating the loop and inbound/outbound tracks isn't written well yet, causing flaws in that 5% of geometric display).
+- **The Yamanote Paradox**
+    - **Phenomenon**: You may notice that the **[Yamanote Line](https://en.wikipedia.org/wiki/Yamanote_Line)** on the map is not a closed loop, but a "C" shape from Shinagawa via Shinjuku to Tabata.
+    - **Explanation**: Please do not submit Bug reports to us. In the legal definition of the Ministry of Land, Infrastructure, Transport and Tourism (and most strict [GIS](https://www.esri.com/en-us/what-is-gis/overview) databases), **"The Yamanote Line" as a legal entity is indeed just that "C" shape**. The remaining parts borrow tracks from the [Tokaido Main Line](https://en.wikipedia.org/wiki/Tokaido_Main_Line) and the [Tohoku Main Line](https://en.wikipedia.org/wiki/Tohoku_Main_Line).
+    - **Conclusion**: If the current frontend rendering looks like a broken ring, that is not a Bug; it is respect for bureaucratic legal reality (of course, it might also be because our logic for separating the loop and inbound/outbound tracks isn't written well yet, causing flaws in that 5% of geometric display).
 
-* **Privacy**
-    * **Box Model**: We use [KV](https://en.wikipedia.org/wiki/Key%E2%80%93value_database) storage, where all user information queries are based on a simple Hash Key (strictly speaking, two).
-    * **Warning**: This is like keeping your diary in a box without a lock, but hidden in a corner of the galaxy. Theoretically, no one can find it, but this service is **not** designed to store [NERV](https://evangelion.fandom.com/wiki/NERV) classified secrets. **Strictly do not upload home addresses, real names, or any sensitive information you wouldn't want the Vogon Captain to see, otherwise you may perish by having poetry read to you by the authorities.**
+- **Privacy**
+    - **Box Model**: We use [KV](https://en.wikipedia.org/wiki/Key%E2%80%93value_database) storage, where all user information queries are based on a simple Hash Key (strictly speaking, two).
+    - **Warning**: This is like keeping your diary in a box without a lock, but hidden in a corner of the galaxy. Theoretically, no one can find it, but this service is **not** designed to store [NERV](https://evangelion.fandom.com/wiki/NERV) classified secrets. **Strictly do not upload home addresses, real names, or any sensitive information you wouldn't want the Vogon Captain to see, otherwise you may perish by having poetry read to you by the authorities.**
 
 ---
 
@@ -60,9 +60,9 @@ We collect the following information solely for the purpose of providing the cor
 
 ### Changelog
 
-* **v0.10**: Pure frontend "Vibe Coding". Laggy as hell, barely usable. Rendering accuracy: **0%**.
-* **v0.20**: Optimized route lookup and planning, polished UI details. Completely rewrote rendering and planning logic (from scratch). Added automatic CDN imports.
-* **v0.30 (Current)**: Added user account system based on KV storage. Integrated GitHub login.
+- **v0.10**: Pure frontend "Vibe Coding". Laggy as hell, barely usable. Rendering accuracy: **0%**.
+- **v0.20**: Optimized route lookup and planning, polished UI details. Completely rewrote rendering and planning logic (from scratch). Added automatic CDN imports.
+- **v0.30 (Current)**: Added user account system based on KV storage. Integrated GitHub login.
 
 ---
 
@@ -102,11 +102,11 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 #### Acknowledgements
 This service cites and displays data in accordance with the terms of use of the relevant data sources. Please adhere to the following agreements during secondary development or distribution:
 
-* **Public Transportation Data**: Powered by **[ODPT](https://www.odpt.org)** (Open Data Public Transportation Center).
+- **Public Transportation Data**: Powered by **[ODPT](https://www.odpt.org)** (Open Data Public Transportation Center).
     * *License*: [ODPT Terms of Use](https://www.odpt.org/terms/) (Compatible with CC BY 4.0).
-* **Geospatial Data**: Sourced from **[MLIT](https://www.mlit.go.jp/kokudoseisaku/gis/)** (Ministry of Land, Infrastructure, Transport and Tourism) - National Land Numerical Information.
+- **Geospatial Data**: Sourced from **[MLIT](https://www.mlit.go.jp/kokudoseisaku/gis/)** (Ministry of Land, Infrastructure, Transport and Tourism) - National Land Numerical Information.
     * *License*: [MLIT Standard Terms of Use](https://www.mlit.go.jp/kokudoseisaku/gis/terms.html) (CC BY 4.0 compatible).
-* **Station Data**: **[Ekidata.jp](https://ekidata.jp)**.
-* **Linked Open Data**: **[JRSLOD](https://uedayou.net/jrslod/)** datasets.
+- **Station Data**: **[Ekidata.jp](https://ekidata.jp)**.
+- **Linked Open Data**: **[JRSLOD](https://uedayou.net/jrslod/)** datasets.
 
 > *Note: While RailLOOP itself is open source, the map data and railway icons cached locally are subject to their original copyright holders' terms.*

@@ -14,18 +14,18 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 - **地圖模式**: 可視化查看您的足跡，支持上傳 GeoJSON 地圖文件。
 - **GitHub 掛件**: 綁定 GitHub 帳號後，可生成動態 SVG 卡片展示在您的個人主頁。
 
-* **存在與持久性 (The Persistence)**
+- **存在與持久性 (The Persistence)**
     本服務不設立傳統的「帳戶」概念。當你訪問時，我們會基於瀏覽器 [LocalStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) 為你生成一個 [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier)。
-    * **關於 Bypass 的警告**：請務必定時備份本地存儲，或者至少登陸帳號，綁定 [GitHub](https://github.com) 就更好了 (雖然這和存儲沒有更多關係，但是可以用於 Socializing)。雖然我們在邏輯上基於「線路/車站名稱和 ID」進行了深度綁定，擁有 **12 個 9** 的理論數據可靠性 (這甚至高於 CDN 的承諾)。這意味著，即便 [沃貢人](https://hitchhikers.fandom.com/wiki/Vogons) (或者 [JR 北海道](https://www.jrhokkaido.co.jp)) 為了建設一條新的新幹線聯絡線 (這不太可能) 而決定殘酷地廢線某些物理設施 (這絕對可能)，只要車站 ID 還在，你的記錄就不會隨版本更迭而失效。但如果你清空了緩存且沒綁定帳號，數據就會像被拋入 [全視角漩渦](https://hitchhikers.fandom.com/wiki/Total_Perspective_Vortex) 一樣消失。
+    - **關於 Bypass 的警告**：請務必定時備份本地存儲，或者至少登陸帳號，綁定 [GitHub](https://github.com) 就更好了 (雖然這和存儲沒有更多關係，但是可以用於 Socializing)。雖然我們在邏輯上基於「線路/車站名稱和 ID」進行了深度綁定，擁有 **12 個 9** 的理論數據可靠性 (這甚至高於 CDN 的承諾)。這意味著，即便 [沃貢人](https://hitchhikers.fandom.com/wiki/Vogons) (或者 [JR 北海道](https://www.jrhokkaido.co.jp)) 為了建設一條新的新幹線聯絡線 (這不太可能) 而決定殘酷地廢線某些物理設施 (這絕對可能)，只要車站 ID 還在，你的記錄就不會隨版本更迭而失效。但如果你清空了緩存且沒綁定帳號，數據就會像被拋入 [全視角漩渦](https://hitchhikers.fandom.com/wiki/Total_Perspective_Vortex) 一樣消失。
 
-* **可用性之哲學 (The Probability)**
-    * **12 個 9 的真相**：請注意，這個高得離譜的可用性數字屬於我們白嫖的 CDN 服務商 ([EdgeOne](https://cloud.tencent.com/product/teo))，而非本服務的代碼質量。這意味著，伺服器幾乎永不宕機，但**並不**保證運行在上面的代碼邏輯不會像一台 [無限非概率驅動引擎](https://hitchhikers.fandom.com/wiki/Infinite_Improbability_Drive) (Infinite Improbability Drive) 一樣，突然把你的路徑規劃變成一個 200 km/h 達速運行的綠色垃圾桶。
+- **可用性之哲學 (The Probability)**
+    - **12 個 9 的真相**：請注意，這個高得離譜的可用性數字屬於我們白嫖的 CDN 服務商 ([EdgeOne](https://cloud.tencent.com/product/teo))，而非本服務的代碼質量。這意味著，伺服器幾乎永不宕機，但**並不**保證運行在上面的代碼邏輯不會像一台 [無限非概率驅動引擎](https://hitchhikers.fandom.com/wiki/Infinite_Improbability_Drive) (Infinite Improbability Drive) 一樣，突然把你的路徑規劃變成一個 200 km/h 達速運行的綠色垃圾桶。
 
-* **存在主義圖床 (Image Availability)**
+- **存在主義圖床 (Image Availability)**
     * 正如指南中關於「[抹茶](https://en.wikipedia.org/wiki/Matcha)」的條目經常讓飛船電腦崩潰一樣，本服務**不提供圖床**。
     * 如果你想展示你與新幹線 [黃醫生](https://zh.wikipedia.org/zh-tw/%E6%96%B0%E5%B9%B9%E7%B7%9A%E9%86%AB%E7%94%9F%E9%BB%83) 的自拍 (沒人關心前者)，請**自己想辦法** ([S3](https://aws.amazon.com/s3)、[R2](https://www.cloudflare.com/developer-platform/r2)、或者某種古老的微博外鏈技術)，然後手動粘貼 URL。這被視為一種對核心玩家的篩選機制 —— 只有真正懂得如何在數字荒原生存的人，才配擁有思想、尊嚴、記錄和圖片。
 
-* **社交身分象徵 (Badges)**
+- **社交身分象徵 (Badges)**
     * 我們開發了 **GitHub Readme Badge**。這是一個動態 [SVG](https://www.w3.org/Graphics/SVG/)，旨在向其他碳基生物炫耀你在這個星球的鐵軌上消耗了多少不可再生的時間，或者找到類似的沒有任何生殖希望的同類 ([偽娘 / 男の娘](https://zh.moegirl.org.cn/%E4%BC%AA%E5%A8%98)) 們。
 
 ---
@@ -39,20 +39,20 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 - 您主動記錄的行程數據與圖釘信息。
 - 通過 GitHub 登入時的公開資料（頭像、暱稱）。
 
-* **與不可名狀的 py 交易**
+- **與不可名狀的 py 交易**
     本服務的架構站在無數巨人的肩膀上，以及一些處於灰色地帶的努力：
-    * **基礎設施**：感謝 **[EdgeOne](https://cloud.tencent.com/product/teo)** 提供了 Serverless 計算節點和 Pages CDN。
-    * **特別鳴謝**：**[閑魚](https://2.taobao.com)**。正是在這個混亂而有效率的市場裡，我們以 10r 的低廉價格搞到了一個伺服器 Token，成功繞過了家用寬帶備案那如同沃貢官僚主義般的繁瑣限制，讓早期的原型機得以在物理世界呼吸。雖然後來為了穩定遷移到了 Pages，但這筆交易將永載史冊。
-    * **數據源**：**[國土交通省 (MLIT)](https://www.mlit.go.jp)**、**[ODPT](https://www.odpt.org)**、**[Ekidata](https://ekidata.jp)** 和 **[鉄道駅LOD](https://uedayou.net/jrslod/)**。(見開源協議)
+    - **基礎設施**：感謝 **[EdgeOne](https://cloud.tencent.com/product/teo)** 提供了 Serverless 計算節點和 Pages CDN。
+    - **特別鳴謝**：**[閑魚](https://2.taobao.com)**。正是在這個混亂而有效率的市場裡，我們以 10r 的低廉價格搞到了一個伺服器 Token，成功繞過了家用寬帶備案那如同沃貢官僚主義般的繁瑣限制，讓早期的原型機得以在物理世界呼吸。雖然後來為了穩定遷移到了 Pages，但這筆交易將永載史冊。
+    - **數據源**：**[國土交通省 (MLIT)](https://www.mlit.go.jp)**、**[ODPT](https://www.odpt.org)**、**[Ekidata](https://ekidata.jp)** 和 **[鉄道駅LOD](https://uedayou.net/jrslod/)**。(見開源協議)
 
-* **關於「山手線」的拓撲悖論 (The Yamanote Paradox)**
-    * **現象**：你可能會發現，地圖上的 **[山手線](https://zh.wikipedia.org/zh-tw/%E5%B1%B1%E6%89%8B%E7%B7%9A)** 並不是一個閉合的環，而是一個從品川經新宿到田端的「C」字形。
-    * **解釋**：請不要向我們提交 Bug 報告。在國土交通省 (以及絕大多數嚴格的 [GIS](https://www.esri.com/en-us/what-is-gis/overview) 數據庫) 的法律定義裡，**「山手線」作為一個法律實體，確實只是那個「C」字形**。剩下的部分分別借用了 [東海道本線](https://zh.wikipedia.org/zh-tw/%E6%9D%B1%E6%B5%B7%E9%81%93%E6%9C%AC%E7%B7%9A) 和 [東北本線](https://zh.wikipedia.org/zh-tw/%E6%9D%B1%E5%8C%97%E6%9C%AC%E7%B7%9A) 的軌道。
-    * **結論**：如果目前的前端渲染看起來像個斷開的圓環，那不是 Bug，那是對官僚主義法律現實的尊重 (當然，也可能是因為我們的環線與上下行分離邏輯還沒寫好，導致那 5% 的幾何展示有瑕疵)。
+- **關於「山手線」的拓撲悖論 (The Yamanote Paradox)**
+    - **現象**：你可能會發現，地圖上的 **[山手線](https://zh.wikipedia.org/zh-tw/%E5%B1%B1%E6%89%8B%E7%B7%9A)** 並不是一個閉合的環，而是一個從品川經新宿到田端的「C」字形。
+    - **解釋**：請不要向我們提交 Bug 報告。在國土交通省 (以及絕大多數嚴格的 [GIS](https://www.esri.com/en-us/what-is-gis/overview) 數據庫) 的法律定義裡，**「山手線」作為一個法律實體，確實只是那個「C」字形**。剩下的部分分別借用了 [東海道本線](https://zh.wikipedia.org/zh-tw/%E6%9D%B1%E6%B5%B7%E9%81%93%E6%9C%AC%E7%B7%9A) 和 [東北本線](https://zh.wikipedia.org/zh-tw/%E6%9D%B1%E5%8C%97%E6%9C%AC%E7%B7%9A) 的軌道。
+    - **結論**：如果目前的前端渲染看起來像個斷開的圓環，那不是 Bug，那是對官僚主義法律現實的尊重 (當然，也可能是因為我們的環線與上下行分離邏輯還沒寫好，導致那 5% 的幾何展示有瑕疵)。
 
-* **隱私性 (Privacy)**
-    * **盒子模型**：我們採用 [KV](https://en.wikipedia.org/wiki/Key%E2%80%93value_database) 存儲，一切用戶信息的查詢基於一個簡單的 Hash Key (嚴格講是兩個)。
-    * **警告**：這就像是你把日記放在了一個沒有鎖、但藏在銀河系某個角落的箱子裡。理論上沒人找得到，但本服務**不是**為了存儲 [NERV](https://evangelion.fandom.com/wiki/NERV) 機密設計的。**嚴禁上傳家庭住址、真實姓名或任何你不想讓沃貢 Captain (或者帽子叔叔) 看到的敏感信息，否則你可能被帽子叔叔上門唸詩而亡。**
+- **隱私性 (Privacy)**
+    - **盒子模型**：我們採用 [KV](https://en.wikipedia.org/wiki/Key%E2%80%93value_database) 存儲，一切用戶信息的查詢基於一個簡單的 Hash Key (嚴格講是兩個)。
+    - **警告**：這就像是你把日記放在了一個沒有鎖、但藏在銀河系某個角落的箱子裡。理論上沒人找得到，但本服務**不是**為了存儲 [NERV](https://evangelion.fandom.com/wiki/NERV) 機密設計的。**嚴禁上傳家庭住址、真實姓名或任何你不想讓沃貢 Captain (或者帽子叔叔) 看到的敏感信息，否則你可能被帽子叔叔上門唸詩而亡。**
 
 ---
 
@@ -60,9 +60,9 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 
 ### 版本歷史 (Changelog)
 
-* **v0.10**: 純前端 "Vibe Coding"。卡到爆，勉強能用。繪製正確率：**0%**。
-* **v0.20**: 優化了線路查找和規劃，打磨界面細節。完全重寫渲染和規劃邏輯 (Again)，增加 CDN 自動導入。
-* **v0.30 (Current)**: 增加了基於 KV 存儲的用戶帳戶體系，集成 GitHub 登入。
+- **v0.10**: 純前端 "Vibe Coding"。卡到爆，勉強能用。繪製正確率：**0%**。
+- **v0.20**: 優化了線路查找和規劃，打磨界面細節。完全重寫渲染和規劃邏輯 (Again)，增加 CDN 自動導入。
+- **v0.30 (Current)**: 增加了基於 KV 存儲的用戶帳戶體系，集成 GitHub 登入。
 
 ---
 
@@ -102,11 +102,11 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 #### Acknowledgements
 本服務依照相關數據源的使用條款引用並展示數據。二次開發或分發時請務必遵守以下協議：
 
-* **Public Transportation Data**: Powered by **[ODPT](https://www.odpt.org)** (Open Data Public Transportation Center).
+- **Public Transportation Data**: Powered by **[ODPT](https://www.odpt.org)** (Open Data Public Transportation Center).
     * *License*: [ODPT Terms of Use](https://www.odpt.org/terms/) (Compatible with CC BY 4.0).
-* **Geospatial Data**: Sourced from **[MLIT](https://www.mlit.go.jp/kokudoseisaku/gis/)** (Ministry of Land, Infrastructure, Transport and Tourism) - National Land Numerical Information.
+- **Geospatial Data**: Sourced from **[MLIT](https://www.mlit.go.jp/kokudoseisaku/gis/)** (Ministry of Land, Infrastructure, Transport and Tourism) - National Land Numerical Information.
     * *License*: [MLIT Standard Terms of Use](https://www.mlit.go.jp/kokudoseisaku/gis/terms.html) (CC BY 4.0 compatible).
-* **Station Data**: **[Ekidata.jp](https://ekidata.jp)**.
-* **Linked Open Data**: **[LOD Challenge](https://uedayou.net/jrslod/)** datasets.
+- **Station Data**: **[Ekidata.jp](https://ekidata.jp)**.
+- **Linked Open Data**: **[LOD Challenge](https://uedayou.net/jrslod/)** datasets.
 
 > *Note: While RailLOOP itself is open source, the map data and railway icons cached locally are subject to their original copyright holders' terms.*

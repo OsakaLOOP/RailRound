@@ -2020,7 +2020,6 @@ export default function RailLOOPApp() {
 
 
   const handleExportUserData = () => {
-      const CURRENT_VERSION = "0.30";
       const linesUsed = new Set();
       const companiesUsed = new Set();
       trips.forEach(t => { (t.segments || []).forEach(s => { if(s.lineKey) { linesUsed.add(s.lineKey); const meta = railwayData[s.lineKey]?.meta; if(meta && meta.company) companiesUsed.add(meta.company); } }); });

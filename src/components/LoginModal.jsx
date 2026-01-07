@@ -13,7 +13,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [readmeContent, setReadmeContent] = useState('');
-  const [lang, setLang] = useState('cn'); // cn, en, jp
+  const [lang, setLang] = useState('zh-cn'); 
 
   useEffect(() => {
     if (isOpen) {
@@ -152,7 +152,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             <div className="flex items-center justify-between p-4 border-b bg-white/50 backdrop-blur shrink-0">
                 <div className="font-bold text-gray-500 text-sm">用户指南 / 协议</div>
                 <div className="flex bg-gray-200 p-1 rounded-lg">
-                    {['cn', 'en', 'jp'].map(l => (
+                    {['zh-cn', 'en', 'ja-jp', 'zh-tw'].map(l => (
                         <button
                             key={l}
                             onClick={() => setLang(l)}

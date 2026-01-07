@@ -1155,7 +1155,7 @@ const GithubCardModal = ({ isOpen, onClose, user }) => {
     if (!isOpen || !user) return null;
 
     const url = cardKey ? `${window.location.origin}/api/card?key=${cardKey}` : '';
-    const md = `[![RailRound Stats](${url})](${window.location.origin})`;
+    const md = `[![RailLOOP Stats](${url})](${window.location.origin})`;
 
     return (
         <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
@@ -1305,7 +1305,7 @@ const MOCK_INITIAL_TRIPS = [];
 const MOCK_INITIAL_PINS = [];
 
 // --- 5. 主组件 ---
-export default function RailRoundApp() {
+export default function RailLOOPApp() {
   const [activeTab, setActiveTab] = useState('records');
   const [railwayData, setRailwayData] = useState({}); 
   const [trips, setTrips] = useState([]); 
@@ -2020,7 +2020,7 @@ export default function RailRoundApp() {
       const linesUsed = new Set();
       const companiesUsed = new Set();
       trips.forEach(t => { (t.segments || []).forEach(s => { if(s.lineKey) { linesUsed.add(s.lineKey); const meta = railwayData[s.lineKey]?.meta; if(meta && meta.company) companiesUsed.add(meta.company); } }); });
-      const backupData = { meta: { version: 1, exportedAt: new Date().toISOString(), appName: "RailRound" }, dependencies: { lines: Array.from(linesUsed), companies: Array.from(companiesUsed) }, data: { trips: trips, pins: pins } };
+      const backupData = { meta: { version: 1, exportedAt: new Date().toISOString(), appName: "RailLOOP" }, dependencies: { lines: Array.from(linesUsed), companies: Array.from(companiesUsed) }, data: { trips: trips, pins: pins } };
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a'); link.href = url; link.download = `railround_backup_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
@@ -2033,7 +2033,7 @@ export default function RailRoundApp() {
       reader.onload = (e) => {
           try {
               const backup = JSON.parse(e.target.result);
-              if (!backup.meta || (backup.meta.appName !== "RailRound" && backup.meta.appName !== "")) { alert("无效的备份文件"); return; }
+              if (!backup.meta || (backup.meta.appName !== "RailLOOP" && backup.meta.appName !== "")) { alert("无效的备份文件"); return; }
               const missingLines = [];
               if (backup.dependencies && backup.dependencies.lines) { backup.dependencies.lines.forEach(lineKey => { if (!railwayData[lineKey]) missingLines.push(lineKey); }); }
               if (missingLines.length > 0) { const msg = `检测到缺少以下线路的基础数据，可能会导致显示异常：\n\n${missingLines.slice(0, 5).join(", ")}${missingLines.length > 5 ? '...' : ''}\n\n建议先去地图页面上传对应的 GeoJSON 文件。是否继续导入？`; if (!confirm(msg)) return; }
@@ -2379,7 +2379,7 @@ export default function RailRoundApp() {
     <div className="flex flex-col h-screen bg-slate-100 font-sans text-slate-800 overflow-hidden">
       <style>{LEAFLET_CSS}</style>
       <header className="bg-slate-900 text-white p-4 shadow-md z-30 flex justify-between shrink-0">
-        <div className="flex items-center gap-2"><Train className="text-emerald-400"/> <span className="font-bold">RailRound</span></div>
+        <div className="flex items-center gap-2"><Train className="text-emerald-400"/> <span className="font-bold">RailLOOP</span></div>
         <div className="flex items-center gap-2">
             {user ? (
                <div className="flex items-center gap-2">

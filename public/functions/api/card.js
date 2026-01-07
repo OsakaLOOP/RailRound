@@ -68,7 +68,6 @@ export async function onRequest(event) {
 
         // Icon SVG (Lucide Train Standard) placed at top right
         const iconSvg = `
-<<<<<<< HEAD
             <g transform="translate(${cardWidth - 48}, 20)" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
                 <rect width="16" height="16" x="4" y="3" rx="2"/>
                 <path d="M4 11h16"/>
@@ -77,16 +76,6 @@ export async function onRequest(event) {
                 <path d="m18 22-2-3"/>
                 <path d="M8 15h.01"/>
                 <path d="M16 15h.01"/>
-=======
-            <g transform="translate(${cardWidth - 40}, 24) scale(1)">
-                <path d="M4 14c0-5.5 4.5-10 10-10s10 4.5 10 10v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6z" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M4 14h16" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12 4v10" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="m8 19-2 3" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="m16 19 2 3" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M9 15h.01" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M15 15h.01" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
->>>>>>> e620aba (refactor: Polish GitHub Card Design (Layout, Colors, 5-Items))
             </g>
         `;
 
@@ -98,7 +87,7 @@ export async function onRequest(event) {
             <rect x="2" y="2" width="${cardWidth-4}" height="${cardHeight-4}" rx="16" class="bg"/>
 
             <!-- Header Section -->
-            <text x="24" y="44" class="text" style="font-size: 18px; font-weight: 800; letter-spacing: -0.5px;">${esc(username)}'s RailRound</text>
+            <text x="24" y="44" class="text" style="font-size: 18px; font-weight: 800; letter-spacing: -0.5px;">${esc(username)}'s RailLOOP</text>
             ${iconSvg}
 
             <!-- Stats Grid (Top Right, shifted left of icon) -->

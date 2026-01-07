@@ -2,99 +2,166 @@ import React, { useState, useEffect } from 'react';
 import { X, LogIn, UserPlus, Github, Mail } from 'lucide-react';
 import { api } from '../services/api';
 
-// Custom Markdown Renderer to ensure consistent styling without dependencies
+// Custom Markdown Renderer
 const renderMarkdown = (text) => {
   if (!text) return null;
 
   const lines = text.split('\n');
   const elements = [];
   let listBuffer = [];
-  let currentIndent = 0; // 0 for H1, 1 for H2, 2 for H3... used for indentation
 
   // Helper to parse inline styles (Bold and Links)
   const parseInline = (text) => {
+    if (!text) return { __html: '' };
+
     // Pass 1: Links [text](url)
-    // We use a callback to handle styling logic
     let processed = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, txt, url) => {
       const isGreen = txt.includes('CR200J') || url.includes('CR200J');
       const classes = isGreen
         ? "text-emerald-600 hover:text-emerald-800 hover:underline transition-colors font-medium"
         : "text-blue-600 hover:text-blue-800 hover:underline transition-colors font-medium";
-      // Ensure we don't break subsequent bold parsing if link text has stars (unlikely but safe to assume standard markdown)
       return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="${classes}">${txt}</a>`;
     });
 
     // Pass 2: Bold (**text**)
-    // We strictly match **...** and wrap in <span class="font-bold">
-    // Note: This simple regex might struggle with nested complex HTML but works for standard MD usage here.
     processed = processed.replace(/\*\*(.*?)\*\*/g, '<span class="font-bold">$1</span>');
 
     return { __html: processed };
   };
 
+  // Helper to render buffered list items into a nested structure
   const flushList = () => {
-    if (listBuffer.length > 0) {
-      elements.push(
-        <ul key={`ul-${elements.length}`} className={`list-disc list-inside mb-4 pl-4 space-y-1 text-gray-600 ${currentIndent === 1 ? 'ml-4' : currentIndent === 2 ? 'ml-8' : ''}`}>
-          {listBuffer.map((item, i) => (
-            <li key={i} dangerouslySetInnerHTML={parseInline(item)} />
+    if (listBuffer.length === 0) return;
+
+    // Build tree from flat list with indent levels
+    const roots = [];
+    const stack = [{ level: -1, children: roots }];
+
+    listBuffer.forEach(item => {
+      // Find parent with level < item.level
+      while (stack.length > 1 && stack[stack.length - 1].level >= item.level) {
+        stack.pop();
+      }
+      const parent = stack[stack.length - 1];
+      const newNode = { ...item, children: [] };
+      parent.children.push(newNode);
+      stack.push(newNode);
+    });
+
+    // Recursive render function
+    const renderTree = (nodes) => {
+      if (!nodes || nodes.length === 0) return null;
+      return (
+        <ul className="list-disc list-outside ml-5 space-y-1 text-gray-600">
+          {nodes.map((node, i) => (
+            <li key={i} className="pl-1">
+              <span dangerouslySetInnerHTML={parseInline(node.content)} />
+              {node.children.length > 0 && renderTree(node.children)}
+            </li>
           ))}
         </ul>
       );
-      listBuffer = [];
-    }
+    };
+
+    elements.push(
+      <div key={`list-${elements.length}`} className="mb-4">
+        {renderTree(roots)}
+      </div>
+    );
+    listBuffer = [];
   };
 
-  lines.forEach((line, index) => {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]; // Do not trim globally yet, need to preserve indent
     const trimmed = line.trim();
+
+    // Empty line: flush list
     if (!trimmed) {
       flushList();
-      return;
+      continue;
     }
 
-    if (trimmed.startsWith('- ')) {
-      listBuffer.push(trimmed.substring(2));
-    } else {
+    // Horizontal Rule (--- or ***)
+    if (trimmed === '---' || trimmed === '***') {
       flushList();
-
-      if (trimmed.startsWith('# ')) {
-        currentIndent = 0;
-        elements.push(
-          <h1 key={index} className="text-2xl font-bold text-center my-6 text-gray-800">
-            {trimmed.substring(2)}
-          </h1>
-        );
-      } else if (trimmed.startsWith('## ')) {
-        currentIndent = 1;
-        elements.push(
-          <h2 key={index} className="text-xl font-bold mt-6 mb-3 pb-2 border-b border-gray-200 text-gray-800 ml-4">
-            {trimmed.substring(3)}
-          </h2>
-        );
-      } else if (trimmed.startsWith('### ')) {
-        currentIndent = 2;
-        elements.push(
-          <h3 key={index} className="text-lg font-bold mt-4 mb-2 text-gray-800 ml-8">
-            {trimmed.substring(4)}
-          </h3>
-        );
-      } else if (trimmed.startsWith('> ')) {
-        // Blockquotes inherit indentation
-        const indentClass = currentIndent === 1 ? 'ml-4' : currentIndent === 2 ? 'ml-8' : '';
-        elements.push(
-          <blockquote key={index} className={`border-l-4 border-gray-300 pl-4 py-2 my-4 bg-gray-50 text-gray-600 italic rounded-r ${indentClass}`} dangerouslySetInnerHTML={parseInline(trimmed.substring(2))} />
-        );
-      } else {
-        // Paragraph - inherit indentation
-        const indentClass = currentIndent === 1 ? 'ml-4' : currentIndent === 2 ? 'ml-8' : '';
-        elements.push(
-          <p key={index} className={`mb-4 leading-relaxed text-gray-600 ${indentClass}`} dangerouslySetInnerHTML={parseInline(trimmed)} />
-        );
-      }
+      elements.push(<hr key={`hr-${i}`} className="my-6 border-t border-gray-200" />);
+      continue;
     }
-  });
-  flushList();
 
+    // Headers
+    // H1
+    if (line.match(/^#\s/)) {
+      flushList();
+      elements.push(
+        <h1 key={i} className="text-2xl font-bold text-center my-6 text-gray-800">
+          {line.substring(2).trim()}
+        </h1>
+      );
+      continue;
+    }
+    // H2
+    if (line.match(/^##\s/)) {
+      flushList();
+      elements.push(
+        <h2 key={i} className="text-xl font-bold mt-8 mb-4 pb-2 border-b border-gray-200 text-gray-800">
+          {line.substring(3).trim()}
+        </h2>
+      );
+      continue;
+    }
+    // H3
+    if (line.match(/^###\s/)) {
+      flushList();
+      elements.push(
+        <h3 key={i} className="text-lg font-bold mt-6 mb-3 text-gray-800 ml-4">
+          {line.substring(4).trim()}
+        </h3>
+      );
+      continue;
+    }
+    // H4
+    if (line.match(/^####\s/)) {
+        flushList();
+        elements.push(
+          <h4 key={i} className="text-base font-bold mt-4 mb-2 text-gray-800 ml-8">
+            {line.substring(5).trim()}
+          </h4>
+        );
+        continue;
+      }
+
+    // List Items (- or *)
+    // Capture indentation (group 1), marker (group 2), content (group 3)
+    const listMatch = line.match(/^(\s*)([-*])\s+(.+)$/);
+    if (listMatch) {
+      const indent = listMatch[1].length;
+      const content = listMatch[3];
+      // Normalize indent: assume 2 spaces per level approx, or just use raw count
+      // We will rely on relative comparison in tree builder.
+      listBuffer.push({ level: indent, content });
+      continue;
+    }
+
+    // If we are here, it's not a list item. Flush any existing list.
+    flushList();
+
+    // Blockquotes
+    if (trimmed.startsWith('> ')) {
+      elements.push(
+        <blockquote key={i} className="border-l-4 border-gray-300 pl-4 py-2 my-4 bg-gray-50 text-gray-600 italic rounded-r" dangerouslySetInnerHTML={parseInline(trimmed.substring(2))} />
+      );
+      continue;
+    }
+
+    // Paragraph
+    // For simple parsing, just render as P.
+    // Preserve some indentation? No, usually P are just text blocks.
+    elements.push(
+      <p key={i} className="mb-4 leading-relaxed text-gray-600" dangerouslySetInnerHTML={parseInline(trimmed)} />
+    );
+  }
+
+  flushList();
   return elements;
 };
 
@@ -145,7 +212,11 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
   return (
     <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+<<<<<<< HEAD
       <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-auto animate-slide-up h-[80vh] md:h-[600px]" onClick={e => e.stopPropagation()}>
+=======
+      <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-slide-up h-[85vh] md:h-[650px]" onClick={e => e.stopPropagation()}>
+>>>>>>> c5f1c00 (feat: enhance markdown parser and styling in LoginModal)
 
         {/* Left: Login Form */}
         <div className="w-full md:w-[40%] p-8 flex flex-col justify-center border-b md:border-b-0 md:border-r border-gray-100 relative bg-white z-10">
@@ -257,6 +328,21 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
+                <style jsx>{`
+                  .custom-scrollbar::-webkit-scrollbar {
+                    width: 6px;
+                  }
+                  .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                  }
+                  .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background-color: rgba(156, 163, 175, 0.5);
+                    border-radius: 20px;
+                  }
+                  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background-color: rgba(107, 114, 128, 0.8);
+                  }
+                `}</style>
                 {renderMarkdown(readmeContent)}
             </div>
 

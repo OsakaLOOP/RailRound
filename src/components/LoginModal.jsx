@@ -11,29 +11,38 @@ const renderMarkdown = (text) => {
   let listBuffer = [];
   let currentIndent = 0; // 0 for H1, 1 for H2, 2 for H3... used for indentation
 
+  // Helper to parse inline styles (Bold and Links)
+  const parseInline = (text) => {
+    // Pass 1: Links [text](url)
+    // We use a callback to handle styling logic
+    let processed = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, txt, url) => {
+      const isGreen = txt.includes('CR200J') || url.includes('CR200J');
+      const classes = isGreen
+        ? "text-emerald-600 hover:text-emerald-800 hover:underline transition-colors font-medium"
+        : "text-blue-600 hover:text-blue-800 hover:underline transition-colors font-medium";
+      // Ensure we don't break subsequent bold parsing if link text has stars (unlikely but safe to assume standard markdown)
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="${classes}">${txt}</a>`;
+    });
+
+    // Pass 2: Bold (**text**)
+    // We strictly match **...** and wrap in <span class="font-bold">
+    // Note: This simple regex might struggle with nested complex HTML but works for standard MD usage here.
+    processed = processed.replace(/\*\*(.*?)\*\*/g, '<span class="font-bold">$1</span>');
+
+    return { __html: processed };
+  };
+
   const flushList = () => {
     if (listBuffer.length > 0) {
       elements.push(
         <ul key={`ul-${elements.length}`} className={`list-disc list-inside mb-4 pl-4 space-y-1 text-gray-600 ${currentIndent === 1 ? 'ml-4' : currentIndent === 2 ? 'ml-8' : ''}`}>
           {listBuffer.map((item, i) => (
-            <li key={i} dangerouslySetInnerHTML={{ __html: parseLinks(item) }} />
+            <li key={i} dangerouslySetInnerHTML={parseInline(item)} />
           ))}
         </ul>
       );
       listBuffer = [];
     }
-  };
-
-  const parseLinks = (str) => {
-    // Replace [text](url) with <a ...> using callback to check for "CR200J"
-    return str.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
-      const isGreen = text.includes('CR200J') || url.includes('CR200J');
-      const classes = isGreen
-        ? "text-emerald-600 hover:text-emerald-800 hover:underline transition-colors font-medium"
-        : "text-blue-600 hover:text-blue-800 hover:underline transition-colors font-medium";
-
-      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="${classes}">${text}</a>`;
-    });
   };
 
   lines.forEach((line, index) => {
@@ -73,15 +82,13 @@ const renderMarkdown = (text) => {
         // Blockquotes inherit indentation
         const indentClass = currentIndent === 1 ? 'ml-4' : currentIndent === 2 ? 'ml-8' : '';
         elements.push(
-          <blockquote key={index} className={`border-l-4 border-gray-300 pl-4 py-2 my-4 bg-gray-50 text-gray-600 italic rounded-r ${indentClass}`}>
-            {trimmed.substring(2)}
-          </blockquote>
+          <blockquote key={index} className={`border-l-4 border-gray-300 pl-4 py-2 my-4 bg-gray-50 text-gray-600 italic rounded-r ${indentClass}`} dangerouslySetInnerHTML={parseInline(trimmed.substring(2))} />
         );
       } else {
         // Paragraph - inherit indentation
         const indentClass = currentIndent === 1 ? 'ml-4' : currentIndent === 2 ? 'ml-8' : '';
         elements.push(
-          <p key={index} className={`mb-4 leading-relaxed text-gray-600 ${indentClass}`} dangerouslySetInnerHTML={{ __html: parseLinks(trimmed) }} />
+          <p key={index} className={`mb-4 leading-relaxed text-gray-600 ${indentClass}`} dangerouslySetInnerHTML={parseInline(trimmed)} />
         );
       }
     }

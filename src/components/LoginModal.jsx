@@ -103,7 +103,7 @@ const renderMarkdown = (text) => {
     if (line.match(/^##\s/)) {
       flushList();
       elements.push(
-        <h2 key={i} className="text-xl font-bold mt-8 mb-4 pb-2 ml-0 border-b border-gray-200 text-gray-800">
+        <h2 key={i} className="text-xl font-bold mt-8 mb-4 pb-2 border-b border-gray-200 text-gray-800">
           {line.substring(3).trim()}
         </h2>
       );

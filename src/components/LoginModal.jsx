@@ -341,7 +341,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
 
             <div className="flex items-center justify-between p-4 border-b bg-white/50 backdrop-blur shrink-0">
                 <div className="font-bold text-gray-500 text-sm">用户指南 / 协议</div>
-                <div className="flex bg-gray-200 p-1 rounded-lg">
+                <div className="flex bg-gray-200 p-1 rounded-lg mr-8">
                     {['zh-cn', 'en', 'ja-jp', 'zh-tw'].map(l => (
                         <button
                             key={l}

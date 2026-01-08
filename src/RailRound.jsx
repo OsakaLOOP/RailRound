@@ -1220,12 +1220,16 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeom
                  return count;
              })()} 个站点。<br/>
              Last Modified: {LAST_MODIFIED}<br/>
-             Version Updated: {LAST_UPDATED}<br/>
-             <br/>
-             <div class="flex justify-center items-center mt-2">
-    <span class="px-4 bg-white text-gray-500">分・割・線・な・の・だ</span>
-  </div>
-  <hr class="my-2 w-40 border-2 border-gray-300"/>
+             Version Updated: {LAST_UPDATED}
+             <div class="relative flex py-5 items-center mt-4 text-gray-500">
+    <div class="flex-grow border-t-2 border-dashed border-gray-300/70"></div>
+    
+    <span class="flex-shrink mx-4 px-3 py-1 text-sm font-bold tracking-[0.2em] bg-slate-50 rounded-full shadow-sm border border-gray-100 text-gray-600">
+      分・割・線・な・の・だ
+    </span>
+    
+    <div class="flex-grow border-t-2 border-dashed border-gray-300/70"></div>
+</div>
              Lisenced under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-500 hover:underline transition-all">CC BY-SA 4.0</a> 
              <br/>
              Copyleft <span aria-label="Copyleft icon" style={{display: 'inline-block', transform: 'rotateY(180deg)'}}>&copy;</span> 2025-2026 @OsakaLOOP

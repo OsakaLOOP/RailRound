@@ -18,6 +18,7 @@ import Tutorial from './components/Tutorial';
 import { api } from './services/api';
 import { db } from './utils/db';
 import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './utils/stats';
+import {VersionBadge} from './components/VersionBadge';
 
 const CURRENT_VERSION = 0.32;
 const LAST_MODIFIED = "2025-11-27";
@@ -941,6 +942,8 @@ const GithubCardModal = ({ isOpen, onClose, user, folders, badgeSettings, onUpda
     );
 };
 
+
+
 const FolderManagerModal = ({ isOpen, onClose, folders, onUpdateFolders }) => {
     const [newFolderName, setNewFolderName] = useState("");
 
@@ -1113,7 +1116,7 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
     <button id="btn-add-trip" onClick={onAdd} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
   </div>
 );
-const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeometries, onOpenCard, onOpenFolders, companyDB }) => {
+const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeometries, onOpenCard, onOpenFolders, companyDB ,setIsLoginOpen}) => {
     const totalTrips = trips.length;
     const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
     const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
@@ -1216,14 +1219,22 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeom
                  }
                  return count;
              })()} 个站点。<br/>
-             Data Last Modified: {LAST_MODIFIED} Version Updated: {LAST_UPDATED}
-        </div>
+             Last Modified: {LAST_MODIFIED}<br/>
+             Version Updated: {LAST_UPDATED}<br/>
+             <br/>
+             <div class="flex justify-center items-center mt-2">
+    <span class="px-4 bg-white text-gray-500">分・割・線・な・の・だ</span>
+  </div>
+  <hr class="my-2 w-40 border-2 border-gray-300"/>
+             Lisenced under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-500 hover:underline transition-all">CC BY-SA 4.0</a> 
+             <br/>
+             Copyleft <span aria-label="Copyleft icon" style={{display: 'inline-block', transform: 'rotateY(180deg)'}}>&copy;</span> 2025-2026 @OsakaLOOP
+             <br/>
+             <div><span display="inline">更多详情, 参见</span><button display="inline" onClick={() => setIsLoginOpen(true)} className="text-xs text-blue-400 hover:text-blue-500 hover:underline transition-all items-center gap-1">用户指南</button>
+        </div></div>
       </div>
     );
   };
-const MOCK_RAILWAY_DATA = {};
-const MOCK_INITIAL_TRIPS = [];
-const MOCK_INITIAL_PINS = [];
 
 // --- 5. 主组件 ---
 export default function RailLOOPApp() {
@@ -2266,11 +2277,7 @@ export default function RailLOOPApp() {
       onEachFeature: (f, l) => f.properties.name && l.bindTooltip(f.properties.name)
     }).addTo(baseStationsLayer.current);
 
-    // Refresh visibility state (in case data loaded at a zoom level where lines should be visible)
     if (mapInstance.current) {
-        // Trigger the logic to ensure lines are added/removed correctly with new data content
-        // We can manually call fire 'zoomend' or just replicate the logic check.
-        // Re-firing zoomend is safest.
         mapInstance.current.fire('zoomend');
     }
   };
@@ -2326,14 +2333,23 @@ export default function RailLOOPApp() {
     });
   };
 
+  const onAddToFolder = (trip) => {
+      setCurrentTripForFolder(trip);
+      setAddToFolderModalOpen(true);
+  };
+
+  const onOpenFolders = () => {
+      setFolderManagerOpen(true);
+  };
+
   return (
-    <div className="flex flex-col h-screen bg-slate-100 font-sans text-slate-800 overflow-hidden">
+    <div className="flex flex-col h-screen bg-slate-100 font-sans text-slate-800 overflow-visible">
       <style>{LEAFLET_CSS}</style>
       <header className="bg-slate-900 text-white p-4 shadow-md z-30 flex justify-between shrink-0">
-        <div className="flex items-center gap-2">
+        <div id="header-title" className="flex items-center gap-2">
             <Train className="text-emerald-400"/>
             <span className="font-bold">RailLOOP</span>
-            <span className="bg-[#39C5BB] text-white rounded px-1.5 py-0.5 text-[10px] font-bold ml-2 shadow-sm">v{CURRENT_VERSION}</span>
+            <VersionBadge version={CURRENT_VERSION} />
         </div>
         <div className="flex items-center gap-2">
             {user ? (
@@ -2373,7 +2389,7 @@ export default function RailLOOPApp() {
 
       <div className="flex-1 relative overflow-hidden flex flex-col">
         {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} segmentGeometries={segmentGeometries} onAddToFolder={onAddToFolder} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
-        {activeTab === 'stats' && <StatsView trips={trips} onOpenFolders={onOpenFolders} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} onOpenCard={setCardModalUser} companyDB={companyDB} />}
+        {activeTab === 'stats' && <StatsView trips={trips} setIsLoginOpen={setIsLoginOpen} onOpenFolders={onOpenFolders} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} onOpenCard={setCardModalUser} companyDB={companyDB} />}
         <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
           <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
           <FabButton activeTab={activeTab} pinMode={pinMode} togglePinMode={togglePinMode} />
@@ -2391,9 +2407,10 @@ export default function RailLOOPApp() {
          setIsLoginOpen={setIsLoginOpen}
          user={user}
          pinMode={pinMode}
+         editorMode={editorMode}
       />
 
-      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} user={user} />
       <GithubRegisterModal isOpen={isGithubRegisterOpen} onClose={() => setIsGithubRegisterOpen(false)} regToken={githubRegToken} onLoginSuccess={handleLoginSuccess} />
 
       <GithubCardModal
@@ -2423,11 +2440,6 @@ export default function RailLOOPApp() {
           onUpdateFolders={(updatedFolders) => {
               // Recalculate stats for modified folders
               const foldersWithStats = updatedFolders.map(f => {
-                  // Optimization: only recalc if we touched this folder?
-                  // Since we don't easily know, let's just recalc for safety or check trip_ids length change?
-                  // For simplicity, we just recalc all or specifically if trip_ids is different from old state (but we only have new state here).
-                  // Actually, the `onUpdateFolders` logic in `AddToFolderModal` returns the full new array.
-                  // We should re-run calculateLatestStats for any folder in the array to ensure its `stats` cache is fresh.
                   if (f.trip_ids && f.trip_ids.length > 0) {
                       const folderTrips = trips.filter(t => f.trip_ids.includes(t.id));
                       // Sort by date desc

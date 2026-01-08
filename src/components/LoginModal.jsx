@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, LogIn, UserPlus, Github, Mail } from 'lucide-react';
 import { api } from '../services/api';
 
+
+
 // Custom Markdown Renderer
 const renderMarkdown = (text) => {
   if (!text) return null;
@@ -172,7 +174,7 @@ const renderMarkdown = (text) => {
   return elements;
 };
 
-export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
+export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -180,10 +182,11 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [readmeContent, setReadmeContent] = useState('');
   const [lang, setLang] = useState('zh-cn'); 
+  
 
   useEffect(() => {
     if (isOpen) {
-      fetch(`/readme/${lang}.md`)
+      fetch(`/readme/${lang}.md?t=${new Date().getTime()}`)// CDN cache buster
         .then(res => res.text())
         .then(text => setReadmeContent(text))
         .catch(err => setReadmeContent('# Error loading guide'));
@@ -191,6 +194,8 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   }, [isOpen, lang]);
 
   if (!isOpen) return null;
+
+  const isLoggedIn = !!user;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -222,7 +227,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
       <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-auto animate-slide-up h-[85vh] md:h-[650px]" onClick={e => e.stopPropagation()}>
 
         {/* Left: Login Form */}
-        <div className="w-full md:w-[40%] p-8 flex flex-col justify-center border-b md:border-b-0 md:border-r border-gray-100 relative bg-white z-10">
+        {!isLoggedIn &&<div className="w-full md:w-[40%] p-8 flex flex-col justify-center border-b md:border-b-0 md:border-r border-gray-100 relative bg-white z-10">
              <button onClick={onClose} className="absolute top-4 left-4 md:hidden"><X className="text-gray-400 hover:text-gray-600"/></button>
             <div className="mb-8">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2 mb-2">
@@ -309,10 +314,10 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
                 {isRegistering ? '去登录' : '创建新账号'}
             </button>
             </div>
-        </div>
+        </div>}
 
         {/* Right: User Guide / Agreement */}
-        <div id="login-readme-container" className="w-full md:w-[60%] bg-slate-50 flex flex-col relative">
+        <div id="login-readme-container" className={`bg-slate-50 flex flex-col relative ${isLoggedIn ? 'w-full' : 'w-full md:w-[60%]'}`}>
             <button onClick={onClose} className="absolute top-4 right-4 z-10 hidden md:block"><X className="text-gray-400 hover:text-gray-600"/></button>
 
             <div className="flex items-center justify-between p-4 border-b bg-white/50 backdrop-blur shrink-0">

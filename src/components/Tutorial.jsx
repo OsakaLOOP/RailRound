@@ -10,7 +10,8 @@ const Tutorial = ({
     isLoginOpen,
     setIsLoginOpen,
     user,
-    pinMode
+    pinMode,
+    editorMode
 }) => {
     const [step, setStep] = useState(-1); // -1: Loading/Check, 0+: Steps
     const [rect, setRect] = useState(null);
@@ -24,7 +25,7 @@ const Tutorial = ({
     const STEPS = [
         {
             id: 'welcome',
-            target: null, // Center modal
+            target: '#header-title', // Center modal
             title: "Welcome to RailLOOP",
             content: "RailLOOP 是一个个人向旅铁手账, 旨在帮助你追踪和管理你的铁路旅程, 直观可感地展示旅行足迹.",
             position: 'center',
@@ -45,7 +46,7 @@ const Tutorial = ({
             title: "初次记录",
             content: "点击打开新旅程编辑菜单",
             position: 'top',
-            action: 'wait-interaction', // Wait for user to click
+            action: 'wait-interaction', 
             check: () => isTripEditing
         },
         {
@@ -54,7 +55,10 @@ const Tutorial = ({
             title: "编辑模式",
             content: "你可以选择“手动录入”以此致敬旧时代的工匠精神，或者尝试“自动规划”, 将命运交给无限非概率驱动",
             position: 'bottom',
-            action: 'next'
+            action: 'wait-interaction',
+            check: () => {
+                return editorMode === 'auto';
+            }
         },
         {
             id: 'close-editor',
@@ -140,7 +144,7 @@ const Tutorial = ({
             // Open Login Modal
             setIsLoginOpen(true);
             // Wait a bit for modal to open then next
-            setTimeout(() => setStep(s => s + 1), 500);
+            setTimeout(() => setStep(s => s + 1), 200);
         } else if (step >= STEPS.length - 1) {
             // End
             setStep(-2);
@@ -161,11 +165,6 @@ const Tutorial = ({
     // Initialization check
     useEffect(() => {
         const skipped = localStorage.getItem('rail_tutorial_skipped');
-        // If user logged in (and likely not new), maybe skip?
-        // Requirement says "entering page in non-login status".
-        // If user is already logged in via token in URL or localStorage, we might skip,
-        // BUT user specifically said "non-login status".
-        // We will assume `user` prop is null if not logged in.
 
         if (skipped === 'true' || user) {
             setStep(-2); // Skipped
@@ -183,7 +182,7 @@ const Tutorial = ({
 
         // 1. Target Resolution
         const updateRect = () => {
-            if (!currentStep.target) {
+            if (!currentStep.target ) {
                 setRect(null);
                 setTooltipStyle({
                     position: 'fixed',
@@ -195,6 +194,16 @@ const Tutorial = ({
                 });
                 return;
             }
+            if (currentStep.target === '#header-title') {
+                setTooltipStyle({
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    opacity: 1,
+                    transition: 'all 0.5s cubic-bezier(0.25, 1, 0.5, 1)'
+                });
+            }    
             const el = document.querySelector(currentStep.target);
             if (el) {
                 const r = el.getBoundingClientRect();
@@ -235,7 +244,7 @@ const Tutorial = ({
             clearInterval(interval);
             if (checkInterval) clearInterval(checkInterval);
         };
-    }, [step, activeTab, isTripEditing, isLoginOpen, pinMode]);
+    }, [step, activeTab, isTripEditing, isLoginOpen, pinMode, editorMode]);
 
     // Strict Positioning Logic
     const calculatePosition = () => {

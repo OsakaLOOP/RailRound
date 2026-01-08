@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, ArrowRight } from 'lucide-react';
 
@@ -15,6 +15,9 @@ const Tutorial = ({
     const [rect, setRect] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
     const [tooltipPos, setTooltipPos] = useState({});
+
+    // Ref for the tooltip card to measure strict dimensions
+    const tooltipRef = useRef(null);
 
     // Config
     const STEPS = [
@@ -149,7 +152,7 @@ const Tutorial = ({
         setIsVisible(true);
     }, [user]);
 
-    // Step Transition Logic
+    // Step Transition Logic & Rect Calculation
     useEffect(() => {
         if (step < 0 || step >= STEPS.length) return;
 
@@ -165,9 +168,6 @@ const Tutorial = ({
             const el = document.querySelector(currentStep.target);
             if (el) {
                 const r = el.getBoundingClientRect();
-                const PADDING = 20;
-                const CARD_W = 384; // max-w-sm approx
-                const CARD_H = 250; // approx height estimate
 
                 // Add padding to highlight box
                 const highlight = {
@@ -177,61 +177,6 @@ const Tutorial = ({
                     height: r.height + 10
                 };
                 setRect(highlight);
-
-                // Calculate Tooltip Position with Clamping
-                let top, left, transform = 'none';
-
-                if (currentStep.position === 'bottom') {
-                    top = highlight.top + highlight.height + 20;
-                    left = highlight.left;
-                } else if (currentStep.position === 'top') {
-                    top = highlight.top - CARD_H - 20;
-                    left = highlight.left;
-                } else if (currentStep.position === 'right') {
-                    top = highlight.top;
-                    left = highlight.left + highlight.width + 20;
-                } else if (currentStep.position === 'left') {
-                    top = highlight.top;
-                    left = highlight.left - CARD_W - 20;
-                } else { // center
-                    top = '50%';
-                    left = '50%';
-                    transform = 'translate(-50%, -50%)';
-                }
-
-                // Clamping Logic
-                if (typeof top === 'number') {
-                    // Vertical Clamp
-                    if (top < PADDING) top = PADDING;
-                    if (top + CARD_H > window.innerHeight - PADDING) {
-                        // Try flipping if overflowing bottom
-                        if (currentStep.position === 'bottom') {
-                             const flippedTop = highlight.top - CARD_H - 20;
-                             if (flippedTop > PADDING) top = flippedTop;
-                             else top = window.innerHeight - CARD_H - PADDING;
-                        } else {
-                             top = window.innerHeight - CARD_H - PADDING;
-                        }
-                    }
-                }
-
-                if (typeof left === 'number') {
-                    // Horizontal Clamp
-                    if (left < PADDING) left = PADDING;
-                    if (left + CARD_W > window.innerWidth - PADDING) {
-                        // Try flipping if overflowing right
-                        if (currentStep.position === 'right') {
-                            const flippedLeft = highlight.left - CARD_W - 20;
-                            if (flippedLeft > PADDING) left = flippedLeft;
-                            else left = window.innerWidth - CARD_W - PADDING;
-                        } else {
-                            left = window.innerWidth - CARD_W - PADDING;
-                        }
-                    }
-                }
-
-                setTooltipPos({ top, left, transform });
-
             } else {
                 // Element not found? Retry in a bit (maybe animation or mounting)
                 setRect(null);
@@ -263,6 +208,88 @@ const Tutorial = ({
             if (checkInterval) clearInterval(checkInterval);
         };
     }, [step, activeTab, isTripEditing, isLoginOpen]);
+
+    // Strict Positioning Logic
+    useLayoutEffect(() => {
+        if (step < 0 || step >= STEPS.length || !rect || !tooltipRef.current) return;
+
+        const currentStep = STEPS[step];
+        const PADDING = 20;
+
+        // Measure ACTUAL tooltip dimensions
+        const CARD_W = tooltipRef.current.offsetWidth || 384;
+        const CARD_H = tooltipRef.current.offsetHeight || 250;
+
+        let top, left, transform = 'none';
+
+        if (currentStep.position === 'bottom') {
+            top = rect.top + rect.height + 20;
+            left = rect.left;
+        } else if (currentStep.position === 'top') {
+            top = rect.top - CARD_H - 20;
+            left = rect.left;
+        } else if (currentStep.position === 'right') {
+            top = rect.top;
+            left = rect.left + rect.width + 20;
+        } else if (currentStep.position === 'left') {
+            top = rect.top;
+            left = rect.left - CARD_W - 20;
+        } else { // center
+            top = '50%';
+            left = '50%';
+            transform = 'translate(-50%, -50%)';
+        }
+
+        // --- Strict Boundary Logic ---
+        const winH = window.innerHeight;
+        const winW = window.innerWidth;
+
+        if (typeof top === 'number') {
+            // 1. Flip Logic (Vertical)
+            // If overflow bottom, try flip top
+            if (top + CARD_H > winH - PADDING) {
+                if (currentStep.position === 'bottom') {
+                     const flippedTop = rect.top - CARD_H - 20;
+                     // Only flip if there is space on top
+                     if (flippedTop > PADDING) top = flippedTop;
+                }
+            }
+            // If overflow top (e.g. from flip or 'top' pos), try flip bottom
+            if (top < PADDING) {
+                if (currentStep.position === 'top') {
+                    const flippedBottom = rect.top + rect.height + 20;
+                    if (flippedBottom + CARD_H < winH - PADDING) top = flippedBottom;
+                }
+            }
+
+            // 2. Clamp Logic (Vertical) - Final fallback
+            if (top < PADDING) top = PADDING;
+            if (top + CARD_H > winH - PADDING) top = winH - CARD_H - PADDING;
+        }
+
+        if (typeof left === 'number') {
+            // 1. Flip Logic (Horizontal)
+            if (left + CARD_W > winW - PADDING) {
+                if (currentStep.position === 'right') {
+                    const flippedLeft = rect.left - CARD_W - 20;
+                    if (flippedLeft > PADDING) left = flippedLeft;
+                }
+            }
+             if (left < PADDING) {
+                if (currentStep.position === 'left') {
+                    const flippedRight = rect.left + rect.width + 20;
+                    if (flippedRight + CARD_W < winW - PADDING) left = flippedRight;
+                }
+            }
+
+            // 2. Clamp Logic (Horizontal)
+            if (left < PADDING) left = PADDING;
+            if (left + CARD_W > winW - PADDING) left = winW - CARD_W - PADDING;
+        }
+
+        setTooltipPos({ top, left, transform });
+
+    }, [rect, step]); // Re-run when rect changes (target moves) or step changes (content changes)
 
     const handleNext = () => {
         if (step === STEPS.length - 2) { // Finish step
@@ -316,11 +343,13 @@ const Tutorial = ({
 
             {/* Tooltip / Card */}
             <div
+                ref={tooltipRef}
                 className={`absolute pointer-events-auto transition-all duration-300 flex flex-col gap-4 max-w-sm w-full p-6 bg-white rounded-2xl shadow-2xl animate-slide-up`}
                 style={{
                     top: tooltipPos.top,
                     left: tooltipPos.left,
-                    transform: tooltipPos.transform
+                    transform: tooltipPos.transform,
+                    opacity: tooltipPos.top ? 1 : 0 // Hide until positioned
                 }}
             >
                 <div>

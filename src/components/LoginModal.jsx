@@ -33,6 +33,9 @@ const renderMarkdown = (text) => {
     // Pass 2: Bold (**text**)
     processed = processed.replace(/\*\*(.*?)\*\*/g, '<span class="font-bold">$1</span>');
 
+    // Pass 3: Italic (*text*)
+    processed = processed.replace(/\*([^*]+)\*/g, '<span class="italic">$1</span>');
+
     return { __html: processed };
   };
 
@@ -59,13 +62,29 @@ const renderMarkdown = (text) => {
     const renderTree = (nodes) => {
       if (!nodes || nodes.length === 0) return null;
       return (
-        <ul className="list-disc list-outside ml-5 space-y-1 text-gray-600">
-          {nodes.map((node, i) => (
-            <li key={i} className="pl-1">
-              <span dangerouslySetInnerHTML={parseInline(node.content)} />
-              {node.children.length > 0 && renderTree(node.children)}
-            </li>
-          ))}
+        <ul className="list-disc list-outside pl-5 space-y-1 text-gray-600">
+          {nodes.map((node, i) => {
+            // Check for key-value format: - **Key**: Value
+            const kvMatch = node.content.match(/^(\*\*.*?\*\*:\s+)(.*)$/);
+            let content;
+            if (kvMatch) {
+              content = (
+                <div>
+                  <span dangerouslySetInnerHTML={parseInline(kvMatch[1])} />
+                  <div className="mt-1" dangerouslySetInnerHTML={parseInline(kvMatch[2])} />
+                </div>
+              );
+            } else {
+              content = <span dangerouslySetInnerHTML={parseInline(node.content)} />;
+            }
+
+            return (
+              <li key={i} className="pl-1">
+                {content}
+                {node.children.length > 0 && renderTree(node.children)}
+              </li>
+            );
+          })}
         </ul>
       );
     };

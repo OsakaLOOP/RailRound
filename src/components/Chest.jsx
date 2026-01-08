@@ -178,8 +178,8 @@ const Chest = ({ onDropItem }) => {
                             <span className="text-xs text-gray-600">{items.length} slots</span>
                         </h3>
 
-                        <div className="grid grid-cols-4 gap-1 max-h-60 overflow-y-auto p-2 bg-[#C6C6C6]">
-                            {items.length === 0 && <div className="col-span-4 text-center text-gray-500 text-xs py-4 pixel-font">Empty Inventory</div>}
+                        <div className="flex flex-wrap gap-0.5 max-h-60 overflow-y-auto p-2 bg-[#C6C6C6]">
+                            {items.length === 0 && <div className="w-full text-center text-gray-500 text-xs py-4 pixel-font">Empty Inventory</div>}
                             {items.map(item => (
                                 <ChestItem key={item.id} item={item} onRemove={() => removeItem(item.id)} />
                             ))}

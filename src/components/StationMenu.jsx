@@ -76,7 +76,7 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                 </div>
 
                 {/* Inventory Bar (Horizontal Slots) */}
-                <div className="flex gap-1">
+                <div className="flex gap-0.5">
                     {lines.map((line) => {
                         const isBeingDragged = isDragging && dragItem?.type === 'station' && dragItem?.lineKey === line.lineKey && dragItem?.id === line.stationId;
 

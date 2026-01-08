@@ -17,6 +17,7 @@ import { api } from './services/api';
 import { db } from './utils/db';
 
 const CURRENT_VERSION = 0.30;
+const LAST_MODIFIED = "2024-05-22";
 const MIN_SUPPORTED_VERSION = 0.0;
 
 const GithubRegisterModal = ({ isOpen, onClose, regToken, onLoginSuccess }) => {
@@ -1231,7 +1232,7 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
     <button onClick={onAdd} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
   </div>
 );
-const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeometries, onOpenCard }) => {
+const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeometries, onOpenCard, companyDB }) => {
     const totalTrips = trips.length;
     const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
     const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
@@ -1299,6 +1300,23 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeom
         </div>
         <div className="bg-white rounded-xl border overflow-hidden"><div className="p-3 border-b bg-slate-50 font-bold text-sm text-slate-600">常乘路线排行</div>
           {Object.entries(allSegments.reduce((acc, s) => { acc[s.lineKey] = (acc[s.lineKey]||0)+1; return acc; }, {})).sort((a,b) => b[1]-a[1]).slice(0, 3).map(([line, count], idx) => { const icon = railwayData[line]?.meta?.icon; return ( <div key={line} className="p-3 border-b last:border-0 flex justify-between items-center"><div className="flex items-center gap-3"><span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${idx===0?'bg-yellow-100 text-yellow-700':'bg-slate-100 text-slate-600'}`}>{idx+1}</span>{icon && <img src={icon} alt="" className="line-icon" />}<span>{line}</span></div><span className="font-bold text-slate-400 text-sm">{count}</span></div> )})}
+        </div>
+
+        <div className="text-center text-xs text-gray-400 mt-8 pb-4">
+             加载了 {companyDB ? Object.keys(companyDB).length : 0} 家公司，
+             {railwayData ? Object.keys(railwayData).length : 0} 条线路，
+             {(() => {
+                 let count = 0;
+                 if (railwayData) {
+                    const uniqueStations = new Set();
+                    Object.values(railwayData).forEach(line => {
+                        if (line.stations) line.stations.forEach(s => uniqueStations.add(s.id));
+                    });
+                    count = uniqueStations.size;
+                 }
+                 return count;
+             })()} 个站点。<br/>
+             Last Updated: {LAST_MODIFIED}
         </div>
       </div>
     );
@@ -2382,7 +2400,11 @@ export default function RailLOOPApp() {
     <div className="flex flex-col h-screen bg-slate-100 font-sans text-slate-800 overflow-hidden">
       <style>{LEAFLET_CSS}</style>
       <header className="bg-slate-900 text-white p-4 shadow-md z-30 flex justify-between shrink-0">
-        <div className="flex items-center gap-2"><Train className="text-emerald-400"/> <span className="font-bold">RailLOOP</span></div>
+        <div className="flex items-center gap-2">
+            <Train className="text-emerald-400"/>
+            <span className="font-bold">RailLOOP</span>
+            <span className="bg-[#39C5BB] text-white rounded px-1.5 py-0.5 text-[10px] font-bold ml-2 shadow-sm">v{CURRENT_VERSION}</span>
+        </div>
         <div className="flex items-center gap-2">
             {user ? (
                <div className="flex items-center gap-2">
@@ -2421,7 +2443,7 @@ export default function RailLOOPApp() {
 
       <div className="flex-1 relative overflow-hidden flex flex-col">
         {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} segmentGeometries={segmentGeometries} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
-        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} onOpenCard={setCardModalUser} />}
+        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} onOpenCard={setCardModalUser} companyDB={companyDB} />}
         <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
           <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
           <FabButton activeTab={activeTab} pinMode={pinMode} togglePinMode={togglePinMode} />

@@ -40,17 +40,55 @@ export async function onRequest(event) {
 
     if (event.request.method === "POST") {
         const body = await event.request.json();
-        const { trips, pins, latest_5, version } = body;
+        const { trips, pins, latest_5, version, folders, badge_settings } = body;
 
         // Fetch existing to preserve other fields (like password, bindings)
         const existingRaw = await DB.get(userKey);
         const existing = existingRaw ? JSON.parse(existingRaw) : {};
+
+        // --- Folder Badge Sync Logic ---
+        if (folders && Array.isArray(folders)) {
+            const oldFolders = existing.folders || [];
+
+            // 1. Identify hashes to delete (existed before, but now removed or made private)
+            // Map current public hashes
+            const newPublicHashes = new Set(folders.filter(f => f.is_public && f.hash).map(f => f.hash));
+
+            const promises = [];
+
+            oldFolders.forEach(f => {
+                if (f.hash && !newPublicHashes.has(f.hash)) {
+                    promises.push(DB.delete(`badge:${f.hash}`));
+                }
+            });
+
+            // 2. Identify/Update hashes to save
+            folders.forEach(f => {
+                if (f.is_public && f.hash && f.stats) {
+                    // Store minimal data needed for the card
+                    const badgeData = {
+                        username: username,
+                        stats: f.stats,
+                        type: 'folder',
+                        updated_at: new Date().toISOString()
+                    };
+                    promises.push(DB.put(`badge:${f.hash}`, JSON.stringify(badgeData)));
+                }
+            });
+
+            if (promises.length > 0) {
+                await Promise.allSettled(promises);
+            }
+        }
+        // -------------------------------
 
         const newData = {
             ...existing,
             trips: trips || existing.trips || [],
             pins: pins || existing.pins || [],
             latest_5: latest_5 || existing.latest_5 || null, // Store the pre-calculated card data
+            folders: folders || existing.folders || [],
+            badge_settings: badge_settings || existing.badge_settings || { enabled: true },
             version: version || existing.version || null
         };
 

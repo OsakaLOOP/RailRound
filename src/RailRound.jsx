@@ -1318,6 +1318,14 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeom
 
 // --- 5. 主组件 ---
 export default function RailLOOPApp() {
+  return (
+    <DragProvider>
+        <RailRoundContent />
+    </DragProvider>
+  );
+}
+
+function RailRoundContent() {
   const [activeTab, setActiveTab] = useState('records');
   const [railwayData, setRailwayData] = useState({}); 
   const [trips, setTrips] = useState([]); 
@@ -2575,17 +2583,15 @@ export default function RailLOOPApp() {
       <LineSelector isOpen={false} onClose={() => {}} onSelect={() => {}} railwayData={railwayData} /> 
 
       {/* Global Drag UI */}
-      <DragProvider>
-          {stationMenu && (
-              <StationMenu
-                  position={stationMenu}
-                  stationData={stationMenu.stationData}
-                  railwayData={railwayData}
-                  onClose={() => setStationMenu(null)}
-              />
-          )}
-          <Chest />
-      </DragProvider>
+      {stationMenu && (
+          <StationMenu
+              position={stationMenu}
+              stationData={stationMenu.stationData}
+              railwayData={railwayData}
+              onClose={() => setStationMenu(null)}
+          />
+      )}
+      <Chest />
 
       <nav className="bg-white border-t p-2 flex justify-around shrink-0 pb-safe z-30">
         {['records', 'map', 'stats'].map(t => <button id={`tab-btn-${t}`} key={t} onClick={()=>setActiveTab(t)} className={`p-2 rounded-lg ${activeTab===t ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>{t==='records' ? <Layers/> : t==='map' ? <MapIcon/> : <PieChart/>}</button>)}

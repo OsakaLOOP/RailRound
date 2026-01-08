@@ -13,27 +13,27 @@ if (!fs.existsSync(tutorialPath)) {
 
 const content = fs.readFileSync(tutorialPath, 'utf-8');
 
-// 1. Check for measure logic (dynamic size)
-if (content.includes('tooltipRef.current.offsetWidth') && content.includes('useLayoutEffect')) {
-    console.log("[OK] Dynamic sizing logic found (useLayoutEffect + offsetWidth)");
+// 1. Check for visualViewport usage
+if (content.includes('window.visualViewport.height')) {
+    console.log("[OK] visualViewport usage found");
 } else {
-    console.error("[FAIL] Dynamic sizing logic missing");
+    console.error("[FAIL] visualViewport usage missing");
     process.exit(1);
 }
 
-// 2. Check for Flip/Clamp logic
-if (content.includes('flippedTop') && content.includes('winH - PADDING')) {
-    console.log("[OK] Boundary Flip/Clamp logic found");
+// 2. Check for ResizeObserver usage
+if (content.includes('new ResizeObserver')) {
+    console.log("[OK] ResizeObserver usage found");
 } else {
-    console.error("[FAIL] Boundary logic missing");
+    console.error("[FAIL] ResizeObserver usage missing");
     process.exit(1);
 }
 
-// 3. Check interaction logic (hiding button)
-if (content.includes('!isInteractionStep &&')) {
-    console.log("[OK] Next button hiding logic found");
+// 3. Check for map-pins interactive mode
+if (content.includes('id: \'map-pins\'') && content.includes('action: \'wait-interaction\'') && content.includes('pinMode')) {
+    console.log("[OK] Map pins interactive mode configured");
 } else {
-    console.error("[FAIL] Next button logic missing");
+    console.error("[FAIL] Map pins configuration incorrect");
     process.exit(1);
 }
 

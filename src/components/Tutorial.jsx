@@ -9,7 +9,8 @@ const Tutorial = ({
     setIsTripEditing,
     isLoginOpen,
     setIsLoginOpen,
-    user
+    user,
+    pinMode
 }) => {
     const [step, setStep] = useState(-1); // -1: Loading/Check, 0+: Steps
     const [rect, setRect] = useState(null);
@@ -87,7 +88,8 @@ const Tutorial = ({
             title: "Map Pins",
             content: "Use this button to add pins (photos or comments) to the map.",
             position: 'right', // FAB is bottom-left
-            action: 'next'
+            action: 'wait-interaction',
+            check: () => pinMode && pinMode !== 'idle'
         },
         {
             id: 'map-layers',
@@ -207,10 +209,10 @@ const Tutorial = ({
             clearInterval(interval);
             if (checkInterval) clearInterval(checkInterval);
         };
-    }, [step, activeTab, isTripEditing, isLoginOpen]);
+    }, [step, activeTab, isTripEditing, isLoginOpen, pinMode]);
 
     // Strict Positioning Logic
-    useLayoutEffect(() => {
+    const calculatePosition = () => {
         if (step < 0 || step >= STEPS.length || !rect || !tooltipRef.current) return;
 
         const currentStep = STEPS[step];
@@ -229,10 +231,12 @@ const Tutorial = ({
             top = rect.top - CARD_H - 20;
             left = rect.left;
         } else if (currentStep.position === 'right') {
-            top = rect.top;
+            // Vertically center for side positioning
+            top = rect.top + (rect.height / 2) - (CARD_H / 2);
             left = rect.left + rect.width + 20;
         } else if (currentStep.position === 'left') {
-            top = rect.top;
+            // Vertically center for side positioning
+            top = rect.top + (rect.height / 2) - (CARD_H / 2);
             left = rect.left - CARD_W - 20;
         } else { // center
             top = '50%';
@@ -241,8 +245,15 @@ const Tutorial = ({
         }
 
         // --- Strict Boundary Logic ---
-        const winH = window.innerHeight;
-        const winW = window.innerWidth;
+        // Use visualViewport if available for mobile robustness
+        const winH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        const winW = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+        const offsetTop = window.visualViewport ? window.visualViewport.offsetTop : 0;
+
+        // Adjust for viewport scrolling/offset if using visualViewport
+        // Actually for fixed position elements, visualViewport logic is complex.
+        // If we use simple innerHeight, it might be safer unless keyboard is up.
+        // But for FAB (bottom) clipping, visualViewport height is the visible part.
 
         if (typeof top === 'number') {
             // 1. Flip Logic (Vertical)
@@ -250,11 +261,10 @@ const Tutorial = ({
             if (top + CARD_H > winH - PADDING) {
                 if (currentStep.position === 'bottom') {
                      const flippedTop = rect.top - CARD_H - 20;
-                     // Only flip if there is space on top
                      if (flippedTop > PADDING) top = flippedTop;
                 }
             }
-            // If overflow top (e.g. from flip or 'top' pos), try flip bottom
+            // If overflow top, try flip bottom
             if (top < PADDING) {
                 if (currentStep.position === 'top') {
                     const flippedBottom = rect.top + rect.height + 20;
@@ -288,8 +298,21 @@ const Tutorial = ({
         }
 
         setTooltipPos({ top, left, transform });
+    };
 
-    }, [rect, step]); // Re-run when rect changes (target moves) or step changes (content changes)
+    useLayoutEffect(() => {
+        calculatePosition();
+    }, [rect, step]);
+
+    // ResizeObserver to handle content size changes
+    useEffect(() => {
+        if (!tooltipRef.current) return;
+        const observer = new ResizeObserver(() => {
+            calculatePosition();
+        });
+        observer.observe(tooltipRef.current);
+        return () => observer.disconnect();
+    }, [rect, step]);
 
     const handleNext = () => {
         if (step === STEPS.length - 2) { // Finish step

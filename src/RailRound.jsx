@@ -1681,6 +1681,16 @@ export default function RailLOOPApp() {
   }, []);
 
   useEffect(() => { if (activeTab === 'map' && leafletReady) setTimeout(initMap, 100); }, [activeTab, leafletReady]);
+
+  // Fix: Invalidate map size when switching back to map tab to prevent blank tiles
+  useEffect(() => {
+      if (activeTab === 'map' && mapInstance.current) {
+          setTimeout(() => {
+              mapInstance.current.invalidateSize();
+          }, 200);
+      }
+  }, [activeTab]);
+
   useEffect(() => { if (mapInstance.current && leafletReady && geoData) renderBaseMap(geoData); }, [geoData, leafletReady]);
   const [segmentGeometries, setSegmentGeometries] = useState(new Map()); // Key -> { coords, color, isMulti, fallback }
   const [tripSegmentsGeometry, setTripSegmentsGeometry] = useState([]);

@@ -32,4 +32,4 @@ dist-ssr
 .edgeone/*
 !.edgeone/project.json
 .tef_dist/*
-  
+  dist.rar

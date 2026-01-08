@@ -16,8 +16,8 @@ import { LoginModal } from './components/LoginModal';
 import { api } from './services/api';
 import { db } from './utils/db';
 
-const CURRENT_VERSION = 0.30;
-const MIN_SUPPORTED_VERSION = 0.0;
+const CURRENT_VERSION = 0.31;
+export const MIN_SUPPORTED_VERSION = 0.0;
 
 const GithubRegisterModal = ({ isOpen, onClose, regToken, onLoginSuccess }) => {
     const [username, setUsername] = useState('');

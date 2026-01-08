@@ -21,11 +21,11 @@ If you are an interstellar hitchhiker who has just been beamed here (or an unpop
     - **The Truth about 12 Nines**: Please note that this ridiculously high availability figure belongs to our freeloaded CDN provider ([EdgeOne](https://cloud.tencent.com/product/teo)), not the code quality of this service. This means the server almost never goes down, but it **does not** guarantee that the code logic running on top of it won't act like an [Infinite Improbability Drive](https://hitchhikers.fandom.com/wiki/Infinite_Improbability_Drive), suddenly turning your route planning into a green trash can running at 200 km/h.
 
 - **Image Availability (Existentialism)**
-    * Just as the entry on "[Matcha](https://en.wikipedia.org/wiki/Matcha)" (Tea) in the Guide often causes the ship's computer to crash, this service **does not provide image hosting**.
-    * If you wish to display your selfie with the Shinkansen [Doctor Yellow](https://en.wikipedia.org/wiki/Doctor_Yellow) (no one cares about the former), please **figure it out yourself** ([S3](https://aws.amazon.com/s3), [R2](https://www.cloudflare.com/developer-platform/r2), or some ancient Weibo external link technology), and manually paste the URL. This is regarded as a screening mechanism for core players—only those who truly know how to survive in the digital wasteland deserve thoughts, dignity, records, and images.
+    - Just as the entry on "[Matcha](https://en.wikipedia.org/wiki/Matcha)" (Tea) in the Guide often causes the ship's computer to crash, this service **does not provide image hosting**.
+    - If you wish to display your selfie with the Shinkansen [Doctor Yellow](https://en.wikipedia.org/wiki/Doctor_Yellow) (no one cares about the former), please **figure it out yourself** ([S3](https://aws.amazon.com/s3), [R2](https://www.cloudflare.com/developer-platform/r2), or some ancient Weibo external link technology), and manually paste the URL. This is regarded as a screening mechanism for core players—only those who truly know how to survive in the digital wasteland deserve thoughts, dignity, records, and images.
 
 - **Badges (Social Status Symbols)**
-    * We have developed a **GitHub Readme Badge**. This is a dynamic [SVG](https://www.w3.org/Graphics/SVG/) designed to show off to other carbon-based lifeforms how much non-renewable time you have wasted on the rails of this planet, or to find similar conspecifics ([Otokonoko](https://en.wikipedia.org/wiki/Otokonoko)) with absolutely no hope of reproduction.
+    - We have developed a **GitHub Readme Badge**. This is a dynamic [SVG](https://www.w3.org/Graphics/SVG/) designed to show off to other carbon-based lifeforms how much non-renewable time you have wasted on the rails of this planet, or to find similar conspecifics ([Otokonoko](https://en.wikipedia.org/wiki/Otokonoko)) with absolutely no hope of reproduction.
 
 ---
 
@@ -102,9 +102,9 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 This service cites and displays data in accordance with the terms of use of the relevant data sources. Please adhere to the following agreements during secondary development or distribution:
 
 - **Public Transportation Data**: Powered by **[ODPT](https://www.odpt.org)** (Open Data Public Transportation Center).
-    * *License*: [ODPT Terms of Use](https://www.odpt.org/terms/) (Compatible with CC BY 4.0).
+    - *License*: [ODPT Terms of Use](https://www.odpt.org/terms/) (Compatible with CC BY 4.0).
 - **Geospatial Data**: Sourced from **[MLIT](https://www.mlit.go.jp/kokudoseisaku/gis/)** (Ministry of Land, Infrastructure, Transport and Tourism) - National Land Numerical Information.
-    * *License*: [MLIT Standard Terms of Use](https://www.mlit.go.jp/kokudoseisaku/gis/terms.html) (CC BY 4.0 compatible).
+    - *License*: [MLIT Standard Terms of Use](https://www.mlit.go.jp/kokudoseisaku/gis/terms.html) (CC BY 4.0 compatible).
 - **Station Data**: **[Ekidata.jp](https://ekidata.jp)**.
 - **Linked Open Data**: **[JRSLOD](https://uedayou.net/jrslod/)** datasets.
 

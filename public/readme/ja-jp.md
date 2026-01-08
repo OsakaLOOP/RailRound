@@ -21,11 +21,11 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
     - **12 ナインの真実**: ご注意ください。この馬鹿げた高い可用性の数値は、私たちがタダ乗りしている CDN プロバイダー ([EdgeOne](https://cloud.tencent.com/product/teo)) のものであり、本サービスのコード品質のものではありません。サーバーがダウンすることはほぼありませんが、その上で動作するコードロジックが [無限不可能性ドライブ](https://hitchhikers.fandom.com/wiki/Infinite_Improbability_Drive) (Infinite Improbability Drive) のように振る舞い、あなたの経路探索を突如として時速 200km で疾走する緑色のゴミ箱に変えてしまわないという保証は **ありません**。
 
 - **実存主義的画像ホスティング (Image Availability)**
-    * ガイドの「[抹茶](https://en.wikipedia.org/wiki/Matcha)」の項目が頻繁に宇宙船のコンピュータをクラッシュさせるのと同様に、本サービスは **画像ホスティングを提供しません**。
-    * もしあなたが新幹線の [ドクターイエロー](https://ja.wikipedia.org/wiki/%E3%83%89%E3%82%AF%E3%82%BF%E3%83%BC%E3%82%A4%E3%82%A8%E3%83%AD%E3%83%BC) との自撮り (前者を気にする人はいません) を表示したいなら、**自分でなんとかしてください** ([S3](https://aws.amazon.com/s3)、[R2](https://www.cloudflare.com/developer-platform/r2)、あるいは何らかの古の Weibo 外的リンク技術など)。そして手動で URL を貼り付けてください。これはコアなプレイヤーに対する選別メカニズムと見なされます —— デジタル荒野での生存方法を真に理解している者だけが、思想、尊厳、記録、そして画像を持つに値するのです。
+    - ガイドの「[抹茶](https://en.wikipedia.org/wiki/Matcha)」の項目が頻繁に宇宙船のコンピュータをクラッシュさせるのと同様に、本サービスは **画像ホスティングを提供しません**。
+    - もしあなたが新幹線の [ドクターイエロー](https://ja.wikipedia.org/wiki/%E3%83%89%E3%82%AF%E3%82%BF%E3%83%BC%E3%82%A4%E3%82%A8%E3%83%AD%E3%83%BC) との自撮り (前者を気にする人はいません) を表示したいなら、**自分でなんとかしてください** ([S3](https://aws.amazon.com/s3)、[R2](https://www.cloudflare.com/developer-platform/r2)、あるいは何らかの古の Weibo 外的リンク技術など)。そして手動で URL を貼り付けてください。これはコアなプレイヤーに対する選別メカニズムと見なされます —— デジタル荒野での生存方法を真に理解している者だけが、思想、尊厳、記録、そして画像を持つに値するのです。
 
 - **社会的ステータスの象徴 (Badges)**
-    * そのため、 **GitHub Readme Badge** を開発しました。これは動的な [SVG](https://www.w3.org/Graphics/SVG/) であり、あなたがこの惑星のレールの上でどれだけの再生不可能な時間を浪費したかを他の炭素生命体に自慢するため、あるいは生殖の希望が全くない同様の同類 ([男の娘](https://dic.pixiv.net/a/%E7%94%B7%E3%81%AE%E5%A8%98)) を見つけるためのものです。
+    - そのため、 **GitHub Readme Badge** を開発しました。これは動的な [SVG](https://www.w3.org/Graphics/SVG/) であり、あなたがこの惑星のレールの上でどれだけの再生不可能な時間を浪費したかを他の炭素生命体に自慢するため、あるいは生殖の希望が全くない同様の同類 ([男の娘](https://dic.pixiv.net/a/%E7%94%B7%E3%81%AE%E5%A8%98)) を見つけるためのものです。
 
 ---
 
@@ -102,9 +102,9 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 本サービスは関連データソースの利用規約に従ってデータを引用・表示しています。二次開発または配布の際は、以下の規約を必ず遵守してください：
 
 - **Public Transportation Data**: Powered by **[ODPT](https://www.odpt.org)** (Open Data Public Transportation Center).
-    * *License*: [ODPT Terms of Use](https://www.odpt.org/terms/) (Compatible with CC BY 4.0).
+    - *License*: [ODPT Terms of Use](https://www.odpt.org/terms/) (Compatible with CC BY 4.0).
 - **Geospatial Data**: Sourced from **[MLIT](https://www.mlit.go.jp/kokudoseisaku/gis/)** (国土交通省) - National Land Numerical Information.
-    * *License*: [MLIT Standard Terms of Use](https://www.mlit.go.jp/kokudoseisaku/gis/terms.html) (CC BY 4.0 compatible).
+    - *License*: [MLIT Standard Terms of Use](https://www.mlit.go.jp/kokudoseisaku/gis/terms.html) (CC BY 4.0 compatible).
 - **Station Data**: **[Ekidata.jp](https://ekidata.jp)**.
 - **Linked Open Data**: **[JRSLOD](https://uedayou.net/jrslod/)** datasets.
 

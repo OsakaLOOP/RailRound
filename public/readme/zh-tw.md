@@ -21,11 +21,11 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
     - **12 個 9 的真相**：請注意，這個高得離譜的可用性數字屬於我們白嫖的 CDN 服務商 ([EdgeOne](https://cloud.tencent.com/product/teo))，而非本服務的代碼質量。這意味著，伺服器幾乎永不宕機，但**並不**保證運行在上面的代碼邏輯不會像一台 [無限非概率驅動引擎](https://hitchhikers.fandom.com/wiki/Infinite_Improbability_Drive) (Infinite Improbability Drive) 一樣，突然把你的路徑規劃變成一個 200 km/h 達速運行的綠色垃圾桶。
 
 - **存在主義圖床 (Image Availability)**
-    * 正如指南中關於「[抹茶](https://en.wikipedia.org/wiki/Matcha)」的條目經常讓飛船電腦崩潰一樣，本服務**不提供圖床**。
-    * 如果你想展示你與新幹線 [黃醫生](https://zh.wikipedia.org/zh-tw/%E6%96%B0%E5%B9%B9%E7%B7%9A%E9%86%AB%E7%94%9F%E9%BB%83) 的自拍 (沒人關心前者)，請**自己想辦法** ([S3](https://aws.amazon.com/s3)、[R2](https://www.cloudflare.com/developer-platform/r2)、或者某種古老的微博外鏈技術)，然後手動粘貼 URL。這被視為一種對核心玩家的篩選機制 —— 只有真正懂得如何在數字荒原生存的人，才配擁有思想、尊嚴、記錄和圖片。
+    - 正如指南中關於「[抹茶](https://en.wikipedia.org/wiki/Matcha)」的條目經常讓飛船電腦崩潰一樣，本服務**不提供圖床**。
+    - 如果你想展示你與新幹線 [黃醫生](https://zh.wikipedia.org/zh-tw/%E6%96%B0%E5%B9%B9%E7%B7%9A%E9%86%AB%E7%94%9F%E9%BB%83) 的自拍 (沒人關心前者)，請**自己想辦法** ([S3](https://aws.amazon.com/s3)、[R2](https://www.cloudflare.com/developer-platform/r2)、或者某種古老的微博外鏈技術)，然後手動粘貼 URL。這被視為一種對核心玩家的篩選機制 —— 只有真正懂得如何在數字荒原生存的人，才配擁有思想、尊嚴、記錄和圖片。
 
 - **社交身分象徵 (Badges)**
-    * 我們開發了 **GitHub Readme Badge**。這是一個動態 [SVG](https://www.w3.org/Graphics/SVG/)，旨在向其他碳基生物炫耀你在這個星球的鐵軌上消耗了多少不可再生的時間，或者找到類似的沒有任何生殖希望的同類 ([偽娘 / 男の娘](https://zh.moegirl.org.cn/%E4%BC%AA%E5%A8%98)) 們。
+    - 我們開發了 **GitHub Readme Badge**。這是一個動態 [SVG](https://www.w3.org/Graphics/SVG/)，旨在向其他碳基生物炫耀你在這個星球的鐵軌上消耗了多少不可再生的時間，或者找到類似的沒有任何生殖希望的同類 ([偽娘 / 男の娘](https://zh.moegirl.org.cn/%E4%BC%AA%E5%A8%98)) 們。
 
 ---
 
@@ -102,9 +102,9 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 本服務依照相關數據源的使用條款引用並展示數據。二次開發或分發時請務必遵守以下協議：
 
 - **Public Transportation Data**: Powered by **[ODPT](https://www.odpt.org)** (Open Data Public Transportation Center).
-    * *License*: [ODPT Terms of Use](https://www.odpt.org/terms/) (Compatible with CC BY 4.0).
+    - *License*: [ODPT Terms of Use](https://www.odpt.org/terms/) (Compatible with CC BY 4.0).
 - **Geospatial Data**: Sourced from **[MLIT](https://www.mlit.go.jp/kokudoseisaku/gis/)** (Ministry of Land, Infrastructure, Transport and Tourism) - National Land Numerical Information.
-    * *License*: [MLIT Standard Terms of Use](https://www.mlit.go.jp/kokudoseisaku/gis/terms.html) (CC BY 4.0 compatible).
+    - *License*: [MLIT Standard Terms of Use](https://www.mlit.go.jp/kokudoseisaku/gis/terms.html) (CC BY 4.0 compatible).
 - **Station Data**: **[Ekidata.jp](https://ekidata.jp)**.
 - **Linked Open Data**: **[LOD Challenge](https://uedayou.net/jrslod/)** datasets.
 

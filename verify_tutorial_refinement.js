@@ -13,29 +13,27 @@ if (!fs.existsSync(tutorialPath)) {
 
 const content = fs.readFileSync(tutorialPath, 'utf-8');
 
-// 1. Check for Bezier Curve
-if (content.includes('cubic-bezier(0.25, 1, 0.5, 1)')) {
-    console.log("[OK] Bezier curve animation found");
+// 1. Check for tooltipStyle usage
+if (content.includes('style={tooltipStyle}')) {
+    console.log("[OK] Dynamic style usage found");
 } else {
-    console.error("[FAIL] Bezier curve animation missing");
+    console.error("[FAIL] Dynamic style usage missing");
     process.exit(1);
 }
 
-// 2. Check for Horizontal Centering (Top/Bottom)
-// Look for (rect.width / 2) - (CARD_W / 2)
-if (content.includes('rect.left + (rect.width / 2) - (CARD_W / 2)')) {
-    console.log("[OK] Horizontal centering logic found");
+// 2. Check for Math.max clamping logic
+if (content.includes('Math.max(PADDING, Math.min')) {
+    console.log("[OK] Strict Clamping logic found");
 } else {
-    console.error("[FAIL] Horizontal centering logic missing");
+    console.error("[FAIL] Strict Clamping logic missing");
     process.exit(1);
 }
 
-// 3. Check for Vertical Centering (Left/Right)
-// Look for (rect.height / 2) - (CARD_H / 2)
-if (content.includes('rect.top + (rect.height / 2) - (CARD_H / 2)')) {
-    console.log("[OK] Vertical centering logic found");
+// 3. Check for Smart Flip logic
+if (content.includes('const opposites = { \'top\': \'bottom\'')) {
+    console.log("[OK] Smart Flip logic found");
 } else {
-    console.error("[FAIL] Vertical centering logic missing");
+    console.error("[FAIL] Smart Flip logic missing");
     process.exit(1);
 }
 

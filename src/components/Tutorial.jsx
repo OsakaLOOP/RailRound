@@ -15,7 +15,7 @@ const Tutorial = ({
     const [step, setStep] = useState(-1); // -1: Loading/Check, 0+: Steps
     const [rect, setRect] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
-    const [tooltipPos, setTooltipPos] = useState({});
+    const [tooltipStyle, setTooltipStyle] = useState({});
 
     // Ref for the tooltip card to measure strict dimensions
     const tooltipRef = useRef(null);
@@ -138,18 +138,10 @@ const Tutorial = ({
     // Initialization check
     useEffect(() => {
         const skipped = localStorage.getItem('rail_tutorial_skipped');
-        // If user logged in (and likely not new), maybe skip?
-        // Requirement says "entering page in non-login status".
-        // If user is already logged in via token in URL or localStorage, we might skip,
-        // BUT user specifically said "non-login status".
-        // We will assume `user` prop is null if not logged in.
-
         if (skipped === 'true' || user) {
             setStep(-2); // Skipped
             return;
         }
-
-        // Start tutorial
         setStep(0);
         setIsVisible(true);
     }, [user]);
@@ -164,7 +156,14 @@ const Tutorial = ({
         const updateRect = () => {
             if (!currentStep.target) {
                 setRect(null);
-                setTooltipPos({ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' });
+                setTooltipStyle({
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    opacity: 1,
+                    transition: 'all 0.5s cubic-bezier(0.25, 1, 0.5, 1)'
+                });
                 return;
             }
             const el = document.querySelector(currentStep.target);
@@ -222,69 +221,84 @@ const Tutorial = ({
         const CARD_W = tooltipRef.current.offsetWidth || 384;
         const CARD_H = tooltipRef.current.offsetHeight || 250;
 
-        let top, left, transform = 'none';
-
-        if (currentStep.position === 'bottom') {
-            top = rect.top + rect.height + 20;
-            left = rect.left + (rect.width / 2) - (CARD_W / 2); // Center horizontally
-        } else if (currentStep.position === 'top') {
-            top = rect.top - CARD_H - 20;
-            left = rect.left + (rect.width / 2) - (CARD_W / 2); // Center horizontally
-        } else if (currentStep.position === 'right') {
-            top = rect.top + (rect.height / 2) - (CARD_H / 2); // Center vertically
-            left = rect.left + rect.width + 20;
-        } else if (currentStep.position === 'left') {
-            top = rect.top + (rect.height / 2) - (CARD_H / 2); // Center vertically
-            left = rect.left - CARD_W - 20;
-        } else { // center
-            top = '50%';
-            left = '50%';
-            transform = 'translate(-50%, -50%)';
-        }
-
-        // --- Strict Boundary Logic ---
+        // Viewport Dimensions
         const winH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         const winW = window.visualViewport ? window.visualViewport.width : window.innerWidth;
 
-        if (typeof top === 'number') {
-            // 1. Flip Logic (Vertical)
-            if (top + CARD_H > winH - PADDING) {
-                if (currentStep.position === 'bottom') {
-                     const flippedTop = rect.top - CARD_H - 20;
-                     if (flippedTop > PADDING) top = flippedTop;
+        // Center of the target element
+        const targetCenterX = rect.left + rect.width / 2;
+        const targetCenterY = rect.top + rect.height / 2;
+
+        let top = 0;
+        let left = 0;
+        let pos = currentStep.position;
+
+        // Helper to check collision
+        const checkBounds = (t, l) => {
+            return (t >= PADDING && l >= PADDING && (t + CARD_H) <= (winH - PADDING) && (l + CARD_W) <= (winW - PADDING));
+        };
+
+        // 1. Determine Initial Position & Flip if needed
+        const getCoords = (p) => {
+            let t, l;
+            if (p === 'bottom') {
+                t = rect.top + rect.height + 20;
+                l = targetCenterX - (CARD_W / 2);
+            } else if (p === 'top') {
+                t = rect.top - CARD_H - 20;
+                l = targetCenterX - (CARD_W / 2);
+            } else if (p === 'right') {
+                t = targetCenterY - (CARD_H / 2);
+                l = rect.left + rect.width + 20;
+            } else if (p === 'left') {
+                t = targetCenterY - (CARD_H / 2);
+                l = rect.left - CARD_W - 20;
+            } else { // center
+                t = winH / 2 - CARD_H / 2;
+                l = winW / 2 - CARD_W / 2;
+            }
+            return { t, l };
+        };
+
+        let coords = getCoords(pos);
+
+        // Smart Flip
+        if (!checkBounds(coords.t, coords.l) && pos !== 'center') {
+            const opposites = { 'top': 'bottom', 'bottom': 'top', 'left': 'right', 'right': 'left' };
+            const altPos = opposites[pos];
+            if (altPos) {
+                const altCoords = getCoords(altPos);
+                // If alternative is better (or valid), take it
+                // Simple heuristic: check if alt fits vertically for top/bottom swap
+                if (pos === 'top' || pos === 'bottom') {
+                    if (altCoords.t >= PADDING && (altCoords.t + CARD_H) <= (winH - PADDING)) {
+                        coords = altCoords;
+                        pos = altPos;
+                    }
+                }
+                // Check if alt fits horizontally for left/right swap
+                if (pos === 'left' || pos === 'right') {
+                    if (altCoords.l >= PADDING && (altCoords.l + CARD_W) <= (winW - PADDING)) {
+                        coords = altCoords;
+                        pos = altPos;
+                    }
                 }
             }
-            if (top < PADDING) {
-                if (currentStep.position === 'top') {
-                    const flippedBottom = rect.top + rect.height + 20;
-                    if (flippedBottom + CARD_H < winH - PADDING) top = flippedBottom;
-                }
-            }
-            // 2. Clamp Logic (Vertical)
-            if (top < PADDING) top = PADDING;
-            if (top + CARD_H > winH - PADDING) top = winH - CARD_H - PADDING;
         }
 
-        if (typeof left === 'number') {
-            // 1. Flip Logic (Horizontal)
-            if (left + CARD_W > winW - PADDING) {
-                if (currentStep.position === 'right') {
-                    const flippedLeft = rect.left - CARD_W - 20;
-                    if (flippedLeft > PADDING) left = flippedLeft;
-                }
-            }
-             if (left < PADDING) {
-                if (currentStep.position === 'left') {
-                    const flippedRight = rect.left + rect.width + 20;
-                    if (flippedRight + CARD_W < winW - PADDING) left = flippedRight;
-                }
-            }
-            // 2. Clamp Logic (Horizontal)
-            if (left < PADDING) left = PADDING;
-            if (left + CARD_W > winW - PADDING) left = winW - CARD_W - PADDING;
-        }
+        // 2. Strict Clamping (The "Aggressive" Part)
+        // Ensure card never goes off screen, even if it de-centers from target
+        top = Math.max(PADDING, Math.min(coords.t, winH - CARD_H - PADDING));
+        left = Math.max(PADDING, Math.min(coords.l, winW - CARD_W - PADDING));
 
-        setTooltipPos({ top, left, transform });
+        setTooltipStyle({
+            position: 'fixed',
+            top: `${top}px`,
+            left: `${left}px`,
+            transform: 'none',
+            opacity: 1,
+            transition: 'all 0.4s cubic-bezier(0.25, 1, 0.5, 1)' // Smooth transitions
+        });
     };
 
     useLayoutEffect(() => {
@@ -354,14 +368,8 @@ const Tutorial = ({
             {/* Tooltip / Card */}
             <div
                 ref={tooltipRef}
-                className={`absolute pointer-events-auto transition-all duration-300 flex flex-col gap-4 max-w-sm w-full p-6 bg-white rounded-2xl shadow-2xl animate-slide-up`}
-                style={{
-                    top: tooltipPos.top,
-                    left: tooltipPos.left,
-                    transform: tooltipPos.transform,
-                    opacity: tooltipPos.top ? 1 : 0, // Hide until positioned
-                    transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)' // Bessel curve (Bezier)
-                }}
+                className={`absolute pointer-events-auto flex flex-col gap-4 max-w-sm w-full p-6 bg-white rounded-2xl shadow-2xl`}
+                style={tooltipStyle}
             >
                 <div>
                     <div className="flex justify-between items-start mb-2">

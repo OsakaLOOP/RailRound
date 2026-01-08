@@ -10,6 +10,13 @@ const renderMarkdown = (text) => {
   const elements = [];
   let listBuffer = [];
 
+  // Track context for indentation of non-header content
+  // Default (start/after H1): ml-4
+  // After H2 (ml-0): ml-4
+  // After H3 (ml-4): ml-8
+  // After H4 (ml-8): ml-12
+  let contentIndentClass = 'ml-4';
+
   // Helper to parse inline styles (Bold and Links)
   const parseInline = (text) => {
     if (!text) return { __html: '' };
@@ -63,8 +70,9 @@ const renderMarkdown = (text) => {
       );
     };
 
+    // Apply the current content indentation to the list container
     elements.push(
-      <div key={`list-${elements.length}`} className="mb-4">
+      <div key={`list-${elements.length}`} className={`mb-4 ${contentIndentClass}`}>
         {renderTree(roots)}
       </div>
     );
@@ -72,7 +80,7 @@ const renderMarkdown = (text) => {
   };
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]; // Do not trim globally yet, need to preserve indent
+    const line = lines[i];
     const trimmed = line.trim();
 
     // Empty line: flush list
@@ -89,9 +97,10 @@ const renderMarkdown = (text) => {
     }
 
     // Headers
-    // H1
+    // H1: Centered. Next content indent: ml-4 (Step 1)
     if (line.match(/^#\s/)) {
       flushList();
+      contentIndentClass = 'ml-4';
       elements.push(
         <h1 key={i} className="text-2xl font-bold text-center my-6 text-gray-800">
           {line.substring(2).trim()}
@@ -99,9 +108,10 @@ const renderMarkdown = (text) => {
       );
       continue;
     }
-    // H2
+    // H2: ml-0 (Step 0). Next content indent: ml-4 (Step 1)
     if (line.match(/^##\s/)) {
       flushList();
+      contentIndentClass = 'ml-4';
       elements.push(
         <h2 key={i} className="text-xl font-bold mt-8 mb-4 pb-2 border-b border-gray-200 text-gray-800">
           {line.substring(3).trim()}
@@ -109,9 +119,10 @@ const renderMarkdown = (text) => {
       );
       continue;
     }
-    // H3
+    // H3: ml-4 (Step 1). Next content indent: ml-8 (Step 2)
     if (line.match(/^###\s/)) {
       flushList();
+      contentIndentClass = 'ml-8';
       elements.push(
         <h3 key={i} className="text-lg font-bold mt-6 mb-3 text-gray-800 ml-4">
           {line.substring(4).trim()}
@@ -119,9 +130,10 @@ const renderMarkdown = (text) => {
       );
       continue;
     }
-    // H4
+    // H4: ml-8 (Step 2). Next content indent: ml-12 (Step 3)
     if (line.match(/^####\s/)) {
         flushList();
+        contentIndentClass = 'ml-12';
         elements.push(
           <h4 key={i} className="text-base font-bold mt-4 mb-2 text-gray-800 ml-8">
             {line.substring(5).trim()}
@@ -131,33 +143,28 @@ const renderMarkdown = (text) => {
       }
 
     // List Items (- or *)
-    // Capture indentation (group 1), marker (group 2), content (group 3)
     const listMatch = line.match(/^(\s*)([-*])\s+(.+)$/);
     if (listMatch) {
       const indent = listMatch[1].length;
       const content = listMatch[3];
-      // Normalize indent: assume 2 spaces per level approx, or just use raw count
-      // We will rely on relative comparison in tree builder.
       listBuffer.push({ level: indent, content });
       continue;
     }
 
-    // If we are here, it's not a list item. Flush any existing list.
+    // Flush list if we encounter non-list content
     flushList();
 
     // Blockquotes
     if (trimmed.startsWith('> ')) {
       elements.push(
-        <blockquote key={i} className="border-l-4 border-gray-300 pl-4 py-2 my-4 bg-gray-50 text-gray-600 italic rounded-r" dangerouslySetInnerHTML={parseInline(trimmed.substring(2))} />
+        <blockquote key={i} className={`border-l-4 border-gray-300 pl-4 py-2 my-4 bg-gray-50 text-gray-600 italic rounded-r ${contentIndentClass}`} dangerouslySetInnerHTML={parseInline(trimmed.substring(2))} />
       );
       continue;
     }
 
     // Paragraph
-    // For simple parsing, just render as P.
-    // Preserve some indentation? No, usually P are just text blocks.
     elements.push(
-      <p key={i} className="mb-4 leading-relaxed text-gray-600" dangerouslySetInnerHTML={parseInline(trimmed)} />
+      <p key={i} className={`mb-4 leading-relaxed text-gray-600 ${contentIndentClass}`} dangerouslySetInnerHTML={parseInline(trimmed)} />
     );
   }
 

@@ -55,6 +55,12 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                 top: position.y,
                 transform: 'translate(-50%, -100%) translateY(-24px)'
             }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onScroll={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
         >
             {/* Minecraft Panel Container */}
             <div
@@ -70,7 +76,7 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                 </div>
 
                 {/* Inventory Bar (Horizontal Slots) */}
-                <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+                <div className="flex gap-1">
                     {lines.map((line) => {
                         const isBeingDragged = isDragging && dragItem?.type === 'station' && dragItem?.lineKey === line.lineKey && dragItem?.id === line.stationId;
 
@@ -113,6 +119,11 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                                             {(line.icon || line.logo) && (
                                                 <img src={line.icon || line.logo} className="w-4 h-4 mb-2 object-contain z-20 filter drop-shadow-sm" alt="" />
                                             )}
+                                        </div>
+
+                                        {/* Company Name Label - Bottom Bar (Unified with Chest) */}
+                                        <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-white text-center truncate px-0.5 pointer-events-none z-30">
+                                            {line.company || line.name}
                                         </div>
 
                                         {/* Tooltip on Hover */}

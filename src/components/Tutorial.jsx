@@ -26,15 +26,15 @@ const Tutorial = ({
             id: 'welcome',
             target: null, // Center modal
             title: "Welcome to RailLOOP",
-            content: "Welcome! Let's take a quick tour to help you get started with tracking your railway journeys.",
+            content: "RailLOOP 是一个个人向旅铁手账, 旨在帮助你追踪和管理你的铁路旅程, 直观可感地展示旅行足迹.",
             position: 'center',
             action: 'next'
         },
         {
             id: 'tab-records',
             target: '#tab-btn-records',
-            title: "Your Journey Log",
-            content: "This is the Records tab. Here you can view and manage all your railway trips.",
+            title: "行程记录",
+            content: "这个标签页是你的旅程控制中心. 你可以在这里查看、添加和管理所有的铁路旅行记录, 或者添加到收藏",
             position: 'top',
             action: 'switch-tab',
             tab: 'records'
@@ -42,8 +42,8 @@ const Tutorial = ({
         {
             id: 'add-trip',
             target: '#btn-add-trip',
-            title: "Record a Trip",
-            content: "Click here to add a new trip. Let's try opening it now.",
+            title: "初次记录",
+            content: "点击打开新旅程编辑菜单",
             position: 'top',
             action: 'wait-interaction', // Wait for user to click
             check: () => isTripEditing
@@ -51,16 +51,16 @@ const Tutorial = ({
         {
             id: 'editor-modes',
             target: '#trip-editor-toggle-mode',
-            title: "Two Input Modes",
-            content: "You can manually enter details or use the 'Auto Plan' feature to search for routes.",
+            title: "编辑模式",
+            content: "你可以选择“手动录入”以此致敬旧时代的工匠精神，或者尝试“自动规划”, 将命运交给无限非概率驱动",
             position: 'bottom',
             action: 'next'
         },
         {
             id: 'close-editor',
             target: '#btn-close-editor',
-            title: "Close Editor",
-            content: "Let's close this for now to continue the tour.",
+            title: "关闭编辑器",
+            content: "先关掉它. 继续参观飞船的其他部分，别让编辑器挡住了视线. ",
             position: 'bottom',
             action: 'wait-interaction',
             check: () => !isTripEditing
@@ -68,16 +68,16 @@ const Tutorial = ({
         {
             id: 'import-export',
             target: '#header-actions',
-            title: "Data Management",
-            content: "Here you can export your data (KML/JSON) or import backups. Keep your data safe!",
+            title: "Escape Pods",
+            content: "我们坚信数据归你自己所有, 前提是你得学会备份. 在这里你可以将行程导出为 KML/JSON. ",
             position: 'bottom',
             action: 'next'
         },
         {
             id: 'tab-map',
             target: '#tab-btn-map',
-            title: "Map View",
-            content: "Switch to the Map tab to see your travels on the map.",
+            title: "地图模式",
+            content: "切换并查看铁路网络. 灰色的是未乘区段, 而已乘线路将以对应的颜色高亮显示. 放大到 10x 可查看 openrailwaymap 提供的配线和站台详情.",
             position: 'top',
             action: 'switch-tab',
             tab: 'map'
@@ -85,8 +85,8 @@ const Tutorial = ({
         {
             id: 'map-pins',
             target: '#btn-pins-fab',
-            title: "Map Pins",
-            content: "Use this button to add pins (photos or comments) to the map.",
+            title: "安放地图图钉",
+            content: "在这里把照片或评论钉在地图上, 大概率比某个名叫 Jesus Christ 男人的十字架更牢固. ",
             position: 'right', // FAB is bottom-left
             action: 'wait-interaction',
             check: () => pinMode && pinMode !== 'idle'
@@ -94,16 +94,16 @@ const Tutorial = ({
         {
             id: 'map-layers',
             target: '.leaflet-control-layers',
-            title: "Switch Map Style",
-            content: "Toggle between Dark and Light map themes here.",
+            title: "切换底图风格",
+            content: "无论是为了省电还是为了配合夜宵，这里可以在深色和浅色地图风格间切换. ",
             position: 'left', // Top-right control
             action: 'next'
         },
         {
             id: 'tab-stats',
             target: '#tab-btn-stats',
-            title: "Statistics",
-            content: "Finally, check your travel statistics here.",
+            title: "Aftermath",
+            content: "点击这里查看统计。看看你在这个星球的铁轨上究竟烧掉了多少钱，以及产生了多少碳排放(已加入todo).",
             position: 'top',
             action: 'wait-click-tab', // Specifically asked to guide click
             tab: 'stats',
@@ -112,24 +112,24 @@ const Tutorial = ({
         {
             id: 'stats-content',
             target: '#stats-view-content',
-            title: "Your Achievements",
-            content: "View your total distance, cost, and most frequented lines here.",
+            title: "铁道迷的勋章",
+            content: "这里展示你的总里程、消费和最常访问的线路. ",
             position: 'center', // It's a large area, maybe just highlight without blocking? Or center modal over it? Let's try target.
             action: 'next'
         },
         {
             id: 'finish-login',
             target: null,
-            title: "Login & User Guide",
-            content: "That's it! We'll now open the Login screen where you can read the full User Guide.",
+            title: "RailLOOP, 轻而易举啊",
+            content: "引导结束。现在我们将打开登录界面，建议你绑定 GitHub 账号，这能让你生成酷炫的 SVG 卡片去主页显摆.",
             position: 'center',
             action: 'finish'
         },
         {
              id: 'login-guide',
              target: '#login-readme-container',
-             title: "Read the Guide",
-             content: "Please take a moment to read the User Guide / Agreement here.",
+             title: "阅读协议",
+             content: "在开始之前，请务必阅读这份实则是免责声明的用户指南. 如果你们当中有宇宙人、未来人、超能力者, 请忽略其中的物理限制条款.",
              position: 'left',
              action: 'end'
         }
@@ -138,11 +138,6 @@ const Tutorial = ({
     // Initialization check
     useEffect(() => {
         const skipped = localStorage.getItem('rail_tutorial_skipped');
-        // If user logged in (and likely not new), maybe skip?
-        // Requirement says "entering page in non-login status".
-        // If user is already logged in via token in URL or localStorage, we might skip,
-        // BUT user specifically said "non-login status".
-        // We will assume `user` prop is null if not logged in.
 
         if (skipped === 'true' || user) {
             setStep(-2); // Skipped

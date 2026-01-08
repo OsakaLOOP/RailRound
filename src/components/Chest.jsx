@@ -42,10 +42,10 @@ const Chest = ({ onDropItem }) => {
     return (
         <>
             {/* The Chest Icon / Drop Target */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[500]">
+            <div className="fixed bottom-24 right-4 z-[500]">
                 <DropZone onDrop={handleDrop} className="relative group">
                     <div
-                        className={`w-20 h-20 transition-transform duration-200 cursor-pointer ${isDragging ? 'scale-110' : ''} ${animating ? 'animate-bounce' : ''}`}
+                        className={`w-16 h-16 transition-transform duration-200 cursor-pointer ${isDragging ? 'scale-110' : ''} ${animating ? 'animate-bounce' : ''}`}
                         onClick={() => setIsOpen(!isOpen)}
                     >
                         {/* Chest Image */}

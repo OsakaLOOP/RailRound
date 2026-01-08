@@ -111,7 +111,7 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
 
                                             {/* Icon */}
                                             {(line.icon || line.logo) && (
-                                                <img src={line.icon || line.logo} className="w-6 h-6 object-contain z-20 filter drop-shadow-sm" alt="" />
+                                                <img src={line.icon || line.logo} className="w-4 h-4 mb-2 object-contain z-20 filter drop-shadow-sm" alt="" />
                                             )}
                                         </div>
 

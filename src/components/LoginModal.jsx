@@ -103,7 +103,7 @@ const renderMarkdown = (text) => {
     if (line.match(/^##\s/)) {
       flushList();
       elements.push(
-        <h2 key={i} className="text-xl font-bold mt-8 mb-4 pb-2 border-b border-gray-200 text-gray-800">
+        <h2 key={i} className="text-xl font-bold mt-8 mb-4 pb-2 ml-0 border-b border-gray-200 text-gray-800">
           {line.substring(3).trim()}
         </h2>
       );
@@ -212,11 +212,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
   return (
     <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-<<<<<<< HEAD
-      <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-auto animate-slide-up h-[80vh] md:h-[600px]" onClick={e => e.stopPropagation()}>
-=======
-      <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-slide-up h-[85vh] md:h-[650px]" onClick={e => e.stopPropagation()}>
->>>>>>> c5f1c00 (feat: enhance markdown parser and styling in LoginModal)
+      <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-auto animate-slide-up h-[85vh] md:h-[650px]" onClick={e => e.stopPropagation()}>
 
         {/* Left: Login Form */}
         <div className="w-full md:w-[40%] p-8 flex flex-col justify-center border-b md:border-b-0 md:border-r border-gray-100 relative bg-white z-10">

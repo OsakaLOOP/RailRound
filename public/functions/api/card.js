@@ -2,6 +2,8 @@ export async function onRequest(event) {
     const url = new URL(event.request.url);
     const key = url.searchParams.get("key");
 
+    const CURRENT_VERSION = "0.30";
+
     // SVG Headers
     const headers = {
         "Content-Type": "image/svg+xml",
@@ -64,6 +66,8 @@ export async function onRequest(event) {
             .trip-dist { font-size: 9px; fill: ${labelColor}; font-family: monospace; }
             .line-path { fill: none; stroke: ${accentColor}; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
             .separator { stroke: ${glassBorder}; stroke-width: 1; }
+            .version-badge { fill: #39C5BB; }
+            .version-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 9px; font-weight: bold; fill: #ffffff; }
         `;
 
         // Icon SVG (Lucide Train Standard) placed at top right
@@ -88,6 +92,13 @@ export async function onRequest(event) {
 
             <!-- Header Section -->
             <text x="24" y="44" class="text" style="font-size: 18px; font-weight: 800; letter-spacing: -0.5px;">${esc(username)}'s RailLOOP</text>
+
+            <!-- Version Badge -->
+            <g transform="translate(${cardWidth - 95}, 22)">
+                <rect width="36" height="14" rx="4" class="version-badge"/>
+                <text x="18" y="10" text-anchor="middle" class="version-text">v${CURRENT_VERSION}</text>
+            </g>
+
             ${iconSvg}
 
             <!-- Stats Grid (Top Right, shifted left of icon) -->

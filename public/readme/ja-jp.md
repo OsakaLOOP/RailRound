@@ -88,7 +88,7 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 12. **視覚の饗宴**: 切符のレンダリング、駅の [LED](https://en.wikipedia.org/wiki/Dot-matrix_display) 風再生、思い出の手帳ページ表示。写真を撮り忘れる (あるいは駅員に止められる) のを防ぎ、あなたの思い出を実際に起きたことよりも美しく見せます (本当に)。
 13. **駅娘 (Eki-musume) デザイン**: 現在、全社会に向けて公募中です。場所は例の地下室です。あるいは私がデジタルイラストと [Live2D](https://www.live2d.com) をマスターするまでお待ちください。
 
-*Sit down and Enjoy the Tabitetsu travel. (もしあなたが素晴らしい指定席券を持っていればの話ですが。そうでなければ、忘れてください)*\
+*Sit down and Enjoy the Tabitetsu travel. (もしあなたが素晴らしい指定席券を持っていればの話ですが。そうでなければ、忘れてください)*
 *P.S. もしあなたの中に宇宙人、未来人、超能力者がいたら、このガイドには従わないでください。*
 
 ---

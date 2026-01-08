@@ -88,7 +88,7 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 12. **視覺盛宴**：車票渲染、站台 [LED](https://en.wikipedia.org/wiki/Dot-matrix_display)、回憶手帳頁面展示。防止你忘了拍照 (或者被站務阻止)，讓你的回憶看起來比實際發生的更美好 (真的)。
 13. **站娘 (Eki-musume) 設計**：現向全社會公開徵集，地點還是在那個地下室。或者等我精通板繪和 [Live2D](https://www.live2d.com)。
 
-*Sit down and Enjoy the Tabitetsu travel. (如果你有美妙的指定席座位，否則，當我沒說)*\
+*Sit down and Enjoy the Tabitetsu travel. (如果你有美妙的指定席座位，否則，當我沒說)*
 *P.S. 如果你們當中有外星人、未來人、超能力者，請勿遵守本指南。*
 
 ---

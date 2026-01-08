@@ -89,7 +89,7 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 13. **站娘设计**: 现向全社会公开征集, 地点还是在那个地下室. 或者等我精通板绘和 [Live2D](https://www.live2d.com).
 14. **提供 API**: 开源项目怎么能少的了这个.
 
-*Sit down and Enjoy the Tabitetsu travel.(如果你有美妙的指定席座位, 否则, 当我没说)*\
+*Sit down and Enjoy the Tabitetsu travel.(如果你有美妙的指定席座位, 否则, 当我没说)*
 *P.S.* 如果你们当中有外星人、未来人、超能力者, 请勿遵守本指南.
 ---
 

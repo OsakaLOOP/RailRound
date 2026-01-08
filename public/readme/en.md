@@ -1,4 +1,4 @@
-# RailLOOP - Personal Railway Travel Log
+# RailLOOP - Personal Railway Travel(Tabitetsu) Log
 
 Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 
@@ -88,7 +88,7 @@ The following is our plan to make sense of this chaotic and crowded universe, or
 12. **Visual Feast**: Ticket rendering, platform [LED](https://en.wikipedia.org/wiki/Dot-matrix_display) style playback, memory handbook page display. Preventing you from forgetting to take photos (or being stopped by station staff), making your memories look better than what actually happened (truly).
 13. **Station Girl Design**: Now soliciting publicly from the whole society, the location is still in that basement. Or wait until I master digital painting and [Live2D](https://www.live2d.com).
 
-*Sit down and Enjoy the Tabitetsu travel. (If you have a wonderful reserved seat, otherwise, forget I said that)*\
+*Sit down and Enjoy the Tabitetsu travel. (If you have a wonderful reserved seat, otherwise, forget that)*
 *P.S. If there are any aliens, time travelers, or espers among you, please do not follow this guide.*
 
 ---

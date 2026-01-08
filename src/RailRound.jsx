@@ -14,6 +14,7 @@ import {
   LogOut, User, Github
 } from 'lucide-react';
 import { LoginModal } from './components/LoginModal';
+import Tutorial from './components/Tutorial';
 import { api } from './services/api';
 import { db } from './utils/db';
 
@@ -794,9 +795,9 @@ const TripEditor = ({
                 {isEditing ? <Edit2 size={18} /> : <Plus size={18} />}
                 {isEditing ? '编辑行程' : '新行程'}
              </h3>
-             <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
+             <button id="btn-close-editor" onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
           </div>
-          <div className="grid grid-cols-2 p-1 bg-gray-200 rounded-lg relative isolate overflow-hidden">
+          <div id="trip-editor-toggle-mode" className="grid grid-cols-2 p-1 bg-gray-200 rounded-lg relative isolate overflow-hidden">
              <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white shadow rounded-md transition-all duration-100 ease-out z-0`} style={{ left: editorMode === 'manual' ? '4px' : 'calc(50% + 0px)' }} />
              <button onClick={() => setEditorMode('manual')} className={`py-1.5 text-sm font-bold rounded-md z-10 transition-colors duration-300 ${editorMode === 'manual' ? 'text-gray-800' : 'text-gray-500'}`}>手动输入</button>
              <button onClick={() => setEditorMode('auto')} className={`py-1.5 text-sm font-bold rounded-md z-10 transition-colors duration-300 ${editorMode === 'auto' ? 'text-blue-600' : 'text-slate-500'}`}>自动规划</button>
@@ -919,7 +920,7 @@ const PinEditor = ({ editingPin, setEditingPin, pinMode, setPinMode, deletePin, 
   );
 };
 const FabButton = ({ activeTab, pinMode, togglePinMode }) => (
-  <div className="absolute bottom-4 left-4 z-[400] flex flex-col gap-3">{activeTab === 'map' && (<button onClick={togglePinMode} className={`p-3 rounded-full shadow-lg transition-all transform hover:scale-105 ${pinMode==='idle'?'bg-white text-gray-700':pinMode==='free'?'bg-blue-500 text-white':'bg-indigo-600 text-white ring-4 ring-indigo-200'}`}>{pinMode === 'snap' ? <Magnet size={24} /> : <MapPin size={24} />}</button>)}</div>
+  <div id="btn-pins-fab" className="absolute bottom-4 left-4 z-[400] flex flex-col gap-3">{activeTab === 'map' && (<button onClick={togglePinMode} className={`p-3 rounded-full shadow-lg transition-all transform hover:scale-105 ${pinMode==='idle'?'bg-white text-gray-700':pinMode==='free'?'bg-blue-500 text-white':'bg-indigo-600 text-white ring-4 ring-indigo-200'}`}>{pinMode === 'snap' ? <Magnet size={24} /> : <MapPin size={24} />}</button>)}</div>
 );
 
 // --- Shared Helper: Calculate Visualization Data ---
@@ -1267,7 +1268,7 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
         </div>
       );
     }))}
-    <button onClick={onAdd} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
+    <button id="btn-add-trip" onClick={onAdd} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
   </div>
 );
 const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeometries, onOpenCard, companyDB }) => {
@@ -1300,7 +1301,7 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeom
       });
     }
     return (
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div id="stats-view-content" className="flex-1 overflow-y-auto p-4 space-y-4">
         {user && (
             <div className="bg-white p-4 rounded-xl shadow-sm border relative">
                 <div className="flex items-center gap-4">
@@ -2457,7 +2458,7 @@ export default function RailLOOPApp() {
             {user ? (
                <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-300 hidden sm:inline">欢迎, {user.username}</span>
-                  <button onClick={handleLogout} className="bg-slate-700 hover:bg-red-900 p-2 rounded text-xs flex items-center gap-1 transition">
+                  <button id="btn-login-user" onClick={handleLogout} className="bg-slate-700 hover:bg-red-900 p-2 rounded text-xs flex items-center gap-1 transition">
                       <LogOut size={14}/><span className="hidden sm:inline">退出</span>
                   </button>
                </div>
@@ -2468,7 +2469,7 @@ export default function RailLOOPApp() {
             )}
 
             {activeTab !== 'map' ? (
-            <div className="flex gap-2 ml-2 border-l border-slate-700 pl-2">
+            <div id="header-actions" className="flex gap-2 ml-2 border-l border-slate-700 pl-2">
                <button onClick={handleExportKML} className="cursor-pointer bg-emerald-700 hover:bg-emerald-600 p-2 rounded text-xs flex items-center gap-1 transition">
                    <Download size={14}/><span className="hidden sm:inline">导出 KML</span>
                </button>
@@ -2481,7 +2482,7 @@ export default function RailLOOPApp() {
                 </label>
             </div>
             ) : (
-            <div className="flex gap-2 ml-2 border-l border-slate-700 pl-2">
+            <div id="header-actions" className="flex gap-2 ml-2 border-l border-slate-700 pl-2">
                 <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition"><Building2 size={14}/><span className="hidden sm:inline">数据</span><input type="file" accept=".json" className="hidden" onChange={handleCompanyUpload}/></label>
                 <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition"><FilePlus size={14}/><span className="hidden sm:inline">地图</span><input type="file" multiple accept=".geojson,.json" className="hidden" onChange={handleFileUpload}/></label>
             </div>
@@ -2492,13 +2493,23 @@ export default function RailLOOPApp() {
       <div className="flex-1 relative overflow-hidden flex flex-col">
         {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} segmentGeometries={segmentGeometries} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
         {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} onOpenCard={setCardModalUser} companyDB={companyDB} />}
-        <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
+        <div id="map-container" className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
           <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
           <FabButton activeTab={activeTab} pinMode={pinMode} togglePinMode={togglePinMode} />
           <PinEditor editingPin={editingPin} setEditingPin={setEditingPin} pinMode={pinMode} setPinMode={setPinMode} deletePin={deletePin} savePin={savePin} />
         </div>
       </div>
       <TripEditor isOpen={isTripEditing} onClose={() => setIsTripEditing(false)} isEditing={!!editingTripId} form={tripForm} setForm={setTripForm} onSave={handleSaveTrip} railwayData={railwayData} editorMode={editorMode} setEditorMode={setEditorMode} autoForm={autoForm} setAutoForm={setAutoForm} onAutoSearch={handleAutoRouteSearch} isRouteSearching={isRouteSearching} />
+
+      <Tutorial
+         activeTab={activeTab}
+         setActiveTab={setActiveTab}
+         isTripEditing={isTripEditing}
+         setIsTripEditing={setIsTripEditing}
+         isLoginOpen={isLoginOpen}
+         setIsLoginOpen={setIsLoginOpen}
+         user={user}
+      />
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />
       <GithubRegisterModal isOpen={isGithubRegisterOpen} onClose={() => setIsGithubRegisterOpen(false)} regToken={githubRegToken} onLoginSuccess={handleLoginSuccess} />
@@ -2507,7 +2518,7 @@ export default function RailLOOPApp() {
       {/* Line Selector */}
       <LineSelector isOpen={false} onClose={() => {}} onSelect={() => {}} railwayData={railwayData} /> 
       <nav className="bg-white border-t p-2 flex justify-around shrink-0 pb-safe z-30">
-        {['records', 'map', 'stats'].map(t => <button key={t} onClick={()=>setActiveTab(t)} className={`p-2 rounded-lg ${activeTab===t ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>{t==='records' ? <Layers/> : t==='map' ? <MapIcon/> : <PieChart/>}</button>)}
+        {['records', 'map', 'stats'].map(t => <button id={`tab-btn-${t}`} key={t} onClick={()=>setActiveTab(t)} className={`p-2 rounded-lg ${activeTab===t ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>{t==='records' ? <Layers/> : t==='map' ? <MapIcon/> : <PieChart/>}</button>)}
       </nav>
     </div>
   );

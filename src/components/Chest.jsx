@@ -77,8 +77,9 @@ const Chest = ({ onDropItem }) => {
                             <span className="text-xs text-gray-600">{items.length} slots</span>
                         </h3>
 
-                        <div className="grid grid-cols-4 gap-2 max-h-60 overflow-y-auto p-2 bg-[#8b8b8b] rounded" style={{ boxShadow: 'inset 2px 2px 0 #373737, inset -2px -2px 0 #fff' }}>
-                            {items.length === 0 && <div className="col-span-4 text-center text-white/50 text-xs py-4">Empty</div>}
+                        <div className="grid grid-cols-4 gap-1 max-h-60 overflow-y-auto p-2 bg-[#C6C6C6]" style={{ }}>
+                            {/* Empty Slots Filler? Optional. Let's just list items */}
+                            {items.length === 0 && <div className="col-span-4 text-center text-gray-500 text-xs py-4 pixel-font">Empty Inventory</div>}
                             {items.map(item => (
                                 <ChestItem key={item.id} item={item} onRemove={() => removeItem(item.id)} />
                             ))}
@@ -90,28 +91,46 @@ const Chest = ({ onDropItem }) => {
     );
 };
 
+// Reusing the SVG from StationMenu might be better if exported, but inline is safe for now to avoid exports refactor issues.
+const McSlotSvg = () => (
+    <svg viewBox="0 0 50 50" preserveAspectRatio="none" className="w-full h-full absolute inset-0 z-0" style={{ imageRendering: 'pixelated' }}>
+        <rect x="0" y="0" width="50" height="50" fill="#8B8B8B" />
+        <path d="M0 0 H50 V2 H2 V50 H0 Z" fill="#373737" />
+        <path d="M50 50 H0 V48 H48 V0 H50 Z" fill="#FFFFFF" />
+    </svg>
+);
+
 const ChestItem = ({ item, onRemove }) => {
-    const { startDrag } = useDrag();
+    const { startDrag, isDragging, dragItem } = useDrag();
+    const isHidden = isDragging && dragItem?.id === item.id;
 
     return (
         <div
-            className="w-16 h-16 bg-[#8b8b8b] relative group hover:bg-[#a0a0a0] transition-colors border-2 border-transparent hover:border-white cursor-grab active:cursor-grabbing"
+            className="w-12 h-12 relative group"
             onMouseDown={(e) => startDrag(item, e)}
             onTouchStart={(e) => startDrag(item, e)}
         >
-            <div className="w-full h-full flex items-center justify-center relative">
-                 <img src="/src/assets/rail_bg.png" className="absolute inset-0 w-full h-full opacity-50 pixelated" alt="" />
-                 {item.logo && <img src={item.logo} className="w-8 h-8 object-contain z-10" alt={item.lineKey} />}
-            </div>
-            <button
-                onClick={(e) => { e.stopPropagation(); onRemove(); }}
-                className="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-sm"
-            >
-                &times;
-            </button>
-            <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-white text-center truncate px-1">
-                {item.name}
-            </div>
+            <McSlotSvg />
+
+            {!isHidden && (
+                <div className="absolute inset-0 z-10 p-1 cursor-grab active:cursor-grabbing hover:bg-white/10">
+                    <div className="w-full h-full flex items-center justify-center relative">
+                        <img src="/src/assets/rail_bg.png" className="absolute inset-0 w-full h-full object-contain pixelated opacity-80" alt="" />
+                        {item.logo && <img src={item.logo} className="w-6 h-6 object-contain z-10 filter drop-shadow-sm" alt={item.lineKey} />}
+                    </div>
+
+                    {/* Hover Controls */}
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onRemove(); }}
+                        className="absolute -top-1 -right-1 bg-red-500 text-white w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-sm text-[10px]"
+                    >
+                        &times;
+                    </button>
+                    <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-white text-center truncate px-0.5 pointer-events-none">
+                        {item.name}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

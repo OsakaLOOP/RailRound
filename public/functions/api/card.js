@@ -3,7 +3,7 @@ export async function onRequest(event) {
     const key = url.searchParams.get("key");
     const hash = url.searchParams.get("hash");
 
-    const CURRENT_VERSION = "0.30";
+    const CURRENT_VERSION = "0.32";
 
     // SVG Headers
     const headers = {

@@ -19,8 +19,9 @@ import { api } from './services/api';
 import { db } from './utils/db';
 import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './utils/stats';
 
-const CURRENT_VERSION = 0.30;
+const CURRENT_VERSION = 0.32;
 const LAST_MODIFIED = "2025-11-27";
+const LAST_UPDATED = "2026-01-08";
 const MIN_SUPPORTED_VERSION = 0.0;
 
 const GithubRegisterModal = ({ isOpen, onClose, regToken, onLoginSuccess }) => {
@@ -1215,7 +1216,7 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeom
                  }
                  return count;
              })()} 个站点。<br/>
-             Last Updated: {LAST_MODIFIED}
+             Data Last Modified: {LAST_MODIFIED} Version Updated: {LAST_UPDATED}
         </div>
       </div>
     );
@@ -2394,8 +2395,8 @@ export default function RailLOOPApp() {
       </header>
 
       <div className="flex-1 relative overflow-hidden flex flex-col">
-        {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} segmentGeometries={segmentGeometries} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
-        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} onOpenCard={setCardModalUser} />}
+        {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} segmentGeometries={segmentGeometries} onAddToFolder={onAddToFolder} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
+        {activeTab === 'stats' && <StatsView trips={trips} onOpenFolders={onOpenFolders} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} onOpenCard={setCardModalUser} companyDB={companyDB} />}
         <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
           <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
           <FabButton activeTab={activeTab} pinMode={pinMode} togglePinMode={togglePinMode} />

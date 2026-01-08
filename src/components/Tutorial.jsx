@@ -174,7 +174,6 @@ const Tutorial = ({
                 };
                 setRect(highlight);
             } else {
-                // Element not found? Retry in a bit (maybe animation or mounting)
                 setRect(null);
             }
         };
@@ -183,15 +182,6 @@ const Tutorial = ({
         updateRect();
         // Poll for rect changes (animations)
         const interval = setInterval(updateRect, 100);
-
-        // 2. Auto-actions (Switch Tab)
-        // Note: The requirement says "guide to click stats tab".
-        // For others, we can auto-switch or guide.
-        // The prompt says "Step by step guidance for 3 tabs".
-        // Let's Guide instead of Auto-switch for tabs to be interactive,
-        // except when the element isn't there (e.g. #btn-add-trip is only in Records tab).
-        // If target is missing, maybe we SHOULD switch tab?
-        // Let's auto-switch for smoother flow unless it's the specific Stats requirement.
 
         if (currentStep.action === 'switch-tab' && currentStep.tab && activeTab !== currentStep.tab) {
              setActiveTab(currentStep.tab);
@@ -472,7 +462,7 @@ const Tutorial = ({
                             {step === 0 && (
                                 <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer hover:text-gray-700">
                                     <input type="checkbox" onChange={(e) => { if(e.target.checked) handleSkip(true); }} className="rounded border-gray-300"/>
-                                    Don't show again
+                                    不再显示
                                 </label>
                             )}
                             {step > 0 && (
@@ -485,12 +475,12 @@ const Tutorial = ({
                                 onClick={handleNext}
                                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-200 transition-all transform active:scale-95"
                              >
-                                {step === STEPS.length - 1 ? 'Finish' : 'Next'} <ArrowRight size={16}/>
+                                {step === STEPS.length - 1 ? '结束' : '继续'} <ArrowRight size={16}/>
                              </button>
                         )}
                         {(currentStep.action === 'wait-interaction' || currentStep.action === 'wait-click-tab') && (
                             <div className="text-xs font-bold text-emerald-600 animate-pulse flex items-center gap-1">
-                                <ChevronRight size={14}/> Please interact to continue...
+                                <ChevronRight size={14}/> 请按照指示操作
                             </div>
                         )}
                     </div>

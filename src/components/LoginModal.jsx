@@ -312,7 +312,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
         </div>
 
         {/* Right: User Guide / Agreement */}
-        <div className="w-full md:w-[60%] bg-slate-50 flex flex-col relative">
+        <div id="login-readme-container" className="w-full md:w-[60%] bg-slate-50 flex flex-col relative">
             <button onClick={onClose} className="absolute top-4 right-4 z-10 hidden md:block"><X className="text-gray-400 hover:text-gray-600"/></button>
 
             <div className="flex items-center justify-between p-4 border-b bg-white/50 backdrop-blur shrink-0">

@@ -1,6 +1,9 @@
 const API_BASE = '/api'; // Relative path for Edge Functions
 
 export const api = {
+  // Export API_BASE for direct usage if needed
+  API_BASE,
+
   async register(username, password) {
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
@@ -36,14 +39,14 @@ export const api = {
     return data;
   },
 
-  async saveData(token, trips, pins, latest_5, version = null) {
+  async saveData(token, trips, pins, latest_5, version = null, folders = null, badge_settings = null) {
     const res = await fetch(`${API_BASE}/user/data`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ trips, pins, latest_5, version })
+      body: JSON.stringify({ trips, pins, latest_5, version, folders, badge_settings })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to save data');

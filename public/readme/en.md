@@ -38,7 +38,7 @@ We collect the following information solely for the purpose of providing the cor
 - Trip data and pin information you actively record.
 - Public profile information (avatar, nickname) accessed via GitHub login.
 
-- **Shady Deals & Acknowledgements**
+- **Deals with the Devil Cthulhu & Acknowledgements**
     The architecture of this service stands on the shoulders of giants, as well as some efforts in the grey area:
     - **Infrastructure**: Thanks to **[EdgeOne](https://cloud.tencent.com/product/teo)** for providing Serverless compute nodes and Pages CDN.
     - **Special Thanks**: **[Xianyu](https://2.taobao.com)**. It was in this chaotic yet efficient marketplace that we procured a server Token for the low price of 10 RMB, successfully bypassing the Vogon-bureaucracy-like restrictions of residential broadband registration, allowing early prototypes to breathe in the physical world. Although we later migrated to Pages for stability, this transaction will go down in history.

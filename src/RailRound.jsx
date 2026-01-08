@@ -2307,7 +2307,7 @@ export default function RailLOOPApp() {
     railLayerRef.current = rail;
     
     dark.addTo(map); rail.addTo(map);
-    L.control.layers({ "标准 (light)": light, "暗色 (Dark)": dark }, { "铁道网 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);
+    L.control.layers({ "标准 (light)": light, "暗色 (Dark)": dark }, { "详细配线图 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);
     mapInstance.current = map;
 
     // 初始化图层（注意顺序影响 z-index）

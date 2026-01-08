@@ -91,15 +91,15 @@ export async function onRequest(event) {
             <rect x="2" y="2" width="${cardWidth-4}" height="${cardHeight-4}" rx="16" class="bg"/>
 
             <!-- Header Section -->
-            <text x="24" y="44" class="text" style="font-size: 18px; font-weight: 800; letter-spacing: -0.5px;">${esc(username)}'s RailLOOP</text>
-
+            ${iconSvg}
             <!-- Version Badge -->
             <g transform="translate(${cardWidth - 95}, 22)">
                 <rect width="36" height="14" rx="4" class="version-badge"/>
                 <text x="18" y="10" text-anchor="middle" class="version-text">v${CURRENT_VERSION}</text>
             </g>
 
-            ${iconSvg}
+            <text x="24" y="44" class="text" style="font-size: 18px; font-weight: 800; letter-spacing: -0.5px;">${esc(username)}'s RailLOOP</text>        
+            
 
             <!-- Stats Grid (Top Right, shifted left of icon) -->
             <g transform="translate(24, 75)">

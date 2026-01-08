@@ -2509,6 +2509,7 @@ export default function RailLOOPApp() {
          isLoginOpen={isLoginOpen}
          setIsLoginOpen={setIsLoginOpen}
          user={user}
+         pinMode={pinMode}
       />
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />

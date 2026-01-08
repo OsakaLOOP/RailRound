@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useDrag, DropZone } from './DragContext';
-import chestGif from '../chest_animated.gif';
+import chestGif from './../assets/chest_animated.gif';
 
 const CHEST_GIF = chestGif;
-// Or just use the Rail BG as placeholder for static if needed, or the first frame.
-// Actually, let's just use the GIF for now, or a simple div.
 
 const Chest = ({ onDropItem }) => {
     const { isDragging } = useDrag();

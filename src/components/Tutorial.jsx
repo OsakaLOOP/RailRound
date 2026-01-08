@@ -226,17 +226,15 @@ const Tutorial = ({
 
         if (currentStep.position === 'bottom') {
             top = rect.top + rect.height + 20;
-            left = rect.left;
+            left = rect.left + (rect.width / 2) - (CARD_W / 2); // Center horizontally
         } else if (currentStep.position === 'top') {
             top = rect.top - CARD_H - 20;
-            left = rect.left;
+            left = rect.left + (rect.width / 2) - (CARD_W / 2); // Center horizontally
         } else if (currentStep.position === 'right') {
-            // Vertically center for side positioning
-            top = rect.top + (rect.height / 2) - (CARD_H / 2);
+            top = rect.top + (rect.height / 2) - (CARD_H / 2); // Center vertically
             left = rect.left + rect.width + 20;
         } else if (currentStep.position === 'left') {
-            // Vertically center for side positioning
-            top = rect.top + (rect.height / 2) - (CARD_H / 2);
+            top = rect.top + (rect.height / 2) - (CARD_H / 2); // Center vertically
             left = rect.left - CARD_W - 20;
         } else { // center
             top = '50%';
@@ -245,34 +243,24 @@ const Tutorial = ({
         }
 
         // --- Strict Boundary Logic ---
-        // Use visualViewport if available for mobile robustness
         const winH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         const winW = window.visualViewport ? window.visualViewport.width : window.innerWidth;
-        const offsetTop = window.visualViewport ? window.visualViewport.offsetTop : 0;
-
-        // Adjust for viewport scrolling/offset if using visualViewport
-        // Actually for fixed position elements, visualViewport logic is complex.
-        // If we use simple innerHeight, it might be safer unless keyboard is up.
-        // But for FAB (bottom) clipping, visualViewport height is the visible part.
 
         if (typeof top === 'number') {
             // 1. Flip Logic (Vertical)
-            // If overflow bottom, try flip top
             if (top + CARD_H > winH - PADDING) {
                 if (currentStep.position === 'bottom') {
                      const flippedTop = rect.top - CARD_H - 20;
                      if (flippedTop > PADDING) top = flippedTop;
                 }
             }
-            // If overflow top, try flip bottom
             if (top < PADDING) {
                 if (currentStep.position === 'top') {
                     const flippedBottom = rect.top + rect.height + 20;
                     if (flippedBottom + CARD_H < winH - PADDING) top = flippedBottom;
                 }
             }
-
-            // 2. Clamp Logic (Vertical) - Final fallback
+            // 2. Clamp Logic (Vertical)
             if (top < PADDING) top = PADDING;
             if (top + CARD_H > winH - PADDING) top = winH - CARD_H - PADDING;
         }
@@ -291,7 +279,6 @@ const Tutorial = ({
                     if (flippedRight + CARD_W < winW - PADDING) left = flippedRight;
                 }
             }
-
             // 2. Clamp Logic (Horizontal)
             if (left < PADDING) left = PADDING;
             if (left + CARD_W > winW - PADDING) left = winW - CARD_W - PADDING;
@@ -372,7 +359,8 @@ const Tutorial = ({
                     top: tooltipPos.top,
                     left: tooltipPos.left,
                     transform: tooltipPos.transform,
-                    opacity: tooltipPos.top ? 1 : 0 // Hide until positioned
+                    opacity: tooltipPos.top ? 1 : 0, // Hide until positioned
+                    transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)' // Bessel curve (Bezier)
                 }}
             >
                 <div>

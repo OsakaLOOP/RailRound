@@ -1,6 +1,7 @@
 export async function onRequest(event) {
     const url = new URL(event.request.url);
     const key = url.searchParams.get("key");
+    const hash = url.searchParams.get("hash");
 
     // SVG Headers
     const headers = {
@@ -11,26 +12,66 @@ export async function onRequest(event) {
 
     const errorSvg = (msg) => new Response(`<svg width="600" height="300" xmlns="http://www.w3.org/2000/svg"><text x="300" y="150" text-anchor="middle" fill="#ef4444" font-family="sans-serif">${msg}</text></svg>`, { headers });
 
-    if (!key) {
-        return errorSvg("Key missing");
+    if (!key && !hash) {
+        return errorSvg("Key or Hash missing");
     }
 
     try {
         const DB = globalThis.RAILROUND_KV;
         if (!DB) return errorSvg("KV Error");
 
-        const username = await DB.get(`card_key:${key}`);
-        if (!username) return errorSvg("Invalid Key");
+        let stats = null;
+        let username = "Traveller";
+        let isGlobalEnabled = true;
 
-        const userKey = `user:${username}`;
-        const dataRaw = await DB.get(userKey);
+        if (hash) {
+            // Folder Badge Mode
+            const badgeDataRaw = await DB.get(`badge:${hash}`);
+            if (!badgeDataRaw) return errorSvg("Invalid Hash");
 
-        if (!dataRaw) {
-             return errorSvg("User data not found");
+            const badgeData = JSON.parse(badgeDataRaw);
+            username = badgeData.username || "Traveller";
+            stats = badgeData.stats;
+
+            // Check global switch via User KV
+            if (badgeData.username) {
+                const userKey = `user:${badgeData.username}`;
+                const userDataRaw = await DB.get(userKey);
+                if (userDataRaw) {
+                     const u = JSON.parse(userDataRaw);
+                     if (u.badge_settings?.enabled === false) {
+                         isGlobalEnabled = false;
+                     }
+                }
+            }
+
+        } else if (key) {
+            // Global Badge Mode
+            username = await DB.get(`card_key:${key}`);
+            if (!username) return errorSvg("Invalid Key");
+
+            const userKey = `user:${username}`;
+            const dataRaw = await DB.get(userKey);
+
+            if (!dataRaw) {
+                 return errorSvg("User data not found");
+            }
+
+            const data = JSON.parse(dataRaw);
+
+            // Check Master Switch
+            if (data.badge_settings?.enabled === false) {
+                isGlobalEnabled = false;
+            }
+
+            stats = data.latest_5 || { count: 0, dist: 0, lines: 0, latest: [] };
         }
 
-        const data = JSON.parse(dataRaw);
-        const stats = data.latest_5 || { count: 0, dist: 0, lines: 0, latest: [] };
+        if (!isGlobalEnabled) {
+            return errorSvg("Badge Disabled by User");
+        }
+
+        if (!stats) stats = { count: 0, dist: 0, lines: 0, latest: [] };
 
         const esc = (str) => {
             if (!str) return "";
@@ -92,11 +133,6 @@ export async function onRequest(event) {
 
             <!-- Stats Grid (Top Right, shifted left of icon) -->
             <g transform="translate(24, 75)">
-                <!-- Stats moved to header line to save vertical space? Or kept below?
-                     User said "placing the stats split on the right".
-                     Let's move them up to y=20 relative to header or keep in separate row but compressed.
-                     Let's try putting them on the same visual "block" but aligned.
-                -->
             </g>
 
             <!-- Redesigned Stats (Aligned Right) -->

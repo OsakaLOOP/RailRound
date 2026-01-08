@@ -10,11 +10,12 @@ try { console.log('[iconfixed] module loaded'); } catch  {}
 import { 
   Train, Calendar, Navigation, Map as MapIcon, Layers, Upload, Plus, Edit2, Trash2, 
   PieChart, TrendingUp, MapPin, Save, X, Camera, MessageSquare, Move, Magnet, CheckCircle2, FilePlus, ArrowDown, Search, Building2, AlertTriangle, Loader2, Download, ListFilter,
-  LogOut, User, Github
+  LogOut, User, Github, Star, Folder, Globe, Lock, Eye, EyeOff
 } from 'lucide-react';
 import { LoginModal } from './components/LoginModal';
 import { api } from './services/api';
 import { db } from './utils/db';
+import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './utils/stats';
 
 const CURRENT_VERSION = 0.30;
 const MIN_SUPPORTED_VERSION = 0.0;
@@ -131,17 +132,6 @@ const LEAFLET_CSS = `
 const COLOR_PALETTE = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#64748b'];
 
 // --- 2. 核心算法 (Integrated) ---
-// 辅助：计算两点间直线距离 (Haversine Formula)
-const calcDist = (lat1, lon1, lat2, lon2) => {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
-  const R = 6371; // 地球半径 km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
 
 const distSq = (x1, y1, x2, y2) => (x1-x2)**2 + (y1-y2)**2;
 
@@ -168,150 +158,6 @@ const getCoordinates = (geometry) => {
     if (geometry.type === 'LineString') return geometry.coordinates;
     if (geometry.type === 'MultiLineString') return geometry.coordinates.flat(); 
     return [];
-};
-
-// [New] 路径缝合算法: 将乱序的 MultiLineString 缝合成连续的 LineString
-const stitchRoutes = (turf, multiCoords, startPt) => {
-  let pool = multiCoords.map((coords, i) => {
-    if (!coords || coords.length < 2) return null;
-    return {
-      id: i,
-      coords: coords,
-      head: turf.point(coords[0]),
-      tail: turf.point(coords[coords.length - 1])
-    };
-  }).filter(Boolean);
-
-  if (pool.length === 0) return [];
-  if (pool.length === 1) return pool[0].coords;
-
-  let seedIdx = -1;
-  let minSeedDist = Infinity;
-    
-  pool.forEach((seg, i) => {
-    const line = turf.lineString(seg.coords);
-    const dist = turf.pointToLineDistance(startPt, line);
-    if (dist < minSeedDist) { minSeedDist = dist; seedIdx = i; }
-  });
-
-  if (seedIdx === -1) seedIdx = 0; 
-
-  let pathSegments = [pool[seedIdx]];
-  pool.splice(seedIdx, 1);
-
-  while (pool.length > 0) {
-    const currentHeadCoords = pathSegments[0].coords;
-    const currentTailCoords = pathSegments[pathSegments.length - 1].coords;
-        
-    const pathHeadPt = turf.point(currentHeadCoords[0]);
-    const pathTailPt = turf.point(currentTailCoords[currentTailCoords.length - 1]);
-
-    let bestMatchIdx = -1;
-    let minDist = Infinity;
-    let matchType = ''; 
-
-    for (let i = 0; i < pool.length; i++) {
-      const seg = pool[i];
-      const d_Tail_Start = turf.distance(pathTailPt, seg.head); 
-      const d_Tail_End   = turf.distance(pathTailPt, seg.tail); 
-      const d_Head_End   = turf.distance(pathHeadPt, seg.tail); 
-      const d_Head_Start = turf.distance(pathHeadPt, seg.head); 
-
-      if (d_Tail_Start < minDist) { minDist = d_Tail_Start; bestMatchIdx = i; matchType = 'tail-start'; }
-      if (d_Tail_End < minDist)   { minDist = d_Tail_End;   bestMatchIdx = i; matchType = 'tail-end'; }
-      if (d_Head_End < minDist)   { minDist = d_Head_End;   bestMatchIdx = i; matchType = 'head-end'; }
-      if (d_Head_Start < minDist) { minDist = d_Head_Start; bestMatchIdx = i; matchType = 'head-start'; }
-    }
-
-    if (bestMatchIdx !== -1) {
-      const seg = pool[bestMatchIdx];
-      if (matchType === 'tail-start') {
-        pathSegments.push(seg);
-      } else if (matchType === 'tail-end') {
-        seg.coords.reverse();
-        const temp = seg.head; seg.head = seg.tail; seg.tail = temp;
-        pathSegments.push(seg);
-      } else if (matchType === 'head-end') {
-        pathSegments.unshift(seg);
-      } else if (matchType === 'head-start') {
-        seg.coords.reverse();
-        const temp = seg.head; seg.head = seg.tail; seg.tail = temp;
-        pathSegments.unshift(seg);
-      }
-      pool.splice(bestMatchIdx, 1);
-    } else {
-      break; 
-    }
-  }
-
-  let flatCoords = [];
-  pathSegments.forEach(seg => {
-    flatCoords.push(...seg.coords);
-  });
-  return flatCoords;
-};
-
-// [Turf.js] 轨迹切分算法
-const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) => {
-    if (!turf || !feature || !feature.geometry) return null;
-
-    try {
-      let line = feature;
-      const startPt = turf.point([startLng, startLat]);
-      const endPt = turf.point([endLng, endLat]);
-
-      // If MultiLineString, attempt to stitch segments into a sensible continuous path
-      if (feature.geometry.type === 'MultiLineString') {
-         const multiCoords = feature.geometry.coordinates;
-         const stitchedCoords = stitchRoutes(turf, multiCoords, startPt);
-         if (stitchedCoords && stitchedCoords.length > 0) {
-           line = turf.lineString(stitchedCoords);
-         } else {
-           const flatCoords = feature.geometry.coordinates.flat();
-           line = turf.lineString(flatCoords);
-         }
-      }
-
-      // 1. 吸附 (Snap)
-      const snappedStart = turf.nearestPointOnLine(line, startPt);
-      const snappedEnd = turf.nearestPointOnLine(line, endPt);
-
-        const startIdx = snappedStart.properties.index;
-        const endIdx = snappedEnd.properties.index;
-        
-        // 2. 环线检测
-        const coords = line.geometry.coordinates;
-        const firstPt = coords[0];
-        const lastPt = coords[coords.length - 1];
-        const isLoop = turf.distance(turf.point(firstPt), turf.point(lastPt)) < 0.5;
-
-        // 3. 切分
-        let resultCoords = [];
-
-        if (!isLoop) {
-            const sliced = turf.lineSlice(snappedStart, snappedEnd, line);
-            resultCoords = sliced.geometry.coordinates;
-        } else {
-            const sliceDirect = turf.lineSlice(snappedStart, snappedEnd, line);
-            const lenDirect = turf.length(sliceDirect);
-            
-            const sliceToTail = turf.lineSlice(snappedStart, turf.point(lastPt), line);
-            const sliceFromHead = turf.lineSlice(turf.point(firstPt), snappedEnd, line);
-            const lenWrap = turf.length(sliceToTail) + turf.length(sliceFromHead);
-
-            if (lenDirect <= lenWrap) {
-                resultCoords = sliceDirect.geometry.coordinates;
-            } else {
-                const c1 = sliceToTail.geometry.coordinates.map(p => [p[1], p[0]]);
-                const c2 = sliceFromHead.geometry.coordinates.map(p => [p[1], p[0]]);
-                return [c1, c2]; // MultiPolyline
-            }
-        }
-        return resultCoords.map(p => [p[1], p[0]]); // Leaflet [lat, lng]
-    } catch (e) {
-        console.warn("Turf slice failed:", e);
-        return null;
-    }
 };
 
 // [Custom] 高精度吸附算法 (无需 Turf, 纯几何计算投影)
@@ -921,152 +767,6 @@ const FabButton = ({ activeTab, pinMode, togglePinMode }) => (
 );
 
 // --- Shared Helper: Calculate Visualization Data ---
-const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData) => {
-    let totalDist = 0;
-    const allCoords = [];
-
-    // Helper to get or calc geometry on-the-fly
-    const getGeometry = (seg) => {
-        const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
-        let geom = segmentGeometries ? segmentGeometries.get(key) : null;
-
-        // Fallback: If not in cache but we have geoData, try to slice it now
-        if ((!geom || !geom.coords) && geoData && railwayData) {
-            const line = railwayData[seg.lineKey];
-            if (line) {
-                const s1 = line.stations.find(st => st.id === seg.fromId);
-                const s2 = line.stations.find(st => st.id === seg.toId);
-                if (s1 && s2) {
-                    const parts = seg.lineKey.split(':');
-                    const company = parts[0];
-                    const lineName = parts.slice(1).join(':');
-                    const feature = geoData.features.find(f =>
-                        f.properties.type === 'line' &&
-                        f.properties.name === lineName &&
-                        f.properties.company === company
-                    );
-                    if (feature) {
-                        const coords = sliceGeoJsonPath(feature, s1.lat, s1.lng, s2.lat, s2.lng);
-                        if (coords) {
-                            const isMulti = Array.isArray(coords[0]) && Array.isArray(coords[0][0]);
-                            geom = { coords, isMulti };
-                        }
-                    }
-                }
-            }
-        }
-        return geom;
-    };
-
-    segments.forEach(seg => {
-        const geom = getGeometry(seg);
-        if (geom && geom.coords) {
-            if (geom.isMulti) {
-                geom.coords.forEach(c => {
-                    allCoords.push({ coords: c, color: geom.color || '#94a3b8' });
-                    if(turf) totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
-                });
-            } else {
-                allCoords.push({ coords: geom.coords, color: geom.color || '#94a3b8' });
-                if(turf) totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
-            }
-        } else {
-             // Fallback Distance Approx
-            const line = railwayData ? railwayData[seg.lineKey] : null;
-            if (line) {
-                const s1 = line.stations.find(st => st.id === seg.fromId);
-                const s2 = line.stations.find(st => st.id === seg.toId);
-                if (s1 && s2) totalDist += calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
-            }
-        }
-    });
-
-    if (allCoords.length === 0) return { totalDist, visualPaths: [] };
-
-    // PCA & Projection Logic
-    let sumLat = 0, sumLng = 0, count = 0;
-    allCoords.forEach(item => {
-        item.coords.forEach(pt => {
-            sumLat += pt[0];
-            sumLng += pt[1];
-            count++;
-        });
-    });
-
-    if (count === 0) return { totalDist, visualPaths: [] };
-
-    const cenLat = sumLat / count;
-    const cenLng = sumLng / count;
-
-    let u20 = 0, u02 = 0, u11 = 0;
-    allCoords.forEach(item => {
-        item.coords.forEach(pt => {
-            const x = pt[1] - cenLng;
-            const y = pt[0] - cenLat;
-            u20 += x * x;
-            u02 += y * y;
-            u11 += x * y;
-        });
-    });
-
-    const theta = 0.5 * Math.atan2(2 * u11, u20 - u02);
-    const cosT = Math.cos(-theta);
-    const sinT = Math.sin(-theta);
-
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-
-    // Helper to rotate a point
-    const rotate = (lat, lng) => {
-        const x = lng - cenLng;
-        const y = lat - cenLat;
-        const rx = x * cosT - y * sinT;
-        const ry = x * sinT + y * cosT;
-        return { rx, ry };
-    };
-
-    // 1. Calc BBox
-    allCoords.forEach(item => {
-        item.coords.forEach(pt => {
-            const { rx, ry } = rotate(pt[0], pt[1]);
-            if (rx < minX) minX = rx;
-            if (rx > maxX) maxX = rx;
-            if (ry < minY) minY = ry;
-            if (ry > maxY) maxY = ry;
-        });
-    });
-
-    const w = maxX - minX || 0.001;
-    const h = maxY - minY || 0.001;
-    const padX = w * 0.1;
-    const padY = h * 0.1;
-    const vMinX = minX - padX;
-    const vMinY = minY - padY;
-    const vW = w + padX * 2;
-    const vH = h + padY * 2;
-
-    const contentRatio = vW / vH;
-    const visualRatio = Math.min(8, Math.max(2, contentRatio));
-    const heightPx = 40;
-    const widthPx = heightPx * visualRatio;
-
-    // 2. Generate Paths
-    const visualPaths = allCoords.map(item => {
-        const pointsStr = item.coords.map(pt => {
-            const { rx, ry } = rotate(pt[0], pt[1]);
-            const px = ((rx - vMinX) / vW) * 100;
-            const py = 50 - ((ry - vMinY) / vH) * 50;
-            return `${px.toFixed(1)},${py.toFixed(1)}`;
-        }).join(' ');
-
-        return {
-            path: `M ${pointsStr.replace(/ /g, ' L ')}`, // SVG Path Command
-            polyline: pointsStr, // Legacy Polyline points
-            color: item.color
-        };
-    });
-
-    return { totalDist, visualPaths, widthPx, heightPx };
-};
 
 const RouteSlice = ({ segments, segmentGeometries, railwayData, geoData }) => {
   const { visualPaths, totalDist, widthPx, heightPx } = useMemo(
@@ -1104,46 +804,12 @@ const RouteSlice = ({ segments, segmentGeometries, railwayData, geoData }) => {
 };
 
 // --- Updated: Stats Calculation using Shared Helper ---
-const calculateLatestStats = (trips, segmentGeometries, railwayData, geoData) => {
-    // 1. Basic Stats
-    const totalTrips = trips.length;
-    const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
-    const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
 
-    // Calc total distance using helper (aggregating cached or on-the-fly)
-    const { totalDist: grandTotalDist } = getRouteVisualData(allSegments, segmentGeometries, railwayData, geoData);
-
-    // 2. Latest 5
-    const latest = trips.slice(0, 5).map(t => {
-        const segs = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
-        const lineNames = segs.map(s => s.lineKey.split(':').pop()).join(' → '); // Simplified Title
-
-        const { totalDist, visualPaths } = getRouteVisualData(segs, segmentGeometries, railwayData, geoData);
-
-        // Combine all paths into one 'd' string for the card
-        const svgPoints = visualPaths.map(vp => vp.path).join(" ");
-
-        return {
-            id: t.id,
-            date: t.date,
-            title: lineNames,
-            dist: totalDist,
-            svg_points: svgPoints
-        };
-    });
-
-    return {
-        count: totalTrips,
-        lines: uniqueLines,
-        dist: grandTotalDist,
-        latest: latest
-    };
-};
-
-const GithubCardModal = ({ isOpen, onClose, user }) => {
+const GithubCardModal = ({ isOpen, onClose, user, folders, badgeSettings, onUpdateSettings }) => {
     const [cardKey, setCardKey] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [source, setSource] = useState('global'); // 'global' or folder_id
 
     useEffect(() => {
         if (isOpen && user && !cardKey) {
@@ -1157,8 +823,18 @@ const GithubCardModal = ({ isOpen, onClose, user }) => {
 
     if (!isOpen || !user) return null;
 
-    const url = cardKey ? `${window.location.origin}/api/card?key=${cardKey}` : '';
-    const md = `[![RailLOOP Stats](${url})](${window.location.origin})`;
+    let url = "";
+    if (source === 'global' && cardKey) {
+        url = `${window.location.origin}/api/card?key=${cardKey}`;
+    } else if (source !== 'global') {
+        const f = folders.find(fo => fo.id === source);
+        if (f && f.hash) {
+            url = `${window.location.origin}/api/card?hash=${f.hash}`;
+        }
+    }
+
+    const md = url ? `[![RailLOOP Stats](${url})](${window.location.origin})` : "Please select a valid source";
+    const publicFolders = folders.filter(f => f.is_public && f.hash);
 
     return (
         <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
@@ -1168,21 +844,55 @@ const GithubCardModal = ({ isOpen, onClose, user }) => {
                     <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
                 </div>
 
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                    <span className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        {badgeSettings.enabled ? <Eye size={16} className="text-emerald-500"/> : <EyeOff size={16} className="text-red-500"/>}
+                        Public Badge Access
+                    </span>
+                    <button
+                        onClick={() => onUpdateSettings({ ...badgeSettings, enabled: !badgeSettings.enabled })}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${badgeSettings.enabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                    >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${badgeSettings.enabled ? 'translate-x-6' : 'translate-x-1'}`}/>
+                    </button>
+                </div>
+
                 {loading ? (
                     <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-blue-500"/></div>
                 ) : error ? (
                     <div className="p-4 bg-red-50 text-red-500 rounded-lg">{error}</div>
                 ) : (
                     <div className="space-y-4">
-                        <div className="bg-slate-100 p-4 rounded-lg flex justify-center overflow-hidden">
-                            <img src={url} alt="Preview" className="max-w-full shadow-sm rounded" />
-                        </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1">Markdown Code (Copy to README)</label>
-                            <div className="relative">
-                                <textarea readOnly className="w-full p-3 border rounded-lg bg-slate-50 font-mono text-xs text-slate-600 h-20 resize-none outline-none focus:ring-2 focus:ring-blue-500" value={md} onClick={e => e.target.select()} />
-                            </div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Source</label>
+                            <select
+                                className="w-full p-2 border rounded-lg text-sm"
+                                value={source}
+                                onChange={e => setSource(e.target.value)}
+                            >
+                                <option value="global">Global (All Trips)</option>
+                                {publicFolders.map(f => (
+                                    <option key={f.id} value={f.id}>Folder: {f.name}</option>
+                                ))}
+                            </select>
                         </div>
+
+                        <div className="bg-slate-100 p-4 rounded-lg flex justify-center overflow-hidden min-h-[100px] items-center">
+                            {badgeSettings.enabled ? (
+                                url ? <img src={url} alt="Preview" className="max-w-full shadow-sm rounded" /> : <span className="text-xs text-gray-400">No public URL available</span>
+                            ) : (
+                                <span className="text-sm text-red-400 font-bold flex items-center gap-2"><Lock size={16}/> Badges are disabled</span>
+                            )}
+                        </div>
+
+                        {badgeSettings.enabled && url && (
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Markdown Code (Copy to README)</label>
+                                <div className="relative">
+                                    <textarea readOnly className="w-full p-3 border rounded-lg bg-slate-50 font-mono text-xs text-slate-600 h-20 resize-none outline-none focus:ring-2 focus:ring-blue-500" value={md} onClick={e => e.target.select()} />
+                                </div>
+                            </div>
+                        )}
                         <button onClick={onClose} className="w-full bg-slate-800 text-white py-2 rounded-lg font-bold">Close</button>
                     </div>
                 )}
@@ -1191,7 +901,138 @@ const GithubCardModal = ({ isOpen, onClose, user }) => {
     );
 };
 
-const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, segmentGeometries }) => (
+const FolderManagerModal = ({ isOpen, onClose, folders, onUpdateFolders }) => {
+    const [newFolderName, setNewFolderName] = useState("");
+
+    if (!isOpen) return null;
+
+    const handleCreate = () => {
+        if (!newFolderName.trim()) return;
+        const newFolder = {
+            id: crypto.randomUUID(),
+            name: newFolderName.trim(),
+            is_public: false,
+            trip_ids: [],
+            stats: null,
+            hash: null
+        };
+        onUpdateFolders([...folders, newFolder]);
+        setNewFolderName("");
+    };
+
+    const handleDelete = (id) => {
+        if (confirm("Delete this folder?")) {
+            onUpdateFolders(folders.filter(f => f.id !== id));
+        }
+    };
+
+    const togglePublic = (id) => {
+        const updated = folders.map(f => {
+            if (f.id === id) {
+                const willBePublic = !f.is_public;
+                return {
+                    ...f,
+                    is_public: willBePublic,
+                    hash: willBePublic ? (f.hash || crypto.randomUUID()) : null
+                };
+            }
+            return f;
+        });
+        onUpdateFolders(updated);
+    };
+
+    return (
+        <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2"><Folder size={24}/> Star Folders</h3>
+                    <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
+                </div>
+
+                <div className="flex gap-2 mb-4">
+                    <input
+                        className="flex-1 p-2 border rounded-lg text-sm"
+                        placeholder="New folder name..."
+                        value={newFolderName}
+                        onChange={e => setNewFolderName(e.target.value)}
+                    />
+                    <button onClick={handleCreate} disabled={!newFolderName.trim()} className="bg-gray-800 text-white px-4 py-2 rounded-lg font-bold text-sm disabled:opacity-50">Create</button>
+                </div>
+
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                    {folders.length === 0 && <div className="text-center text-gray-400 py-4 text-sm">No folders yet.</div>}
+                    {folders.map(f => (
+                        <div key={f.id} className="p-3 border rounded-lg flex items-center justify-between bg-gray-50">
+                            <div>
+                                <div className="font-bold text-sm text-gray-700">{f.name}</div>
+                                <div className="text-xs text-gray-400">{f.trip_ids?.length || 0} trips</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => togglePublic(f.id)}
+                                    className={`p-1.5 rounded-md transition-colors ${f.is_public ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-200 text-gray-400'}`}
+                                    title={f.is_public ? "Public" : "Private"}
+                                >
+                                    <Globe size={16}/>
+                                </button>
+                                <button onClick={() => handleDelete(f.id)} className="p-1.5 rounded-md text-red-400 hover:bg-red-50 hover:text-red-500"><Trash2 size={16}/></button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const AddToFolderModal = ({ isOpen, onClose, trip, folders, onUpdateFolders }) => {
+    if (!isOpen || !trip) return null;
+
+    const toggleFolder = (folderId) => {
+        const updatedFolders = folders.map(f => {
+            if (f.id === folderId) {
+                const currentIds = new Set(f.trip_ids || []);
+                if (currentIds.has(trip.id)) {
+                    currentIds.delete(trip.id);
+                } else {
+                    currentIds.add(trip.id);
+                }
+                return { ...f, trip_ids: Array.from(currentIds) };
+            }
+            return f;
+        });
+        onUpdateFolders(updatedFolders);
+    };
+
+    return (
+        <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+            <div className="bg-white w-full max-w-xs rounded-xl shadow-2xl p-4 animate-slide-up" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-base text-gray-800 flex items-center gap-2"><Star size={18} className="text-yellow-500 fill-yellow-500"/> Add to Folder</h3>
+                    <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
+                </div>
+                <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+                    {folders.length === 0 && <div className="text-center text-gray-400 text-xs py-4">No folders created. Go to Stats page to create one.</div>}
+                    {folders.map(f => {
+                        const isSelected = f.trip_ids?.includes(trip.id);
+                        return (
+                            <button
+                                key={f.id}
+                                onClick={() => toggleFolder(f.id)}
+                                className={`w-full p-3 rounded-lg flex items-center justify-between text-sm transition-colors ${isSelected ? 'bg-yellow-50 border border-yellow-200 text-yellow-800' : 'bg-gray-50 border border-transparent text-gray-600 hover:bg-gray-100'}`}
+                            >
+                                <span className="font-bold truncate">{f.name}</span>
+                                {isSelected && <CheckCircle2 size={16} className="text-yellow-500"/>}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, segmentGeometries, onAddToFolder }) => (
   <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4">
     {trips.length === 0 ? (
         <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
@@ -1208,6 +1049,7 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
             <span className="text-xs font-bold text-gray-400">{t.date}</span>
             <div className="flex items-center gap-2">
                 {t.cost > 0 && <span className="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">¥{t.cost}</span>}
+                <button onClick={() => onAddToFolder(t)} className="text-gray-400 hover:text-yellow-500"><Star size={14}/></button>
                 <button onClick={()=>onEdit(t)} className="text-gray-400 hover:text-blue-500"><Edit2 size={14}/></button>
                 <button onClick={(e) => { e.stopPropagation(); onDelete(t.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
             </div>
@@ -1231,7 +1073,7 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
     <button onClick={onAdd} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
   </div>
 );
-const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeometries, onOpenCard }) => {
+const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeometries, onOpenCard, onOpenFolders }) => {
     const totalTrips = trips.length;
     const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
     const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
@@ -1291,7 +1133,26 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeom
             </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4"><div className="bg-white p-4 rounded-xl shadow-sm border text-center"><div className="text-xs text-gray-400 mb-1">记录数</div><div className="text-3xl font-bold text-gray-800">{totalTrips}</div></div><div className="bg-white p-4 rounded-xl shadow-sm border text-center"><div className="text-xs text-gray-400 mb-1">制霸路线</div><div className="text-3xl font-bold text-indigo-600">{uniqueLines}</div></div></div>
+        <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white p-4 rounded-xl shadow-sm border text-center"><div className="text-xs text-gray-400 mb-1">记录数</div><div className="text-3xl font-bold text-gray-800">{totalTrips}</div></div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border text-center"><div className="text-xs text-gray-400 mb-1">制霸路线</div><div className="text-3xl font-bold text-indigo-600">{uniqueLines}</div></div>
+        </div>
+
+        {user && (
+            <button onClick={onOpenFolders} className="w-full bg-white p-4 rounded-xl shadow-sm border flex items-center justify-between group hover:bg-gray-50 transition-colors">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center text-yellow-600">
+                        <Folder size={20}/>
+                    </div>
+                    <div className="text-left">
+                        <div className="font-bold text-gray-800">Star Folders</div>
+                        <div className="text-xs text-gray-400">Manage trip collections & badges</div>
+                    </div>
+                </div>
+                <Move size={16} className="text-gray-300 group-hover:text-gray-500"/>
+            </button>
+        )}
+
         <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-6 rounded-xl shadow-lg text-white">
             <div className="flex items-center justify-between mb-2"><h3 className="font-bold flex items-center gap-2"><TrendingUp size={18}/> 里程统计</h3><span className="text-xs bg-white/20 px-2 py-1 rounded">总距离</span></div>
             <div className="text-4xl font-bold mb-2">{Math.round(totalDist)} <span className="text-lg font-normal opacity-80">km</span></div>
@@ -1333,6 +1194,9 @@ export default function RailLOOPApp() {
   const [mapZoom, setMapZoom] = useState(10);
   const [isExportingKML, setIsExportingKML] = useState(false);
   const [cardModalUser, setCardModalUser] = useState(null);
+  const [folderManagerOpen, setFolderManagerOpen] = useState(false);
+  const [addToFolderModalOpen, setAddToFolderModalOpen] = useState(false);
+  const [currentTripForFolder, setCurrentTripForFolder] = useState(null);
 
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
@@ -1436,6 +1300,9 @@ export default function RailLOOPApp() {
     }
   }, []);
 
+  const [folders, setFolders] = useState([]);
+  const [badgeSettings, setBadgeSettings] = useState({ enabled: true });
+
   const loadUserData = async (token, isInteractive = false) => {
     try {
       const cloudData = await api.getData(token);
@@ -1443,6 +1310,8 @@ export default function RailLOOPApp() {
 
       let newTrips = cloudData.trips || [];
       let newPins = cloudData.pins || [];
+      let newFolders = cloudData.folders || [];
+      let newBadgeSettings = cloudData.badge_settings || { enabled: true };
 
       if (isInteractive && (trips.length > 0 || pins.length > 0)) {
          // Merge Strategy
@@ -1461,13 +1330,15 @@ export default function RailLOOPApp() {
 
              // Sync back the merged result to cloud immediately
              if (token) {
-                api.saveData(token, newTrips, newPins, null, CURRENT_VERSION).catch(e => console.error("Merge sync failed", e));
+                saveDataFull(token, newTrips, newPins, newFolders, newBadgeSettings);
              }
          }
       }
 
       setTrips(newTrips.sort((a,b) => b.date.localeCompare(a.date)));
       setPins(newPins);
+      setFolders(newFolders);
+      setBadgeSettings(newBadgeSettings);
       console.log('User data loaded');
     } catch (e) {
       console.error('Failed to load user data:', e);
@@ -1475,6 +1346,41 @@ export default function RailLOOPApp() {
         handleLogout();
       }
     }
+  };
+
+  const saveDataFull = async (token, currentTrips, currentPins, currentFolders, currentBadgeSettings) => {
+       const latest5 = calculateLatestStats(currentTrips, segmentGeometries, railwayData, geoData);
+       // We also need to construct the full payload for the new API
+       // Note: api.saveData signature needs update or we pass a custom object
+       // Since we didn't update api.js definition in the plan step (my bad), we will use the raw fetch here or update api.js?
+       // Let's use api.saveData but we need to update it to accept folders/badgeSettings?
+       // Actually I should have updated src/services/api.js in the plan.
+       // Workaround: Call raw fetch here or modify api.js now.
+       // Let's modify api.js first? No, sticking to plan. Plan said "Update Data Persistence Layer (Backend)".
+       // I'll implement a helper here that does the fetch.
+
+       await fetch(`${api.API_BASE}/user/data`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                trips: currentTrips,
+                pins: currentPins,
+                latest_5: latest5,
+                folders: currentFolders,
+                badge_settings: currentBadgeSettings,
+                version: CURRENT_VERSION
+            })
+       });
+  };
+
+  const saveUserFolders = (newFolders) => {
+      setFolders(newFolders);
+      if (user) {
+          saveDataFull(user.token, trips, pins, newFolders, badgeSettings).catch(e => alert("保存失败: " + e.message));
+      }
   };
 
   const handleLoginSuccess = (data) => {
@@ -2159,8 +2065,7 @@ export default function RailLOOPApp() {
 
     // Sync to Cloud
     if (user) {
-       const latest5 = calculateLatestStats(finalTrips, segmentGeometries, railwayData, geoData);
-       api.saveData(user.token, finalTrips, pins, latest5, CURRENT_VERSION).catch(e => alert('云端保存失败: ' + e.message));
+       saveDataFull(user.token, finalTrips, pins, folders, badgeSettings).catch(e => alert('云端保存失败: ' + e.message));
     }
 
     setIsTripEditing(false); setEditingTripId(null); 
@@ -2177,8 +2082,7 @@ export default function RailLOOPApp() {
           const newTrips = trips.filter(t => t.id !== id);
           setTrips(newTrips);
           if (user) {
-             const latest5 = calculateLatestStats(newTrips, segmentGeometries, railwayData, geoData);
-             api.saveData(user.token, newTrips, pins, latest5, CURRENT_VERSION).catch(e => alert('云端同步失败'));
+             saveDataFull(user.token, newTrips, pins, folders, badgeSettings).catch(e => alert('云端同步失败'));
           }
       }
   };
@@ -2213,7 +2117,7 @@ export default function RailLOOPApp() {
       setPins(newPins);
 
       if (user) {
-         api.saveData(user.token, trips, newPins, null, CURRENT_VERSION).catch(e => console.error('Pin sync failed', e));
+         saveDataFull(user.token, trips, newPins, folders, badgeSettings).catch(e => console.error('Pin sync failed', e));
       }
 
       setEditingPin(null);
@@ -2226,7 +2130,7 @@ export default function RailLOOPApp() {
           if (editingPin?.id === id) setEditingPin(null);
 
           if (user) {
-            api.saveData(user.token, trips, newPins, null, CURRENT_VERSION).catch(e => console.error('Pin sync failed', e));
+            saveDataFull(user.token, trips, newPins, folders, badgeSettings).catch(e => console.error('Pin sync failed', e));
           }
       }
   };
@@ -2420,8 +2324,8 @@ export default function RailLOOPApp() {
       </header>
 
       <div className="flex-1 relative overflow-hidden flex flex-col">
-        {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} segmentGeometries={segmentGeometries} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
-        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} onOpenCard={setCardModalUser} />}
+        {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} segmentGeometries={segmentGeometries} onAddToFolder={(t) => { setCurrentTripForFolder(t); setAddToFolderModalOpen(true); }} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
+        {activeTab === 'stats' && <StatsView trips={trips} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} onOpenCard={setCardModalUser} onOpenFolders={() => setFolderManagerOpen(true)} />}
         <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
           <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
           <FabButton activeTab={activeTab} pinMode={pinMode} togglePinMode={togglePinMode} />
@@ -2432,7 +2336,52 @@ export default function RailLOOPApp() {
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />
       <GithubRegisterModal isOpen={isGithubRegisterOpen} onClose={() => setIsGithubRegisterOpen(false)} regToken={githubRegToken} onLoginSuccess={handleLoginSuccess} />
-      <GithubCardModal isOpen={!!cardModalUser} user={cardModalUser} onClose={() => setCardModalUser(null)} />
+
+      <GithubCardModal
+          isOpen={!!cardModalUser}
+          user={cardModalUser}
+          onClose={() => setCardModalUser(null)}
+          folders={folders}
+          badgeSettings={badgeSettings}
+          onUpdateSettings={(s) => {
+              setBadgeSettings(s);
+              if (user) saveDataFull(user.token, trips, pins, folders, s).catch(e => alert("Failed to save settings: " + e.message));
+          }}
+      />
+
+      <FolderManagerModal
+          isOpen={folderManagerOpen}
+          onClose={() => setFolderManagerOpen(false)}
+          folders={folders}
+          onUpdateFolders={saveUserFolders}
+      />
+
+      <AddToFolderModal
+          isOpen={addToFolderModalOpen}
+          onClose={() => setAddToFolderModalOpen(false)}
+          trip={currentTripForFolder}
+          folders={folders}
+          onUpdateFolders={(updatedFolders) => {
+              // Recalculate stats for modified folders
+              const foldersWithStats = updatedFolders.map(f => {
+                  // Optimization: only recalc if we touched this folder?
+                  // Since we don't easily know, let's just recalc for safety or check trip_ids length change?
+                  // For simplicity, we just recalc all or specifically if trip_ids is different from old state (but we only have new state here).
+                  // Actually, the `onUpdateFolders` logic in `AddToFolderModal` returns the full new array.
+                  // We should re-run calculateLatestStats for any folder in the array to ensure its `stats` cache is fresh.
+                  if (f.trip_ids && f.trip_ids.length > 0) {
+                      const folderTrips = trips.filter(t => f.trip_ids.includes(t.id));
+                      // Sort by date desc
+                      folderTrips.sort((a,b) => b.date.localeCompare(a.date));
+                      const stats = calculateLatestStats(folderTrips, segmentGeometries, railwayData, geoData);
+                      return { ...f, stats };
+                  } else {
+                      return { ...f, stats: null };
+                  }
+              });
+              saveUserFolders(foldersWithStats);
+          }}
+      />
 
       {/* Line Selector */}
       <LineSelector isOpen={false} onClose={() => {}} onSelect={() => {}} railwayData={railwayData} /> 

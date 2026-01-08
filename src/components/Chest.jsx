@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useDrag, DropZone } from './DragContext';
 import chestGif from './../assets/chest_animated.gif';
 
@@ -9,10 +9,26 @@ const Chest = ({ onDropItem }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [items, setItems] = useState([]);
     const [animating, setAnimating] = useState(false);
+    const [staticChestSrc, setStaticChestSrc] = useState(null);
+    const [animationKey, setAnimationKey] = useState(0); // Key to force restart GIF
+    const timerRef = useRef(null);
 
     useEffect(() => {
         const saved = localStorage.getItem('rail_chest_items');
         if (saved) setItems(JSON.parse(saved));
+
+        // Generate static frame from GIF (Frame 0) to "freeze" it effectively
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = CHEST_GIF;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            setStaticChestSrc(canvas.toDataURL());
+        };
     }, []);
 
     const saveItems = (newItems) => {
@@ -27,8 +43,15 @@ const Chest = ({ onDropItem }) => {
         const newItems = [...items, { ...item, id: Date.now() }]; // unique ID for chest
         saveItems(newItems);
 
+        // Restart animation
+        if (timerRef.current) clearTimeout(timerRef.current);
+        setAnimationKey(prev => prev + 1); // Force re-mount of IMG to restart GIF
         setAnimating(true);
-        setTimeout(() => setAnimating(false), 2200); // GIF loop approx
+
+        // Duration of GIF loop (approx 2200ms based on user info/testing)
+        timerRef.current = setTimeout(() => {
+            setAnimating(false);
+        }, 2200);
 
         if (onDropItem) onDropItem(item);
     };
@@ -47,11 +70,26 @@ const Chest = ({ onDropItem }) => {
                         onClick={() => setIsOpen(!isOpen)}
                     >
                         {/* Chest Image */}
-                        <img
-                            src={CHEST_GIF}
-                            alt="Chest"
-                            className={`w-full h-full object-contain pixelated ${animating ? '' : 'grayscale-[0.2]'}`}
-                        />
+                        {/*
+                           Logic:
+                           - If animating, show the GIF (with unique key to restart).
+                           - If not animating, show the Static Frame (generated via canvas) or fallback to GIF (grayed out).
+                        */}
+                        {animating ? (
+                            <img
+                                key={animationKey} // Forces remount -> restarts GIF
+                                src={CHEST_GIF}
+                                alt="Chest"
+                                className="w-full h-full object-contain pixelated"
+                            />
+                        ) : (
+                            <img
+                                src={staticChestSrc || CHEST_GIF}
+                                alt="Chest"
+                                className={`w-full h-full object-contain pixelated ${!staticChestSrc ? 'grayscale-[0.5]' : ''}`}
+                            />
+                        )}
+
                         {/* Badge count */}
                         {items.length > 0 && (
                             <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
@@ -76,7 +114,6 @@ const Chest = ({ onDropItem }) => {
                         </h3>
 
                         <div className="grid grid-cols-4 gap-1 max-h-60 overflow-y-auto p-2 bg-[#C6C6C6]" style={{ }}>
-                            {/* Empty Slots Filler? Optional. Let's just list items */}
                             {items.length === 0 && <div className="col-span-4 text-center text-gray-500 text-xs py-4 pixel-font">Empty Inventory</div>}
                             {items.map(item => (
                                 <ChestItem key={item.id} item={item} onRemove={() => removeItem(item.id)} />

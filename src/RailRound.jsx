@@ -2301,13 +2301,13 @@ export default function RailLOOPApp() {
   const initMap = () => {
     if (!mapRef.current || mapInstance.current ) return;
     const map = L.map(mapRef.current, { zoomControl: true, preferCanvas: true }).setView([35.68, 139.76], 10);
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', maxZoom: 20 });
+    const light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { attribution: '© CARTO', subdomains: 'abcd', maxZoom: 20 });
     const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', subdomains: 'abcd', maxZoom: 20 });
     const rail = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 20, opacity: 0, attribution: '© OpenRailwayMap' });
     railLayerRef.current = rail;
     
     dark.addTo(map); rail.addTo(map);
-    L.control.layers({ "标准 (OSM)": osm, "暗色 (Dark)": dark }, { "铁道网 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);
+    L.control.layers({ "标准 (light)": light, "暗色 (Dark)": dark }, { "铁道网 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);
     mapInstance.current = map;
 
     // 初始化图层（注意顺序影响 z-index）

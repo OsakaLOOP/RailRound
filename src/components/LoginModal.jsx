@@ -350,7 +350,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             </div>
 
             <div className="p-4 border-t bg-white/50 backdrop-blur text-center text-xs text-gray-400 shrink-0">
-                继续使用即代表您同意上述协议内容
+                注册/登录后使用即代表您同意上述协议内容, 否则您的数据将仅在本地(前端)处理.
             </div>
         </div>
 

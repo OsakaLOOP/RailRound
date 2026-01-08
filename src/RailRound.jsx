@@ -1407,30 +1407,7 @@ export default function RailLOOPApp() {
 
   const saveDataFull = async (token, currentTrips, currentPins, currentFolders, currentBadgeSettings) => {
        const latest5 = calculateLatestStats(currentTrips, segmentGeometries, railwayData, geoData);
-       // We also need to construct the full payload for the new API
-       // Note: api.saveData signature needs update or we pass a custom object
-       // Since we didn't update api.js definition in the plan step (my bad), we will use the raw fetch here or update api.js?
-       // Let's use api.saveData but we need to update it to accept folders/badgeSettings?
-       // Actually I should have updated src/services/api.js in the plan.
-       // Workaround: Call raw fetch here or modify api.js now.
-       // Let's modify api.js first? No, sticking to plan. Plan said "Update Data Persistence Layer (Backend)".
-       // I'll implement a helper here that does the fetch.
-
-       await fetch(`${api.API_BASE}/user/data`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                trips: currentTrips,
-                pins: currentPins,
-                latest_5: latest5,
-                folders: currentFolders,
-                badge_settings: currentBadgeSettings,
-                version: CURRENT_VERSION
-            })
-       });
+       await api.saveData(token, currentTrips, currentPins, latest5, CURRENT_VERSION, currentFolders, currentBadgeSettings);
   };
 
   const saveUserFolders = (newFolders) => {

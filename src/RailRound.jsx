@@ -10,10 +10,13 @@ import { isMobile } from 'react-device-detect';
 try { console.log('[iconfixed] module loaded'); } catch  {}
 import { 
   Train, Calendar, Navigation, Map as MapIcon, Layers, Upload, Plus, Edit2, Trash2, 
-  PieChart, TrendingUp, MapPin, Save, X, Camera, MessageSquare, Move, Magnet, CheckCircle2, FilePlus, ArrowDown, Search, Building2, AlertTriangle, Loader2, Download, ListFilter,
+  PieChart, TrendingUp, MapPin, Save, X, Camera, MessageSquare, Move, Magnet, CheckCircle2, FilePlus, ArrowDown, ArrowRightLeft, Search, Building2, AlertTriangle, Loader2, Download, ListFilter,
   LogOut, User, Github, Star, Folder, Globe, Lock, Eye, EyeOff
 } from 'lucide-react';
 import { LoginModal } from './components/LoginModal';
+import { DragProvider, DropZone } from './components/DragContext';
+import Chest from './components/Chest';
+import StationMenu from './components/StationMenu';
 import Tutorial from './components/Tutorial';
 import { api } from './services/api';
 import { db } from './utils/db';
@@ -707,10 +710,65 @@ const TripEditor = ({
                          {warning && <div className="text-xs text-red-500 mt-1"><AlertTriangle size={12} className="inline"/> {warning}</div>}
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-2 pl-2">
-                        <select className={`w-full p-2 border rounded text-xs ${idx > 0 ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white'}`} disabled={!segment.lineKey || idx > 0} value={segment.fromId} onChange={e => updateSegment(idx, 'fromId', e.target.value)}><option value="">乘车...</option>{segment.lineKey && railwayData[segment.lineKey].stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
-                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">→</div>
-                        <select className="w-full p-2 border rounded bg-white text-xs" disabled={!segment.lineKey || !segment.fromId} value={segment.toId} onChange={e => updateSegment(idx, 'toId', e.target.value)}><option value="">下车...</option>{segment.lineKey && railwayData[segment.lineKey].stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                      <div className="grid grid-cols-[1fr,auto,1fr] gap-2 pl-2 items-center">
+                        <DropZone onDrop={(item) => {
+                            if (item.type === 'station') {
+                                // Auto-fill Line and From Station
+                                setForm(prev => {
+                                    const newSegs = [...prev.segments];
+                                    newSegs[idx] = { ...newSegs[idx], lineKey: item.lineKey, fromId: item.id };
+                                    return { ...prev, segments: newSegs };
+                                });
+                            }
+                        }}>
+                            <select className="w-full p-2 border rounded text-xs bg-white" value={segment.fromId} onChange={e => updateSegment(idx, 'fromId', e.target.value)}><option value="">乘车...</option>{segment.lineKey && railwayData[segment.lineKey]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                        </DropZone>
+
+                        <button
+                            className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                            onClick={() => {
+                                const { fromId,ToId } = segment;
+                                setForm(prev => {
+                                    const newSegs = [...prev.segments];
+                                    // Swap logic: basic ID swap
+                                    newSegs[idx] = { ...newSegs[idx], fromId: segment.toId, toId: segment.fromId };
+                                    return { ...prev, segments: newSegs };
+                                });
+                            }}
+                        >
+                            <ArrowRightLeft size={12} />
+                        </button>
+
+                        <DropZone onDrop={(item) => {
+                            if (item.type === 'station') {
+                                // Auto-fill Line (if empty) and To Station
+                                setForm(prev => {
+                                    const newSegs = [...prev.segments];
+                                    const update = { ...newSegs[idx], toId: item.id };
+                                    if (!update.lineKey) update.lineKey = item.lineKey;
+                                    // Warn if line mismatch? For now allow overwrite or strict check?
+                                    // If line exists and different, maybe ask? Or just update ID if it exists in current line?
+                                    // Simpler: If line matches, set ID. If line empty, set Line + ID.
+                                    if (update.lineKey && update.lineKey !== item.lineKey) {
+                                        // Line mismatch logic could be complex. Let's just set ID if valid.
+                                        const lineData = railwayData[update.lineKey];
+                                        if (lineData && lineData.stations.find(s => s.id === item.id)) {
+                                            // Station belongs to current line, OK
+                                        } else {
+                                            // Station not on line. Force switch line?
+                                            // Ideally we shouldn't break 'fromId' if we switch line.
+                                            // Let's force switch for now as user intent is explicit.
+                                            update.lineKey = item.lineKey;
+                                            update.fromId = ''; // Clear fromId if line changed
+                                        }
+                                    }
+                                    newSegs[idx] = update;
+                                    return { ...prev, segments: newSegs };
+                                });
+                            }
+                        }}>
+                            <select className="w-full p-2 border rounded bg-white text-xs" value={segment.toId} onChange={e => updateSegment(idx, 'toId', e.target.value)}><option value="">下车...</option>{segment.lineKey && railwayData[segment.lineKey]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                        </DropZone>
                       </div>
                   </div>
                   );
@@ -1113,7 +1171,25 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
         </div>
       );
     }))}
-    <button id="btn-add-trip" onClick={onAdd} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
+    <DropZone onDrop={(item) => {
+        if (item.type === 'station') {
+            onAdd(); // Trigger add
+            // We need a way to pass the initial data to onAdd.
+            // Currently onAdd is () => { setTripForm(...); setIsTripEditing(true); }
+            // We'll dispatch a custom event or rely on parent state update?
+            // Refactoring onAdd to accept data is cleaner but requires prop change in parent.
+            // Let's assume onAdd can handle it or we use a workaround.
+            // WORKAROUND: We can't easily change the prop signature here without changing parent.
+            // Actually, we can just call window.dispatchEvent or use a global state, but that's messy.
+            // Better: update the parent to pass `onAddWithData` or similar.
+            // For now, let's just trigger add.
+            // Wait, the requirement says "drag to 'Add Trip' button... automatically as starting station".
+            // I need to modify the parent `onAdd` prop to accept an optional station.
+            onAdd(item);
+        }
+    }}>
+        <button id="btn-add-trip" onClick={() => onAdd()} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
+    </DropZone>
   </div>
 );
 const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeometries, onOpenCard, onOpenFolders, companyDB ,setIsLoginOpen}) => {
@@ -1265,6 +1341,7 @@ export default function RailLOOPApp() {
   const [folderManagerOpen, setFolderManagerOpen] = useState(false);
   const [addToFolderModalOpen, setAddToFolderModalOpen] = useState(false);
   const [currentTripForFolder, setCurrentTripForFolder] = useState(null);
+  const [stationMenu, setStationMenu] = useState(null); // { x, y, stationData }
 
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
@@ -2251,7 +2328,16 @@ export default function RailLOOPApp() {
     map.on('zoomend', updateLayerVisibility);
     updateLayerVisibility(); // Init
 
-    map.on('click', (e) => { if (pinMode !== 'idle' && editingPin) { let newPos = { lat: e.latlng.lat, lng: e.latlng.lng }; if (pinMode === 'snap') newPos = findNearestPointOnLine(railwayData, newPos.lat, newPos.lng); setEditingPin(prev => ({ ...prev, ...newPos })); } });
+    map.on('click', (e) => {
+        if (pinMode !== 'idle' && editingPin) {
+            let newPos = { lat: e.latlng.lat, lng: e.latlng.lng };
+            if (pinMode === 'snap') newPos = findNearestPointOnLine(railwayData, newPos.lat, newPos.lng);
+            setEditingPin(prev => ({ ...prev, ...newPos }));
+        } else {
+            // Close station menu on map click (if not clicking a station)
+            setStationMenu(null);
+        }
+    });
     if (geoData && geoData.features.length > 0) { renderBaseMap(geoData); renderTripRoutes(); }
     renderPins();
   };
@@ -2272,9 +2358,28 @@ export default function RailLOOPApp() {
     L.geoJSON(data, {
       filter: (f) => f.properties.type === 'station',
       pointToLayer: (f, ll) => {
-          return L.circleMarker(ll, { radius: 2, color: 'transparent', fillColor: '#64748b', fillOpacity: 0.5, weight: 0, className: 'station-dot' });
+          // Increase radius slightly for easier tapping on mobile
+          return L.circleMarker(ll, { radius: 4, color: 'transparent', fillColor: '#64748b', fillOpacity: 0.5, weight: 0, className: 'station-dot' });
       },
-      onEachFeature: (f, l) => f.properties.name && l.bindTooltip(f.properties.name)
+      onEachFeature: (f, l) => {
+          if (f.properties.name) l.bindTooltip(f.properties.name);
+          l.on('click', (e) => {
+              L.DomEvent.stopPropagation(e); // Prevent map click
+              const { originalEvent } = e;
+              // Use client coordinates for fixed positioning
+              const x = originalEvent.clientX || (originalEvent.touches ? originalEvent.touches[0].clientX : 0);
+              const y = originalEvent.clientY || (originalEvent.touches ? originalEvent.touches[0].clientY : 0);
+
+              setStationMenu({
+                  x,
+                  y,
+                  stationData: {
+                      name_ja: f.properties.name,
+                      // We can pass other props if needed, but name is key
+                  }
+              });
+          });
+      }
     }).addTo(baseStationsLayer.current);
 
     if (mapInstance.current) {
@@ -2388,7 +2493,15 @@ export default function RailLOOPApp() {
       </header>
 
       <div className="flex-1 relative overflow-hidden flex flex-col">
-        {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} segmentGeometries={segmentGeometries} onAddToFolder={onAddToFolder} onAdd={() => { setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }] }); setIsTripEditing(true); }} />}
+        {activeTab === 'records' && <RecordsView trips={trips} railwayData={railwayData} setTrips={setTrips} onEdit={handleEditTrip} onDelete={handleDeleteTrip} segmentGeometries={segmentGeometries} onAddToFolder={onAddToFolder} onAdd={(startItem) => {
+            const newSegments = [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }];
+            if (startItem && startItem.type === 'station') {
+                newSegments[0].lineKey = startItem.lineKey;
+                newSegments[0].fromId = startItem.id;
+            }
+            setTripForm({ date: new Date().toISOString().split('T')[0], memo: '', segments: newSegments });
+            setIsTripEditing(true);
+        }} />}
         {activeTab === 'stats' && <StatsView trips={trips} setIsLoginOpen={setIsLoginOpen} onOpenFolders={onOpenFolders} railwayData={railwayData} geoData={geoData} user={user} userProfile={userProfile} segmentGeometries={segmentGeometries} onOpenCard={setCardModalUser} companyDB={companyDB} />}
         <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
           <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
@@ -2456,6 +2569,20 @@ export default function RailLOOPApp() {
 
       {/* Line Selector */}
       <LineSelector isOpen={false} onClose={() => {}} onSelect={() => {}} railwayData={railwayData} /> 
+
+      {/* Global Drag UI */}
+      <DragProvider>
+          {stationMenu && (
+              <StationMenu
+                  position={stationMenu}
+                  stationData={stationMenu.stationData}
+                  railwayData={railwayData}
+                  onClose={() => setStationMenu(null)}
+              />
+          )}
+          <Chest />
+      </DragProvider>
+
       <nav className="bg-white border-t p-2 flex justify-around shrink-0 pb-safe z-30">
         {['records', 'map', 'stats'].map(t => <button id={`tab-btn-${t}`} key={t} onClick={()=>setActiveTab(t)} className={`p-2 rounded-lg ${activeTab===t ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>{t==='records' ? <Layers/> : t==='map' ? <MapIcon/> : <PieChart/>}</button>)}
       </nav>

@@ -5,6 +5,7 @@ import  buildKMLString  from './buildKml';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as turf from '@turf/turf';
+import { isMobile } from 'react-device-detect';
 // Quick import-time log to ensure the module loads when Vite imports it.
 try { console.log('[iconfixed] module loaded'); } catch  {}
 import { 
@@ -1069,6 +1070,28 @@ const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData) =
 };
 
 const RouteSlice = ({ segments, segmentGeometries, railwayData, geoData }) => {
+  const containerRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    // Basic measurement of the parent container or the window if simpler
+    // Ideally we want the width of the list item container to subtract 300px
+    const measure = () => {
+       if (containerRef.current) {
+         // Traverse up to find the trip card container (closest relative/absolute parent usually works, or just take window width for mobile heuristics if the card is full width)
+         // Given the layout "flex-1 space-y-2 relative" is the text container.
+         // Let's use the closest meaningful parent width.
+         const parent = containerRef.current.closest('.bg-white'); // The card container
+         if (parent) {
+             setContainerWidth(parent.offsetWidth);
+         }
+       }
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
   const { visualPaths, totalDist, widthPx, heightPx } = useMemo(
       () => getRouteVisualData(segments, segmentGeometries, railwayData, geoData),
       [segments, segmentGeometries, railwayData, geoData]
@@ -1076,13 +1099,28 @@ const RouteSlice = ({ segments, segmentGeometries, railwayData, geoData }) => {
 
   if (visualPaths.length === 0) return <div className="w-28 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">无预览</div>;
 
+  const maxWidth = Math.max(0, containerWidth - 300);
+  const shouldRotate = isMobile && widthPx > maxWidth && maxWidth > 0;
+
   return (
-      <div className="shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-end pl-2 gap-2" style={{ minWidth: '100px' }}>
-          <div style={{ width: widthPx, height: heightPx }}>
+      <div ref={containerRef} className="shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-end pl-2 gap-2" style={{ minWidth: shouldRotate ? '40px' : '100px' }}>
+          <div style={{
+              width: shouldRotate ? heightPx : widthPx,
+              height: shouldRotate ? widthPx : heightPx,
+              maxWidth: shouldRotate ? 'none' : '100%', // Allow full expansion if vertical
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
             <svg
                 viewBox="0 0 100 50"
                 preserveAspectRatio="none"
-                className="w-full h-full opacity-80"
+                className="opacity-80"
+                style={{
+                    width: widthPx,
+                    height: heightPx,
+                    transform: shouldRotate ? 'rotate(90deg)' : 'none',
+                    // When rotated, we must ensure the origin is center so it fits into the swapped dimensions
+                    transformOrigin: 'center center'
+                }}
             >
                 {visualPaths.map((item, idx) => (
                     <path

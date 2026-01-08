@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronRight, CheckCircle2, ArrowRight } from 'lucide-react';
+import { ChevronRight, ArrowRight } from 'lucide-react';
 
 const Tutorial = ({
     activeTab,
@@ -14,6 +14,7 @@ const Tutorial = ({
     const [step, setStep] = useState(-1); // -1: Loading/Check, 0+: Steps
     const [rect, setRect] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
+    const [tooltipPos, setTooltipPos] = useState({});
 
     // Config
     const STEPS = [
@@ -158,18 +159,79 @@ const Tutorial = ({
         const updateRect = () => {
             if (!currentStep.target) {
                 setRect(null);
+                setTooltipPos({ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' });
                 return;
             }
             const el = document.querySelector(currentStep.target);
             if (el) {
                 const r = el.getBoundingClientRect();
-                // Add padding
-                setRect({
+                const PADDING = 20;
+                const CARD_W = 384; // max-w-sm approx
+                const CARD_H = 250; // approx height estimate
+
+                // Add padding to highlight box
+                const highlight = {
                     top: r.top - 5,
                     left: r.left - 5,
                     width: r.width + 10,
                     height: r.height + 10
-                });
+                };
+                setRect(highlight);
+
+                // Calculate Tooltip Position with Clamping
+                let top, left, transform = 'none';
+
+                if (currentStep.position === 'bottom') {
+                    top = highlight.top + highlight.height + 20;
+                    left = highlight.left;
+                } else if (currentStep.position === 'top') {
+                    top = highlight.top - CARD_H - 20;
+                    left = highlight.left;
+                } else if (currentStep.position === 'right') {
+                    top = highlight.top;
+                    left = highlight.left + highlight.width + 20;
+                } else if (currentStep.position === 'left') {
+                    top = highlight.top;
+                    left = highlight.left - CARD_W - 20;
+                } else { // center
+                    top = '50%';
+                    left = '50%';
+                    transform = 'translate(-50%, -50%)';
+                }
+
+                // Clamping Logic
+                if (typeof top === 'number') {
+                    // Vertical Clamp
+                    if (top < PADDING) top = PADDING;
+                    if (top + CARD_H > window.innerHeight - PADDING) {
+                        // Try flipping if overflowing bottom
+                        if (currentStep.position === 'bottom') {
+                             const flippedTop = highlight.top - CARD_H - 20;
+                             if (flippedTop > PADDING) top = flippedTop;
+                             else top = window.innerHeight - CARD_H - PADDING;
+                        } else {
+                             top = window.innerHeight - CARD_H - PADDING;
+                        }
+                    }
+                }
+
+                if (typeof left === 'number') {
+                    // Horizontal Clamp
+                    if (left < PADDING) left = PADDING;
+                    if (left + CARD_W > window.innerWidth - PADDING) {
+                        // Try flipping if overflowing right
+                        if (currentStep.position === 'right') {
+                            const flippedLeft = highlight.left - CARD_W - 20;
+                            if (flippedLeft > PADDING) left = flippedLeft;
+                            else left = window.innerWidth - CARD_W - PADDING;
+                        } else {
+                            left = window.innerWidth - CARD_W - PADDING;
+                        }
+                    }
+                }
+
+                setTooltipPos({ top, left, transform });
+
             } else {
                 // Element not found? Retry in a bit (maybe animation or mounting)
                 setRect(null);
@@ -182,14 +244,6 @@ const Tutorial = ({
         const interval = setInterval(updateRect, 100);
 
         // 2. Auto-actions (Switch Tab)
-        // Note: The requirement says "guide to click stats tab".
-        // For others, we can auto-switch or guide.
-        // The prompt says "Step by step guidance for 3 tabs".
-        // Let's Guide instead of Auto-switch for tabs to be interactive,
-        // except when the element isn't there (e.g. #btn-add-trip is only in Records tab).
-        // If target is missing, maybe we SHOULD switch tab?
-        // Let's auto-switch for smoother flow unless it's the specific Stats requirement.
-
         if (currentStep.action === 'switch-tab' && currentStep.tab && activeTab !== currentStep.tab) {
              setActiveTab(currentStep.tab);
         }
@@ -236,6 +290,7 @@ const Tutorial = ({
     if (!isVisible || step < 0) return null;
 
     const currentStep = STEPS[step];
+    const isInteractionStep = currentStep.action === 'wait-interaction' || currentStep.action === 'wait-click-tab';
 
     // Render
     return createPortal(
@@ -263,21 +318,9 @@ const Tutorial = ({
             <div
                 className={`absolute pointer-events-auto transition-all duration-300 flex flex-col gap-4 max-w-sm w-full p-6 bg-white rounded-2xl shadow-2xl animate-slide-up`}
                 style={{
-                    // Positioning logic
-                    top: rect
-                        ? (currentStep.position === 'bottom' ? rect.top + rect.height + 20
-                           : currentStep.position === 'top' ? rect.top - 200 // Approx height of card
-                           : rect.top)
-                        : '50%',
-                    left: rect
-                        ? (currentStep.position === 'right' ? rect.left + rect.width + 20
-                           : currentStep.position === 'left' ? rect.left - 340 // Approx width
-                           : Math.max(20, Math.min(window.innerWidth - 340, rect.left)))
-                        : '50%',
-                    transform: rect
-                        ? 'none'
-                        : 'translate(-50%, -50%)',
-                    // Adjust if off-screen (basic)
+                    top: tooltipPos.top,
+                    left: tooltipPos.left,
+                    transform: tooltipPos.transform
                 }}
             >
                 <div>
@@ -302,7 +345,7 @@ const Tutorial = ({
                             )}
                          </div>
 
-                        {currentStep.action !== 'wait-interaction' && currentStep.action !== 'wait-click-tab' && (
+                        {!isInteractionStep && (
                              <button
                                 onClick={handleNext}
                                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-200 transition-all transform active:scale-95"
@@ -310,7 +353,7 @@ const Tutorial = ({
                                 {step === STEPS.length - 1 ? 'Finish' : 'Next'} <ArrowRight size={16}/>
                              </button>
                         )}
-                        {(currentStep.action === 'wait-interaction' || currentStep.action === 'wait-click-tab') && (
+                        {isInteractionStep && (
                             <div className="text-xs font-bold text-emerald-600 animate-pulse flex items-center gap-1">
                                 <ChevronRight size={14}/> Please interact to continue...
                             </div>

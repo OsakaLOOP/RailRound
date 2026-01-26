@@ -11,6 +11,16 @@ export const DragProvider = ({ children }) => {
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
   const [dropZone, setDropZone] = useState(null);
 
+  useEffect(() => {
+    if (isDragging) {
+        document.body.style.userSelect = 'none';
+        document.body.style.webkitUserSelect = 'none';
+    } else {
+        document.body.style.userSelect = '';
+        document.body.style.webkitUserSelect = '';
+    }
+  }, [isDragging]);
+
   // Global Mouse/Touch Handlers
   useEffect(() => {
     if (!isDragging) return;
@@ -103,6 +113,10 @@ export const DropZone = ({ onDrop, children, className = "", activeClassName = "
         window.__dropZoneRegistry[idRef.current] = onDrop;
         return () => { delete window.__dropZoneRegistry[idRef.current]; };
     }, [onDrop]);
+
+    useEffect(() => {
+        if (!isDragging) setIsOver(false);
+    }, [isDragging]);
 
     // Polling or Context-driven active state check would be cleaner, but for now
     // we let the Provider setDropZone, and we check if *we* are the active one.

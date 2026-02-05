@@ -147,7 +147,7 @@ const VersionBadge = ({ version: currentVersion }) => {
                             <Clock size={10} />
                             <span>Latest: {data?.meta?.latestVersion || currentVersion}</span>
                         </div>
-                        <a href="https://github.com/OsakaLOOP" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-[#39C5BB] transition-colors font-bold">
+                        <a href="https://github.com/OsakaLOOP/RailRound" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-[#39C5BB] transition-colors font-bold">
                             Full History <GitCommit size={10} />
                         </a>
                     </div>

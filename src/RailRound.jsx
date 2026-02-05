@@ -22,10 +22,10 @@ import { api } from './services/api';
 import { db } from './utils/db';
 import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './utils/stats';
 import {VersionBadge} from './components/VersionBadge';
-
-const CURRENT_VERSION = 0.32;
-const LAST_MODIFIED = "2025-11-27";
-const LAST_UPDATED = "2026-01-08";
+import {meta} from '../public/changelog.json';
+const CURRENT_VERSION = meta["currentVersion"];
+const LAST_MODIFIED = meta["lastModified"];
+const LAST_UPDATED = meta["lastUpdated"];
 const MIN_SUPPORTED_VERSION = 0.0;
 
 const GithubRegisterModal = ({ isOpen, onClose, regToken, onLoginSuccess }) => {

@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
 # Copyright files
 *.json
+!public/changelog.json
 !public/company_data.json
 *.geojson
 

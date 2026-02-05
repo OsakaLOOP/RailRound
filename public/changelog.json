@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "lastUpdated": "2026-01-26",
+    "lastModified": "2025-11-27", 
+    "currentVersion": "0.33",
+    "appName": "RailLOOP"
+  },
+  "logs": [
+    {
+        "version": "0.34",
+        "date": "2026-03-31",
+        "type": "next",
+        "content": "前瞻: JRE 3月调图和改订, 计划爬取新数据并更新."
+    },
+    {
+      "version": "0.33",
+      "date": "2026-01-26",
+      "type": "feat",
+      "content": "加入神秘切斯特, 另外体验了JR Pass, せり鍋, Mos Burger, 山形拉面, 日归温泉, BA Fes 和长崎咖喱, 最后 npm run build. 切斯特的实际用途将不早于 v0.40 想起来."
+    },
+    {
+      "version": "0.32",
+      "date": "2026-01-08",
+      "type": "feat",
+      "content": "新增教程 modal, 引入收藏文件夹整理归档, 还有这个 changelog 本身.(badge 可以滚动 qwq)"
+    },
+    {
+      "version": "0.31",
+      "date": "2025-01-05",
+      "type": "feat",
+      "content": "引入 readme 文档."
+    },
+    {
+      "version": "0.30",
+      "date": "2025-12-25",
+      "type": "feat",
+      "content": "重构架构，集成 GitHub OAuth 登录与 KV 存储"
+    },
+    {
+        "version": "0.20",
+        "date": "2025-11-30",
+        "type": "feat",
+        "content": "大幅优化可用性, 改进线路选择器与地图交互体验."
+    },
+    {
+        "version": "0.10",
+        "date": "2025-11-27",
+        "type": "init",
+        "content": "爬取 geojson, 导入前端, 初步实现功能."
+    }
+  ]
+}

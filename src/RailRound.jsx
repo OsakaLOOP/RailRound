@@ -49,6 +49,17 @@ const GithubRegisterModal = ({ isOpen, onClose, regToken, onLoginSuccess }) => {
         }
     };
 
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
     if (!isOpen) return null;
 
     return (
@@ -498,6 +509,17 @@ const LineSelector = ({ isOpen, onClose, onSelect, railwayData, allowedLines }) 
         if (!regionsForActiveTab.includes(selectedRegion)) setSelectedRegion('all');
     }, [activeTab, regionsForActiveTab]);
 
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
     if (!isOpen) return null;
     const currentRegionData = groups[activeTab];
 
@@ -569,6 +591,25 @@ const TripEditor = ({
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [selectorTarget, setSelectorTarget] = useState(null); 
   const [allowedLines, setAllowedLines] = useState(null); 
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+            onClose();
+        }
+        // 使用 Ctrl+Enter 或 Cmd+Enter 提交，避免在输入时误触
+        else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            if (editorMode === 'manual') {
+                onSave();
+            } else {
+                onAutoSearch();
+            }
+        }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, onSave, onAutoSearch, editorMode]);
 
   if (!isOpen) return null;
 
@@ -781,7 +822,7 @@ const TripEditor = ({
 
         {/* Auto Mode */}
         <div className={`p-6 space-y-6 flex-1 transition-opacity duration-300 ${editorMode === 'auto' ? 'opacity-100' : 'hidden opacity-0'}`}>
-            <div className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
+            <div id="auto-planning-form" className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
                 <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">出发地</label>
                     <div className="grid grid-cols-2 gap-2">
@@ -815,8 +856,24 @@ const TripEditor = ({
 
 const PinEditor = ({ editingPin, setEditingPin, pinMode, setPinMode, deletePin, savePin }) => {
   if (!editingPin) return null;
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+            setEditingPin(null);
+            setPinMode('idle');
+        } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            savePin();
+        }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [editingPin, savePin, setEditingPin, setPinMode]);
+
   return (
-    <div className="absolute bottom-6 left-4 right-4 z-[400] bg-white rounded-xl shadow-2xl p-4 animate-slide-up max-w-md mx-auto border border-gray-200">
+    <div id="pin-editor" className="absolute bottom-6 left-4 right-4 z-[400] bg-white rounded-xl shadow-2xl p-4 animate-slide-up max-w-md mx-auto border border-gray-200">
       <div className="flex justify-between items-center mb-3 border-b pb-2"><span className="font-bold text-gray-700 flex items-center gap-2">{pinMode === 'snap' ? <Magnet size={16} className="text-indigo-600"/> : <Move size={16} />}{pinMode === 'snap' ? `吸附: ${editingPin.lineKey || '未知'}` : '自由位置'}</span><button onClick={() => {setEditingPin(null); setPinMode('idle');}} className="absolute right-0"><X size={18} className="text-gray-400"/></button></div>
       <div className="flex gap-3 mb-3"><div className="flex bg-gray-100 rounded-lg p-1 gap-1">{['photo', 'comment'].map(t => (<button key={t} onClick={() => setEditingPin({...editingPin, type: t})} className={`p-2 rounded-md ${editingPin.type===t ? 'bg-white shadow text-blue-600' : 'text-gray-400'}`}>{t==='photo'?<Camera size={18}/>:<MessageSquare size={18}/>}</button>))}</div><div className="flex-1 flex items-center gap-1 overflow-x-auto no-scrollbar">{COLOR_PALETTE.map(c => <button key={c} onClick={() => setEditingPin({...editingPin, color: c})} className={`w-6 h-6 rounded-full border-2 ${editingPin.color===c?'border-gray-600 scale-110':'border-transparent'}`} style={{background: c}} />)}</div></div>
       <input className="w-full p-2 border rounded text-sm mb-2" placeholder="备注..." value={editingPin.comment||''} onChange={e => setEditingPin({...editingPin, comment: e.target.value})} />
@@ -920,6 +977,17 @@ const GithubCardModal = ({ isOpen, onClose, user, folders, badgeSettings, onUpda
         }
     }, [isOpen, user]);
 
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' || e.key === 'Enter') {
+                onClose();
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
     if (!isOpen || !user) return null;
 
     let url = "";
@@ -1005,6 +1073,17 @@ const GithubCardModal = ({ isOpen, onClose, user, folders, badgeSettings, onUpda
 const FolderManagerModal = ({ isOpen, onClose, folders, onUpdateFolders }) => {
     const [newFolderName, setNewFolderName] = useState("");
 
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
     if (!isOpen) return null;
 
     const handleCreate = () => {
@@ -1050,15 +1129,15 @@ const FolderManagerModal = ({ isOpen, onClose, folders, onUpdateFolders }) => {
                     <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
                 </div>
 
-                <div className="flex gap-2 mb-4">
+                <form onSubmit={(e) => { e.preventDefault(); handleCreate(); }} className="flex gap-2 mb-4">
                     <input
                         className="flex-1 p-2 border rounded-lg text-sm"
                         placeholder="New folder name..."
                         value={newFolderName}
                         onChange={e => setNewFolderName(e.target.value)}
                     />
-                    <button onClick={handleCreate} disabled={!newFolderName.trim()} className="bg-gray-800 text-white px-4 py-2 rounded-lg font-bold text-sm disabled:opacity-50">Create</button>
-                </div>
+                    <button type="submit" disabled={!newFolderName.trim()} className="bg-gray-800 text-white px-4 py-2 rounded-lg font-bold text-sm disabled:opacity-50">Create</button>
+                </form>
 
                 <div className="space-y-2 max-h-[60vh] overflow-y-auto">
                     {folders.length === 0 && <div className="text-center text-gray-400 py-4 text-sm">No folders yet.</div>}
@@ -1087,6 +1166,17 @@ const FolderManagerModal = ({ isOpen, onClose, folders, onUpdateFolders }) => {
 };
 
 const AddToFolderModal = ({ isOpen, onClose, trip, folders, onUpdateFolders }) => {
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
     if (!isOpen || !trip) return null;
 
     const toggleFolder = (folderId) => {

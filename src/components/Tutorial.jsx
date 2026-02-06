@@ -194,6 +194,29 @@ const Tutorial = ({
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [isVisible, step, handleNext, handleSkip]);
 
+    const handleNext = () => {
+        if (step === STEPS.length - 2) { // Finish step
+            // Open Login Modal
+            setIsLoginOpen(true);
+            // Wait a bit for modal to open then next
+            setTimeout(() => setStep(s => s + 1), 500);
+        } else if (step >= STEPS.length - 1) {
+            // End
+            setStep(-2);
+            setIsVisible(false);
+        } else {
+            setStep(s => s + 1);
+        }
+    };
+
+    const handleSkip = (dontShowAgain) => {
+        if (dontShowAgain) {
+            localStorage.setItem('rail_tutorial_skipped', 'true');
+        }
+        setStep(-2);
+        setIsVisible(false);
+    };
+
     // Initialization check
     useEffect(() => {
         const skipped = localStorage.getItem('rail_tutorial_skipped');

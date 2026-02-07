@@ -6,13 +6,15 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as turf from '@turf/turf';
 import { isMobile } from 'react-device-detect';
+
 // Quick import-time log to ensure the module loads when Vite imports it.
-try { console.log('[iconfixed] module loaded'); } catch  {}
+try { console.log('[icon] module loaded'); } catch  {}
 import { 
   Train, Calendar, Navigation, Map as MapIcon, Layers, Upload, Plus, Edit2, Trash2, 
   PieChart, TrendingUp, MapPin, Save, X, Camera, MessageSquare, Move, Magnet, CheckCircle2, FilePlus, ArrowDown, ArrowRightLeft, Search, Building2, AlertTriangle, Loader2, Download, ListFilter,
   LogOut, User, Github, Star, Folder, Globe, Lock, Eye, EyeOff
 } from 'lucide-react';
+
 import { LoginModal } from './components/LoginModal';
 import { DragProvider, DropZone } from './components/DragContext';
 import Chest from './components/Chest';
@@ -21,12 +23,15 @@ import Tutorial from './components/Tutorial';
 import { api } from './services/api';
 import { db } from './utils/db';
 import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './utils/stats';
-import {VersionBadge} from './components/VersionBadge';
-import {meta} from '../public/changelog.json';
+import { VersionBadge } from './components/VersionBadge';
+
+
+import { meta } from '../public/changelog.json';
+
 const CURRENT_VERSION = meta["currentVersion"];
 const LAST_MODIFIED = meta["lastModified"];
 const LAST_UPDATED = meta["lastUpdated"];
-const MIN_SUPPORTED_VERSION = 0.0;
+const MIN_SUPPORTED_VERSION = 0.20;
 
 const GithubRegisterModal = ({ isOpen, onClose, regToken, onLoginSuccess }) => {
     const [username, setUsername] = useState('');

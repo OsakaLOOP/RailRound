@@ -3,20 +3,22 @@
     "lastUpdated": "2026-01-26",
     "lastModified": "2025-11-27", 
     "currentVersion": "0.33",
-    "appName": "RailLOOP"
+    "appName": "RailLOOP",
+    "author": "@OsakaLOOP",
+    "minVer": "0.20"
   },
   "logs": [
     {
         "version": "0.34",
         "date": "2026-03-31",
         "type": "next",
-        "content": "前瞻: JRE 3月调图和改订, 计划爬取新数据并更新."
+        "content": "前瞻: JRE 3月调图和改订, 计划爬取新数据并更新. 另外正在阅读 react.dev, 并学习路由."
     },
     {
       "version": "0.33",
       "date": "2026-01-26",
       "type": "feat",
-      "content": "加入神秘切斯特, 另外体验了JR Pass, せり鍋, Mos Burger, 山形拉面, 日归温泉, BA Fes 和长崎咖喱, 最后 npm run build. 切斯特的实际用途将不早于 v0.40 想起来."
+      "content": "加入神秘切斯特, 另外体验了JR Pass, せり鍋, Mos Burger, 山形拉面, 日归温泉, BA Fes 和长崎咖喱, 最后 npm run build. 切斯特的实际用途将不早于 v0.40 想出来."
     },
     {
       "version": "0.32",

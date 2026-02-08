@@ -9,7 +9,7 @@ export const MetaContext = createContext({
         thememode: 'light',
         area: 'JP', // 用于决定地图显示区域等
         locale: 'zh-CN', 
-});
+});// 注意这里的 Meta 代表全局设置, 与版本信息无关.
 export const useMeta = () => useContext(MetaContext);// Hook
 
 export const VersionContext = createContext(null);
@@ -105,5 +105,5 @@ export const GlobalProvider = ({ children }) => {
                 </AuthContext>
             </MetaContext>
         </VersionContext>
-    );// react 19+ 特性可以不要.Provider. Working at 19.2.4
+    );// react 19+ 特性, 不需要使用.Provider. Working at 19.2.4.
 };

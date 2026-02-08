@@ -11,4 +11,6 @@
 
 //使用 react-router-dom
 
-//RailRound.jsx 中定义路由：/trips (Index), /map (透明页), /stats, /login (弹窗 Modal), /trip/new (弹窗 Modal)。
+//RailRound.jsx 中定义路由：/trips (Index), /map (透明页), /stats, /login (弹窗 Modal), /trip/new (弹窗 Modal) /tutorial(覆盖全屏, 和原先一致)
+//注意原先为modal的现在还是modal, 不应该因为路由而视为单独页面.
+//必须严格控制ui行为与原先一致, 并且唯一.

@@ -356,11 +356,26 @@ export const GlobalProvider = ({ children }) => {
         });
     }, []);
 
+    const generateKmlData = useCallback(async (tripsList) => {
+        if (!workerRef.current) return [];
+        return new Promise((resolve) => {
+            const id = Date.now() + Math.random();
+            const handler = (e) => {
+                if (e.data.id === id) {
+                    workerRef.current.removeEventListener('message', handler);
+                    resolve(e.data.result);
+                }
+            };
+            workerRef.current.addEventListener('message', handler);
+            workerRef.current.postMessage({ type: 'GENERATE_KML_DATA', id, payload: { trips: tripsList } });
+        });
+    }, []);
+
 
     // --- Combine Values ---
     const authVal = { user, userProfile, login, logout };
     const userVal = { trips, pins, folders, badgeSettings, saveData, setTrips, setPins, setFolders, setBadgeSettings, editorMode, setEditorMode };
-    const geoVal = { railwayData, geoData, companyDB, isGeoReady, getRouteVisualData, getAllGeometries, workerRef, pinMode, setPinMode };
+    const geoVal = { railwayData, setRailwayData, geoData, setGeoData, companyDB, setCompanyDB, isGeoReady, getRouteVisualData, getAllGeometries, generateKmlData, workerRef, pinMode, setPinMode };
 
     return (
         <VersionContext value={versionInfo}>

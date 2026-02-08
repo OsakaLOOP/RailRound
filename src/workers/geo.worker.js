@@ -407,6 +407,45 @@ self.onmessage = (e) => {
                 }
                 break;
 
+            case 'GENERATE_KML_DATA':
+                // payload.trips
+                {
+                    const allPaths = [];
+                    payload.trips.forEach(t => {
+                        const tripName = `${t.date} - Trip ${t.id}`;
+                        const segs = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
+                        segs.forEach((seg, segIndex) => {
+                             const g = getGeometry(seg);
+                             if (g && g.coords) {
+                                 let kmlCoords = "";
+                                 if (g.isMulti) {
+                                     // Flatten multi-coords for KML (or handle as MultiGeometry? simple KML usually one string per Placemark)
+                                     // We will create separate paths for multi-segments or join them with a jump?
+                                     // KML LineString must be continuous.
+                                     // For simplicity, we create one path entry per continuous segment.
+                                     g.coords.forEach((part, partIdx) => {
+                                         const str = part.map(p => `${p[1]},${p[0]},0`).join(' ');
+                                         allPaths.push({
+                                             name: `${tripName} Segment ${segIndex + 1}.${partIdx + 1}`,
+                                             coordinates: str,
+                                             lineKey: seg.lineKey
+                                         });
+                                     });
+                                 } else {
+                                     const str = g.coords.map(p => `${p[1]},${p[0]},0`).join(' ');
+                                     allPaths.push({
+                                         name: `${tripName} Segment ${segIndex + 1}`,
+                                         coordinates: str,
+                                         lineKey: seg.lineKey
+                                     });
+                                 }
+                             }
+                        });
+                    });
+                    result = allPaths;
+                }
+                break;
+
             default:
                 throw new Error(`Unknown message type: ${type}`);
         }

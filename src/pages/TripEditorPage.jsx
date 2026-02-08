@@ -172,7 +172,7 @@ export default function TripEditorPage() {
                             {isEditing ? <Edit2 size={18} /> : <Plus size={18} />}
                             {isEditing ? '编辑行程' : '新行程'}
                         </h3>
-                        <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
+                        <button id="btn-close-editor" onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
                     </div>
                     <div className="grid grid-cols-2 p-1 bg-gray-200 rounded-lg relative isolate overflow-hidden">
                         <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white shadow rounded-md transition-all duration-100 ease-out z-0`} style={{ left: editorMode === 'manual' ? '4px' : 'calc(50% + 0px)' }} />
@@ -283,7 +283,7 @@ export default function TripEditorPage() {
                     ) : (
                         <div className="p-6 space-y-6">
                              {/* Auto Form */}
-                             <div className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                             <div id="auto-planning-form" className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 mb-1">出发地</label>
                                     <div className="grid grid-cols-2 gap-2">

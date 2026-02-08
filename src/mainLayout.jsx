@@ -1,14 +1,52 @@
-// 现在只是 SPA, 所以考虑利用 outlet 机制引入路由和上下文, 不要搞得全是弹窗.
-//实现 Map Keep-Alive。
+import React, { useEffect, useState } from 'react';
+import { Outlet, useLocation, useNavigate, NavLink } from 'react-router-dom';
+import { Layers, Map as MapIcon, PieChart } from 'lucide-react';
+import MapComponent from './components/MapComponent';
+import Chest from './components/Chest';
+import Tutorial from './components/Tutorial';
+import { useAuth } from './globalContext';
 
-//地图层：z-0。非地图路由时设置 opacity-0 和 pointer-events-none。
+export default function MainLayout() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-//路由层：z-10。容器设为 pointer-events-none。
+  const isMapMode = location.pathname === '/map' || location.pathname === '/';
+  const showMap = isMapMode;
 
-//子页面：所有渲染在 <Outlet /> 中的组件（如 RecordsList）必须在最外层 div 设置 pointer-events-auto 和背景色。
+  return (
+    <div className="relative w-full h-full min-h-screen overflow-hidden bg-slate-100 flex flex-col">
+       {/* Map Layer (z-0) */}
+       <div
+         className={`absolute inset-0 z-0 transition-opacity duration-300 ${showMap ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+       >
+         <MapComponent />
+       </div>
 
-//路由定义：
+       {/* Router Layer (z-10) */}
+       <div className="absolute inset-0 z-10 pointer-events-none flex flex-col">
+          <Outlet />
+       </div>
 
-//使用 react-router-dom
+       {/* Global UI */}
+       <div className="absolute bottom-24 right-4 z-20 pointer-events-auto">
+          <Chest />
+       </div>
 
-//RailRound.jsx 中定义路由：/trips (Index), /map (透明页), /stats, /login (弹窗 Modal), /trip/new (弹窗 Modal)。
+       <Tutorial />
+
+       {/* Navigation Bar (z-30) */}
+       <nav className="absolute bottom-0 left-0 right-0 bg-white border-t p-2 flex justify-around shrink-0 pb-safe z-30 pointer-events-auto">
+            <NavLink to="/records" className={({isActive}) => `p-2 rounded-lg ${isActive ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>
+                <Layers />
+            </NavLink>
+            <NavLink to="/map" className={({isActive}) => `p-2 rounded-lg ${isActive ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>
+                <MapIcon />
+            </NavLink>
+            <NavLink to="/stats" className={({isActive}) => `p-2 rounded-lg ${isActive ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>
+                <PieChart />
+            </NavLink>
+       </nav>
+    </div>
+  );
+}

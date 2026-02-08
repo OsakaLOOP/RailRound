@@ -75,6 +75,13 @@ export default function LoginPage() {
                          <p>已有账户？ <button onClick={() => setMode('login')} className="text-blue-600 font-bold hover:underline">直接登录</button></p>
                     )}
                 </div>
+
+                {/* Login Guide - Tutorial Target */}
+                <div id="login-readme-container" className="mt-6 p-4 bg-gray-50 rounded-lg border text-xs text-gray-500">
+                    <h4 className="font-bold mb-2">用户指南 & 免责声明</h4>
+                    <p className="mb-2">使用本服务即表示您同意以下条款...</p>
+                    <p>RailLOOP 是一个开源项目，不保证数据准确性。</p>
+                </div>
             </div>
         </div>
     );

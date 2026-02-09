@@ -1,7 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState, useMemo, useEffectEvent, useCallback, useRef } from "react";
+import { createContext, useContext, useEffect, useState, useMemo, useEffectEvent, useCallback, useRef, use } from "react";
 // createContext, 这是让一切好起来的关键!
 
+import { api } from "./services/api";
+import { db } from "./utils/db";
 import { verCalc, isVerSupported, verCmp } from "./utils/verCalc";
 import { meta, logs } from '../public/changelog.json';
 
@@ -9,7 +11,7 @@ export const MetaContext = createContext({
         thememode: 'light',
         area: 'JP', // 用于决定地图显示区域等
         locale: 'zh-CN', 
-});// 注意这里的 Meta 代表全局设置, 与版本信息无关.
+});// 注意这里的 Meta 代表全局设置, 与版本信息的 meta 无关.
 export const useMeta = () => useContext(MetaContext);// Hook
 
 export const VersionContext = createContext(null);
@@ -18,8 +20,8 @@ export const useVersion = () => useContext(VersionContext);// Hook
 export const AuthContext = createContext({
     isLoggedIn: false,
     username: null,
+    token: null,// a.k.a. userInfo. 
     userProfile: null,
-    token: null,
 
 });// 用于用户登录逻辑的迁移. 还要创建其他 Hook. UserDataContext 必须实现 actions 对象，封装所有数据修改逻辑(含乐观更新).
 
@@ -48,13 +50,14 @@ export const GlobalProvider = ({ children }) => {
     const [hasUpdate, setHasUpdate] = useState(null);
 
     const onUpdateReceived = useEffectEvent((remoteData) => {
-        const remoteMeta = remoteData.meta;
-        const remoteVer = remoteMeta.currentVersion;
-        
         // 确保 versionInfo.currentVer 永远是最新的
+
+        const remoteMeta = remoteData.meta;
+        const remoteVer = remoteMeta.currentVersion;        
         const cmpRes = verCmp(remoteVer, versionInfo.currentVer);
         
         if (cmpRes && cmpRes.diff > 0) {
+            console.log(`[RailLOOP] Update Available: ${remoteVer} (current: ${versionInfo.currentVer}), min supported: ${remoteMeta.minVer || "0.20"})`);
             setHasUpdate(cmpRes.at);
             setVersionInfo({
                 currentVer: remoteVer,
@@ -66,7 +69,7 @@ export const GlobalProvider = ({ children }) => {
                 isSupported: isVerSupported(remoteVer, remoteMeta.minVer || "0.20")
             });
         }
-    });// react 19.2 新 Hook
+    });// react 19.2 新 Hook, 避免闭包.
 
     useEffect(() => {
         const checkUpdate = async() => {
@@ -86,13 +89,15 @@ export const GlobalProvider = ({ children }) => {
 
     }, []);// 只挂载一次
 
-    const userInfo = {
+    // Auth State
+    const [userInfo, setUserInfo] = useState({
         isLoggedIn: false,
-        username: null,
         token: null,
-    };
-
+        username: null,
+    });
+    const [userProfile, setUserProfile] = useState(null);
     
+
     return (
         <VersionContext value={versionInfo}>
             <MetaContext value={meta}>

@@ -1520,8 +1520,8 @@ function RailRoundContent() {
     if (tokenFromUrl && usernameFromUrl) {
         // Handle OAuth Login
         setUser({ token: tokenFromUrl, username: usernameFromUrl });
-        localStorage.setItem('rail_token', tokenFromUrl);
-        localStorage.setItem('rail_username', usernameFromUrl);
+        localStorage.setItem('railloop_token', tokenFromUrl);
+        localStorage.setItem('railloop_username', usernameFromUrl);
         loadUserData(tokenFromUrl, true);
 
         // Clean URL
@@ -1534,8 +1534,8 @@ function RailRoundContent() {
         window.history.replaceState({}, document.title, window.location.pathname);
     } else {
         // Handle Local Storage Login
-        const token = localStorage.getItem('rail_token');
-        const username = localStorage.getItem('rail_username');
+        const token = localStorage.getItem('railloop_token');
+        const username = localStorage.getItem('railloop_username');
         if (token && username) {
           setUser({ token, username });
           loadUserData(token);
@@ -1546,8 +1546,8 @@ function RailRoundContent() {
         alert("GitHub 绑定成功！");
         window.history.replaceState({}, document.title, window.location.pathname);
         // Refresh profile if logged in
-        if (localStorage.getItem('rail_token')) {
-            loadUserData(localStorage.getItem('rail_token'));
+        if (localStorage.getItem('railloop_token')) {
+            loadUserData(localStorage.getItem('railloop_token'));
         }
     }
   }, []);
@@ -1614,16 +1614,16 @@ function RailRoundContent() {
 
   const handleLoginSuccess = (data) => {
     setUser({ token: data.token, username: data.username });
-    localStorage.setItem('rail_token', data.token);
-    localStorage.setItem('rail_username', data.username);
+    localStorage.setItem('railloop_token', data.token);
+    localStorage.setItem('railloop_username', data.username);
     // 加载数据
     loadUserData(data.token, true);
   };
 
   const handleLogout = () => {
     setUser(null);
-    localStorage.removeItem('rail_token');
-    localStorage.removeItem('rail_username');
+    localStorage.removeItem('railloop_token');
+    localStorage.removeItem('railloop_username');
     // 可选：清空本地数据
     // setTrips([]);
     // setPins([]);

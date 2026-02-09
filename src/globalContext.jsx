@@ -24,8 +24,6 @@ export const AuthContext = createContext({
     token: null,
 
 });// 用于用户登录逻辑的迁移. 还要创建其他 Hook. UserDataContext 必须实现 actions 对象，封装所有数据修改逻辑(含乐观更新).
-
-
 export const UserDataContext = createContext(null);// 用于用户数据存储的迁移. 后面将采用 S3.
 export const useAuth = () => useContext(AuthContext);
 export const useUserData = () => useContext(UserDataContext)// Hook
@@ -48,7 +46,7 @@ export const GlobalProvider = ({ children }) => {
         hasUpdate: null
     });// 用于完善版本检查, 提示等. 为了让 Context 有更多用处, 我们考虑支持热更新.
 
-    // Update Logic
+    // 检查与更新
     useEffect(() => {
         const checkUpdate = async () => {
             try {
@@ -59,6 +57,7 @@ export const GlobalProvider = ({ children }) => {
                 const cmpRes = verCmp(remoteMeta.currentVersion, versionInfo.currentVer);
 
                 if (cmpRes && cmpRes.diff > 0) {
+                    console.log(`[RailLOOP] New version available: ${remoteMeta.currentVersion} (current: ${versionInfo.currentVer})`);
                     setVersionInfo(prev => ({
                         ...prev,
                         hasUpdate: cmpRes.at,
@@ -86,15 +85,15 @@ export const GlobalProvider = ({ children }) => {
 
     const login = useCallback(async (token, username) => {
         setUser({ token, username });
-        localStorage.setItem('rail_token', token);
-        localStorage.setItem('rail_username', username);
+        localStorage.setItem('railloop_token', token);
+        localStorage.setItem('railloop_username', username);
     }, []);
 
     const logout = useCallback(() => {
         setUser(null);
         setUserProfile(null);
-        localStorage.removeItem('rail_token');
-        localStorage.removeItem('rail_username');
+        localStorage.removeItem('railloop_token');
+        localStorage.removeItem('railloop_username');
         window.location.href = '/';
     }, []);
 
@@ -107,8 +106,8 @@ export const GlobalProvider = ({ children }) => {
             login(tokenFromUrl, usernameFromUrl);
             window.history.replaceState({}, document.title, window.location.pathname);
         } else {
-            const t = localStorage.getItem('rail_token');
-            const u = localStorage.getItem('rail_username');
+            const t = localStorage.getItem('railloop_token');
+            const u = localStorage.getItem('railloop_username');
             if (t && u) setUser({ token: t, username: u });
         }
     }, [login]);
@@ -189,7 +188,7 @@ export const GlobalProvider = ({ children }) => {
     }, [user, trips, pins, folders, badgeSettings, versionInfo]);
 
 
-    // --- Geo State ---
+    // Geo State
     const [railwayData, setRailwayData] = useState({});
     const [geoData, setGeoData] = useState({ type: "FeatureCollection", features: [] });
     const [companyDB, setCompanyDB] = useState({});

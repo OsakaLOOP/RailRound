@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth, useUserData, useGeo } from '../globalContext';
 import { api } from '../services/api';
 import { Github, Folder, TrendingUp, Move, Eye, EyeOff, Loader2, Lock, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Outlet } from 'react-router-dom';
 import { VersionBadge } from '../components/VersionBadge';
 
 // Helper to calc stats using worker
@@ -136,6 +136,7 @@ export default function StatsPage() {
              <br/>
              <div><span display="inline">更多详情, 参见</span><button display="inline" onClick={() => navigate('/login')} className="text-xs text-blue-400 hover:text-blue-500 hover:underline transition-all items-center gap-1">用户指南</button>
         </div></div>
+        <Outlet />
       </div>
     );
 }

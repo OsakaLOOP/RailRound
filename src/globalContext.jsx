@@ -184,6 +184,7 @@ export const GlobalProvider = ({ children }) => {
         } catch (e) {
             console.error("Save failed", e);
             alert("同步失败: " + e.message);
+            throw e;
         }
     }, [user, trips, pins, folders, badgeSettings, versionInfo]);
 

@@ -6,7 +6,7 @@ import './index.css';
 
 import { GlobalProvider } from './globalContext';
 import MainLayout from './MainLayout';
-import RecordsPage from './pages/RecordsPage';
+import TripsPage from './pages/TripsPage';
 import StatsPage from './pages/StatsPage';
 import LoginPage from './pages/LoginPage';
 import TripEditorPage from './pages/TripEditorPage';
@@ -21,15 +21,15 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="/records" replace />
+        element: <Navigate to="/trips" replace />
       },
       {
         path: "map",
         element: null // Map is always rendered in Layout, this route just enables interaction
       },
       {
-        path: "records",
-        element: <RecordsPage />
+        path: "trips",
+        element: <TripsPage />
       },
       {
         path: "stats",
@@ -56,7 +56,7 @@ const router = createBrowserRouter([
         element: <FolderManagerModal />
       },
       {
-        path: "records/folder/:tripId",
+        path: "trips/folder/:tripId",
         element: <AddToFolderModal />
       }
     ]

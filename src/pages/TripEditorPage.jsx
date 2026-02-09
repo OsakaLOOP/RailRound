@@ -31,7 +31,7 @@ export default function TripEditorPage() {
                 setForm(JSON.parse(JSON.stringify(t)));
                 setIsEditing(true);
             } else {
-                navigate('/records'); // Not found
+                navigate('/trips'); // Not found
             }
         } else {
             // New Trip
@@ -47,7 +47,7 @@ export default function TripEditorPage() {
 
     const onClose = () => navigate(-1);
 
-    const onSave = () => {
+    const onSave = async () => {
         const validSegments = form.segments.filter(s => s.fromId !== s.toId);
         if (validSegments.length === 0) { alert("至少包含一段有效行程"); return; }
         if (validSegments.some(s => !s.lineKey || !s.fromId || !s.toId)) { alert("请完善信息"); return; }
@@ -81,8 +81,12 @@ export default function TripEditorPage() {
         if (isEditing && id) { nextTrips = nextTrips.filter(t => t.id.toString() !== id); }
         const finalTrips = [...newTripsToAdd, ...nextTrips].sort((a,b) => b.date.localeCompare(a.date));
 
-        saveData(finalTrips, null, null, null);
-        onClose();
+        try {
+            await saveData(finalTrips, null, null, null);
+            onClose();
+        } catch (e) {
+            // Error is alerted in saveData
+        }
     };
 
     const handleAutoSearch = () => {

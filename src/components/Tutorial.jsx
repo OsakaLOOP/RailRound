@@ -15,12 +15,12 @@ const STEPS = [
     },
     {
         id: 'tab-records',
-        target: 'nav a[href="/records"]', // Selector for Records Tab
+        target: 'nav a[href="/trips"]', // Selector for Trips Tab
         title: "行程记录",
         content: "这个标签页是你的旅程控制中心. 你可以在这里查看、添加和管理所有的铁路旅行记录, 或者添加到收藏",
         position: 'top',
         action: 'switch-tab',
-        path: '/records'
+        path: '/trips'
     },
     {
         id: 'add-trip',

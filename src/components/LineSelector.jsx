@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Map as MapIcon, Train, Building2 } from 'lucide-react';
 
 export const LineSelector = ({ isOpen, onClose, onSelect, railwayData, allowedLines }) => {
@@ -61,7 +62,7 @@ export const LineSelector = ({ isOpen, onClose, onSelect, railwayData, allowedLi
     if (!isOpen) return null;
     const currentRegionData = groups[activeTab];
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-[600] bg-black/50 flex items-center justify-center p-4 animate-fade-in pointer-events-auto" onClick={onClose}>
             <div className="bg-white w-full max-w-2xl max-h-[85vh] h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up ring-1 ring-black/5" onClick={e => e.stopPropagation()}>
                 <div className="p-4 border-b bg-gray-50 flex justify-between items-center shrink-0">
@@ -116,6 +117,7 @@ export const LineSelector = ({ isOpen, onClose, onSelect, railwayData, allowedLi
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

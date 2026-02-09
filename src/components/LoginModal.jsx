@@ -253,7 +253,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in pointer-events-auto" onClick={onClose}>
       <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-auto animate-slide-up h-[85vh] md:h-[650px]" onClick={e => e.stopPropagation()}>
 
         {/* Left: Login Form */}

@@ -303,7 +303,7 @@ export default function MainLayout() {
 
        {/* Navigation Bar (z-30) */}
        <nav className="absolute bottom-0 left-0 right-0 bg-white border-t p-2 flex justify-around shrink-0 pb-safe z-30 pointer-events-auto">
-            <NavLink id="tab-btn-records" to="/records" className={({isActive}) => `p-2 rounded-lg ${isActive ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>
+            <NavLink id="tab-btn-trips" to="/trips" className={({isActive}) => `p-2 rounded-lg ${isActive ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>
                 <Layers />
             </NavLink>
             <NavLink id="tab-btn-map" to="/map" className={({isActive}) => `p-2 rounded-lg ${isActive ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>

@@ -5,7 +5,7 @@ import { Train, Star, Edit2, Trash2 } from 'lucide-react';
 import { DropZone } from '../components/DragContext';
 import { RouteSlice } from '../components/RouteSlice';
 
-export default function RecordsPage() {
+export default function TripsPage() {
     const { trips, setTrips, saveData, folders, setFolders } = useUserData();
     const { user } = useAuth();
     const { railwayData } = useGeo();
@@ -36,7 +36,7 @@ export default function RecordsPage() {
         // Or keep it as a local modal since it's small?
         // User said "UI popup control... directly native Router".
         // Let's use a sub-route: /records/folder/:tripId
-        navigate(`/records/folder/${trip.id}`);
+        navigate(`/trips/folder/${trip.id}`);
     };
 
     return (

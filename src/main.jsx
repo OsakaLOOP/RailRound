@@ -29,35 +29,24 @@ const router = createBrowserRouter([
       },
       {
         path: "trips",
-        element: <TripsPage />
+        element: <TripsPage />,
+        children: [
+            { path: "new", element: <TripEditorPage /> },
+            { path: ":id/edit", element: <TripEditorPage /> },
+            { path: "folder/:tripId", element: <AddToFolderModal /> }
+        ]
       },
       {
         path: "stats",
-        element: <StatsPage />
+        element: <StatsPage />,
+        children: [
+            { path: "card", element: <GithubCardModal /> },
+            { path: "folders", element: <FolderManagerModal /> }
+        ]
       },
       {
         path: "login",
         element: <LoginPage />
-      },
-      {
-        path: "trips/new",
-        element: <TripEditorPage />
-      },
-      {
-        path: "trips/:id/edit",
-        element: <TripEditorPage />
-      },
-      {
-        path: "stats/card",
-        element: <GithubCardModal />
-      },
-      {
-        path: "stats/folders",
-        element: <FolderManagerModal />
-      },
-      {
-        path: "trips/folder/:tripId",
-        element: <AddToFolderModal />
       }
     ]
   }

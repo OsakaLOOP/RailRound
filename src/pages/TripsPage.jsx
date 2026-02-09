@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, useUserData, useGeo } from '../globalContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Outlet } from 'react-router-dom';
 import { Train, Star, Edit2, Trash2 } from 'lucide-react';
 import { DropZone } from '../components/DragContext';
 import { RouteSlice } from '../components/RouteSlice';
@@ -86,6 +86,7 @@ export default function TripsPage() {
             }}>
                 <button id="btn-add-trip" onClick={() => onAdd()} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
             </DropZone>
+            <Outlet />
         </div>
     );
 }

@@ -1,18 +1,24 @@
 {
   "meta": {
-    "lastUpdated": "2026-01-26",
+    "lastUpdated": "2026-02-10",
     "lastModified": "2025-11-27", 
-    "currentVersion": "0.33",
+    "currentVersion": "0.34",
     "appName": "RailLOOP",
     "author": "@OsakaLOOP",
     "minVer": "0.20"
   },
   "logs": [
     {
-        "version": "0.34",
+        "version": "0.35",
         "date": "2026-03-31",
         "type": "next",
         "content": "前瞻: JRE 3月调图和改订, 计划爬取新数据并更新. 另外正在阅读 react.dev, 并学习路由."
+    },
+    {
+        "version": "0.34",
+        "date": "2026-02-10",
+        "type": "feat",
+        "content": "爬取, 清洗并导入南京地铁线路(已开通市内线和所有市域线). 完成了一些 UI 调整, 线路排序优化."
     },
     {
       "version": "0.33",

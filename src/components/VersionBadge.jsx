@@ -17,6 +17,10 @@ const VersionBadge = ({ version: currentVersion }) => {
     const open = () => {
         if (timerRef.current) clearTimeout(timerRef.current);
         setShow(true);
+        if (showDot) {
+            localStorage.setItem('rail_last_viewed_version', String(currentVersion));
+            setShowDot(false);
+        }
     };
 
     const close = () => {
@@ -39,6 +43,7 @@ const VersionBadge = ({ version: currentVersion }) => {
         if (!lastViewed || lastViewed !== String(currentVersion)) {
             setShowDot(true);
         }
+
     }, [currentVersion]);
 
     useEffect(() => {

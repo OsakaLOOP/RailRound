@@ -3,11 +3,13 @@ import { useDrag, DropZone } from './DragContext';
 import chestGif from './../assets/chest_animated.gif';
 import chestOn from './../assets/chest_on.png';
 import chestOff from './../assets/chest_off.png';
+import rail_bg from './../assets/rail_bg.png';
+
 
 const CHEST_GIF = chestGif;
 const CHEST_ON = chestOn;
 const CHEST_OFF = chestOff;
-
+const RAIL_BG = rail_bg;
 // Reusing the SVG from StationMenu - duplicate definition for now to avoid large refactors
 // Ideally this should be a shared component.
 const McSlotSvg = () => (
@@ -207,7 +209,7 @@ const ChestItem = ({ item, onRemove }) => {
                 <div className="absolute inset-0 z-10 p-1 cursor-grab active:cursor-grabbing hover:bg-white/10">
                     <div className="w-full h-full flex items-center justify-center relative">
                         {/* Rail Background */}
-                        <img src="/src/assets/rail_bg.png" className="absolute inset-0 w-full h-full object-contain pixelated opacity-80" alt="" />
+                        <img src={RAIL_BG} className="absolute inset-0 w-full h-full object-contain pixelated opacity-80" alt="" />
 
                         {/* Icon - Unified with StationMenu: w-4 h-4 mb-2 (moved up) */}
                         {item.logo && (

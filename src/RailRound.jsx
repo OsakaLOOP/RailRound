@@ -485,7 +485,23 @@ const LineSelector = ({ isOpen, onClose, onSelect, railwayData, allowedLines }) 
                       }
                     }
                     else {
-                      result = aName.localeCompare(bName, 'ja');
+                      const getSortKey = (name) => {
+                        
+                        const prefixMatch = name.match(/^[A-Za-z0-9]+/);
+                        if (prefixMatch) {
+                            return prefixMatch[0];
+                        }
+
+                        // Priority 3: 无特殊前缀，使用原名
+                        return name;
+                      };
+
+                      const keyA = getSortKey(aName);
+                      const keyB = getSortKey(bName);
+
+                      // 使用 numeric: true 确保 "1", "2", "10" 的数字顺序正确
+                      result = keyA.localeCompare(keyB, 'ja', { numeric: true, sensitivity: 'base' });
+
                     }
                     
                     return result;
@@ -500,7 +516,7 @@ const LineSelector = ({ isOpen, onClose, onSelect, railwayData, allowedLines }) 
     const regionsForActiveTab = useMemo(() => {
         if (!groups[activeTab]) return ['all'];
         const regs = Object.keys(groups[activeTab]);
-        const order = ['北海道・東北', '関東', '中部', '近畿', '中国', '四国', '九州・沖縄', '其他'];
+        const order = ['北海道・東北', '関東', '中部', '近畿', '中国地方', '四国', '九州・沖縄', '其他', '中国大陆'];
         regs.sort((a, b) => {
             const idxA = order.indexOf(a);
             const idxB = order.indexOf(b);
@@ -1767,7 +1783,7 @@ function RailRoundContent() {
           return !cachedFileNames.has(name);
       });
 
-      if (missingFiles.length === 0) {
+      if (missingFiles.length === 0 && cachedFiles.length >= geojsonFiles.length) {
           console.log('[Autoload] 所有文件已缓存，无需下载。');
           return;
       }

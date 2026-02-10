@@ -11,17 +11,18 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
 如果你是一个刚刚被传送至此的星际搭车客 (或者不受欢迎的 [JR](https://www.jr-odekake.net) 铁道迷), 请务必遵循以下生存守则:
 
 - **记录行程**: 在首页点击“记录新行程”，支持公司/线路选择或自动规划。
-- **地图模式**: 可视化查看您的足迹，支持上传 GeoJSON 地图文件。
+- **地图模式**: 可视化查看您的足迹，支持上传 GeoJSON 地图文件和图钉放置。
 - **GitHub 挂件**: 绑定 GitHub 账号后，可生成动态 SVG 卡片展示在您的个人主页。
 
 ### 存在与持久性 (The Persistence)
-    - **关于 Bypass 的警告**: 请务必定时备份本地存储, 或者至少登陆账号, 绑定 [GitHub](https://github.com) 就更好了 (虽然这和存储没有更多关系, 但是可以用于 Socializing). 虽然我们在逻辑上基于 “线路/车站名称和 ID” 进行了深度绑定, 拥有 **12 个 9** 的理论数据可靠性 (这甚至高于 CDN 的承诺). 这意味着, 即便 [沃贡人](https://hitchhikers.fandom.com/wiki/Vogons) (或者 [JR 北海道](https://www.jrhokkaido.co.jp)) 为了建设一条新的新干线联络线 (这不太可能) 而决定残酷地废线某些物理设施 (这绝对可能), 只要车站 ID 还在, 你的记录就不会随版本更迭而失效. 但如果你清空了缓存且没绑定账号, 数据就会和曾经的地球(消歧义: [The Earth - Supercomputer](https://hitchhikers.fandom.com/wiki/Earth), not [The Earth - Planet](https://en.wikipedia.org/wiki/Earth))一样消失.
+    - **关于 Bypass 的警告**: 请务必定时备份本地存储, 或者至少登陆账号, 绑定 [GitHub](https://github.com) 就更好了 (虽然这和存储没有更多关系, 但是可以用于 Socializing). 虽然我们在逻辑上基于 “线路/车站名称和 ID” 进行了深度绑定, 拥有 **12 个 9** 的理论数据可靠性. 这意味着, 即便 [沃贡人](https://hitchhikers.fandom.com/wiki/Vogons) (或者 [JR 北海道](https://www.jrhokkaido.co.jp)) 为了建设一条新的新干线联络线 (这不太可能) 而决定残酷地废线某些物理设施 (这绝对可能), 只要车站 ID 还在, 你的记录就不会随版本更迭而失效. 但如果你清空了缓存且没绑定账号, 数据就会和曾经的地球(消歧义: [The Earth - Supercomputer](https://hitchhikers.fandom.com/wiki/Earth), not [The Earth - Planet](https://en.wikipedia.org/wiki/Earth))一样消失.
 
 ### 可用性之哲学 (The Probability)
     - **12 个 9 的真相**: 请注意, 这个高得离谱的可用性数字属于我们白嫖的 CDN 服务商 ([EdgeOne](https://cloud.tencent.com/product/teo)), 而非本服务的代码质量. 这意味着, 服务器几乎永不宕机, 但**并不**保证运行在上面的代码逻辑不会像一台 [无限非概率驱动引擎](https://hitchhikers.fandom.com/wiki/Infinite_Improbability_Drive) (Infinite Improbability Drive) 一样, 突然把你的路径规划变成一个 [200 km/h 达速运行的绿色垃圾桶](https://en.wikipedia.org/wiki/China_Railway_CR200J).
 
 ### 存在主义图床 (Image Availability)
     - 正如指南中关于 “[抹茶](https://en.wikipedia.org/wiki/Matcha)” 的条目经常让飞船电脑崩溃一样, 本服务**不提供图床**.
+    - 这导致来自 Wikimedia 的大部分线路 logo 在某些网络环境不可见.
     - 如果你想展示你与新干线 [黄医生](https://en.wikipedia.org/wiki/Doctor_Yellow) 的自拍 (没人关心前者), 请**自己想办法** ([S3](https://aws.amazon.com/s3), [R2](https://www.cloudflare.com/developer-platform/r2), 或者某种古老的微博外链技术), 然后手动粘贴 URL. 这被视为一种对核心玩家的筛选机制 —— 只有真正懂得如何在数字荒原生存的人, 才配拥有思想, 尊严, 记录和图片.
 
 ### 社交身份象征 (Badges)
@@ -42,7 +43,8 @@ Presented & Maintained by [@OsakaLOOP](https://github.com/OsakaLOOP)
     本服务的架构站在无数巨人的肩膀上, 以及一些处于灰色地带的努力:
     - **基础设施**: 感谢 **[EdgeOne](https://cloud.tencent.com/product/teo)** 提供了 Serverless 计算节点和 Pages CDN.
     - **特别鸣谢**: **[闲鱼](https://2.taobao.com)**. 正是在这个混乱而有高效的市场里, 我们以 10r 的低廉价格搞到了一个服务器 Token, 成功绕过了家用宽带备案那如同沃贡官僚主义般的繁琐限制, 让早期的原型机得以在物理世界呼吸. 虽然后来为了稳定迁移到了 Pages, 但这笔交易将永载史册.
-    - **数据源**: **[国土交通省 (MLIT)](https://www.mlit.go.jp)**, **[ODPT](https://www.odpt.org)**, **[Ekidata](https://ekidata.jp)** 和 **[鉄道駅LOD](https://uedayou.net/jrslod/)**. (见开源协议)
+    - **数据源**: **[国土交通省 (MLIT)](https://www.mlit.go.jp)**, **[ODPT](https://www.odpt.org)**, **[Ekidata](https://ekidata.jp)** 和 **[鉄道駅LOD](https://uedayou.net/jrslod/)**. (详见开源协议)
+    - 另外, 南京地铁部分数据采集基于**[开源项目](https://github.com/scuzzk/AmapMetro)**实现, 但是具体的数据源和方法不可言说. 还要感谢[南京地铁官网](https://njmetro.com.cn)的 logo 没有做防盗链处理, 节约了图床开支. 但是对不同的网络环境, 这与来自 Wikimedia 的其他 logo 似乎完全互斥.
 
 ### 关于 “山手线” 的拓扑悖论 (The Yamanote Paradox)
     - **现象**: 你可能会发现, 地图上的 **[山手线](https://en.wikipedia.org/wiki/Yamanote_Line)** 并不是一个闭合的环, 而是一个从品川经新宿到田端的 “C” 字形.

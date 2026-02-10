@@ -20,7 +20,7 @@ export const useVersion = () => useContext(VersionContext);// Hook
 export const AuthContext = createContext({
     isLoggedIn: false,
     username: null,
-    token: null,// a.k.a. userInfo. 
+    token: null,// a.k.a. user. 
     userProfile: null,
 
 });// 用于用户登录逻辑的迁移. 还要创建其他 Hook. UserDataContext 必须实现 actions 对象，封装所有数据修改逻辑(含乐观更新).
@@ -90,18 +90,31 @@ export const GlobalProvider = ({ children }) => {
     }, []);// 只挂载一次
 
     // Auth State
-    const [userInfo, setUserInfo] = useState({
+    const [user, setUser] = useState({
         isLoggedIn: false,
         token: null,
         username: null,
     });
     const [userProfile, setUserProfile] = useState(null);
     
+    const login = useCallback(async (token, username) => {
+        setUser({isLoggedIn:true, token, username });
+        localStorage.setItem('railloop_token', token);
+        localStorage.setItem('railloop_username', username);
+    }, []);
+
+    const logout = useCallback(() => {
+        setUser({isLoggedIn:false, username:null, token:null});
+        setUserProfile(null);
+        localStorage.removeItem('railloop_token');
+        localStorage.removeItem('railloop_username');
+        window.location.href = '/';
+    }, []);
 
     return (
         <VersionContext value={versionInfo}>
             <MetaContext value={meta}>
-                <AuthContext value={userInfo}>
+                <AuthContext value={user}>
                     <GeoContext value={null}>
                         <UserDataContext value={null}>
                             {children}

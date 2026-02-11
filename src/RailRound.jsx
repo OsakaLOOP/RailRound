@@ -1431,12 +1431,12 @@ const StatsView = ({ trips, railwayData ,geoData, user, userProfile, segmentGeom
 export default function RailLOOPApp() {
   return (
     <DragProvider>
-        <RailRoundContent />
+        <RailLOOPContent />
     </DragProvider>
   );
 }
 
-function RailRoundContent() {
+function RailLOOPContent() {
   const [activeTab, setActiveTab] = useState('records');
   const [railwayData, setRailwayData] = useState({}); 
   const [trips, setTrips] = useState([]); 
@@ -2279,7 +2279,7 @@ function RailRoundContent() {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `RailRound_KML_export_${new Date().toISOString().slice(0, 10)}.kml`;
+            link.download = `RailLOOP_KML_export_${new Date().toISOString().slice(0, 10)}.kml`;
             document.body.appendChild(link);
             link.click();
 

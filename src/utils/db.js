@@ -1,5 +1,5 @@
 // src/utils/db.js
-const DB_NAME = 'RailRoundDB';
+const DB_NAME = 'RailLOOPDB';
 const DB_VERSION = 1;
 const STORE_FILES = 'files';
 const STORE_SEGMENTS = 'segments';

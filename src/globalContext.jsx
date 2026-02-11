@@ -111,6 +111,11 @@ export const GlobalProvider = ({ children }) => {
         window.location.href = '/';
     }, []);
 
+    //User Data State 
+    const [trips, setTrips] = useState([]);
+    const [pins, setPins] = useState([]);
+    const [folders, setFolders] = useState([]);
+    const [preferences, setPreferences] = useState({badgeEnabled: true, initMapView:{center: [35.68, 139.76], zoom:10} });
     return (
         <VersionContext value={versionInfo}>
             <MetaContext value={meta}>

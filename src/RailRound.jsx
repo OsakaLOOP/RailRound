@@ -24,12 +24,12 @@ import { api } from './services/api';
 import { db } from './utils/db';
 import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './utils/stats';
 import { VersionBadge } from './components/VersionBadge';
-
+import manifest from '../public/geojson_manifest.json';
 
 import { meta } from '../public/changelog.json';
 
 const CURRENT_VERSION = meta["currentVersion"];
-const LAST_MODIFIED = meta["lastModified"];
+const LAST_MODIFIED = manifest.lastModified
 const LAST_UPDATED = meta["lastUpdated"];
 const MIN_SUPPORTED_VERSION = 0.20;
 
@@ -1146,14 +1146,14 @@ const FolderManagerModal = ({ isOpen, onClose, folders, onUpdateFolders }) => {
         <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2"><Folder size={24}/> Star Folders</h3>
+                    <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2"><Folder size={24}/> 收藏夹</h3>
                     <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
                 </div>
 
                 <form onSubmit={(e) => { e.preventDefault(); handleCreate(); }} className="flex gap-2 mb-4">
                     <input
                         className="flex-1 p-2 border rounded-lg text-sm"
-                        placeholder="New folder name..."
+                        placeholder="名称..."
                         value={newFolderName}
                         onChange={e => setNewFolderName(e.target.value)}
                     />

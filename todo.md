@@ -1,5 +1,5 @@
 ## 重构
-1. 引入 react-router-dom, 实现 SPA 的路由覆盖.(根路由对应父组件, 用 Outlet 实现 Map Keep-Alive, 还要实现三个页面的子路由/trips, /map, /user, 以及单独的 /login, 且 login 根据历史延续背景ui的一致衔接)
+1. 引入 react-router-dom, 实现 SPA 的路由覆盖.(实现 Map Keep-Alive 作为背景, 页面内容/上层组件 Outlet, 实现三个页面的子路由/trips, /map, /user, 以及单独的 /login, 且 login 根据路由历史延续背景ui的一致衔接)
 2. 部分 modal 改为兼容全屏.(暂时没用)
 3. 文件组织:./feature/..., ./services/..., ./stores, ./components
 4. 内部方法的 hook 化

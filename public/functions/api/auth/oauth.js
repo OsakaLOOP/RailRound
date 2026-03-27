@@ -15,8 +15,8 @@ export async function onRequest(event) {
     const code = url.searchParams.get("code");
     const error = url.searchParams.get("error");
     const provider = url.searchParams.get("provider");
-    const CLIENT_ID = "Ov23liT4HJxoaeqBXzWj";
-    const CLIENT_SECRET =  "183d0216185cd0286b4fd916ab53cb3cfbe3767d";
+    const CLIENT_ID =  import.meta.env.CLIENT_ID;
+    const CLIENT_SECRET =   import.meta.env.CLIENT_SECRET;
 
     // 1. Handle Callback (if 'code' is present)
     if (code) {

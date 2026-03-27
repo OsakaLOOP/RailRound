@@ -3,11 +3,12 @@ import { Github, Folder, TrendingUp, Move } from 'lucide-react';
 import { useStore } from '../store';
 import { calcDist } from '../utils/stats';
 import * as turf from '@turf/turf';
+import { useShallow } from 'zustand/react/shallow';
 
 export const StatsPage: React.FC = () => {
     const {
         trips, railwayData, geoData, user, userProfile, segmentGeometries, companyDB
-    } = useStore(state => ({
+    } = useStore(useShallow(state => ({
         trips: state.trips,
         railwayData: state.railwayData,
         geoData: state.geoData,
@@ -15,7 +16,7 @@ export const StatsPage: React.FC = () => {
         userProfile: state.userProfile,
         segmentGeometries: state.segmentGeometries,
         companyDB: state.companyDB
-    }));
+    })));
     const setModalState = useStore(state => state.setModalState);
 
     const { totalTrips, uniqueLines, totalDist, totalCost, rankedSegments } = useMemo(() => {

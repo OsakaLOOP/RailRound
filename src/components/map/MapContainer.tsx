@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { useStore, PinMode, StationMenuData, CustomFeatureCollection, CustomGeoJSONFeature } from '../../store';
 import { findNearestPointOnLine } from '../../utils/railwayRouting';
 import { syncLeafletLayerGroup } from '../../utils/leafletSync';
+import { useShallow } from 'zustand/react/shallow';
 
 interface Props {
     setStationMenu: (menu: StationMenuData | null) => void;
@@ -23,7 +24,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         geoData, leafletReady, tripSegmentsGeometry, activeTab, mapZoom,
         setMapZoom, setLeafletReady, pins, editingPin, pinMode, railwayData,
         setEditingPin, setPinMode
-    } = useStore(state => ({
+    } = useStore(useShallow(state => ({
         geoData: state.geoData,
         leafletReady: state.leafletReady,
         tripSegmentsGeometry: state.tripSegmentsGeometry,
@@ -37,7 +38,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         railwayData: state.railwayData,
         setEditingPin: state.setEditingPin,
         setPinMode: state.setPinMode
-    }));
+    })));
 
     useEffect(() => {
         setLeafletReady(true);

@@ -1,12 +1,13 @@
 import React from 'react';
 import { Layers, Map as MapIcon, PieChart } from 'lucide-react';
 import { useStore } from '../../store';
+import { useShallow } from 'zustand/react/shallow';
 
 export const BottomNav: React.FC = () => {
-    const { activeTab, setActiveTab } = useStore(state => ({
+    const { activeTab, setActiveTab } = useStore(useShallow(state => ({
         activeTab: state.activeTab,
         setActiveTab: state.setActiveTab
-    }));
+    })));
 
     return (
         <nav className="bg-white border-t p-2 flex justify-around shrink-0 pb-safe z-30">

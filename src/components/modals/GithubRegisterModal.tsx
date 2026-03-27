@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { X, Github, AlertTriangle, Loader2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { api } from '../../services/api';
+import { useShallow } from 'zustand/react/shallow';
 
 export const GithubRegisterModal: React.FC = () => {
-    const { isOpen, regToken } = useStore(state => ({
+    const { isOpen, regToken } = useStore(useShallow(state => ({
         isOpen: state.modals.isGithubRegOpen,
         regToken: state.modals.githubRegToken
-    }));
+    })));
     const setModalState = useStore(state => state.setModalState);
     const login = useStore(state => state.login);
 

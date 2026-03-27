@@ -1,13 +1,14 @@
 import React, { useEffect } from 'react';
 import { X, Star, CheckCircle2 } from 'lucide-react';
 import { useStore } from '../../store';
+import { useShallow } from 'zustand/react/shallow';
 
 export const AddToFolderModal: React.FC = () => {
-    const { isOpen, trip, folders } = useStore(state => ({
+    const { isOpen, trip, folders } = useStore(useShallow(state => ({
         isOpen: state.modals.addToFolderModalOpen,
         trip: state.modals.currentTripForFolder,
         folders: state.folders
-    }));
+    })));
     const setModalState = useStore(state => state.setModalState);
     const setFolders = useStore(state => state.setFolders);
 

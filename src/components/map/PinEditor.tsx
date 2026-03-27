@@ -1,15 +1,16 @@
 import React, { useEffect } from 'react';
 import { Move, Magnet, Camera, MessageSquare, Trash2, X } from 'lucide-react';
 import { useStore, PinMode } from '../../store';
+import { useShallow } from 'zustand/react/shallow';
 
 const COLOR_PALETTE = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#64748b'];
 
 export const PinEditor: React.FC = () => {
-    const { editingPin, pinMode, pins } = useStore(state => ({
+    const { editingPin, pinMode, pins } = useStore(useShallow(state => ({
         editingPin: state.editingPin,
         pinMode: state.pinMode,
         pins: state.pins
-    }));
+    })));
     const setEditingPin = useStore(state => state.setEditingPin);
     const setPinMode = useStore(state => state.setPinMode);
     const setPins = useStore(state => state.setPins);

@@ -4,11 +4,12 @@ import { useStore, EditorMode } from '../../store';
 import { DropZone } from '../DragContext';
 import { LineSelector } from './LineSelector';
 import { isCompanyCompatible, getTransferableLines, findRoute } from '../../utils/railwayRouting'; // Will need to ensure these are typed
+import { useShallow } from 'zustand/react/shallow';
 
 export const TripEditor: React.FC = () => {
     const {
         isOpen, isEditing, form, editorMode, autoForm, isRouteSearching, railwayData, trips, pins, folders, badgeSettings, user
-    } = useStore(state => ({
+    } = useStore(useShallow(state => ({
         isOpen: state.isTripEditing,
         isEditing: !!state.editingTripId,
         form: state.tripForm,
@@ -21,7 +22,7 @@ export const TripEditor: React.FC = () => {
         folders: state.folders,
         badgeSettings: state.badgeSettings,
         user: state.user
-    }));
+    })));
 
     const setForm = useStore(state => state.setTripForm);
     const setEditorMode = useStore(state => state.setEditorMode);

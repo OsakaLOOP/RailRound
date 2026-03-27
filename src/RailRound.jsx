@@ -2425,17 +2425,6 @@ function RailLOOPContent() {
         if (baseLinesLayer.current) {
             if (showBaseLines) {
                  if (!map.hasLayer(baseLinesLayer.current)) {
-                     // Insert at bottom to not cover stations/routes if possible,
-                     // though L.layerGroup order relies on insertion.
-                     // addTo puts it in overlay pane.
-                     // Leaflet vector layers don't strictly support z-index moving without logic,
-                     // but usually adding it last puts it on top.
-                     // We want lines BELOW stations.
-                     // Since stations are already added, adding lines now might put them ON TOP of stations in SVG order.
-                     // To fix this, we can use `bringToBack()` on the layer group if it supports it,
-                     // or rely on `map.addLayer`.
-                     // However, standard L.LayerGroup doesn't have bringToBack invoked on the group itself easily for all children?
-                     // Actually, we can just add it. The stations are transparent dots anyway.
                      map.addLayer(baseLinesLayer.current);
                      // Try to push lines to back if possible so they don't cover dots
                      baseLinesLayer.current.invoke('bringToBack');

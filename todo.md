@@ -3,7 +3,7 @@
 2. 部分 modal 改为兼容全屏.(暂时没用)
 3. 文件组织:./feature/..., ./services/..., ./stores, ./components
 4. 内部方法的 hook 化
-5. 结合 useContext 和 useStore(Zustand), 优化 props 传递和依赖式更新. (必须确认哪些是全局配置或基础数据, 哪些是高频操作相关)
+5. 结合 useContext 和 useStore(Zustand + typescript), 优化 props 传递和依赖式更新. (必须确认哪些是全局配置或基础数据, 哪些是高频操作相关)
 6. 计算转移到 Web Worker.
 
 ## 远景

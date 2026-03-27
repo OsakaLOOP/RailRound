@@ -17,6 +17,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     const pinsLayer = useRef<L.LayerGroup | null>(null);
     const baseLinesLayer = useRef<L.LayerGroup | null>(null);
     const baseStationsLayer = useRef<L.LayerGroup | null>(null);
+    const geoDataRef = useRef<CustomFeatureCollection | null>(null);
     const routeLayer = useRef<L.LayerGroup | null>(null);
     const railLayerRef = useRef<L.TileLayer | null>(null);
     const [isMapInitialized, setIsMapInitialized] = React.useState(false);
@@ -53,7 +54,11 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     }, [activeTab, leafletReady]);
 
     useEffect(() => {
-        if (isMapInitialized && leafletReady && geoData) renderBaseMap(geoData);
+        geoDataRef.current = geoData;
+        if (isMapInitialized && leafletReady && geoData) {
+            renderBaseMap(geoData);
+            renderStations();
+        }
     }, [geoData, leafletReady, isMapInitialized]);
 
     useEffect(() => {
@@ -103,6 +108,11 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         map.on('zoomend', updateLayerVisibility);
         updateLayerVisibility();
 
+        // Listen to moveend to update stations with new bounds
+        map.on('moveend', () => {
+            renderStations();
+        });
+
         map.on('click', (e: L.LeafletMouseEvent) => {
             const currentPinMode = useStore.getState().pinMode;
             const currentEditingPin = useStore.getState().editingPin;
@@ -122,8 +132,97 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         setIsMapInitialized(true);
     };
 
+
+    const renderStations = () => {
+        if (!baseStationsLayer.current || !mapInstance.current || !geoDataRef.current) return;
+
+        const map = mapInstance.current;
+        const currentZoom = map.getZoom();
+
+        // At zoom < 5, strictly provide empty array to clear/hide stations
+        if (currentZoom < 5) {
+            syncLeafletLayerGroup<CustomGeoJSONFeature>(
+                baseStationsLayer.current,
+                [],
+                (f) => f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`,
+                (f) => L.circleMarker([0, 0]),
+                () => {}
+            );
+            return;
+        }
+
+        // Calculate 3x3 viewport bounds
+        const bounds = map.getBounds();
+        const latDiff = bounds.getNorth() - bounds.getSouth();
+        const lngDiff = bounds.getEast() - bounds.getWest();
+
+        const expandedBounds = L.latLngBounds(
+            L.latLng(bounds.getSouth() - latDiff, bounds.getWest() - lngDiff),
+            L.latLng(bounds.getNorth() + latDiff, bounds.getEast() + lngDiff)
+        );
+
+        // Filter stations within the expanded bounds
+        const stationFeatures = geoDataRef.current.features.filter((f: CustomGeoJSONFeature) => {
+            if (f.properties.type !== 'station') return false;
+            const lng = f.geometry.coordinates[0];
+            const lat = f.geometry.coordinates[1];
+            // Since it's point data, check if it's within the expanded bounds
+            return expandedBounds.contains([lat, lng]);
+        });
+
+        syncLeafletLayerGroup<CustomGeoJSONFeature>(
+            baseStationsLayer.current,
+            stationFeatures,
+            (f) => f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`,
+            (f) => {
+                const latlng = [f.geometry.coordinates[1], f.geometry.coordinates[0]] as [number, number];
+                const layer = L.circleMarker(latlng, { radius: 4, color: 'transparent', fillColor: '#64748b', fillOpacity: 0.5, weight: 0, className: 'station-dot' });
+                if (f.properties.name) layer.bindTooltip(f.properties.name);
+
+                // @ts-ignore
+                layer._cachedLat = latlng[0];
+                // @ts-ignore
+                layer._cachedLng = latlng[1];
+                // @ts-ignore
+                layer._cachedName = f.properties.name;
+
+                layer.on('click', (e: L.LeafletMouseEvent) => {
+                    L.DomEvent.stopPropagation(e);
+                    const originalEvent = e.originalEvent as MouseEvent | TouchEvent;
+                    const x = 'clientX' in originalEvent ? originalEvent.clientX : (originalEvent as TouchEvent).touches[0].clientX;
+                    const y = 'clientY' in originalEvent ? originalEvent.clientY : (originalEvent as TouchEvent).touches[0].clientY;
+                    setStationMenu({ x, y, stationData: { name_ja: f.properties.name || '' } });
+                });
+                return layer;
+            },
+            (layer, f) => {
+                const marker = layer as any;
+                const newLat = f.geometry.coordinates[1];
+                const newLng = f.geometry.coordinates[0];
+                const newName = f.properties.name;
+
+                let changed = false;
+                if (marker._cachedLat !== newLat || marker._cachedLng !== newLng) {
+                    marker.setLatLng([newLat, newLng]);
+                    marker._cachedLat = newLat;
+                    marker._cachedLng = newLng;
+                    changed = true;
+                }
+
+                if (marker._cachedName !== newName) {
+                    marker.unbindTooltip();
+                    if (newName) marker.bindTooltip(newName);
+                    marker._cachedName = newName;
+                    changed = true;
+                }
+
+                // Do nothing else if not changed to optimize DOM updates
+            }
+        );
+    };
+
     const renderBaseMap = (data: CustomFeatureCollection) => {
-        if (!baseLinesLayer.current || !baseStationsLayer.current) return;
+        if (!baseLinesLayer.current) return;
 
         // Base Lines
         const lineFeatures = data.features.filter((f: CustomGeoJSONFeature) => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString');
@@ -143,29 +242,6 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             }
         );
 
-        // Base Stations
-        const stationFeatures = data.features.filter((f: CustomGeoJSONFeature) => f.properties.type === 'station');
-        syncLeafletLayerGroup<CustomGeoJSONFeature>(
-            baseStationsLayer.current,
-            stationFeatures,
-            (f) => f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`,
-            (f) => {
-                const latlng = [f.geometry.coordinates[1], f.geometry.coordinates[0]] as [number, number];
-                const layer = L.circleMarker(latlng, { radius: 4, color: 'transparent', fillColor: '#64748b', fillOpacity: 0.5, weight: 0, className: 'station-dot' });
-                if (f.properties.name) layer.bindTooltip(f.properties.name);
-                layer.on('click', (e: L.LeafletMouseEvent) => {
-                    L.DomEvent.stopPropagation(e);
-                    const originalEvent = e.originalEvent as MouseEvent | TouchEvent;
-                    const x = 'clientX' in originalEvent ? originalEvent.clientX : (originalEvent as TouchEvent).touches[0].clientX;
-                    const y = 'clientY' in originalEvent ? originalEvent.clientY : (originalEvent as TouchEvent).touches[0].clientY;
-                    setStationMenu({ x, y, stationData: { name_ja: f.properties.name || '' } });
-                });
-                return layer;
-            },
-            (layer, f) => {
-                // Stations static
-            }
-        );
     };
 
     const renderTripRoutes = () => {

@@ -19,11 +19,16 @@ export function syncLeafletLayerGroup<T>(
 ) {
     if (!layerGroup) return;
 
+    interface TrackedLayer extends L.Layer {
+        sourceId?: string | number;
+    }
+
     // 获取当前 LayerGroup 中已有的 Layer，要求创建时在 layer 上附加了 sourceId
-    const existingLayers = new Map<string | number, L.Layer>();
-    layerGroup.eachLayer((layer: any) => {
-        if (layer.sourceId !== undefined) {
-            existingLayers.set(layer.sourceId, layer);
+    const existingLayers = new Map<string | number, TrackedLayer>();
+    layerGroup.eachLayer((layer: L.Layer) => {
+        const tracked = layer as TrackedLayer;
+        if (tracked.sourceId !== undefined) {
+            existingLayers.set(tracked.sourceId, tracked);
         }
     });
 
@@ -40,7 +45,7 @@ export function syncLeafletLayerGroup<T>(
             updateLayer(existingLayer, item);
         } else {
             // 不存在，创建并添加到 LayerGroup
-            const newLayer: any = createLayer(item);
+            const newLayer: TrackedLayer = createLayer(item);
             newLayer.sourceId = id; // 附加唯一标识，供下次识别
             layerGroup.addLayer(newLayer);
         }

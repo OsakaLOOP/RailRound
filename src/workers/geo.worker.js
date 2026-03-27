@@ -167,14 +167,12 @@ self.addEventListener('message', async (e) => {
                 if (payload.railwayData) railwayData = payload.railwayData;
                 if (payload.geoData) geoData = payload.geoData;
                 self.postMessage({ id, type: 'SYNC_DATA_SUCCESS' });
-                print('Synced');
                 break;
 
             case 'GET_ALL_GEOMETRIES':
                 // 按需计算所需的 segments
                 const neededSegments = payload.segments || [];
                 const results = [];
-                print('calcing');
 
                 for (const seg of neededSegments) {
                     const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;

@@ -28,3 +28,4 @@
   src: local('Courier New'), monospace; /* Fallback */
 }
 .pixel-font { font-family: 'PixelFont', monospace; letter-spacing: -1px; }
+.line-icon { height: 1.2em; width: auto; vertical-align: text-bottom; margin-right: 4px; display: inline-block; object-fit: contain; }

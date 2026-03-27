@@ -336,8 +336,20 @@ export const AppLayout: React.FC = () => {
 
                 if (updated) {
                     setSegmentGeometries(newCache);
-                    // 这里不要调用 setTripSegmentsGeometry，
-                    // 因为 updated 的 segmentGeometries 作为依赖项会触发下一次 useEffect 执行。
+
+                // 必须在这里同步生成并调用 setTripSegmentsGeometry，
+                // 否则首次加载从 IndexedDB 读出的数据将因为 setTimeout/useShallow 导致的依赖丢失而无法触发重新渲染。
+                const newRenderList = allSegments.map(seg => {
+                    const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+                    const cached = newCache.get(key);
+                    const line = railwayData[seg.lineKey];
+                    const s1 = line?.stations.find((s: any) => s.id === seg.fromId);
+                    const s2 = line?.stations.find((s: any) => s.id === seg.toId);
+                    if (cached) return { id: seg.id || key, popup: `${seg.lineKey}: ${s1?.name_ja || seg.fromId} → ${s2?.name_ja || seg.toId}`, ...cached };
+                    return null;
+                }).filter(Boolean);
+
+                setTripSegmentsGeometry(newRenderList);
                 }
             };
 

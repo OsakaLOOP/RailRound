@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
-import { GlobalProvider } from './globalContext';
+import { GlobalProvider } from './GlobalProvider';
 import { AppLayout } from './AppLayout'; // Ensure it points to AppLayout
 import { isMobile } from 'react-device-detect';
 

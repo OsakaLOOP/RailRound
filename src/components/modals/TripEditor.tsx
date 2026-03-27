@@ -3,7 +3,7 @@ import { Edit2, Plus, X, ListFilter, AlertTriangle, ArrowRightLeft, ArrowDown, S
 import { useStore, EditorMode } from '../../store';
 import { DropZone } from '../DragContext';
 import { LineSelector } from './LineSelector';
-import { isCompanyCompatible, getTransferableLines, findRoute } from '../../utils/stats'; // Will need to ensure these are typed
+import { isCompanyCompatible, getTransferableLines, findRoute } from '../../utils/railwayRouting'; // Will need to ensure these are typed
 
 export const TripEditor: React.FC = () => {
     const {

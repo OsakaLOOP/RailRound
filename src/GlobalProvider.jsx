@@ -1,21 +1,10 @@
-import { createContext, useContext, useEffect, useState, useEffectEvent } from "react";
+import React, { useEffect, useState, useEffectEvent } from "react";
 import { verCalc, isVerSupported, verCmp } from "./utils/verCalc";
 import changelogData from '../public/changelog.json';
+import { MetaContext, VersionContext } from "./contexts";
 
 const meta = changelogData.meta;
 const logs = changelogData.logs;
-
-// Global settings/configs that rarely change
-export const MetaContext = createContext({
-    thememode: 'light',
-    area: 'JP',
-    locale: 'zh-CN',
-});
-export const useMeta = () => useContext(MetaContext);
-
-// Read-only version information and update checks
-export const VersionContext = createContext(null);
-export const useVersion = () => useContext(VersionContext);
 
 export const GlobalProvider = ({ children }) => {
     const [versionInfo, setVersionInfo] = useState({
@@ -32,9 +21,9 @@ export const GlobalProvider = ({ children }) => {
 
     const onUpdateReceived = useEffectEvent((remoteData) => {
         const remoteMeta = remoteData.meta;
-        const remoteVer = remoteMeta.currentVersion;        
+        const remoteVer = remoteMeta.currentVersion;
         const cmpRes = verCmp(remoteVer, versionInfo.currentVer);
-        
+
         if (cmpRes && cmpRes.diff > 0) {
             console.log(`[RailLOOP] Update Available: ${remoteVer} (current: ${versionInfo.currentVer}), min supported: ${remoteMeta.minVer || "0.20"})`);
             setHasUpdate(cmpRes.at);
@@ -64,7 +53,6 @@ export const GlobalProvider = ({ children }) => {
         return () => clearInterval(timer);
     }, []);
 
-    // Removed UserDataContext, AuthContext, GeoContext as they are now handled by Zustand
     return (
         <VersionContext value={versionInfo}>
             <MetaContext value={meta}>

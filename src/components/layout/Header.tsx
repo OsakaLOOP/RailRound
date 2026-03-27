@@ -1,6 +1,7 @@
 import React from 'react';
 import { Train, LogOut, User, Download, Upload, Building2, FilePlus } from 'lucide-react';
 import { useStore } from '../../store';
+import { useShallow } from 'zustand/react/shallow';
 import { VersionBadge } from '../VersionBadge';
 import { meta } from '../../../public/changelog.json';
 
@@ -13,7 +14,7 @@ export const Header: React.FC<{
     handleCompanyUpload: (e: any) => void;
     handleFileUpload: (e: any) => void;
 }> = ({ handleExportKML, handleExportUserData, handleImportUserData, handleCompanyUpload, handleFileUpload }) => {
-    const { user, activeTab } = useStore(state => ({ user: state.user, activeTab: state.activeTab }));
+    const { user, activeTab } = useStore(useShallow(state => ({ user: state.user, activeTab: state.activeTab })));
     const setModalState = useStore(state => state.setModalState);
     const logout = useStore(state => state.logout);
 

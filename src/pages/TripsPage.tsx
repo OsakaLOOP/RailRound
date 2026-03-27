@@ -1,16 +1,17 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Train, Edit2, Trash2, Star, Plus } from 'lucide-react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { DropZone } from '../components/DragContext';
 import { getRouteVisualData } from '../utils/stats';
 import { isMobile } from 'react-device-detect';
 
 const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
-    const { segmentGeometries, railwayData, geoData } = useStore(state => ({
+    const { segmentGeometries, railwayData, geoData } = useStore(useShallow(state => ({
         segmentGeometries: state.segmentGeometries,
         railwayData: state.railwayData,
         geoData: state.geoData
-    }));
+    })));
 
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerWidth, setContainerWidth] = useState(0);
@@ -52,7 +53,7 @@ const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
 };
 
 export const TripsPage: React.FC = () => {
-    const { trips, railwayData } = useStore(state => ({ trips: state.trips, railwayData: state.railwayData }));
+    const { trips, railwayData } = useStore(useShallow(state => ({ trips: state.trips, railwayData: state.railwayData })));
     const setModalState = useStore(state => state.setModalState);
     const startEditingTrip = useStore(state => state.startEditingTrip);
     const removeTrip = useStore(state => state.removeTrip);

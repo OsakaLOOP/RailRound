@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { X, Github, Eye, EyeOff, Lock, Loader2 } from 'lucide-react';
 import { useStore } from '../../store';
+import { useShallow } from 'zustand/react/shallow';
 import { api } from '../../services/api';
 
 export const GithubCardModal: React.FC = () => {
-    const { isOpen, user, folders, badgeSettings } = useStore(state => ({
+    const { isOpen, user, folders, badgeSettings } = useStore(useShallow(state => ({
         isOpen: !!state.modals.cardModalUser,
         user: state.modals.cardModalUser,
         folders: state.folders,
         badgeSettings: state.badgeSettings
-    }));
+    })));
     const setModalState = useStore(state => state.setModalState);
     const setBadgeSettings = useStore(state => state.setBadgeSettings);
 
     // We need to sync settings back to API, which requires trips, pins
-    const { trips, pins } = useStore(state => ({ trips: state.trips, pins: state.pins }));
+    const { trips, pins } = useStore(useShallow(state => ({ trips: state.trips, pins: state.pins })));
 
     const [cardKey, setCardKey] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);

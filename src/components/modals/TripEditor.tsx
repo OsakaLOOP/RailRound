@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Edit2, Plus, X, ListFilter, AlertTriangle, ArrowRightLeft, ArrowDown, Search, Loader2 } from 'lucide-react';
 import { useStore, EditorMode } from '../../store';
+import { useShallow } from 'zustand/react/shallow';
 import { DropZone } from '../DragContext';
 import { LineSelector } from './LineSelector';
 import { isCompanyCompatible, getTransferableLines, findRoute } from '../../utils/railwayRouting'; // Will need to ensure these are typed
@@ -8,7 +9,7 @@ import { isCompanyCompatible, getTransferableLines, findRoute } from '../../util
 export const TripEditor: React.FC = () => {
     const {
         isOpen, isEditing, form, editorMode, autoForm, isRouteSearching, railwayData, trips, pins, folders, badgeSettings, user
-    } = useStore(state => ({
+    } = useStore(useShallow(state => ({
         isOpen: state.isTripEditing,
         isEditing: !!state.editingTripId,
         form: state.tripForm,
@@ -21,7 +22,7 @@ export const TripEditor: React.FC = () => {
         folders: state.folders,
         badgeSettings: state.badgeSettings,
         user: state.user
-    }));
+    })));
 
     const setForm = useStore(state => state.setTripForm);
     const setEditorMode = useStore(state => state.setEditorMode);
@@ -63,7 +64,7 @@ export const TripEditor: React.FC = () => {
             lineKey: segs[0].lineKey, // legacy support
             fromId: segs[0].fromId,   // legacy support
             toId: segs[segs.length-1].toId
-        }));
+        })));
 
         let nextTrips = [...trips];
         const editingTripId = useStore.getState().editingTripId;

@@ -17,6 +17,7 @@ import { BottomNav } from './components/layout/BottomNav';
 import { TripsPage } from './pages/TripsPage';
 import { StatsPage } from './pages/StatsPage';
 import { useStore } from './store';
+import { useShallow } from 'zustand/react/shallow';
 import { db } from './utils/db';
 import buildKMLString from './buildKml';
 import { sliceGeoJsonPath, calculateLatestStats } from './utils/stats';
@@ -31,7 +32,7 @@ export const AppLayout: React.FC = () => {
         activeTab, user, setModalState, setCompanyDB, setRailwayData, setGeoData,
         trips, pins, railwayData, geoData, companyDB, setTrips, setPins, folders, badgeSettings,
         setSegmentGeometries, setTripSegmentsGeometry, segmentGeometries
-    } = useStore(state => ({
+    } = useStore(useShallow(state => ({
         activeTab: state.activeTab,
         user: state.user,
         setModalState: state.setModalState,
@@ -50,7 +51,7 @@ export const AppLayout: React.FC = () => {
         setSegmentGeometries: state.setSegmentGeometries,
         setTripSegmentsGeometry: state.setTripSegmentsGeometry,
         segmentGeometries: state.segmentGeometries
-    }));
+    })));
 
     const [stationMenu, setStationMenu] = useState<any>(null);
     const [isExportingKML, setIsExportingKML] = useState(false);
@@ -96,7 +97,7 @@ export const AppLayout: React.FC = () => {
                 if (companyRes.ok) {
                     const txt = await companyRes.text();
                     currentCompanyData = JSON.parse(txt.replace(/^\uFEFF/, ''));
-                    setCompanyDB((prev: any) => ({ ...prev, ...currentCompanyData }));
+                    setCompanyDB((prev: any) => ({ ...prev, ...currentCompanyData })));
                     (window as any).__companyData = currentCompanyData;
                 }
             } catch (e) { console.warn('[Autoload] company_data.json 加载失败', e); }
@@ -115,7 +116,7 @@ export const AppLayout: React.FC = () => {
                             ...f.properties,
                             company: f.properties.company || f.properties.operator || defaultCompany || "上传数据"
                         }
-                    }));
+                    })));
                     newFeatures.push(...enriched);
 
                     enriched.forEach((f: any) => {
@@ -151,7 +152,7 @@ export const AppLayout: React.FC = () => {
                 });
 
                 if (newFeatures.length > 0) {
-                    setGeoData((prev: any) => ({ type: "FeatureCollection", features: [...prev.features, ...newFeatures] }));
+                    setGeoData((prev: any) => ({ type: "FeatureCollection", features: [...prev.features, ...newFeatures] })));
                 }
                 if (Object.keys(railwayUpdates).length > 0) {
                     setRailwayData((prev: any) => {
@@ -380,7 +381,7 @@ export const AppLayout: React.FC = () => {
 
     const applyCompanyData = (data: any, { silent = true } = {}) => {
         if (!data || typeof data !== 'object') return;
-        setCompanyDB((prev: any) => ({ ...prev, ...data }));
+        setCompanyDB((prev: any) => ({ ...prev, ...data })));
         try { (window as any).__companyData = { ...((window as any).__companyData || {}), ...data }; } catch (e) {}
         if (!silent) alert('公司数据库已更新');
     };
@@ -420,7 +421,7 @@ export const AppLayout: React.FC = () => {
           const railwayUpdates: any = {};
           validResults.forEach(({ json, companyName: defaultCompany }) => {
             if (!json.features) return;
-            const enriched = json.features.map((f: any) => ({ ...f, properties: { ...f.properties, company: f.properties.company || f.properties.operator || defaultCompany || "上传数据" } }));
+            const enriched = json.features.map((f: any) => ({ ...f, properties: { ...f.properties, company: f.properties.company || f.properties.operator || defaultCompany || "上传数据" } })));
             newFeatures.push(...enriched);
             enriched.forEach((f: any) => {
                  const p = f.properties;
@@ -448,7 +449,7 @@ export const AppLayout: React.FC = () => {
                  }
             });
           });
-          if (newFeatures.length > 0) setGeoData((prev: any) => ({ type: "FeatureCollection", features: [...prev.features, ...newFeatures] }));
+          if (newFeatures.length > 0) setGeoData((prev: any) => ({ type: "FeatureCollection", features: [...prev.features, ...newFeatures] })));
           if (Object.keys(railwayUpdates).length > 0) {
               setRailwayData((prev: any) => {
                 const next = { ...prev };

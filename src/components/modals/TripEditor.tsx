@@ -163,6 +163,15 @@ export const TripEditor: React.FC = () => {
         <>
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4 animate-fade-in">
           <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-slide-up relative overflow-hidden">
+            {isRouteSearching && (
+              <div className="train-animation-layer">
+                <svg viewBox="0 0 100 30" className="train-body" preserveAspectRatio="none"><path d="M 5 20 L 15 5 H 95 L 100 20 H 5 Z" fill="#e2e8f0" stroke="#3b82f6" strokeWidth="1"/><path d="M 5 20 Q 0 20 2 10 L 15 5" fill="none" stroke="#3b82f6" strokeWidth="1"/><rect x="20" y="8" width="10" height="5" fill="#3b82f6" rx="1"/><rect x="35" y="8" width="10" height="5" fill="#3b82f6" rx="1"/><rect x="50" y="8" width="10" height="5" fill="#3b82f6" rx="1"/><rect x="65" y="8" width="10" height="5" fill="#3b82f6" rx="1"/><rect x="10" y="16" width="90" height="2" fill="#3b82f6"/></svg>
+                <div className="speed-line" style={{top:'40%', left:'10%', width:'50px', animationDelay:'0s'}}></div>
+                <div className="speed-line" style={{top:'60%', left:'20%', width:'80px', animationDelay:'0.2s'}}></div>
+                <div className="speed-line" style={{top:'30%', left:'50%', width:'40px', animationDelay:'0.1s'}}></div>
+              </div>
+            )}
+
             <div className="p-4 border-b bg-gray-50 relative z-10">
               <div className="flex justify-between items-center mb-4">
                  <h3 className="font-bold text-lg flex items-center gap-2 text-gray-800">

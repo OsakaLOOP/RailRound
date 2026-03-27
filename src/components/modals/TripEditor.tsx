@@ -169,9 +169,9 @@ export const TripEditor: React.FC = () => {
                     {isEditing ? <Edit2 size={18} /> : <Plus size={18} />}
                     {isEditing ? '编辑行程' : '新行程'}
                  </h3>
-                 <button onClick={closeEditor}><X className="text-gray-400 hover:text-gray-600"/></button>
+                 <button id="btn-close-editor" onClick={closeEditor}><X className="text-gray-400 hover:text-gray-600"/></button>
               </div>
-              <div className="grid grid-cols-2 p-1 bg-gray-200 rounded-lg relative isolate overflow-hidden">
+              <div id="trip-editor-toggle-mode" className="grid grid-cols-2 p-1 bg-gray-200 rounded-lg relative isolate overflow-hidden">
                  <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white shadow rounded-md transition-all duration-100 ease-out z-0`} style={{ left: editorMode === EditorMode.Manual ? '4px' : 'calc(50% + 0px)' }} />
                  <button onClick={() => setEditorMode(EditorMode.Manual)} className={`py-1.5 text-sm font-bold rounded-md z-10 transition-colors duration-300 ${editorMode === EditorMode.Manual ? 'text-gray-800' : 'text-gray-500'}`}>手动输入</button>
                  <button onClick={() => setEditorMode(EditorMode.Auto)} className={`py-1.5 text-sm font-bold rounded-md z-10 transition-colors duration-300 ${editorMode === EditorMode.Auto ? 'text-blue-600' : 'text-slate-500'}`}>自动规划</button>

@@ -193,12 +193,30 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             (item) => item.id,
             (item) => {
                 const options = { color: item.color, weight: zoomWeight, opacity: 0.9, lineCap: 'round', smoothFactor: 0.2, dashArray: item.fallback ? '5, 10' : undefined };
-                return L.polyline(item.coords, options as L.PolylineOptions).bindPopup(item.popup);
+                const pl = L.polyline(item.coords, options as L.PolylineOptions).bindPopup(item.popup);
+                (pl as any)._cachedCoords = item.coords;
+                return pl;
             },
             (layer, item) => {
-                const pl = layer as L.Polyline;
-                pl.setLatLngs(item.coords);
-                pl.setStyle({ color: item.color, weight: zoomWeight, dashArray: item.fallback ? '5, 10' : undefined });
+                const pl = layer as L.Polyline & { _cachedCoords?: any[] };
+
+                // setLatLngs is an extremely expensive operation in Leaflet.
+                // Only call it if the coordinates actually changed (reference check).
+                if (pl._cachedCoords !== item.coords) {
+                    pl.setLatLngs(item.coords);
+                    pl._cachedCoords = item.coords;
+                }
+
+                // setStyle triggers DOM updates. Check before applying.
+                const currentWeight = (pl.options as L.PolylineOptions).weight;
+                const currentColor = (pl.options as L.PolylineOptions).color;
+                const currentDash = (pl.options as L.PolylineOptions).dashArray;
+                const targetDash = item.fallback ? '5, 10' : undefined;
+
+                if (currentWeight !== zoomWeight || currentColor !== item.color || currentDash !== targetDash) {
+                    pl.setStyle({ color: item.color, weight: zoomWeight, dashArray: targetDash });
+                }
+
                 if(pl.getPopup()?.getContent() !== item.popup) {
                     pl.bindPopup(item.popup);
                 }
@@ -244,13 +262,23 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 return marker;
             },
             (layer, pin) => {
-                const marker = layer as L.Marker;
+                const marker = layer as L.Marker & { _cachedLat?: number, _cachedLng?: number, _cachedIsEditing?: boolean, _cachedColor?: string };
                 const isEditing = editingPin?.id === pin.id;
-                const icon = L.divIcon({ className: 'pin-marker-icon', html: `<div class="pin-content ${isEditing ? 'dragging' : ''}" style="background:${pin.color}; border-color:${isEditing?'#ffff00':'white'}; transform:${isEditing?'scale(1.2) rotate(45deg)':''}"> ${pin.type==='photo'?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'} </div>`, iconSize: [32, 32], iconAnchor: [16, 32] });
 
-                marker.setLatLng([pin.lat, pin.lng]);
-                marker.setIcon(icon);
-                marker.setZIndexOffset(isEditing ? 1000 : 0);
+                if (marker._cachedLat !== pin.lat || marker._cachedLng !== pin.lng) {
+                    marker.setLatLng([pin.lat, pin.lng]);
+                    marker._cachedLat = pin.lat;
+                    marker._cachedLng = pin.lng;
+                }
+
+                if (marker._cachedIsEditing !== isEditing || marker._cachedColor !== pin.color) {
+                    const icon = L.divIcon({ className: 'pin-marker-icon', html: `<div class="pin-content ${isEditing ? 'dragging' : ''}" style="background:${pin.color}; border-color:${isEditing?'#ffff00':'white'}; transform:${isEditing?'scale(1.2) rotate(45deg)':''}"> ${pin.type==='photo'?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'} </div>`, iconSize: [32, 32], iconAnchor: [16, 32] });
+                    marker.setIcon(icon);
+                    marker.setZIndexOffset(isEditing ? 1000 : 0);
+
+                    marker._cachedIsEditing = isEditing;
+                    marker._cachedColor = pin.color;
+                }
             }
         );
     };

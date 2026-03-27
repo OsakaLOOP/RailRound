@@ -289,7 +289,9 @@ export const AppLayout: React.FC = () => {
                     const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
                     let data = await db.get(db.STORE_SEGMENTS, key).catch(() => null);
 
-                    if (data) {
+                // 如果缓存是 fallback，但此时可能 geoData 已经加载好了，
+                // 我们允许它重新进入 Worker 计算队列，而不是永远被锁死在 [0,0] 的直线。
+                if (data && !data.fallback) {
                         newCache.set(key, data);
                         updated = true;
                     } else {
@@ -297,20 +299,32 @@ export const AppLayout: React.FC = () => {
                     }
                 }
 
-                // 如果有 IndexedDB 中也没有的，交给 Worker 计算
-                if (toCalculateInWorker.length > 0 && workerRef.current) {
+            // 如果有需要计算的，且 geoData 已经初步加载，再交给 Worker 计算
+            // (如果 geoData 为空，我们先不派发任务，免得算出大量 fallback 写入缓存)
+            if (toCalculateInWorker.length > 0 && workerRef.current && geoData && geoData.features.length > 0) {
                     try {
                         const results = await callWorker('GET_ALL_GEOMETRIES', { segments: toCalculateInWorker });
                         for (const res of results) {
                             const { key, data } = res;
-                            if (data) {
+                        if (data && !data.fallback) {
                                 newCache.set(key, data);
                                 await db.set(db.STORE_SEGMENTS, key, data);
                                 updated = true;
                             } else {
-                                // 为了防止无限重试，存一个 Fallback 占位。同样缓存到 IDB。
-                                const fallbackData = { coords: [[0, 0], [0, 0]], color: '#ff0000', isMulti: false, fallback: true };
+                            // 对于确实无法匹配的数据，生成一个基于车站经纬度的 fallback，而不是 [0,0]
+                            const seg = toCalculateInWorker.find(s => `${s.lineKey}_${s.fromId}_${s.toId}` === key);
+                            let fallbackCoords = [[0, 0], [0, 0]];
+                            if (seg && railwayData[seg.lineKey]) {
+                                const line = railwayData[seg.lineKey];
+                                const s1 = line.stations.find((s: any) => s.id === seg.fromId);
+                                const s2 = line.stations.find((s: any) => s.id === seg.toId);
+                                if (s1 && s2) {
+                                    fallbackCoords = [[s1.lat, s1.lng], [s2.lat, s2.lng]];
+                                }
+                            }
+                            const fallbackData = { coords: fallbackCoords, color: '#ff0000', isMulti: false, fallback: true };
                                 newCache.set(key, fallbackData);
+                            // 将真实的车站连线 fallback 存入 IDB
                                 await db.set(db.STORE_SEGMENTS, key, fallbackData);
                                 updated = true;
                             }

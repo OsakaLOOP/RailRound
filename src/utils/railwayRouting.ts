@@ -121,3 +121,56 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
     }
     return { segments };
 };
+
+// --- Geo Math for Snapping ---
+const getProjectedPointOnSegment = (px: number, py: number, ax: number, ay: number, bx: number, by: number) => {
+    const dx = bx - ax;
+    const dy = by - ay;
+    if (dx === 0 && dy === 0) return { x: ax, y: ay, t: 0 };
+
+    // 投影系数 t
+    let t = ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy);
+    // 限制在线段两端 [0, 1]
+    t = Math.max(0, Math.min(1, t));
+
+    return {
+      x: ax + t * dx, // lng
+      y: ay + t * dy, // lat
+      t: t
+    };
+};
+
+export const findNearestPointOnLine = (railwayData: RailwayMap, targetLat: number, targetLng: number) => {
+    let minDistSq = Infinity;
+    let bestPoint = { lat: targetLat, lng: targetLng, lineKey: '', percentage: 0 };
+
+    Object.entries(railwayData).forEach(([lineKey, line]) => {
+      const stations = line.stations;
+      if (!stations || stations.length < 2) return;
+
+      for (let i = 0; i < stations.length - 1; i++) {
+        const A = stations[i];
+        const B = stations[i+1];
+
+        const proj = getProjectedPointOnSegment(targetLng, targetLat, A.lng, A.lat, B.lng, B.lat);
+        const dSq = (targetLat - proj.y) ** 2 + (targetLng - proj.x) ** 2;
+
+        if (dSq < minDistSq) {
+          minDistSq = dSq;
+          bestPoint = {
+              lat: proj.y,
+              lng: proj.x,
+              lineKey: lineKey,
+              percentage: Math.round((i / stations.length) * 100)
+          };
+        }
+      }
+    });
+
+    // 阈值检查 (约 10km)
+    if (minDistSq > 0.01) {
+        return { lat: targetLat, lng: targetLng, lineKey: '', percentage: 0 };
+    }
+
+    return bestPoint;
+};

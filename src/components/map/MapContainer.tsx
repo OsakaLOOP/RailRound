@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useStore, PinMode, StationMenuData, CustomFeatureCollection, CustomGeoJSONFeature } from '../../store';
-import { findNearestPointOnLine } from '../../utils/stats';
+import { findNearestPointOnLine } from '../../utils/railwayRouting';
 import { syncLeafletLayerGroup } from '../../utils/leafletSync';
 
 interface Props {

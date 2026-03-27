@@ -19,8 +19,8 @@ import { StatsPage } from './pages/StatsPage';
 import { useStore } from './store';
 import { db } from './utils/db';
 import buildKMLString from './buildKml';
-import { sliceGeoJsonPath, calculateLatestStats } from './utils/stats';
-import * as turf from '@turf/turf';
+import { calculateLatestStats } from './utils/stats';
+import GeoWorker from './workers/geo.worker.js?worker';
 import { meta } from '../public/changelog.json';
 import { api } from './services/api';
 import { useShallow } from 'zustand/react/shallow';
@@ -56,6 +56,45 @@ export const AppLayout: React.FC = () => {
     const [stationMenu, setStationMenu] = useState<any>(null);
     const [isExportingKML, setIsExportingKML] = useState(false);
     const isDraggingRef = useRef(false);
+    const workerRef = useRef<Worker | null>(null);
+
+    // --- Worker Setup ---
+    useEffect(() => {
+        workerRef.current = new GeoWorker();
+        return () => {
+            if (workerRef.current) {
+                workerRef.current.terminate();
+            }
+        };
+    }, []);
+
+    const callWorker = (type: string, payload: any): Promise<any> => {
+        return new Promise((resolve, reject) => {
+            if (!workerRef.current) return reject("Worker not initialized");
+            const id = Date.now() + Math.random().toString();
+
+            const handleMessage = (e: MessageEvent) => {
+                if (e.data.id === id) {
+                    workerRef.current?.removeEventListener('message', handleMessage);
+                    if (e.data.type === `${type}_SUCCESS`) {
+                        resolve(e.data.payload);
+                    } else if (e.data.type === 'ERROR') {
+                        reject(new Error(e.data.payload));
+                    }
+                }
+            };
+
+            workerRef.current.addEventListener('message', handleMessage);
+            workerRef.current.postMessage({ id, type, payload });
+        });
+    };
+
+    // --- Sync Data to Worker ---
+    useEffect(() => {
+        if (workerRef.current) {
+            callWorker('SYNC_DATA', { railwayData, geoData }).catch(console.error);
+        }
+    }, [railwayData, geoData]);
 
     // --- 1. Utilities for Parsing and Matching ---
     const normalizeCompanyName = (s: any) => {
@@ -209,19 +248,18 @@ export const AppLayout: React.FC = () => {
             const validResults = results.filter(r => r !== null);
             if (validResults.length > 0) processGeoJsonBatch(validResults, currentCompanyData);
 
+            console.log('[Autoload] 初始化全部完成，应用就绪。');
         } catch (err) { console.error('[Autoload] 致命错误:', err); }
     };
 
-    // --- 3. Geo Calculation Effects (Moved from RailRound) ---
+    // --- 3. Geo Calculation Effects ---
     useEffect(() => {
-        const allSegments = trips.flatMap(t => t.segments || []);
-        const needed = allSegments.filter(seg => {
-            if (!seg.lineKey || !seg.fromId || !seg.toId) return false;
-            return !segmentGeometries.has(`${seg.lineKey}_${seg.fromId}_${seg.toId}`);
-        });
+        // 使用 setTimeout 加上简单的防抖，防止编辑/添加行程时高频触发导致卡顿
+        const timerId = setTimeout(() => {
+            const allSegments = trips.flatMap(t => t.segments || []);
 
-        if (needed.length === 0) {
-            const geometryList = allSegments.map(seg => {
+            // 1. 优先使用已有的缓存进行渲染，保证部分路线立即显示，防止整张地图因为几段缺失而瘫痪。
+            const renderList = allSegments.map(seg => {
                 const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
                 const cached = segmentGeometries.get(key);
                 const line = railwayData[seg.lineKey];
@@ -230,69 +268,69 @@ export const AppLayout: React.FC = () => {
                 if (cached) return { id: seg.id || key, popup: `${seg.lineKey}: ${s1?.name_ja || seg.fromId} → ${s2?.name_ja || seg.toId}`, ...cached };
                 return null;
             }).filter(Boolean);
-            setTripSegmentsGeometry(geometryList);
-            return;
-        }
 
-        const fetchMissing = async () => {
-            const newCache = new Map(segmentGeometries);
-            let updated = false;
+            setTripSegmentsGeometry(renderList);
 
-            for (const seg of needed) {
-                const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
-                let data = await db.get(db.STORE_SEGMENTS, key).catch(() => null);
+            // 2. 筛选缺失的数据发送给 Worker
+            const needed = allSegments.filter(seg => {
+                if (!seg.lineKey || !seg.fromId || !seg.toId) return false;
+                return !segmentGeometries.has(`${seg.lineKey}_${seg.fromId}_${seg.toId}`);
+            });
 
-                if (!data) {
-                    if (!geoData || !geoData.features) continue;
-                    const line = railwayData[seg.lineKey];
-                    if (!line) continue;
-                    const s1 = line.stations.find(s => s.id === seg.fromId);
-                    const s2 = line.stations.find(s => s.id === seg.toId);
-                    if (!s1 || !s2) continue;
+            if (needed.length === 0) return;
 
-                    const parts = seg.lineKey.split(':');
-                    const company = parts[0];
-                    const lineName = parts.slice(1).join(':');
+            const fetchMissing = async () => {
+                const newCache = new Map(segmentGeometries);
+                let updated = false;
+                const toCalculateInWorker: any[] = [];
 
-                    const feature = geoData.features.find((f: any) => f.properties.type === 'line' && f.properties.name === lineName && f.properties.company === company);
+                // 先尝试从 IndexedDB 加载
+                for (const seg of needed) {
+                    const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+                    let data = await db.get(db.STORE_SEGMENTS, key).catch(() => null);
 
-                    let coords = null; let color = '#38bdf8'; let isMulti = false; let fallback = false;
-
-                    if (feature) {
-                        color = feature.properties.stroke || '#38bdf8';
-                        const latLngs = sliceGeoJsonPath(feature, s1.lat, s1.lng, s2.lat, s2.lng);
-                        if (latLngs) {
-                            coords = latLngs;
-                            if (Array.isArray(latLngs[0]) && Array.isArray(latLngs[0][0])) isMulti = true;
-                        }
+                    if (data) {
+                        newCache.set(key, data);
+                        updated = true;
+                    } else {
+                        toCalculateInWorker.push(seg);
                     }
-
-                    if (!coords) {
-                         fallback = true;
-                         const routeCoords = [];
-                         const startIdx = line.stations.findIndex(st => st.id === seg.fromId);
-                         const endIdx = line.stations.findIndex(st => st.id === seg.toId);
-                         if (startIdx !== -1 && endIdx !== -1) {
-                             const step = startIdx <= endIdx ? 1 : -1;
-                             for (let i = startIdx; i !== endIdx + step; i += step) {
-                                if (i >= 0 && i < line.stations.length) routeCoords.push([line.stations[i].lat, line.stations[i].lng]);
-                             }
-                             if (routeCoords.length > 1) { coords = routeCoords; fallback = false; }
-                         }
-                    }
-                    if (!coords) { coords = [[s1.lat, s1.lng], [s2.lat, s2.lng]]; fallback = true; }
-
-                    data = { coords, color, isMulti, fallback };
-                    await db.set(db.STORE_SEGMENTS, key, data);
                 }
 
-                if (data) { newCache.set(key, data); updated = true; }
-            }
+                // 如果有 IndexedDB 中也没有的，交给 Worker 计算
+                if (toCalculateInWorker.length > 0 && workerRef.current) {
+                    try {
+                        const results = await callWorker('GET_ALL_GEOMETRIES', { segments: toCalculateInWorker });
+                        for (const res of results) {
+                            const { key, data } = res;
+                            if (data) {
+                                newCache.set(key, data);
+                                await db.set(db.STORE_SEGMENTS, key, data);
+                                updated = true;
+                            } else {
+                                // 为了防止无限重试，存一个 Fallback 占位。同样缓存到 IDB。
+                                const fallbackData = { coords: [[0, 0], [0, 0]], color: '#ff0000', isMulti: false, fallback: true };
+                                newCache.set(key, fallbackData);
+                                await db.set(db.STORE_SEGMENTS, key, fallbackData);
+                                updated = true;
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Worker Geo Calc failed:", e);
+                    }
+                }
 
-            if (updated) setSegmentGeometries(newCache);
-        };
+                if (updated) {
+                    setSegmentGeometries(newCache);
+                    // 这里不要调用 setTripSegmentsGeometry，
+                    // 因为 updated 的 segmentGeometries 作为依赖项会触发下一次 useEffect 执行。
+                }
+            };
 
-        fetchMissing();
+            fetchMissing();
+        }, 300); // 300ms 延时/防抖
+
+        return () => clearTimeout(timerId);
     }, [trips, geoData, railwayData, segmentGeometries]);
 
     useEffect(() => { autoLoadData(); }, []);
@@ -303,30 +341,27 @@ export const AppLayout: React.FC = () => {
         setIsExportingKML(true);
         setTimeout(async () => {
             try {
-                if (trips.length === 0 || !geoData || !turf) { alert("无行程记录或地图数据未加载。"); setIsExportingKML(false); return; }
+                if (trips.length === 0 || !geoData) { alert("无行程记录或地图数据未加载。"); setIsExportingKML(false); return; }
                 const allPaths: any[] = [];
+
+                // 由于 sliceGeoJsonPath 已移至 Worker，我们需要用另一种方式处理 KML 导出。
+                // 最简单的方法是重用现有的 segmentGeometries 缓存！
                 trips.forEach(t => {
                     const tripName = `${t.date} - Trip ${t.id}`;
                     t.segments.forEach((seg: any, segIndex: number) => {
-                        const line = railwayData[seg.lineKey];
-                        if (!line) return;
-                        const s1 = line.stations.find(s => s.id === seg.fromId);
-                        const s2 = line.stations.find(s => s.id === seg.toId);
-                        if (!s1 || !s2) return;
-                        const parts = seg.lineKey.split(':');
-                        const company = parts[0];
-                        const lineName = parts.slice(1).join(':');
-                        const feature = geoData.features.find((f: any) => f.properties.type === 'line' && f.properties.name === lineName && f.properties.company === company);
-                        if (feature) {
-                            const coords = sliceGeoJsonPath(feature, s1.lat, s1.lng, s2.lat, s2.lng);
-                            if (coords) {
-                                const kmlCoords = Array.isArray(coords[0]) && Array.isArray(coords[0][0]) ? coords.flat().map((p: any) => `${p[1]},${p[0]},0`).join(' ') : coords.map((p: any) => `${p[1]},${p[0]},0`).join(' ');
-                                allPaths.push({ name: `${tripName} Segment ${segIndex + 1}`, coordinates: kmlCoords, lineKey: seg.lineKey });
-                            }
+                        const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+                        const cached = segmentGeometries.get(key);
+                        if (cached && cached.coords) {
+                            const coords = cached.coords;
+                            const kmlCoords = cached.isMulti
+                                ? coords.flat().map((p: any) => `${p[1]},${p[0]},0`).join(' ')
+                                : coords.map((p: any) => `${p[1]},${p[0]},0`).join(' ');
+                            allPaths.push({ name: `${tripName} Segment ${segIndex + 1}`, coordinates: kmlCoords, lineKey: seg.lineKey });
                         }
                     });
                 });
-                if (allPaths.length === 0) { alert("未找到可导出路径。"); setIsExportingKML(false); return; }
+
+                if (allPaths.length === 0) { alert("未找到可导出路径（请确保路线在地图上已显示）。"); setIsExportingKML(false); return; }
                 const kmlString = buildKMLString(allPaths);
                 const blob = new Blob([kmlString], { type: 'application/vnd.google-earth.kml+xml' });
                 const url = URL.createObjectURL(blob);

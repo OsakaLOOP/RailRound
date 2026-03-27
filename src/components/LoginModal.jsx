@@ -366,21 +366,6 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
-                <style jsx>{`
-                  .custom-scrollbar::-webkit-scrollbar {
-                    width: 6px;
-                  }
-                  .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent;
-                  }
-                  .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background-color: rgba(156, 163, 175, 0.5);
-                    border-radius: 20px;
-                  }
-                  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background-color: rgba(107, 114, 128, 0.8);
-                  }
-                `}</style>
                 {renderMarkdown(readmeContent)}
             </div>
 

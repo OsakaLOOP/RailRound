@@ -91,9 +91,15 @@ export const AppLayout: React.FC = () => {
 
     // --- Sync Data to Worker ---
     useEffect(() => {
-        if (workerRef.current) {
-            callWorker('SYNC_DATA', { railwayData, geoData }).catch(console.error);
-        }
+        // Use a debounce to prevent serializing and transferring massive datasets multiple times
+        // during auto-loading or bulk imports. This drastically reduces CPU spikes and memory clones.
+        const timerId = setTimeout(() => {
+            if (workerRef.current) {
+                callWorker('SYNC_DATA', { railwayData, geoData }).catch(console.error);
+            }
+        }, 1000); // 1s debounce
+
+        return () => clearTimeout(timerId);
     }, [railwayData, geoData]);
 
     // --- 1. Utilities for Parsing and Matching ---

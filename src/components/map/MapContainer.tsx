@@ -122,50 +122,53 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         setIsMapInitialized(true);
     };
 
+    const renderedFeatureIds = useRef<Set<string>>(new Set());
+
     const renderBaseMap = (data: CustomFeatureCollection) => {
         if (!baseLinesLayer.current || !baseStationsLayer.current) return;
 
-        // Base Lines
-        const lineFeatures = data.features.filter((f: CustomGeoJSONFeature) => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString');
-        syncLeafletLayerGroup<CustomGeoJSONFeature>(
-            baseLinesLayer.current,
-            lineFeatures,
-            (f) => f.properties.id || `${f.properties.company}:${f.properties.name}`,
-            (f) => {
-                const layer = L.geoJSON(f as any, {
-                    style: { color: '#475569', weight: 1, opacity: 0.3 }
-                });
-                if (f.properties.name) layer.bindTooltip(f.properties.name);
-                return layer;
-            },
-            (layer, f) => {
-                // Lines are largely static
-            }
-        );
+        // Base map features almost never get removed during a session, they only get appended.
+        // To drastically reduce CPU traversal overhead when geoData updates, filter for new items first.
+        const newFeatures = data.features.filter(f => {
+            const id = f.properties.id || `${f.properties.company}:${f.properties.name || f.properties.line}`;
+            if (renderedFeatureIds.current.has(id)) return false;
+            renderedFeatureIds.current.add(id);
+            return true;
+        });
 
-        // Base Stations
-        const stationFeatures = data.features.filter((f: CustomGeoJSONFeature) => f.properties.type === 'station');
-        syncLeafletLayerGroup<CustomGeoJSONFeature>(
-            baseStationsLayer.current,
-            stationFeatures,
-            (f) => f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`,
-            (f) => {
-                const latlng = [f.geometry.coordinates[1], f.geometry.coordinates[0]] as [number, number];
-                const layer = L.circleMarker(latlng, { radius: 4, color: 'transparent', fillColor: '#64748b', fillOpacity: 0.5, weight: 0, className: 'station-dot' });
-                if (f.properties.name) layer.bindTooltip(f.properties.name);
-                layer.on('click', (e: L.LeafletMouseEvent) => {
-                    L.DomEvent.stopPropagation(e);
-                    const originalEvent = e.originalEvent as MouseEvent | TouchEvent;
-                    const x = 'clientX' in originalEvent ? originalEvent.clientX : (originalEvent as TouchEvent).touches[0].clientX;
-                    const y = 'clientY' in originalEvent ? originalEvent.clientY : (originalEvent as TouchEvent).touches[0].clientY;
-                    setStationMenu({ x, y, stationData: { name_ja: f.properties.name || '' } });
-                });
-                return layer;
-            },
-            (layer, f) => {
-                // Stations static
-            }
-        );
+        if (newFeatures.length === 0) return; // Nothing new to render, bypass entirely
+
+        // Base Lines (Only append new features)
+        const lineFeatures = newFeatures.filter((f: CustomGeoJSONFeature) => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString');
+
+        lineFeatures.forEach(f => {
+             const layer = L.geoJSON(f as any, {
+                 style: { color: '#475569', weight: 1, opacity: 0.3 }
+             });
+             if (f.properties.name) layer.bindTooltip(f.properties.name);
+
+             // Directly add instead of syncing, since we already filtered
+             if (baseLinesLayer.current) baseLinesLayer.current.addLayer(layer);
+        });
+
+        // Base Stations (Only append new features)
+        const stationFeatures = newFeatures.filter((f: CustomGeoJSONFeature) => f.properties.type === 'station');
+
+        stationFeatures.forEach(f => {
+            const latlng = [f.geometry.coordinates[1], f.geometry.coordinates[0]] as [number, number];
+            const layer = L.circleMarker(latlng, { radius: 4, color: 'transparent', fillColor: '#64748b', fillOpacity: 0.5, weight: 0, className: 'station-dot' });
+            if (f.properties.name) layer.bindTooltip(f.properties.name);
+            layer.on('click', (e: L.LeafletMouseEvent) => {
+                L.DomEvent.stopPropagation(e);
+                const originalEvent = e.originalEvent as MouseEvent | TouchEvent;
+                const x = 'clientX' in originalEvent ? originalEvent.clientX : (originalEvent as TouchEvent).touches[0].clientX;
+                const y = 'clientY' in originalEvent ? originalEvent.clientY : (originalEvent as TouchEvent).touches[0].clientY;
+                setStationMenu({ x, y, stationData: { name_ja: f.properties.name || '' } });
+            });
+
+            // Directly add instead of syncing
+            if (baseStationsLayer.current) baseStationsLayer.current.addLayer(layer);
+        });
     };
 
     const renderTripRoutes = () => {

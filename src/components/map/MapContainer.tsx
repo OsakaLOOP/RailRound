@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useStore, PinMode } from '../../store';
-import { findNearestPointOnLine } from '../../utils/stats'; // need to define
+import { findNearestPointOnLine } from '../../utils/stats';
 
 interface Props {
     setStationMenu: (menu: any) => void;
@@ -49,16 +49,31 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         }
     }, [activeTab, leafletReady]);
 
+    // Render Base Map (only on geoData changes)
     useEffect(() => {
         if (mapInstance.current && leafletReady && geoData) renderBaseMap(geoData);
     }, [geoData, leafletReady]);
 
+    // Render Trip Routes (Only rebuild on tripSegmentsGeometry changes)
     useEffect(() => {
         if (mapInstance.current && leafletReady && tripSegmentsGeometry) {
             renderTripRoutes();
         }
-    }, [tripSegmentsGeometry, leafletReady, mapZoom]);
+    }, [tripSegmentsGeometry, leafletReady]);
 
+    // Update Route Styles (Only on mapZoom changes, avoids full rebuild)
+    useEffect(() => {
+        if (routeLayer.current) {
+            const zoomWeight = mapZoom < 8 ? 2 : mapZoom < 12 ? 4 : mapZoom < 15 ? 6 : 9;
+            routeLayer.current.eachLayer((layer: any) => {
+                if (layer.setStyle) {
+                    layer.setStyle({ weight: zoomWeight });
+                }
+            });
+        }
+    }, [mapZoom]);
+
+    // Render Pins
     useEffect(() => {
         if (mapInstance.current && leafletReady && !isDraggingRef.current) renderPins();
     }, [pins, editingPin, pinMode, leafletReady]);
@@ -147,7 +162,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     const renderTripRoutes = () => {
         if (!routeLayer.current || !tripSegmentsGeometry) return;
         routeLayer.current.clearLayers();
-        const zoomWeight = mapZoom < 8 ? 2 : mapZoom < 12 ? 4 : mapZoom < 15 ? 6 : 9;
+        const currentZoom = useStore.getState().mapZoom;
+        const zoomWeight = currentZoom < 8 ? 2 : currentZoom < 12 ? 4 : currentZoom < 15 ? 6 : 9;
 
         tripSegmentsGeometry.forEach((seg: any) => {
             const { coords, color, popup, isMulti, fallback } = seg;

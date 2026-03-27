@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Github, Folder, TrendingUp, Move } from 'lucide-react';
 import { useStore } from '../store';
 import { calcDist } from '../utils/stats';
-import * as turf from '@turf/turf'; // Make sure turf is imported or handled
+import * as turf from '@turf/turf';
 
 export const StatsPage: React.FC = () => {
     const {
@@ -18,35 +18,43 @@ export const StatsPage: React.FC = () => {
     }));
     const setModalState = useStore(state => state.setModalState);
 
-    const totalTrips = trips.length;
-    const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
-    const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
-    let totalDist = 0;
-    let totalCost = 0;
-    trips.forEach(t => totalCost += (t.cost || 0));
+    const { totalTrips, uniqueLines, totalDist, totalCost, rankedSegments } = useMemo(() => {
+        const _totalTrips = trips.length;
+        const _allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
+        const _uniqueLines = new Set(_allSegments.map(s => s.lineKey)).size;
+        let _totalCost = 0;
+        trips.forEach(t => _totalCost += (t.cost || 0));
 
-    if (segmentGeometries && turf) {
-      allSegments.forEach(seg => {
-        const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
-        const geom = segmentGeometries.get(key);
-        if (geom && geom.coords) {
-            if (geom.isMulti) {
-                geom.coords.forEach((c: any) => totalDist += turf.length(turf.lineString(c.map((p: any) => [p[1], p[0]]))));
+        let _totalDist = 0;
+        if (segmentGeometries && turf) {
+          _allSegments.forEach(seg => {
+            if(!seg.lineKey) return;
+            const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+            const geom = segmentGeometries.get(key);
+            if (geom && geom.coords) {
+                if (geom.isMulti) {
+                    geom.coords.forEach((c: any) => _totalDist += turf.length(turf.lineString(c.map((p: any) => [p[1], p[0]]))));
+                } else {
+                    _totalDist += turf.length(turf.lineString(geom.coords.map((p: any) => [p[1], p[0]])));
+                }
             } else {
-                totalDist += turf.length(turf.lineString(geom.coords.map((p: any) => [p[1], p[0]])));
+                const line = railwayData[seg.lineKey];
+                if (line) {
+                    const s1 = line.stations.find(st => st.id === seg.fromId);
+                    const s2 = line.stations.find(st => st.id === seg.toId);
+                    if (s1 && s2) _totalDist += calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
+                }
             }
-        } else {
-            const line = railwayData[seg.lineKey];
-            if (line) {
-                const s1 = line.stations.find(st => st.id === seg.fromId);
-                const s2 = line.stations.find(st => st.id === seg.toId);
-                if (s1 && s2) totalDist += calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
-            }
+          });
         }
-      });
-    }
 
-    const uniqueStationsCount = (() => {
+        const counts = _allSegments.reduce((acc: any, s: any) => { acc[s.lineKey] = (acc[s.lineKey]||0)+1; return acc; }, {});
+        const _rankedSegments = Object.entries(counts).sort((a: any, b: any) => b[1]-a[1]).slice(0, 3);
+
+        return { totalTrips: _totalTrips, uniqueLines: _uniqueLines, totalDist: _totalDist, totalCost: _totalCost, rankedSegments: _rankedSegments };
+    }, [trips, segmentGeometries, railwayData]);
+
+    const uniqueStationsCount = useMemo(() => {
         let count = 0;
         if (railwayData) {
             const uniqueStations = new Set();
@@ -56,7 +64,7 @@ export const StatsPage: React.FC = () => {
             count = uniqueStations.size;
         }
         return count;
-    })();
+    }, [railwayData]);
 
     return (
       <div id="stats-view-content" className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -115,7 +123,7 @@ export const StatsPage: React.FC = () => {
             <div className="border-t border-white/20 pt-2 flex items-center gap-2 text-sm opacity-90"><span className="font-bold">¥</span> 总开销: {totalCost.toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-xl border overflow-hidden"><div className="p-3 border-b bg-slate-50 font-bold text-sm text-slate-600">常乘路线排行</div>
-          {Object.entries(allSegments.reduce((acc: any, s: any) => { acc[s.lineKey] = (acc[s.lineKey]||0)+1; return acc; }, {})).sort((a: any, b: any) => b[1]-a[1]).slice(0, 3).map(([line, count]: [string, any], idx) => {
+          {rankedSegments.map(([line, count]: [string, any], idx) => {
               const icon = railwayData[line]?.meta?.icon;
               return (
                   <div key={line} className="p-3 border-b last:border-0 flex justify-between items-center">

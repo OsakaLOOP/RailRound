@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, Folder, Globe, Trash2 } from 'lucide-react';
 import { useStore } from '../../store';
+import { useShallow } from 'zustand/react/shallow';
 
 export const FolderManagerModal: React.FC = () => {
-    const { isOpen, folders } = useStore(state => ({
+    const { isOpen, folders } = useStore(useShallow(state => ({
         isOpen: state.modals.folderManagerOpen,
         folders: state.folders
-    }));
+    })));
     const setModalState = useStore(state => state.setModalState);
     const setFolders = useStore(state => state.setFolders);
     const [newFolderName, setNewFolderName] = useState("");

@@ -3,6 +3,7 @@ import { Train, LogOut, User, Download, Upload, Building2, FilePlus } from 'luci
 import { useStore } from '../../store';
 import { VersionBadge } from '../VersionBadge';
 import { meta } from '../../../public/changelog.json';
+import { useShallow } from 'zustand/react/shallow';
 
 const CURRENT_VERSION = meta["currentVersion"];
 
@@ -13,7 +14,7 @@ export const Header: React.FC<{
     handleCompanyUpload: (e: any) => void;
     handleFileUpload: (e: any) => void;
 }> = ({ handleExportKML, handleExportUserData, handleImportUserData, handleCompanyUpload, handleFileUpload }) => {
-    const { user, activeTab } = useStore(state => ({ user: state.user, activeTab: state.activeTab }));
+    const { user, activeTab } = useStore(useShallow(state => ({ user: state.user, activeTab: state.activeTab })));
     const setModalState = useStore(state => state.setModalState);
     const logout = useStore(state => state.logout);
 

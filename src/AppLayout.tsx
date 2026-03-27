@@ -23,6 +23,7 @@ import { sliceGeoJsonPath, calculateLatestStats } from './utils/stats';
 import * as turf from '@turf/turf';
 import { meta } from '../public/changelog.json';
 import { api } from './services/api';
+import { useShallow } from 'zustand/react/shallow';
 
 const CURRENT_VERSION = meta["currentVersion"];
 
@@ -31,7 +32,7 @@ export const AppLayout: React.FC = () => {
         activeTab, user, setModalState, setCompanyDB, setRailwayData, setGeoData,
         trips, pins, railwayData, geoData, companyDB, setTrips, setPins, folders, badgeSettings,
         setSegmentGeometries, setTripSegmentsGeometry, segmentGeometries
-    } = useStore(state => ({
+    } = useStore(useShallow(state => ({
         activeTab: state.activeTab,
         user: state.user,
         setModalState: state.setModalState,
@@ -50,7 +51,7 @@ export const AppLayout: React.FC = () => {
         setSegmentGeometries: state.setSegmentGeometries,
         setTripSegmentsGeometry: state.setTripSegmentsGeometry,
         segmentGeometries: state.segmentGeometries
-    }));
+    })));
 
     const [stationMenu, setStationMenu] = useState<any>(null);
     const [isExportingKML, setIsExportingKML] = useState(false);

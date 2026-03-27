@@ -19,6 +19,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     const baseStationsLayer = useRef<L.LayerGroup | null>(null);
     const routeLayer = useRef<L.LayerGroup | null>(null);
     const railLayerRef = useRef<L.TileLayer | null>(null);
+    const [isMapInitialized, setIsMapInitialized] = React.useState(false);
 
     const {
         geoData, leafletReady, tripSegmentsGeometry, activeTab, mapZoom,
@@ -52,18 +53,18 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     }, [activeTab, leafletReady]);
 
     useEffect(() => {
-        if (mapInstance.current && leafletReady && geoData) renderBaseMap(geoData);
-    }, [geoData, leafletReady]);
+        if (isMapInitialized && leafletReady && geoData) renderBaseMap(geoData);
+    }, [geoData, leafletReady, isMapInitialized]);
 
     useEffect(() => {
-        if (mapInstance.current && leafletReady && tripSegmentsGeometry) {
+        if (isMapInitialized && leafletReady && tripSegmentsGeometry) {
             renderTripRoutes();
         }
-    }, [tripSegmentsGeometry, leafletReady, mapZoom]);
+    }, [tripSegmentsGeometry, leafletReady, mapZoom, isMapInitialized]);
 
     useEffect(() => {
-        if (mapInstance.current && leafletReady && !isDraggingRef.current) renderPins();
-    }, [pins, editingPin, pinMode, leafletReady]);
+        if (isMapInitialized && leafletReady && !isDraggingRef.current) renderPins();
+    }, [pins, editingPin, pinMode, leafletReady, isMapInitialized]);
 
     const initMap = () => {
         if (!mapRef.current || mapInstance.current ) return;
@@ -117,6 +118,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 setStationMenu(null);
             }
         });
+
+        setIsMapInitialized(true);
     };
 
     const renderBaseMap = (data: CustomFeatureCollection) => {

@@ -272,8 +272,14 @@ export const useStore = create<GlobalStore>()(
       autoForm: { startLine: '', startStation: '', endLine: '', endStation: '' },
       isRouteSearching: false,
 
-      setTripForm: (input) => set((state) => ({ tripForm: typeof input === 'function' ? input(state.tripForm) : input })),
-      setAutoForm: (input) => set((state) => ({ autoForm: typeof input === 'function' ? input(state.autoForm) : input })),
+      setTripForm: (input) => set((state) => {
+        const next = typeof input === 'function' ? input(state.tripForm) : input;
+        return { tripForm: { ...state.tripForm, ...next } };
+      }),
+      setAutoForm: (input) => set((state) => {
+        const next = typeof input === 'function' ? input(state.autoForm) : input;
+        return { autoForm: { ...state.autoForm, ...next } };
+      }),
       setEditorMode: (mode) => set({ editorMode: mode }),
       setIsRouteSearching: (isSearching) => set({ isRouteSearching: isSearching }),
 
@@ -290,7 +296,12 @@ export const useStore = create<GlobalStore>()(
       pinMode: PinMode.Idle,
       editingPin: null,
       setPinMode: (mode) => set({ pinMode: mode }),
-      setEditingPin: (input) => set((state) => ({ editingPin: typeof input === 'function' ? input(state.editingPin) : input })),
+      setEditingPin: (input) => set((state) => {
+        const next = typeof input === 'function' ? input(state.editingPin) : input;
+        // If next is null, we shouldn't spread it.
+        if (next === null) return { editingPin: null };
+        return { editingPin: state.editingPin ? { ...state.editingPin, ...next } : next };
+      }),
 
       modals: {
         isLoginOpen: false,

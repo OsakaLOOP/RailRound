@@ -15,12 +15,12 @@ export enum EditorMode { Manual = 'manual', Auto = 'auto' }
 export type LineKey = string;
 export type StationId = string;
 export type CompanyName = string;
-type CompanyCategory = 'JR' | 'CR' | 'Private' | 'City'
+export type CompanyCategory = 'JR' | 'CR' | 'Private' | 'City';
 
 export interface CompanyMeta {
   region: string;
   type: string;
-  category?: CompanyCategory,
+  category?: CompanyCategory;
   logo: URLString | null;
 }
 
@@ -44,12 +44,42 @@ export interface RailwayLine {
 export type RailwayMap = Record<LineKey, RailwayLine>;
 export type CompanyDB = Record<CompanyName, CompanyMeta>;
 
-// App data
-export type TripSegment = {
+// --- GeoJSON Customizations ---
+export interface CustomGeoJSONProperties {
+    type?: 'line' | 'station';
+    name?: string;
+    line?: string;
+    company?: string;
+    operator?: string;
+    icon?: string;
+    stroke?: string;
+    transfers?: LineKey[];
+    id?: string;
+    [key: string]: any; // Allow fallback for totally custom properties
+}
+
+export interface CustomGeoJSONGeometry {
+    type: 'Point' | 'LineString' | 'MultiLineString' | string;
+    coordinates: any[];
+}
+
+export interface CustomGeoJSONFeature {
+    type: 'Feature';
+    properties: CustomGeoJSONProperties;
+    geometry: CustomGeoJSONGeometry;
+}
+
+export interface CustomFeatureCollection {
+    type: 'FeatureCollection';
+    features: CustomGeoJSONFeature[];
+}
+
+// --- App data ---
+export interface TripSegment {
     id: ID;
     lineKey: LineKey;
-    fromId: StationId; // Changed from fromID to match RailRound.jsx usage
-    toId: StationId;   // Changed from toID
+    fromId: StationId;
+    toId: StationId;
 }
 
 export interface Trip {
@@ -59,7 +89,6 @@ export interface Trip {
   memo?: string;
   segments: TripSegment[];
   suicaData?: any;
-  // For legacy support
   lineKey?: string;
   fromId?: string;
   toId?: string;
@@ -100,16 +129,22 @@ export interface BadgeSettings {
   enabled: boolean;
 }
 
+export interface StationMenuData {
+    x: number;
+    y: number;
+    stationData: { name_ja: string; [key: string]: any };
+}
+
 export interface GlobalStore {
   // Data Slice
   railwayData: RailwayMap;
   companyDB: CompanyDB;
-  geoData: { type: string; features: any[] };
+  geoData: CustomFeatureCollection;
   segmentGeometries: Map<string, any>;
   tripSegmentsGeometry: any[];
   setRailwayData: (updater: RailwayMap | ((prev: RailwayMap) => RailwayMap)) => void;
   setCompanyDB: (db: CompanyDB | ((prev: CompanyDB) => CompanyDB)) => void;
-  setGeoData: (data: any | ((prev: any) => any)) => void;
+  setGeoData: (data: CustomFeatureCollection | ((prev: CustomFeatureCollection) => CustomFeatureCollection)) => void;
   setSegmentGeometries: (data: Map<string, any>) => void;
   setTripSegmentsGeometry: (data: any[]) => void;
 
@@ -273,8 +308,6 @@ export const useStore = create<GlobalStore>()(
       partialize: (state) => ({
         user: state.user,
         isLoggedIn: state.isLoggedIn,
-        // Optional: comment out trips/pins if you want them to ONLY load from cloud.
-        // But local-first offline support is usually good.
         trips: state.trips,
         pins: state.pins,
         folders: state.folders,

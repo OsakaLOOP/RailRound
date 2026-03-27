@@ -31,7 +31,8 @@ export const AppLayout: React.FC = () => {
     const {
         activeTab, user, setModalState, setCompanyDB, setRailwayData, setGeoData,
         trips, pins, railwayData, geoData, companyDB, setTrips, setPins, folders, badgeSettings,
-        setSegmentGeometries, setTripSegmentsGeometry, segmentGeometries
+        setSegmentGeometries, setTripSegmentsGeometry, segmentGeometries,
+        isLoginOpen
     } = useStore(useShallow(state => ({
         activeTab: state.activeTab,
         user: state.user,
@@ -50,7 +51,8 @@ export const AppLayout: React.FC = () => {
         badgeSettings: state.badgeSettings,
         setSegmentGeometries: state.setSegmentGeometries,
         setTripSegmentsGeometry: state.setTripSegmentsGeometry,
-        segmentGeometries: state.segmentGeometries
+        segmentGeometries: state.segmentGeometries,
+        isLoginOpen: state.modals.isLoginOpen
     })));
 
     const [stationMenu, setStationMenu] = useState<any>(null);
@@ -554,7 +556,7 @@ export const AppLayout: React.FC = () => {
                 <TripEditor />
 
                 {/* Global Modals & Components */}
-                <LoginModal isOpen={useStore.getState().modals.isLoginOpen} onClose={() => setModalState({ isLoginOpen: false })} onLoginSuccess={(data: any) => { useStore.getState().login(data.token, data.username); }} />
+                <LoginModal isOpen={isLoginOpen} onClose={() => setModalState({ isLoginOpen: false })} onLoginSuccess={(data: any) => { useStore.getState().login(data.token, data.username); }} />
                 <GithubRegisterModal />
                 <GithubCardModal />
                 <FolderManagerModal />

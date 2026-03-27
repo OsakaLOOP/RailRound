@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useStore, PinMode } from '../../store';
 import { findNearestPointOnLine } from '../../utils/stats';
+import { syncLeafletLayerGroup } from '../../utils/leafletSync';
 
 interface Props {
     setStationMenu: (menu: any) => void;
@@ -49,31 +50,16 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         }
     }, [activeTab, leafletReady]);
 
-    // Render Base Map (only on geoData changes)
     useEffect(() => {
         if (mapInstance.current && leafletReady && geoData) renderBaseMap(geoData);
     }, [geoData, leafletReady]);
 
-    // Render Trip Routes (Only rebuild on tripSegmentsGeometry changes)
     useEffect(() => {
         if (mapInstance.current && leafletReady && tripSegmentsGeometry) {
             renderTripRoutes();
         }
-    }, [tripSegmentsGeometry, leafletReady]);
+    }, [tripSegmentsGeometry, leafletReady, mapZoom]); // Added mapZoom so weight is part of incremental update
 
-    // Update Route Styles (Only on mapZoom changes, avoids full rebuild)
-    useEffect(() => {
-        if (routeLayer.current) {
-            const zoomWeight = mapZoom < 8 ? 2 : mapZoom < 12 ? 4 : mapZoom < 15 ? 6 : 9;
-            routeLayer.current.eachLayer((layer: any) => {
-                if (layer.setStyle) {
-                    layer.setStyle({ weight: zoomWeight });
-                }
-            });
-        }
-    }, [mapZoom]);
-
-    // Render Pins
     useEffect(() => {
         if (mapInstance.current && leafletReady && !isDraggingRef.current) renderPins();
     }, [pins, editingPin, pinMode, leafletReady]);
@@ -134,79 +120,134 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
     const renderBaseMap = (data: any) => {
         if (!baseLinesLayer.current || !baseStationsLayer.current) return;
-        baseLinesLayer.current.clearLayers();
-        baseStationsLayer.current.clearLayers();
 
-        L.geoJSON(data, {
-          filter: (f) => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString',
-          style: { color: '#475569', weight: 1, opacity: 0.3 },
-          onEachFeature: (f, l) => f.properties.name && l.bindTooltip(f.properties.name)
-        }).addTo(baseLinesLayer.current);
+        // Base Lines (Incremental)
+        const lineFeatures = data.features.filter((f: any) => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString');
+        syncLeafletLayerGroup(
+            baseLinesLayer.current,
+            lineFeatures,
+            (f: any) => f.properties.id || `${f.properties.company}:${f.properties.name}`,
+            (f: any) => {
+                const layer = L.geoJSON(f, {
+                    style: { color: '#475569', weight: 1, opacity: 0.3 }
+                });
+                if (f.properties.name) layer.bindTooltip(f.properties.name);
+                return layer;
+            },
+            (layer: any, f: any) => {
+                // GeoJSON lines rarely update coordinates dynamically. Can update style if needed.
+            }
+        );
 
-        L.geoJSON(data, {
-          filter: (f) => f.properties.type === 'station',
-          pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 4, color: 'transparent', fillColor: '#64748b', fillOpacity: 0.5, weight: 0, className: 'station-dot' }),
-          onEachFeature: (f, l) => {
-              if (f.properties.name) l.bindTooltip(f.properties.name);
-              l.on('click', (e) => {
-                  L.DomEvent.stopPropagation(e);
-                  const { originalEvent } = e as any;
-                  const x = originalEvent.clientX || (originalEvent.touches ? originalEvent.touches[0].clientX : 0);
-                  const y = originalEvent.clientY || (originalEvent.touches ? originalEvent.touches[0].clientY : 0);
-                  setStationMenu({ x, y, stationData: { name_ja: f.properties.name } });
-              });
-          }
-        }).addTo(baseStationsLayer.current);
+        // Base Stations (Incremental)
+        const stationFeatures = data.features.filter((f: any) => f.properties.type === 'station');
+        syncLeafletLayerGroup(
+            baseStationsLayer.current,
+            stationFeatures,
+            (f: any) => f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`,
+            (f: any) => {
+                const latlng = [f.geometry.coordinates[1], f.geometry.coordinates[0]] as [number, number];
+                const layer = L.circleMarker(latlng, { radius: 4, color: 'transparent', fillColor: '#64748b', fillOpacity: 0.5, weight: 0, className: 'station-dot' });
+                if (f.properties.name) layer.bindTooltip(f.properties.name);
+                layer.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    const { originalEvent } = e as any;
+                    const x = originalEvent.clientX || (originalEvent.touches ? originalEvent.touches[0].clientX : 0);
+                    const y = originalEvent.clientY || (originalEvent.touches ? originalEvent.touches[0].clientY : 0);
+                    setStationMenu({ x, y, stationData: { name_ja: f.properties.name } });
+                });
+                return layer;
+            },
+            (layer: any, f: any) => {
+                // Stations rarely move. Could update tooltip if name changes.
+            }
+        );
     };
 
     const renderTripRoutes = () => {
         if (!routeLayer.current || !tripSegmentsGeometry) return;
-        routeLayer.current.clearLayers();
+
         const currentZoom = useStore.getState().mapZoom;
         const zoomWeight = currentZoom < 8 ? 2 : currentZoom < 12 ? 4 : currentZoom < 15 ? 6 : 9;
 
+        // Flatten multi-part segments into individual items for the sync function to manage
+        const routeItems: any[] = [];
         tripSegmentsGeometry.forEach((seg: any) => {
-            const { coords, color, popup, isMulti, fallback } = seg;
-            const options = { color, weight: zoomWeight, opacity: 0.9, lineCap: 'round', smoothFactor: 0.2, dashArray: fallback ? '5, 10' : undefined };
-            if (isMulti) {
-                coords.forEach((part: any) => { L.polyline(part, options as any).bindPopup(popup).addTo(routeLayer.current!); });
+            if (seg.isMulti) {
+                seg.coords.forEach((part: any, index: number) => {
+                    routeItems.push({ id: `${seg.id}_part_${index}`, coords: part, color: seg.color, popup: seg.popup, fallback: seg.fallback });
+                });
             } else {
-                 L.polyline(coords, options as any).bindPopup(popup).addTo(routeLayer.current!);
+                routeItems.push({ id: seg.id, coords: seg.coords, color: seg.color, popup: seg.popup, fallback: seg.fallback });
             }
         });
+
+        syncLeafletLayerGroup(
+            routeLayer.current,
+            routeItems,
+            (item: any) => item.id,
+            (item: any) => {
+                const options = { color: item.color, weight: zoomWeight, opacity: 0.9, lineCap: 'round', smoothFactor: 0.2, dashArray: item.fallback ? '5, 10' : undefined };
+                return L.polyline(item.coords, options as any).bindPopup(item.popup);
+            },
+            (layer: any, item: any) => {
+                // Update weight or coords dynamically
+                layer.setLatLngs(item.coords);
+                layer.setStyle({ color: item.color, weight: zoomWeight, dashArray: item.fallback ? '5, 10' : undefined });
+                // We assume popup content doesn't change on the fly, but if it does:
+                if(layer.getPopup()?.getContent() !== item.popup) {
+                    layer.bindPopup(item.popup);
+                }
+            }
+        );
     };
 
     const renderPins = () => {
         if (!pinsLayer.current) return;
-        pinsLayer.current.clearLayers();
+
         const list = editingPin ? [...pins.filter(p => p.id !== editingPin.id), editingPin] : pins;
-        list.forEach(pin => {
-            const isEditing = editingPin?.id === pin.id;
-            const icon = L.divIcon({ className: 'pin-marker-icon', html: `<div class="pin-content ${isEditing ? 'dragging' : ''}" style="background:${pin.color}; border-color:${isEditing?'#ffff00':'white'}; transform:${isEditing?'scale(1.2) rotate(45deg)':''}"> ${pin.type==='photo'?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'} </div>`, iconSize: [32, 32], iconAnchor: [16, 32] });
-            const marker = L.marker([pin.lat, pin.lng], { icon, draggable: true, zIndexOffset: isEditing ? 1000 : 0 });
-            marker.on('dragstart', () => {
-                isDraggingRef.current = true;
-                setEditingPin({ ...pin });
-                if (pinMode === PinMode.Idle) setPinMode(PinMode.Free);
-            });
-            marker.on('dragend', (e) => {
-                isDraggingRef.current = false;
-                const { lat, lng } = e.target.getLatLng();
-                let newPos: any = { lat, lng };
-                if (pinMode === PinMode.Snap) {
-                    const snap = findNearestPointOnLine(useStore.getState().railwayData, lat, lng);
-                    newPos = { lat: snap.lat, lng: snap.lng, lineKey: snap.lineKey, percentage: snap.percentage };
-                    e.target.setLatLng(newPos);
-                }
-                setEditingPin((prev: any) => prev && prev.id === pin.id ? { ...prev, ...newPos } : { ...pin, ...newPos });
-                if (pinMode === PinMode.Idle) setPinMode(PinMode.Free);
-            });
-            marker.on('click', () => {
-                setEditingPin(pin);
-                if (pinMode === PinMode.Idle) setPinMode(PinMode.Free);
-            });
-            marker.addTo(pinsLayer.current!);
-        });
+
+        syncLeafletLayerGroup(
+            pinsLayer.current,
+            list,
+            (pin: any) => pin.id,
+            (pin: any) => {
+                const isEditing = editingPin?.id === pin.id;
+                const icon = L.divIcon({ className: 'pin-marker-icon', html: `<div class="pin-content ${isEditing ? 'dragging' : ''}" style="background:${pin.color}; border-color:${isEditing?'#ffff00':'white'}; transform:${isEditing?'scale(1.2) rotate(45deg)':''}"> ${pin.type==='photo'?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'} </div>`, iconSize: [32, 32], iconAnchor: [16, 32] });
+
+                const marker = L.marker([pin.lat, pin.lng], { icon, draggable: true, zIndexOffset: isEditing ? 1000 : 0 });
+                marker.on('dragstart', () => {
+                    isDraggingRef.current = true;
+                    setEditingPin({ ...pin });
+                    if (pinMode === PinMode.Idle) setPinMode(PinMode.Free);
+                });
+                marker.on('dragend', (e) => {
+                    isDraggingRef.current = false;
+                    const { lat, lng } = e.target.getLatLng();
+                    let newPos: any = { lat, lng };
+                    if (pinMode === PinMode.Snap) {
+                        const snap = findNearestPointOnLine(useStore.getState().railwayData, lat, lng);
+                        newPos = { lat: snap.lat, lng: snap.lng, lineKey: snap.lineKey, percentage: snap.percentage };
+                        e.target.setLatLng(newPos);
+                    }
+                    setEditingPin((prev: any) => prev && prev.id === pin.id ? { ...prev, ...newPos } : { ...pin, ...newPos });
+                    if (pinMode === PinMode.Idle) setPinMode(PinMode.Free);
+                });
+                marker.on('click', () => {
+                    setEditingPin(pin);
+                    if (pinMode === PinMode.Idle) setPinMode(PinMode.Free);
+                });
+                return marker;
+            },
+            (layer: any, pin: any) => {
+                const isEditing = editingPin?.id === pin.id;
+                const icon = L.divIcon({ className: 'pin-marker-icon', html: `<div class="pin-content ${isEditing ? 'dragging' : ''}" style="background:${pin.color}; border-color:${isEditing?'#ffff00':'white'}; transform:${isEditing?'scale(1.2) rotate(45deg)':''}"> ${pin.type==='photo'?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'} </div>`, iconSize: [32, 32], iconAnchor: [16, 32] });
+
+                layer.setLatLng([pin.lat, pin.lng]);
+                layer.setIcon(icon);
+                layer.setZIndexOffset(isEditing ? 1000 : 0);
+            }
+        );
     };
 
     return <div ref={mapRef} style={{ width: '100%', height: '100%' }} />;

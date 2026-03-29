@@ -5,6 +5,7 @@ import { useStore, PinMode, StationMenuData, CustomFeatureCollection, CustomGeoJ
 import { findNearestPointOnLine } from '../../utils/railwayRouting';
 import { syncLeafletLayerGroup } from '../../utils/leafletSync';
 import { useShallow } from 'zustand/react/shallow';
+import { useDrag } from '../DragContext';
 
 interface Props {
     setStationMenu: (menu: StationMenuData | null) => void;
@@ -20,7 +21,10 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     const geoDataRef = useRef<CustomFeatureCollection | null>(null);
     const routeLayer = useRef<L.LayerGroup | null>(null);
     const railLayerRef = useRef<L.TileLayer | null>(null);
+    const rubberBandLayerRef = useRef<L.LayerGroup | null>(null);
     const [isMapInitialized, setIsMapInitialized] = React.useState(false);
+
+    const { isDragging, dragItem } = useDrag();
 
     const {
         geoData, leafletReady, tripSegmentsGeometry, activeTab, mapZoom,
@@ -70,6 +74,136 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     useEffect(() => {
         if (isMapInitialized && leafletReady && !isDraggingRef.current) renderPins();
     }, [pins, editingPin, pinMode, leafletReady, isMapInitialized]);
+
+    useEffect(() => {
+        if (!mapInstance.current) return;
+        const map = mapInstance.current;
+
+        if (isDragging && dragItem?.type === 'station' && dragItem.lat && dragItem.lng) {
+            if (!rubberBandLayerRef.current) {
+                rubberBandLayerRef.current = L.layerGroup().addTo(map);
+            }
+            rubberBandLayerRef.current.clearLayers();
+
+            const routeColor = dragItem.color || '#ec4899'; // vivid pink as default
+
+            const rubberLine = L.polyline([[dragItem.lat, dragItem.lng], [dragItem.lat, dragItem.lng]], {
+                color: routeColor,
+                weight: 6,
+                opacity: 0.8,
+                lineCap: 'round',
+                dashArray: '8, 8',
+                className: 'rubber-band-line'
+            }).addTo(rubberBandLayerRef.current);
+
+            const snapCircleCenter = L.circleMarker([0,0], {
+                radius: 6,
+                color: '#fff',
+                weight: 2,
+                fillColor: routeColor,
+                fillOpacity: 1,
+                opacity: 0
+            }).addTo(rubberBandLayerRef.current);
+
+            const snapCirclePulse = L.circleMarker([0,0], {
+                radius: 10,
+                color: routeColor,
+                weight: 2,
+                fillColor: 'transparent',
+                opacity: 0,
+                className: 'snap-circle-pulse'
+            }).addTo(rubberBandLayerRef.current);
+
+            let currentSnap: any = null;
+
+            const onGlobalMove = (e: MouseEvent | TouchEvent) => {
+                let clientX, clientY;
+                if ('touches' in e) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = (e as MouseEvent).clientX;
+                    clientY = (e as MouseEvent).clientY;
+                }
+
+                const mapRect = map.getContainer().getBoundingClientRect();
+                const containerPoint = L.point(clientX - mapRect.left, clientY - mapRect.top);
+                const mouseLatLng = map.containerPointToLatLng(containerPoint);
+
+                let nearestDist = Infinity;
+                let nearestStation: any = null;
+                let nearestLatLng: L.LatLng | null = null;
+
+                if (geoDataRef.current) {
+                    geoDataRef.current.features.forEach((f: any) => {
+                        if (f.properties.type === 'station' && f.geometry?.coordinates) {
+                            const lat = f.geometry.coordinates[1];
+                            const lng = f.geometry.coordinates[0];
+                            // Skip the start station itself
+                            if (f.properties.name === dragItem.name && f.properties.line === dragItem.lineKey?.split(':')[1]) return;
+
+                            const stPoint = map.latLngToContainerPoint([lat, lng]);
+                            const dist = containerPoint.distanceTo(stPoint);
+
+                            if (dist < 40 && dist < nearestDist) {
+                                nearestDist = dist;
+                                nearestStation = f;
+                                nearestLatLng = L.latLng(lat, lng);
+                            }
+                        }
+                    });
+                }
+
+                currentSnap = nearestStation;
+
+                if (nearestStation && nearestLatLng) {
+                    rubberLine.setLatLngs([[dragItem.lat, dragItem.lng], nearestLatLng]);
+                    snapCircleCenter.setLatLng(nearestLatLng).setStyle({ opacity: 1, fillOpacity: 1 });
+                    snapCirclePulse.setLatLng(nearestLatLng).setStyle({ opacity: 1 });
+                } else {
+                    rubberLine.setLatLngs([[dragItem.lat, dragItem.lng], mouseLatLng]);
+                    snapCircleCenter.setStyle({ opacity: 0, fillOpacity: 0 });
+                    snapCirclePulse.setStyle({ opacity: 0 });
+                }
+            };
+
+            const onGlobalUp = () => {
+                if (currentSnap) {
+                    const snapProps = currentSnap.properties;
+                    const snapLineKey = `${snapProps.company}:${snapProps.line}`;
+
+                    const { setEditorMode, setAutoForm, startEditingTrip } = useStore.getState();
+                    setEditorMode('auto');
+                    setAutoForm({
+                        startLine: dragItem.lineKey,
+                        startStation: dragItem.name,
+                        endLine: snapLineKey,
+                        endStation: snapProps.name
+                    });
+                    startEditingTrip();
+                }
+            };
+
+            window.addEventListener('mousemove', onGlobalMove);
+            window.addEventListener('touchmove', onGlobalMove);
+            window.addEventListener('mouseup', onGlobalUp);
+            window.addEventListener('touchend', onGlobalUp);
+
+            return () => {
+                window.removeEventListener('mousemove', onGlobalMove);
+                window.removeEventListener('touchmove', onGlobalMove);
+                window.removeEventListener('mouseup', onGlobalUp);
+                window.removeEventListener('touchend', onGlobalUp);
+                if (rubberBandLayerRef.current) {
+                    rubberBandLayerRef.current.clearLayers();
+                }
+            };
+        } else {
+            if (rubberBandLayerRef.current) {
+                rubberBandLayerRef.current.clearLayers();
+            }
+        }
+    }, [isDragging, dragItem]);
 
     const initMap = () => {
         if (!mapRef.current || mapInstance.current ) return;
@@ -191,7 +325,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     const originalEvent = e.originalEvent as MouseEvent | TouchEvent;
                     const x = 'clientX' in originalEvent ? originalEvent.clientX : (originalEvent as TouchEvent).touches[0].clientX;
                     const y = 'clientY' in originalEvent ? originalEvent.clientY : (originalEvent as TouchEvent).touches[0].clientY;
-                    setStationMenu({ x, y, stationData: { name_ja: f.properties.name || '' } });
+                    setStationMenu({ x, y, stationData: { name_ja: f.properties.name || '', lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] } });
                 });
                 return layer;
             },

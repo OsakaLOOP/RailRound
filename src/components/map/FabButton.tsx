@@ -15,13 +15,18 @@ export const FabButton: React.FC = () => {
     const togglePinMode = () => {
         if (pinMode === PinMode.Idle) {
             setPinMode(PinMode.Free);
-            // Trigger temporary pin logic handled elsewhere or we mock here
-            // Note: need map instance for center. For simplicity, handled mostly in MapContainer click
-            // For robust temp pin creation, ideally it requests center from store or map.
+            // Dispatch a custom event so MapContainer can create the temp pin and pan the map
+            window.dispatchEvent(new CustomEvent('map:create-temp-pin'));
         }
         else if (pinMode === PinMode.Free) {
             setPinMode(PinMode.Snap);
-            // Snap logic handled by PinEditor or MapContainer dragend
+            if (editingPin) {
+                const railwayData = useStore.getState().railwayData;
+                import('../../utils/railwayRouting').then(({ findNearestPointOnLine }) => {
+                    const snap = findNearestPointOnLine(railwayData, editingPin.lat, editingPin.lng);
+                    setEditingPin({ ...editingPin, ...snap });
+                });
+            }
         }
         else {
             setPinMode(PinMode.Idle);

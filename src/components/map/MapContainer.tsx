@@ -71,6 +71,17 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         if (isMapInitialized && leafletReady && !isDraggingRef.current) renderPins();
     }, [pins, editingPin, pinMode, leafletReady, isMapInitialized]);
 
+    useEffect(() => {
+        const handleCreateTempPin = () => {
+            if (!mapInstance.current) return;
+            const c = mapInstance.current.getCenter();
+            setEditingPin({ id: 'temp', lat: c.lat, lng: c.lng, type: 'photo', color: '#ef4444', isTemp: true } as any);
+            mapInstance.current.panBy([0, 150]);
+        };
+        window.addEventListener('map:create-temp-pin', handleCreateTempPin);
+        return () => window.removeEventListener('map:create-temp-pin', handleCreateTempPin);
+    }, [setEditingPin]);
+
     const initMap = () => {
         if (!mapRef.current || mapInstance.current ) return;
         const map = L.map(mapRef.current, { zoomControl: true, preferCanvas: true }).setView([35.68, 139.76], 10);
@@ -317,23 +328,26 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 marker.on('dragstart', () => {
                     isDraggingRef.current = true;
                     setEditingPin({ ...pin });
-                    if (pinMode === PinMode.Idle) setPinMode(PinMode.Free);
+                    const currentPinMode = useStore.getState().pinMode;
+                    if (currentPinMode === PinMode.Idle) setPinMode(PinMode.Free);
                 });
                 marker.on('dragend', (e) => {
                     isDraggingRef.current = false;
                     const { lat, lng } = e.target.getLatLng();
                     let newPos = { lat, lng, lineKey: pin.lineKey, percentage: pin.percentage };
-                    if (pinMode === PinMode.Snap) {
+                    const currentPinMode = useStore.getState().pinMode;
+                    if (currentPinMode === PinMode.Snap) {
                         const snap = findNearestPointOnLine(useStore.getState().railwayData, lat, lng);
                         newPos = { ...newPos, ...snap };
                         e.target.setLatLng(newPos);
                     }
                     setEditingPin((prev) => prev && prev.id === pin.id ? { ...prev, ...newPos } : { ...pin, ...newPos });
-                    if (pinMode === PinMode.Idle) setPinMode(PinMode.Free);
+                    if (currentPinMode === PinMode.Idle) setPinMode(PinMode.Free);
                 });
                 marker.on('click', () => {
                     setEditingPin(pin);
-                    if (pinMode === PinMode.Idle) setPinMode(PinMode.Free);
+                    const currentPinMode = useStore.getState().pinMode;
+                    if (currentPinMode === PinMode.Idle) setPinMode(PinMode.Free);
                 });
                 return marker;
             },

@@ -61,13 +61,13 @@ const abbrMap: Record<string, Record<string, string>> = {
  */
 export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: string[] | null): Record<CategoryKey, RegionGroup[]> => {
 
-    // 1. Initial rough grouping into objects for easy aggregation
-    const rawGroups: Record<CategoryKey, Record<string, Record<string, { logo: string | null, lines: SelectableLine[] }>>> = {
-        JR: {}, Private: {}, City: {}
+    // 1. Initial rough grouping using Maps for faster lookup and insertion
+    const rawGroups: Record<CategoryKey, Map<string, Map<string, { logo: string | null, lines: SelectableLine[] }>>> = {
+        JR: new Map(), Private: new Map(), City: new Map()
     };
 
-    Object.keys(railwayData).forEach(key => {
-        if (allowedLines && !allowedLines.includes(key)) return;
+    for (const key in railwayData) {
+        if (allowedLines && !allowedLines.includes(key)) continue;
 
         const line = railwayData[key];
         const { region, type, company, logo, icon } = line.meta;
@@ -77,23 +77,28 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
         else if (type === '私鉄' || type === '第三セクター') category = 'Private';
 
         const normRegion = normalizeRegion(region || '未知');
-        if (!rawGroups[category][normRegion]) {
-            rawGroups[category][normRegion] = {};
+        let regionMap = rawGroups[category].get(normRegion);
+        if (!regionMap) {
+            regionMap = new Map();
+            rawGroups[category].set(normRegion, regionMap);
         }
 
         const compKey = company || '其他';
-        if (!rawGroups[category][normRegion][compKey]) {
-            rawGroups[category][normRegion][compKey] = { logo: logo || null, lines: [] };
+        let companyData = regionMap.get(compKey);
+        if (!companyData) {
+            companyData = { logo: logo || null, lines: [] };
+            regionMap.set(compKey, companyData);
         }
 
-        const displayName = key.includes(':') ? key.split(':').slice(1).join(':') : key;
+        const colonIdx = key.indexOf(':');
+        const displayName = colonIdx !== -1 ? key.substring(colonIdx + 1) : key;
 
-        rawGroups[category][normRegion][compKey].lines.push({
+        companyData.lines.push({
             key,
             displayName,
             icon: icon || null
         });
-    });
+    }
 
     // 2. Sorting function for Lines inside a Company
     const sortLines = (lines: SelectableLine[], companyName: string, companyLogo: string | null) => {
@@ -150,17 +155,15 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
 
     const REGION_ORDER = ['北海道・東北', '関東', '中部', '近畿', '中国地方', '四国', '九州・沖縄', '其他', '中国大陆'];
 
-    (Object.keys(rawGroups) as CategoryKey[]).forEach(category => {
-        const regionObj = rawGroups[category];
+    for (const category in rawGroups) {
+        const catKey = category as CategoryKey;
+        const regionMap = rawGroups[catKey];
         const regions: RegionGroup[] = [];
 
-        Object.keys(regionObj).forEach(regionName => {
-            const companyObj = regionObj[regionName];
+        for (const [regionName, companyMap] of regionMap.entries()) {
             const companies: CompanyGroup[] = [];
 
-            Object.keys(companyObj).forEach(companyName => {
-                const companyData = companyObj[companyName];
-
+            for (const [companyName, companyData] of companyMap.entries()) {
                 sortLines(companyData.lines, companyName, companyData.logo);
 
                 companies.push({
@@ -168,7 +171,7 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
                     logo: companyData.logo,
                     lines: companyData.lines
                 });
-            });
+            }
 
             // Sort companies by name, or put major ones first (optional)
             companies.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
@@ -177,7 +180,7 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
                 name: regionName,
                 companies
             });
-        });
+        }
 
         // Sort Regions according to predefined geographical order
         regions.sort((a, b) => {
@@ -187,8 +190,8 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
             return idxA !== -1 ? -1 : 1;
         });
 
-        formattedResult[category] = regions;
-    });
+        formattedResult[catKey] = regions;
+    }
 
     return formattedResult;
 };

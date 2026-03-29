@@ -60,6 +60,40 @@ export const AppLayout: React.FC = () => {
     const isDraggingRef = useRef(false);
     const workerRef = useRef<Worker | null>(null);
 
+    // --- Login & URL Parsing (OAuth) ---
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenFromUrl = urlParams.get('token');
+        const usernameFromUrl = urlParams.get('username');
+        const regTokenFromUrl = urlParams.get('reg_token');
+        const status = urlParams.get('status');
+
+        if (tokenFromUrl && usernameFromUrl) {
+            useStore.getState().login(tokenFromUrl, usernameFromUrl);
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (regTokenFromUrl) {
+            setModalState({ isGithubRegOpen: true, githubRegToken: regTokenFromUrl });
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+            const token = localStorage.getItem('rail_token');
+            const username = localStorage.getItem('rail_username');
+            if (token && username) {
+                // For auto-login from local storage, do not prompt for merge
+                useStore.setState({ isLoggedIn: true, user: { token, username } });
+                useStore.getState().loadUserData(token, false);
+            }
+        }
+
+        if (status === 'bound_success') {
+            alert("GitHub 绑定成功！");
+            window.history.replaceState({}, document.title, window.location.pathname);
+            const token = localStorage.getItem('rail_token');
+            if (token) {
+                useStore.getState().loadUserData(token);
+            }
+        }
+    }, [setModalState]);
+
     // --- Worker Setup ---
     useEffect(() => {
         workerRef.current = new GeoWorker();
@@ -370,15 +404,39 @@ export const AppLayout: React.FC = () => {
         setTimeout(async () => {
             try {
                 if (trips.length === 0 || !geoData) { alert("无行程记录或地图数据未加载。"); setIsExportingKML(false); return; }
-                const allPaths: any[] = [];
 
-                // 由于 sliceGeoJsonPath 已移至 Worker，我们需要用另一种方式处理 KML 导出。
-                // 最简单的方法是重用现有的 segmentGeometries 缓存！
+                const allSegments = trips.flatMap(t => t.segments || []);
+                const neededSegments = allSegments.filter(seg => {
+                    if (!seg.lineKey || !seg.fromId || !seg.toId) return false;
+                    return !segmentGeometries.has(`${seg.lineKey}_${seg.fromId}_${seg.toId}`);
+                });
+
+                if (neededSegments.length > 0 && workerRef.current) {
+                    try {
+                        const results = await callWorker('GET_ALL_GEOMETRIES', { segments: neededSegments });
+                        const newCache = new Map(segmentGeometries);
+                        for (const res of results) {
+                            const { key, data } = res;
+                            if (data && !data.fallback) {
+                                newCache.set(key, data);
+                                await db.set(db.STORE_SEGMENTS, key, data);
+                            }
+                        }
+                        setSegmentGeometries(newCache);
+                    } catch (e) {
+                        console.error("Worker Geo Calc failed during KML Export:", e);
+                    }
+                }
+
+                // Make sure we read from the latest updated cache
+                const currentCache = useStore.getState().segmentGeometries;
+
+                const allPaths: any[] = [];
                 trips.forEach(t => {
                     const tripName = `${t.date} - Trip ${t.id}`;
                     t.segments.forEach((seg: any, segIndex: number) => {
                         const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
-                        const cached = segmentGeometries.get(key);
+                        const cached = currentCache.get(key);
                         if (cached && cached.coords) {
                             const coords = cached.coords;
                             const kmlCoords = cached.isMulti

@@ -21,35 +21,60 @@ export const StatsPage: React.FC = () => {
 
     const { totalTrips, uniqueLines, totalDist, totalCost, rankedSegments } = useMemo(() => {
         const _totalTrips = trips.length;
-        const _allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
-        const _uniqueLines = new Set(_allSegments.map(s => s.lineKey)).size;
         let _totalCost = 0;
-        trips.forEach(t => _totalCost += (t.cost || 0));
+        const _uniqueLinesSet = new Set<string>();
+        const counts: Record<string, number> = {};
+        const _allSegments = [];
+
+        // Single pass over trips to gather segments, cost, and counts
+        for (let i = 0; i < trips.length; i++) {
+            const t = trips[i];
+            _totalCost += (t.cost || 0);
+
+            if (t.segments) {
+                for (let j = 0; j < t.segments.length; j++) {
+                    const seg = t.segments[j];
+                    if (seg.lineKey) {
+                        _uniqueLinesSet.add(seg.lineKey);
+                        counts[seg.lineKey] = (counts[seg.lineKey] || 0) + 1;
+                        _allSegments.push(seg);
+                    }
+                }
+            } else if (t.lineKey) {
+                _uniqueLinesSet.add(t.lineKey);
+                counts[t.lineKey] = (counts[t.lineKey] || 0) + 1;
+                _allSegments.push({ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId });
+            }
+        }
+        const _uniqueLines = _uniqueLinesSet.size;
 
         let _totalDist = 0;
         if (segmentGeometries && turf) {
-          _allSegments.forEach(seg => {
-            if(!seg.lineKey) return;
+          for (let i = 0; i < _allSegments.length; i++) {
+            const seg = _allSegments[i];
+            if (!seg.lineKey) continue;
+
             const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
             const geom = segmentGeometries.get(key);
             if (geom && geom.coords) {
                 if (geom.isMulti) {
-                    geom.coords.forEach((c: any) => _totalDist += turf.length(turf.lineString(c.map((p: any) => [p[1], p[0]]))));
+                    for (let j = 0; j < geom.coords.length; j++) {
+                        _totalDist += turf.length(turf.lineString(geom.coords[j].map((p: any) => [p[1], p[0]])));
+                    }
                 } else {
                     _totalDist += turf.length(turf.lineString(geom.coords.map((p: any) => [p[1], p[0]])));
                 }
             } else {
                 const line = railwayData[seg.lineKey];
-                if (line) {
+                if (line && line.stations) {
                     const s1 = line.stations.find(st => st.id === seg.fromId);
                     const s2 = line.stations.find(st => st.id === seg.toId);
                     if (s1 && s2) _totalDist += calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
                 }
             }
-          });
+          }
         }
 
-        const counts = _allSegments.reduce((acc: any, s: any) => { acc[s.lineKey] = (acc[s.lineKey]||0)+1; return acc; }, {});
         const _rankedSegments = Object.entries(counts).sort((a: any, b: any) => b[1]-a[1]).slice(0, 3);
 
         return { totalTrips: _totalTrips, uniqueLines: _uniqueLines, totalDist: _totalDist, totalCost: _totalCost, rankedSegments: _rankedSegments };
@@ -58,10 +83,15 @@ export const StatsPage: React.FC = () => {
     const uniqueStationsCount = useMemo(() => {
         let count = 0;
         if (railwayData) {
-            const uniqueStations = new Set();
-            Object.values(railwayData).forEach(line => {
-                if (line.stations) line.stations.forEach(s => uniqueStations.add(s.id));
-            });
+            const uniqueStations = new Set<string>();
+            for (const key in railwayData) {
+                const line = railwayData[key];
+                if (line.stations) {
+                    for (let i = 0; i < line.stations.length; i++) {
+                        uniqueStations.add(line.stations[i].id);
+                    }
+                }
+            }
             count = uniqueStations.size;
         }
         return count;

@@ -30,7 +30,10 @@ export const PinEditor: React.FC = () => {
         if(confirm('删除?')) {
             const newPins = pins.filter(p => p.id !== id);
             setPins(newPins);
-            if (editingPin?.id === id) setEditingPin(null);
+            if (editingPin?.id === id) {
+                setEditingPin(null);
+                setPinMode(PinMode.Idle);
+            }
         }
     };
 

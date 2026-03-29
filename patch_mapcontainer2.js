@@ -1,27 +1,64 @@
 const fs = require('fs');
+let content = fs.readFileSync('src/components/map/MapContainer.tsx', 'utf-8');
 
-const filepath = 'src/components/map/MapContainer.tsx';
-let source = fs.readFileSync(filepath, 'utf8');
+// Use current store state in map.on('click') is already done using useStore.getState()
+// Let's check renderPins logic to use useStore.getState().pinMode instead of closure pinMode
 
-source = source.replace(
-    /const marker = layer as L\.CircleMarker & \{ _cachedLat\?: number, _cachedLng\?: number, _cachedName\?: string \};/g,
-    `const marker = layer as any;`
-);
+const dragStartSearch = `                marker.on('dragstart', () => {
+                    isDraggingRef.current = true;
+                    setEditingPin({ ...pin });
+                    if (pinMode === PinMode.Idle) setPinMode(PinMode.Free);
+                });`;
 
-source = source.replace(
-    /\(layer as any\)\._cachedLat = latlng\[0\];/g,
-    `// @ts-ignore\n                layer._cachedLat = latlng[0];`
-);
+const dragStartReplace = `                marker.on('dragstart', () => {
+                    isDraggingRef.current = true;
+                    setEditingPin({ ...pin });
+                    const currentPinMode = useStore.getState().pinMode;
+                    if (currentPinMode === PinMode.Idle) setPinMode(PinMode.Free);
+                });`;
 
-source = source.replace(
-    /\(layer as any\)\._cachedLng = latlng\[1\];/g,
-    `// @ts-ignore\n                layer._cachedLng = latlng[1];`
-);
+content = content.replace(dragStartSearch, dragStartReplace);
 
-source = source.replace(
-    /\(layer as any\)\._cachedName = f\.properties\.name;/g,
-    `// @ts-ignore\n                layer._cachedName = f.properties.name;`
-);
+const dragEndSearch = `                marker.on('dragend', (e) => {
+                    isDraggingRef.current = false;
+                    const { lat, lng } = e.target.getLatLng();
+                    let newPos = { lat, lng, lineKey: pin.lineKey, percentage: pin.percentage };
+                    if (pinMode === PinMode.Snap) {
+                        const snap = findNearestPointOnLine(useStore.getState().railwayData, lat, lng);
+                        newPos = { ...newPos, ...snap };
+                        e.target.setLatLng(newPos);
+                    }
+                    setEditingPin((prev) => prev && prev.id === pin.id ? { ...prev, ...newPos } : { ...pin, ...newPos });
+                    if (pinMode === PinMode.Idle) setPinMode(PinMode.Free);
+                });`;
 
-fs.writeFileSync(filepath, source, 'utf8');
-console.log("Patched MapContainer.tsx!");
+const dragEndReplace = `                marker.on('dragend', (e) => {
+                    isDraggingRef.current = false;
+                    const { lat, lng } = e.target.getLatLng();
+                    let newPos = { lat, lng, lineKey: pin.lineKey, percentage: pin.percentage };
+                    const currentPinMode = useStore.getState().pinMode;
+                    if (currentPinMode === PinMode.Snap) {
+                        const snap = findNearestPointOnLine(useStore.getState().railwayData, lat, lng);
+                        newPos = { ...newPos, ...snap };
+                        e.target.setLatLng(newPos);
+                    }
+                    setEditingPin((prev) => prev && prev.id === pin.id ? { ...prev, ...newPos } : { ...pin, ...newPos });
+                    if (currentPinMode === PinMode.Idle) setPinMode(PinMode.Free);
+                });`;
+
+content = content.replace(dragEndSearch, dragEndReplace);
+
+const clickSearch = `                marker.on('click', () => {
+                    setEditingPin(pin);
+                    if (pinMode === PinMode.Idle) setPinMode(PinMode.Free);
+                });`;
+
+const clickReplace = `                marker.on('click', () => {
+                    setEditingPin(pin);
+                    const currentPinMode = useStore.getState().pinMode;
+                    if (currentPinMode === PinMode.Idle) setPinMode(PinMode.Free);
+                });`;
+
+content = content.replace(clickSearch, clickReplace);
+
+fs.writeFileSync('src/components/map/MapContainer.tsx', content);

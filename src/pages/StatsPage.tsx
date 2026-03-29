@@ -99,8 +99,8 @@ export const StatsPage: React.FC = () => {
         )}
 
         <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-xl shadow-sm border text-center"><div className="text-xs text-gray-400 mb-1">记录数</div><div className="text-3xl font-bold text-gray-800">{totalTrips}</div></div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border text-center"><div className="text-xs text-gray-400 mb-1">制霸路线</div><div className="text-3xl font-bold text-indigo-600">{uniqueLines}</div></div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-105 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">记录数</div><div className="text-3xl font-bold text-gray-800">{totalTrips}</div></div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-105 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">制霸路线</div><div className="text-3xl font-bold text-indigo-600">{uniqueLines}</div></div>
         </div>
 
         {user && (
@@ -118,8 +118,8 @@ export const StatsPage: React.FC = () => {
             </button>
         )}
 
-        <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-6 rounded-xl shadow-lg text-white">
-            <div className="flex items-center justify-between mb-2"><h3 className="font-bold flex items-center gap-2"><TrendingUp size={18}/> 里程统计</h3><span className="text-xs bg-white/20 px-2 py-1 rounded">总距离</span></div>
+        <div className="bg-gradient-to-br from-emerald-600 to-teal-700 hover:from-teal-600 hover:to-emerald-800 p-6 rounded-xl shadow-lg text-white transition-all duration-500 hover:-translate-y-1 hover:shadow-xl cursor-default group">
+            <div className="flex items-center justify-between mb-2"><h3 className="font-bold flex items-center gap-2"><TrendingUp size={18} className="group-hover:-translate-y-1 group-hover:scale-110 transition-transform duration-300"/> 里程统计</h3><span className="text-xs bg-white/20 px-2 py-1 rounded">总距离</span></div>
             <div className="text-4xl font-bold mb-2">{Math.round(totalDist)} <span className="text-lg font-normal opacity-80">km</span></div>
             <div className="border-t border-white/20 pt-2 flex items-center gap-2 text-sm opacity-90"><span className="font-bold">¥</span> 总开销: {totalCost.toLocaleString()}</div>
         </div>
@@ -127,7 +127,7 @@ export const StatsPage: React.FC = () => {
           {rankedSegments.map(([line, count]: [string, any], idx) => {
               const icon = railwayData[line]?.meta?.icon;
               return (
-                  <div key={line} className="p-3 border-b last:border-0 flex justify-between items-center">
+                  <div key={line} className="p-3 border-b last:border-0 flex justify-between items-center hover:bg-slate-50 transition-colors duration-200">
                       <div className="flex items-center gap-3">
                           <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${idx===0?'bg-yellow-100 text-yellow-700':'bg-slate-100 text-slate-600'}`}>{idx+1}</span>
                           {icon && <img src={icon} alt="" className="line-icon" />}

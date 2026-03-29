@@ -70,7 +70,7 @@ export const TripsPage: React.FC = () => {
                 trips.map(t => {
                     const segments = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
                     return (
-                        <div key={t.id} className="bg-white p-4 rounded-lg border shadow-sm">
+                        <div key={t.id} className="bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1">
                             <div className="flex justify-between mb-2 pb-2 border-b border-gray-50">
                                 <span className="text-xs font-bold text-gray-400">{t.date}</span>
                                 <div className="flex items-center gap-2">
@@ -112,7 +112,9 @@ export const TripsPage: React.FC = () => {
                     startEditingTrip({ date: new Date().toISOString().split('T')[0], memo: '', segments: newSegments, cost: 0 });
                 }
             }}>
-                <button id="btn-add-trip" onClick={() => startEditingTrip()} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-gray-50 font-bold transition">+ 记录新行程</button>
+                <button id="btn-add-trip" onClick={() => startEditingTrip()} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
+                    <Plus className="group-hover:rotate-90 transition-transform duration-300" size={18} /> 记录新行程
+                </button>
             </DropZone>
         </div>
     );

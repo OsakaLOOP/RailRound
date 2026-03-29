@@ -26,7 +26,7 @@ export default function MapComponent() {
     const railLayerRef = useRef(null);
     const isDraggingRef = useRef(false);
 
-    const { geoData, railwayData, getAllGeometries, pinMode, setPinMode } = useGeo();
+    const { geoData, railwayData, getAllGeometries, pinMode, setPinMode, mapInstanceRef } = useGeo();
     const { trips, pins, setPins, saveData } = useUserData();
 
     const [mapZoom, setMapZoom] = useState(10);
@@ -53,6 +53,7 @@ export default function MapComponent() {
         pinsLayer.current = L.layerGroup().addTo(map);
 
         mapInstance.current = map;
+        if (mapInstanceRef) mapInstanceRef.current = map;
 
         // Events
         const updateLayerVisibility = () => {

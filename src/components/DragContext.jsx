@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { isMobile } from 'react-device-detect';
+import { useGeo } from '../globalContext';
 
 // --- Global Drag Context ---
 const DragContext = createContext(null);
@@ -10,6 +11,9 @@ export const DragProvider = ({ children }) => {
   const [dragItem, setDragItem] = useState(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
   const [dropZone, setDropZone] = useState(null);
+  const [targetStation, setTargetStation] = useState(null);
+
+  const { railwayData, mapInstanceRef } = useGeo() || {};
 
   // Global Mouse/Touch Handlers
   useEffect(() => {
@@ -17,6 +21,38 @@ export const DragProvider = ({ children }) => {
 
     const handleMove = (x, y) => {
       setCursorPos({ x, y });
+
+      let foundTarget = null;
+      if (dragItem?.type === 'station' && mapInstanceRef?.current && railwayData) {
+          let minDistance = Infinity;
+          let bestStation = null;
+
+          Object.keys(railwayData).forEach(lineKey => {
+             const line = railwayData[lineKey];
+             line.stations.forEach(station => {
+                 // Skip the dragged station itself
+                 if (station.id === dragItem.id) return;
+                 const containerPoint = mapInstanceRef.current.latLngToContainerPoint([station.lat, station.lng]);
+                 const dist = Math.hypot(x - containerPoint.x, y - containerPoint.y);
+                 if (dist < 30 && dist < minDistance) {
+                     minDistance = dist;
+                     bestStation = {
+                         ...station,
+                         lineKey,
+                         containerPoint,
+                         logo: line.meta.logo,
+                         icon: line.meta.icon,
+                         company: line.meta.company
+                     };
+                 }
+             });
+          });
+
+          if (bestStation) {
+              foundTarget = bestStation;
+          }
+      }
+      setTargetStation(foundTarget);
 
       // Manual Drop Zone Detection for Touch (and Mouse consistency)
       // Since the overlay might block events or touch/mouse enter behavior varies
@@ -47,12 +83,17 @@ export const DragProvider = ({ children }) => {
     };
 
     const onEnd = () => {
-      if (dropZone) {
+      if (targetStation && dragItem?.type === 'station') {
+        window.dispatchEvent(new CustomEvent('stationDrop', {
+            detail: { startStation: dragItem, endStation: targetStation }
+        }));
+      } else if (dropZone) {
         dropZone.onDrop(dragItem);
       }
       setIsDragging(false);
       setDragItem(null);
       setDropZone(null);
+      setTargetStation(null);
     };
 
     window.addEventListener('mousemove', onMouseMove);
@@ -82,7 +123,7 @@ export const DragProvider = ({ children }) => {
     <DragContext.Provider value={{ isDragging, dragItem, startDrag, setDropZone }}>
       {children}
       {isDragging && dragItem && (
-        <DragOverlay item={dragItem} pos={cursorPos} />
+        <DragOverlay item={dragItem} pos={cursorPos} targetStation={targetStation} />
       )}
     </DragContext.Provider>
   );
@@ -123,40 +164,73 @@ export const DropZone = ({ onDrop, children, className = "", activeClassName = "
     );
 };
 
-const DragOverlay = ({ item, pos }) => {
-    return createPortal(
-        <div
-            style={{
-                position: 'fixed',
-                left: pos.x,
-                top: pos.y,
-                transform: 'translate(-50%, -50%) rotate(-5deg)',
-                pointerEvents: 'none', // Crucial: lets events pass through to DropZones
-                zIndex: 9999,
-                width: '120px',
-                height: '120px',
-            }}
-            className="animate-pop-in filter drop-shadow-xl"
-        >
-            <div className="relative w-full h-full">
-                {/* Rail Background */}
-                <img src="/src/assets/rail_bg.png" alt="" className="w-full h-full object-contain pixelated" />
+const DragOverlay = ({ item, pos, targetStation }) => {
+    const renderLine = () => {
+        if (!item.originPos) return null;
 
-                {/* Logo */}
-                {item.logo && (
-                    <img
-                        src={item.logo}
-                        alt=""
-                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full w-12 h-12 object-contain"
-                    />
+        const x1 = item.originPos.x;
+        const y1 = item.originPos.y;
+
+        const x2 = targetStation ? targetStation.containerPoint.x : pos.x;
+        const y2 = targetStation ? targetStation.containerPoint.y : pos.y;
+
+        const isSnapped = !!targetStation;
+
+        return (
+            <svg style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9998, width: '100%', height: '100%' }}>
+                <line
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke={isSnapped ? '#38bdf8' : '#94a3b8'}
+                    strokeWidth={isSnapped ? 6 : 4}
+                    strokeLinecap="round"
+                    className="dash-line"
+                />
+                {isSnapped && (
+                    <circle cx={x2} cy={y2} r="8" fill="#38bdf8" stroke="white" strokeWidth="2" />
                 )}
+            </svg>
+        );
+    };
 
-                {/* Text Label */}
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded whitespace-nowrap font-bold border border-white/20">
-                    {item.name || item.lineKey}
+    return createPortal(
+        <>
+            {renderLine()}
+            <div
+                style={{
+                    position: 'fixed',
+                    left: pos.x,
+                    top: pos.y,
+                    transform: 'translate(-50%, -50%) rotate(-5deg)',
+                    pointerEvents: 'none', // Crucial: lets events pass through to DropZones
+                    zIndex: 9999,
+                    width: '120px',
+                    height: '120px',
+                }}
+                className="animate-pop-in filter drop-shadow-xl"
+            >
+                <div className="relative w-full h-full">
+                    {/* Rail Background */}
+                    <img src="/src/assets/rail_bg.png" alt="" className="w-full h-full object-contain pixelated" />
+
+                    {/* Logo */}
+                    {item.logo && (
+                        <img
+                            src={item.logo}
+                            alt=""
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full w-12 h-12 object-contain"
+                        />
+                    )}
+
+                    {/* Text Label */}
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded whitespace-nowrap font-bold border border-white/20">
+                        {item.name || item.lineKey}
+                    </div>
                 </div>
             </div>
-        </div>,
+        </>,
         document.body
     );
 };

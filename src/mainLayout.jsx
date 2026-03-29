@@ -28,6 +28,17 @@ export default function MainLayout() {
 
   const [isExportingKML, setIsExportingKML] = useState(false);
 
+  // --- Global Event Listeners ---
+  useEffect(() => {
+      const handleStationDrop = (e) => {
+          const { startStation, endStation } = e.detail;
+          navigate('/trips/new', { state: { autoPlan: { startStation, endStation } } });
+      };
+
+      window.addEventListener('stationDrop', handleStationDrop);
+      return () => window.removeEventListener('stationDrop', handleStationDrop);
+  }, [navigate]);
+
   // --- File Logic ---
   const handleExportKML = async () => {
     if (isExportingKML) return;

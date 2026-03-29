@@ -28,3 +28,13 @@
   src: local('Courier New'), monospace; /* Fallback */
 }
 .pixel-font { font-family: 'PixelFont', monospace; letter-spacing: -1px; }
+
+@keyframes dashAnim {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.dash-line {
+  stroke-dasharray: 10, 10;
+  animation: dashAnim 0.5s linear infinite;
+}

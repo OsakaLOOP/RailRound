@@ -194,6 +194,7 @@ export const GlobalProvider = ({ children }) => {
     const [companyDB, setCompanyDB] = useState({});
     const [isGeoReady, setIsGeoReady] = useState(false);
     const [pinMode, setPinMode] = useState('idle');
+    const mapInstanceRef = useRef(null);
 
     // Initialize Worker
     useEffect(() => {
@@ -375,7 +376,7 @@ export const GlobalProvider = ({ children }) => {
     // --- Combine Values ---
     const authVal = { user, userProfile, login, logout };
     const userVal = { trips, pins, folders, badgeSettings, saveData, setTrips, setPins, setFolders, setBadgeSettings, editorMode, setEditorMode };
-    const geoVal = { railwayData, setRailwayData, geoData, setGeoData, companyDB, setCompanyDB, isGeoReady, getRouteVisualData, getAllGeometries, generateKmlData, workerRef, pinMode, setPinMode };
+    const geoVal = { railwayData, setRailwayData, geoData, setGeoData, companyDB, setCompanyDB, isGeoReady, getRouteVisualData, getAllGeometries, generateKmlData, workerRef, pinMode, setPinMode, mapInstanceRef };
 
     return (
         <VersionContext value={versionInfo}>

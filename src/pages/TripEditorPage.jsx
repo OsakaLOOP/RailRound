@@ -36,14 +36,28 @@ export default function TripEditorPage() {
         } else {
             // New Trip
             const initialStation = location.state?.initialStation;
+            const autoPlan = location.state?.autoPlan;
             const segments = [{ id: Date.now().toString(), lineKey: '', fromId: '', toId: '' }];
-            if (initialStation) {
+
+            if (autoPlan) {
+                const { startStation, endStation } = autoPlan;
+                setAutoForm(prev => ({
+                    ...prev,
+                    startLine: startStation.lineKey,
+                    startStation: startStation.id,
+                    endLine: endStation.lineKey,
+                    endStation: endStation.id
+                }));
+                setEditorMode('auto');
+            } else if (initialStation) {
                 segments[0].lineKey = initialStation.lineKey;
                 segments[0].fromId = initialStation.id;
+                setForm(prev => ({ ...prev, segments }));
+            } else {
+                setForm(prev => ({ ...prev, segments }));
             }
-            setForm(prev => ({ ...prev, segments }));
         }
-    }, [id, trips, location.state, navigate]);
+    }, [id, trips, location.state, navigate, setEditorMode]);
 
     const onClose = () => navigate(-1);
 
@@ -105,6 +119,19 @@ export default function TripEditorPage() {
             }
         }, 100);
     };
+
+    // Trigger auto search automatically if mounted with autoPlan state
+    useEffect(() => {
+        if (editorMode === 'auto' && autoForm.startStation && autoForm.endStation && !isEditing) {
+            // We only want to trigger this automatically once when coming from a drag-and-drop autoPlan
+            if (location.state?.autoPlan) {
+                handleAutoSearch();
+                // Clear the state so it doesn't re-trigger on subsequent normal interactions
+                navigate('.', { replace: true, state: { ...location.state, autoPlan: null } });
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editorMode, autoForm.startStation, autoForm.endStation, location.state]);
 
     // Helper functions for UI
     const openSelector = (targetType, index = null, allowed = null) => {

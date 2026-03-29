@@ -2,12 +2,17 @@ import React, { useEffect } from 'react';
 import { X, Star, CheckCircle2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
+import { calculateLatestStats } from '../../utils/stats';
 
 export const AddToFolderModal: React.FC = () => {
-    const { isOpen, trip, folders } = useStore(useShallow(state => ({
+    const { isOpen, trip, folders, trips, segmentGeometries, railwayData, geoData } = useStore(useShallow(state => ({
         isOpen: state.modals.addToFolderModalOpen,
         trip: state.modals.currentTripForFolder,
-        folders: state.folders
+        folders: state.folders,
+        trips: state.trips,
+        segmentGeometries: state.segmentGeometries,
+        railwayData: state.railwayData,
+        geoData: state.geoData
     })));
     const setModalState = useStore(state => state.setModalState);
     const setFolders = useStore(state => state.setFolders);
@@ -34,7 +39,17 @@ export const AddToFolderModal: React.FC = () => {
                 } else {
                     currentIds.add(trip.id);
                 }
-                return { ...f, trip_ids: Array.from(currentIds) };
+                const newIds = Array.from(currentIds);
+
+                // Recalculate stats for modified folder
+                let stats = null;
+                if (newIds.length > 0) {
+                    const folderTrips = trips.filter(t => newIds.includes(t.id));
+                    folderTrips.sort((a,b) => b.date.localeCompare(a.date));
+                    stats = calculateLatestStats(folderTrips, segmentGeometries, railwayData, geoData);
+                }
+
+                return { ...f, trip_ids: newIds, stats };
             }
             return f;
         });

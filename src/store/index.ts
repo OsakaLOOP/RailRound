@@ -1,5 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { api } from '../services/api';
+import { calculateLatestStats } from '../utils/stats';
+import changelogData from '../../public/changelog.json';
+
+const CURRENT_VERSION = changelogData.meta["currentVersion"];
 
 // basic value
 export type ID = string | number;
@@ -174,6 +179,9 @@ export interface GlobalStore {
   setFolders: (folders: Folder[] | ((prev: Folder[]) => Folder[])) => void;
   setBadgeSettings: (settings: BadgeSettings) => void;
 
+  syncDataToCloud: () => Promise<void>;
+  loadUserData: (token: string, isInteractive?: boolean) => Promise<void>;
+
   // UI Slice
   activeTab: 'records' | 'map' | 'stats';
   setActiveTab: (tab: 'records' | 'map' | 'stats') => void;
@@ -239,22 +247,123 @@ export const useStore = create<GlobalStore>()(
       folders: [],
       badgeSettings: { enabled: true },
 
-      login: (token, username) => set({ isLoggedIn: true, user: { token, username } }),
-      logout: () => set({ isLoggedIn: false, user: null, userProfile: null }),
+      login: (token, username) => {
+          localStorage.setItem('rail_token', token);
+          localStorage.setItem('rail_username', username);
+          set({ isLoggedIn: true, user: { token, username } });
+          get().loadUserData(token, true);
+      },
+      logout: () => {
+          localStorage.removeItem('rail_token');
+          localStorage.removeItem('rail_username');
+          set({ isLoggedIn: false, user: null, userProfile: null });
+      },
       setUserProfile: (profile) => set({ userProfile: profile }),
 
-      setTrips: (input) => set((state) => ({ trips: typeof input === 'function' ? input(state.trips) : input })),
-      addTrip: (trip) => set((state) => ({ trips: [trip, ...state.trips].sort((a,b) => b.date.localeCompare(a.date)) })),
-      updateTrip: (trip) => set((state) => ({ trips: state.trips.map(t => t.id === trip.id ? trip : t).sort((a,b) => b.date.localeCompare(a.date)) })),
-      removeTrip: (id) => set((state) => ({ trips: state.trips.filter(t => t.id !== id) })),
+      syncDataToCloud: async () => {
+          const state = get();
+          if (!state.user) return;
+          try {
+              const latest5 = calculateLatestStats(state.trips, state.segmentGeometries, state.railwayData, state.geoData);
+              await api.saveData(state.user.token, state.trips, state.pins, latest5, CURRENT_VERSION, state.folders, state.badgeSettings);
+          } catch (e: any) {
+              console.error('Failed to sync data to cloud:', e);
+              // alert('云端同步失败: ' + e.message); // Consider a non-blocking toast
+          }
+      },
 
-      setPins: (input) => set((state) => ({ pins: typeof input === 'function' ? input(state.pins) : input })),
-      addPin: (pin) => set((state) => ({ pins: [...state.pins, pin] })),
-      updatePin: (pin) => set((state) => ({ pins: state.pins.map(p => p.id === pin.id ? pin : p) })),
-      removePin: (id) => set((state) => ({ pins: state.pins.filter(p => p.id !== id) })),
+      loadUserData: async (token, isInteractive = false) => {
+          try {
+              const cloudData = await api.getData(token);
+              set({ userProfile: cloudData });
 
-      setFolders: (input) => set((state) => ({ folders: typeof input === 'function' ? input(state.folders) : input })),
-      setBadgeSettings: (settings) => set({ badgeSettings: settings }),
+              let newTrips = cloudData.trips || [];
+              let newPins = cloudData.pins || [];
+              let newFolders = cloudData.folders || [];
+              let newBadgeSettings = cloudData.badge_settings || { enabled: true };
+
+              const state = get();
+
+              if (isInteractive && (state.trips.length > 0 || state.pins.length > 0)) {
+                  if (confirm("检测到本地有数据，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)")) {
+                      const tripMap = new Map();
+                      newTrips.forEach((t: Trip) => tripMap.set(t.id, t));
+                      state.trips.forEach((t: Trip) => tripMap.set(t.id, t));
+                      newTrips = Array.from(tripMap.values());
+
+                      const pinMap = new Map();
+                      newPins.forEach((p: Pin) => pinMap.set(p.id, p));
+                      state.pins.forEach((p: Pin) => pinMap.set(p.id, p));
+                      newPins = Array.from(pinMap.values());
+
+                      set({
+                          trips: newTrips.sort((a: any, b: any) => b.date.localeCompare(a.date)),
+                          pins: newPins,
+                          folders: newFolders,
+                          badgeSettings: newBadgeSettings
+                      });
+                      get().syncDataToCloud();
+                      return;
+                  }
+              }
+
+              set({
+                  trips: newTrips.sort((a: any, b: any) => b.date.localeCompare(a.date)),
+                  pins: newPins,
+                  folders: newFolders,
+                  badgeSettings: newBadgeSettings
+              });
+              console.log('User data loaded');
+          } catch (e: any) {
+              console.error('Failed to load user data:', e);
+              if (e.message.includes('Unauthorized')) {
+                  get().logout();
+              }
+          }
+      },
+
+      setTrips: (input) => {
+          set((state) => ({ trips: typeof input === 'function' ? input(state.trips) : input }));
+          get().syncDataToCloud();
+      },
+      addTrip: (trip) => {
+          set((state) => ({ trips: [trip, ...state.trips].sort((a,b) => b.date.localeCompare(a.date)) }));
+          get().syncDataToCloud();
+      },
+      updateTrip: (trip) => {
+          set((state) => ({ trips: state.trips.map(t => t.id === trip.id ? trip : t).sort((a,b) => b.date.localeCompare(a.date)) }));
+          get().syncDataToCloud();
+      },
+      removeTrip: (id) => {
+          set((state) => ({ trips: state.trips.filter(t => t.id !== id) }));
+          get().syncDataToCloud();
+      },
+
+      setPins: (input) => {
+          set((state) => ({ pins: typeof input === 'function' ? input(state.pins) : input }));
+          get().syncDataToCloud();
+      },
+      addPin: (pin) => {
+          set((state) => ({ pins: [...state.pins, pin] }));
+          get().syncDataToCloud();
+      },
+      updatePin: (pin) => {
+          set((state) => ({ pins: state.pins.map(p => p.id === pin.id ? pin : p) }));
+          get().syncDataToCloud();
+      },
+      removePin: (id) => {
+          set((state) => ({ pins: state.pins.filter(p => p.id !== id) }));
+          get().syncDataToCloud();
+      },
+
+      setFolders: (input) => {
+          set((state) => ({ folders: typeof input === 'function' ? input(state.folders) : input }));
+          get().syncDataToCloud();
+      },
+      setBadgeSettings: (settings) => {
+          set({ badgeSettings: settings });
+          get().syncDataToCloud();
+      },
 
       // --- UI Slice ---
       activeTab: 'records',

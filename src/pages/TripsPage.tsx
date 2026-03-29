@@ -53,13 +53,17 @@ const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
 };
 
 export const TripsPage: React.FC = () => {
-    const { trips, railwayData } = useStore(useShallow(state => ({ trips: state.trips, railwayData: state.railwayData })));
+    const { trips, railwayData, isRailwayDataReady } = useStore(useShallow(state => ({
+        trips: state.trips,
+        railwayData: state.railwayData,
+        isRailwayDataReady: state.isRailwayDataReady
+    })));
     const setModalState = useStore(state => state.setModalState);
     const startEditingTrip = useStore(state => state.startEditingTrip);
     const removeTrip = useStore(state => state.removeTrip);
 
     return (
-        <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4">
+        <div className={`flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4 transition-all duration-300 ${!isRailwayDataReady ? 'opacity-50 pointer-events-none select-none blur-[1px]' : ''}`}>
             {trips.length === 0 ? (
                 <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
                     <Train size={48} className="opacity-20 mb-4"/>

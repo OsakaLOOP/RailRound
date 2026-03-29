@@ -24,6 +24,7 @@ import GeoWorker from './workers/geo.worker.js?worker';
 import { meta } from '../public/changelog.json';
 import { api } from './services/api';
 import { useShallow } from 'zustand/react/shallow';
+import toast, { Toaster } from 'react-hot-toast';
 
 const CURRENT_VERSION = meta["currentVersion"];
 
@@ -52,7 +53,8 @@ export const AppLayout: React.FC = () => {
         setSegmentGeometries: state.setSegmentGeometries,
         setTripSegmentsGeometry: state.setTripSegmentsGeometry,
         segmentGeometries: state.segmentGeometries,
-        isLoginOpen: state.modals.isLoginOpen
+        isLoginOpen: state.modals.isLoginOpen,
+        setIsRailwayDataReady: state.setIsRailwayDataReady
     })));
 
     const [stationMenu, setStationMenu] = useState<any>(null);
@@ -132,6 +134,9 @@ export const AppLayout: React.FC = () => {
     const autoLoadData = async () => {
         try {
             console.log('[Autoload] 正在初始化...');
+            useStore.getState().setIsRailwayDataReady(false);
+            const loadToast = toast.loading('加载基础地图与路线数据...', { position: 'top-center' });
+
             let currentCompanyData = {};
             try {
                 const companyRes = await fetch('/company_data.json');
@@ -251,7 +256,13 @@ export const AppLayout: React.FC = () => {
             if (validResults.length > 0) processGeoJsonBatch(validResults, currentCompanyData);
 
             console.log('[Autoload] 初始化全部完成，应用就绪。');
-        } catch (err) { console.error('[Autoload] 致命错误:', err); }
+            toast.success('数据加载完成', { id: loadToast });
+            useStore.getState().setIsRailwayDataReady(true);
+        } catch (err) {
+            console.error('[Autoload] 致命错误:', err);
+            toast.error('加载基础数据失败');
+            useStore.getState().setIsRailwayDataReady(true); // Don't block UI forever
+        }
     };
 
     // --- 3. Geo Calculation Effects ---
@@ -453,7 +464,14 @@ export const AppLayout: React.FC = () => {
         const file = event.target.files[0];
         if(!file) return;
         const reader = new FileReader();
-        reader.onload = (e: any) => { try { const json = JSON.parse(e.target.result); applyCompanyData(json, { silent: false }); } catch(err) { alert("解析失败"); } };
+        reader.onload = (e: any) => {
+            try {
+                const json = JSON.parse(e.target.result);
+                applyCompanyData(json, { silent: false });
+            } catch(err) {
+                toast.error("解析失败");
+            }
+        };
         reader.readAsText(file);
         event.target.value = '';
     };
@@ -461,24 +479,34 @@ export const AppLayout: React.FC = () => {
     const handleFileUpload = async(event: any) => {
         const files = event.target.files;
         if (!files || files.length === 0) return;
-        const readTasks = Array.from(files).map((file: any) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e: any) => {
-              try {
-                const json = JSON.parse(e.target.result);
-                const companyName = file.name.replace(/\.(geojson|json)$/i, "");
-                resolve({ json, companyName });
-              } catch (err) { alert(`文件 ${file.name} 解析失败，已跳过`); resolve(null); }
-            };
-            reader.onerror = () => resolve(null);
-            reader.readAsText(file);
-          });
-        });
-        try {
-          const results = await Promise.all(readTasks);
-          const validResults = results.filter(r => r !== null) as any[];
-          if (validResults.length === 0) return;
+
+        const uploadPromise = new Promise(async (resolve, reject) => {
+            try {
+                useStore.getState().setIsRailwayDataReady(false);
+                const readTasks = Array.from(files).map((file: any) => {
+                  return new Promise((resolveTask) => {
+                    const reader = new FileReader();
+                    reader.onload = (e: any) => {
+                      try {
+                        const json = JSON.parse(e.target.result);
+                        const companyName = file.name.replace(/\.(geojson|json)$/i, "");
+                        resolveTask({ json, companyName });
+                      } catch (err) {
+                          console.warn(`文件 ${file.name} 解析失败，已跳过`);
+                          resolveTask(null);
+                      }
+                    };
+                    reader.onerror = () => resolveTask(null);
+                    reader.readAsText(file);
+                  });
+                });
+
+                const results = await Promise.all(readTasks);
+                const validResults = results.filter(r => r !== null) as any[];
+                if (validResults.length === 0) {
+                    reject(new Error("无有效文件"));
+                    return;
+                }
 
           const newFeatures: any[] = [];
           const railwayUpdates: any = {};
@@ -512,28 +540,47 @@ export const AppLayout: React.FC = () => {
                  }
             });
           });
-          if (newFeatures.length > 0) setGeoData((prev: any) => ({ type: "FeatureCollection", features: [...prev.features, ...newFeatures] }));
-          if (Object.keys(railwayUpdates).length > 0) {
-              setRailwayData((prev: any) => {
-                const next = { ...prev };
-                Object.entries(railwayUpdates).forEach(([key, val]: [string, any]) => {
-                    if (!next[key]) { next[key] = val; }
-                    else {
-                        val.stations.forEach((s: any) => { if (!next[key].stations.find((ex: any) => ex.id === s.id)) next[key].stations.push(s); });
-                        if(val.meta.icon && !next[key].meta.icon) next[key].meta.icon = val.meta.icon;
-                    }
-                });
-                return next;
-              });
-          }
-          alert(`成功导入 ${validResults.length} 个文件！`);
-        } catch (err) { alert("文件处理过程中发生未知错误"); }
-        finally { event.target.value = ''; }
+                  if (newFeatures.length > 0) setGeoData((prev: any) => ({ type: "FeatureCollection", features: [...prev.features, ...newFeatures] }));
+                  if (Object.keys(railwayUpdates).length > 0) {
+                      setRailwayData((prev: any) => {
+                        const next = { ...prev };
+                        Object.entries(railwayUpdates).forEach(([key, val]: [string, any]) => {
+                            if (!next[key]) { next[key] = val; }
+                            else {
+                                val.stations.forEach((s: any) => { if (!next[key].stations.find((ex: any) => ex.id === s.id)) next[key].stations.push(s); });
+                                if(val.meta.icon && !next[key].meta.icon) next[key].meta.icon = val.meta.icon;
+                            }
+                        });
+                        return next;
+                      });
+                  }
+                  resolve(`成功导入 ${validResults.length} 个文件！`);
+            } catch (err) {
+                reject(err);
+            } finally {
+                useStore.getState().setIsRailwayDataReady(true);
+            }
+        });
+
+        toast.promise(uploadPromise, {
+            loading: '正在导入路线数据...',
+            success: (msg: any) => msg,
+            error: '文件处理过程中发生未知错误',
+        });
+
+        event.target.value = '';
     };
 
     return (
         <DragProvider>
             <div className="flex flex-col h-screen bg-slate-100 font-sans text-slate-800 overflow-visible">
+                <Toaster toastOptions={{
+                    className: 'text-sm font-bold',
+                    style: {
+                        background: '#333',
+                        color: '#fff',
+                    },
+                }} />
                 <Header
                     handleExportKML={handleExportKML}
                     handleExportUserData={handleExportUserData}

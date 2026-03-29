@@ -148,6 +148,9 @@ export interface GlobalStore {
   setSegmentGeometries: (data: Map<string, any>) => void;
   setTripSegmentsGeometry: (data: any[]) => void;
 
+  isRailwayDataReady: boolean;
+  setIsRailwayDataReady: (ready: boolean) => void;
+
   // User Slice
   user: { token: string; username: string } | null;
   userProfile: UserProfile | null;
@@ -223,7 +226,9 @@ export const useStore = create<GlobalStore>()(
       geoData: { type: 'FeatureCollection', features: [] },
       segmentGeometries: new Map(),
       tripSegmentsGeometry: [],
+      isRailwayDataReady: false,
 
+      setIsRailwayDataReady: (ready) => set({ isRailwayDataReady: ready }),
       setRailwayData: (input) => set((state) => ({ railwayData: typeof input === 'function' ? input(state.railwayData) : input })),
       setCompanyDB: (input) => set((state) => ({ companyDB: typeof input === 'function' ? input(state.companyDB) : input })),
       setGeoData: (input) => set((state) => ({ geoData: typeof input === 'function' ? input(state.geoData) : input })),

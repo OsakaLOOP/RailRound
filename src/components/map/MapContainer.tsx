@@ -23,24 +23,22 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     const [isMapInitialized, setIsMapInitialized] = React.useState(false);
 
     const {
-        geoData, leafletReady, tripSegmentsGeometry, activeTab, mapZoom,
-        setMapZoom, setLeafletReady, pins, editingPin, pinMode, railwayData,
-        setEditingPin, setPinMode
+        geoData, leafletReady, tripSegmentsGeometry, activeTab, mapZoom, pins, editingPin, pinMode, railwayData
     } = useStore(useShallow(state => ({
         geoData: state.geoData,
         leafletReady: state.leafletReady,
         tripSegmentsGeometry: state.tripSegmentsGeometry,
         activeTab: state.activeTab,
         mapZoom: state.mapZoom,
-        setMapZoom: state.setMapZoom,
-        setLeafletReady: state.setLeafletReady,
         pins: state.pins,
         editingPin: state.editingPin,
         pinMode: state.pinMode,
-        railwayData: state.railwayData,
-        setEditingPin: state.setEditingPin,
-        setPinMode: state.setPinMode
+        railwayData: state.railwayData
     })));
+    const setMapZoom = useStore(state => state.setMapZoom);
+    const setLeafletReady = useStore(state => state.setLeafletReady);
+    const setEditingPin = useStore(state => state.setEditingPin);
+    const setPinMode = useStore(state => state.setPinMode);
 
     useEffect(() => {
         setLeafletReady(true);

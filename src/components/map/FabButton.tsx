@@ -4,13 +4,15 @@ import { useStore, PinMode } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 
 export const FabButton: React.FC = () => {
-    const { activeTab, pinMode, editingPin, setPinMode, setEditingPin } = useStore(useShallow(state => ({
+    const {
+        activeTab, pinMode, editingPin
+    } = useStore(useShallow(state => ({
         activeTab: state.activeTab,
         pinMode: state.pinMode,
-        editingPin: state.editingPin,
-        setPinMode: state.setPinMode,
-        setEditingPin: state.setEditingPin
+        editingPin: state.editingPin
     })));
+    const setPinMode = useStore(state => state.setPinMode);
+    const setEditingPin = useStore(state => state.setEditingPin);
 
     const togglePinMode = () => {
         if (pinMode === PinMode.Idle) {

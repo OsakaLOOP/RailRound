@@ -29,31 +29,28 @@ const CURRENT_VERSION = meta["currentVersion"];
 
 export const AppLayout: React.FC = () => {
     const {
-        activeTab, user, setModalState, setCompanyDB, setRailwayData, setGeoData,
-        trips, pins, railwayData, geoData, companyDB, setTrips, setPins, folders, badgeSettings,
-        setSegmentGeometries, setTripSegmentsGeometry, segmentGeometries,
-        isLoginOpen
+        activeTab, user, trips, pins, railwayData, geoData, companyDB, folders, badgeSettings, segmentGeometries, isLoginOpen
     } = useStore(useShallow(state => ({
         activeTab: state.activeTab,
         user: state.user,
-        setModalState: state.setModalState,
-        setCompanyDB: state.setCompanyDB,
-        setRailwayData: state.setRailwayData,
-        setGeoData: state.setGeoData,
         trips: state.trips,
         pins: state.pins,
         railwayData: state.railwayData,
         geoData: state.geoData,
         companyDB: state.companyDB,
-        setTrips: state.setTrips,
-        setPins: state.setPins,
         folders: state.folders,
         badgeSettings: state.badgeSettings,
-        setSegmentGeometries: state.setSegmentGeometries,
-        setTripSegmentsGeometry: state.setTripSegmentsGeometry,
         segmentGeometries: state.segmentGeometries,
         isLoginOpen: state.modals.isLoginOpen
     })));
+    const setModalState = useStore(state => state.setModalState);
+    const setCompanyDB = useStore(state => state.setCompanyDB);
+    const setRailwayData = useStore(state => state.setRailwayData);
+    const setGeoData = useStore(state => state.setGeoData);
+    const setTrips = useStore(state => state.setTrips);
+    const setPins = useStore(state => state.setPins);
+    const setSegmentGeometries = useStore(state => state.setSegmentGeometries);
+    const setTripSegmentsGeometry = useStore(state => state.setTripSegmentsGeometry);
 
     const [stationMenu, setStationMenu] = useState<any>(null);
     const [isExportingKML, setIsExportingKML] = useState(false);

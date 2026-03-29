@@ -289,39 +289,40 @@ export const TripEditor: React.FC = () => {
                       );
                   })}
                   </div>
-                  <button onClick={addSegment} disabled={(form.segments?.length || 0) >= 10} className="w-full py-2 border-2 border-dashed border-gray-300 text-gray-400 rounded-lg hover:bg-gray-50 hover:text-gray-600 transition flex items-center justify-center gap-2 disabled:opacity-50"><Plus size={16} /> 添加换乘 / 下一程</button>
-                  <textarea className="w-full p-2 border rounded h-20 bg-gray-50" placeholder="备注..." value={form.memo || ''} onChange={e => setForm({ memo: e.target.value })} />
+                  <button onClick={addSegment} disabled={(form.segments?.length || 0) >= 10} className="w-full py-2 border-2 border-dashed border-gray-300 text-gray-400 rounded-lg hover:bg-gray-50 hover:text-gray-600 hover:border-gray-400 transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 group"><Plus className="group-hover:rotate-180 transition-transform duration-500" size={16} /> 添加换乘 / 下一程</button>
+                  <textarea className="w-full p-2 border rounded h-20 bg-gray-50 focus:ring-2 focus:ring-emerald-200 outline-none transition-all duration-300" placeholder="备注..." value={form.memo || ''} onChange={e => setForm({ memo: e.target.value })} />
               </div>
             )}
 
             {editorMode === EditorMode.Auto && (
                 <div className="p-6 space-y-6 flex-1 transition-opacity duration-300">
-                    <div id="auto-planning-form" className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <div id="auto-planning-form" className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-100 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-300 via-blue-500 to-blue-300 opacity-50"></div>
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1">出发地</label>
                             <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => openSelector('autoStart')} className="p-2 rounded border text-sm text-left bg-white text-gray-700 truncate flex items-center gap-1">{autoForm.startLine ? <span>{autoForm.startLine}</span> : <span className="text-gray-400">选择线路...</span>}</button>
-                                <select className="p-2 rounded border text-sm" disabled={!autoForm.startLine} value={autoForm.startStation} onChange={e => setAutoForm({ ...autoForm, startStation: e.target.value })}><option value="">车站...</option>{autoForm.startLine && railwayData[autoForm.startLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                <button onClick={() => openSelector('autoStart')} className="p-2 rounded border text-sm text-left bg-white text-gray-700 truncate flex items-center gap-1 hover:border-blue-300 hover:shadow-sm transition-all">{autoForm.startLine ? <span>{autoForm.startLine}</span> : <span className="text-gray-400">选择线路...</span>}</button>
+                                <select className="p-2 rounded border text-sm hover:border-blue-300 hover:shadow-sm transition-all outline-none" disabled={!autoForm.startLine} value={autoForm.startStation} onChange={e => setAutoForm({ ...autoForm, startStation: e.target.value })}><option value="">车站...</option>{autoForm.startLine && railwayData[autoForm.startLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
                             </div>
                         </div>
-                        <div className="flex justify-center text-blue-300"><ArrowDown size={20}/></div>
+                        <div className="flex justify-center text-blue-300"><ArrowDown className="animate-bounce" size={20}/></div>
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1">目的地</label>
                             <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => openSelector('autoEnd')} className="p-2 rounded border text-sm text-left bg-white text-gray-700 truncate flex items-center gap-1">{autoForm.endLine ? <span>{autoForm.endLine}</span> : <span className="text-gray-400">选择线路...</span>}</button>
-                                <select className="p-2 rounded border text-sm" disabled={!autoForm.endLine} value={autoForm.endStation} onChange={e => setAutoForm({ ...autoForm, endStation: e.target.value })}><option value="">车站...</option>{autoForm.endLine && railwayData[autoForm.endLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                <button onClick={() => openSelector('autoEnd')} className="p-2 rounded border text-sm text-left bg-white text-gray-700 truncate flex items-center gap-1 hover:border-blue-300 hover:shadow-sm transition-all">{autoForm.endLine ? <span>{autoForm.endLine}</span> : <span className="text-gray-400">选择线路...</span>}</button>
+                                <select className="p-2 rounded border text-sm hover:border-blue-300 hover:shadow-sm transition-all outline-none" disabled={!autoForm.endLine} value={autoForm.endStation} onChange={e => setAutoForm({ ...autoForm, endStation: e.target.value })}><option value="">车站...</option>{autoForm.endLine && railwayData[autoForm.endLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
                             </div>
                         </div>
                     </div>
-                    <button onClick={onAutoSearch} disabled={isRouteSearching} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-lg disabled:opacity-70">
-                        {isRouteSearching ? <Loader2 className="animate-spin"/> : <Search size={18}/>}
+                    <button onClick={onAutoSearch} disabled={isRouteSearching} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-700 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] active:translate-y-0 transition-all duration-300 disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:scale-100 disabled:hover:shadow-none group">
+                        {isRouteSearching ? <Loader2 className="animate-spin"/> : <Search className="group-hover:scale-110 transition-transform duration-300" size={18}/>}
                         {isRouteSearching ? '规划中...' : '搜索推荐路线'}
                     </button>
                     <div className="text-xs text-center text-slate-400">仅支持同一公司或JR集团内的换乘搜索</div>
                 </div>
             )}
 
-            {editorMode === EditorMode.Manual && <div className="p-4 border-t"><button onClick={onSave} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold">保存行程</button></div>}
+            {editorMode === EditorMode.Manual && <div className="p-4 border-t"><button onClick={onSave} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] active:translate-y-0 transition-all duration-300">保存行程</button></div>}
           </div>
         </div>
         <LineSelector isOpen={selectorOpen} onClose={() => setSelectorOpen(false)} onSelect={handleLineSelect} allowedLines={allowedLines} />

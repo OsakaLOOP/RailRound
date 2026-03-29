@@ -4,10 +4,12 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 
 export const BottomNav: React.FC = () => {
-    const { activeTab, setActiveTab } = useStore(useShallow(state => ({
-        activeTab: state.activeTab,
-        setActiveTab: state.setActiveTab
+    const {
+        activeTab
+    } = useStore(useShallow(state => ({
+        activeTab: state.activeTab
     })));
+    const setActiveTab = useStore(state => state.setActiveTab);
 
     return (
         <nav className="bg-white border-t p-2 flex justify-around shrink-0 pb-safe z-30">

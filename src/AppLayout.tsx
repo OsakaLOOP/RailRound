@@ -31,7 +31,7 @@ export const AppLayout: React.FC = () => {
     const {
         activeTab, user, setModalState, setCompanyDB, setRailwayData, setGeoData,
         trips, pins, railwayData, geoData, companyDB, setTrips, setPins, folders, badgeSettings,
-        setSegmentGeometries, setTripSegmentsGeometry, segmentGeometries,
+        setSegmentGeometries, setTripSegmentsGeometry, segmentGeometries, setVisitedStations,
         isLoginOpen
     } = useStore(useShallow(state => ({
         activeTab: state.activeTab,
@@ -51,6 +51,7 @@ export const AppLayout: React.FC = () => {
         badgeSettings: state.badgeSettings,
         setSegmentGeometries: state.setSegmentGeometries,
         setTripSegmentsGeometry: state.setTripSegmentsGeometry,
+        setVisitedStations: state.setVisitedStations,
         segmentGeometries: state.segmentGeometries,
         isLoginOpen: state.modals.isLoginOpen
     })));
@@ -260,7 +261,28 @@ export const AppLayout: React.FC = () => {
         const timerId = setTimeout(() => {
             const allSegments = trips.flatMap(t => t.segments || []);
 
+
+            // Extract visited stations logic
+            const visited = new Set<string>();
+            allSegments.forEach(seg => {
+                const line = railwayData[seg.lineKey];
+                if (!line) return;
+
+                const fromIdx = line.stations.findIndex(s => s.id === seg.fromId);
+                const toIdx = line.stations.findIndex(s => s.id === seg.toId);
+
+                if (fromIdx !== -1 && toIdx !== -1) {
+                    const start = Math.min(fromIdx, toIdx);
+                    const end = Math.max(fromIdx, toIdx);
+                    for (let i = start; i <= end; i++) {
+                        visited.add(line.stations[i].id);
+                    }
+                }
+            });
+            setVisitedStations(visited);
+
             // 1. 优先使用已有的缓存进行渲染，保证部分路线立即显示，防止整张地图因为几段缺失而瘫痪。
+
             const renderList = allSegments.map(seg => {
                 const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
                 const cached = segmentGeometries.get(key);

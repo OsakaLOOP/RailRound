@@ -142,11 +142,13 @@ export interface GlobalStore {
   geoData: CustomFeatureCollection;
   segmentGeometries: Map<string, any>;
   tripSegmentsGeometry: any[];
+  visitedStations: Set<string>;
   setRailwayData: (updater: RailwayMap | ((prev: RailwayMap) => RailwayMap)) => void;
   setCompanyDB: (db: CompanyDB | ((prev: CompanyDB) => CompanyDB)) => void;
   setGeoData: (data: CustomFeatureCollection | ((prev: CustomFeatureCollection) => CustomFeatureCollection)) => void;
   setSegmentGeometries: (data: Map<string, any>) => void;
   setTripSegmentsGeometry: (data: any[]) => void;
+  setVisitedStations: (stations: Set<string>) => void;
 
   // User Slice
   user: { token: string; username: string } | null;
@@ -223,12 +225,14 @@ export const useStore = create<GlobalStore>()(
       geoData: { type: 'FeatureCollection', features: [] },
       segmentGeometries: new Map(),
       tripSegmentsGeometry: [],
+      visitedStations: new Set<string>(),
 
       setRailwayData: (input) => set((state) => ({ railwayData: typeof input === 'function' ? input(state.railwayData) : input })),
       setCompanyDB: (input) => set((state) => ({ companyDB: typeof input === 'function' ? input(state.companyDB) : input })),
       setGeoData: (input) => set((state) => ({ geoData: typeof input === 'function' ? input(state.geoData) : input })),
       setSegmentGeometries: (data) => set({ segmentGeometries: data }),
       setTripSegmentsGeometry: (data) => set({ tripSegmentsGeometry: data }),
+      setVisitedStations: (stations) => set({ visitedStations: stations }),
 
       // --- User Slice ---
       user: null,

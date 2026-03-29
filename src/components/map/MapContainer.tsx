@@ -18,6 +18,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     const baseLinesLayer = useRef<L.LayerGroup | null>(null);
     const baseStationsLayer = useRef<L.LayerGroup | null>(null);
     const geoDataRef = useRef<CustomFeatureCollection | null>(null);
+    const visitedStationsRef = useRef<Set<string>>(new Set());
     const routeLayer = useRef<L.LayerGroup | null>(null);
     const railLayerRef = useRef<L.TileLayer | null>(null);
     const rubberBandLayerRef = useRef<L.LayerGroup | null>(null);
@@ -32,7 +33,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     const {
         geoData, leafletReady, tripSegmentsGeometry, activeTab, mapZoom,
         setMapZoom, setLeafletReady, pins, editingPin, pinMode, railwayData,
-        setEditingPin, setPinMode
+        setEditingPin, setPinMode, visitedStations
     } = useStore(useShallow(state => ({
         geoData: state.geoData,
         leafletReady: state.leafletReady,
@@ -46,7 +47,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         pinMode: state.pinMode,
         railwayData: state.railwayData,
         setEditingPin: state.setEditingPin,
-        setPinMode: state.setPinMode
+        setPinMode: state.setPinMode,
+        visitedStations: state.visitedStations
     })));
 
     useEffect(() => {
@@ -62,11 +64,12 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
     useEffect(() => {
         geoDataRef.current = geoData;
+        visitedStationsRef.current = visitedStations;
         if (isMapInitialized && leafletReady && geoData) {
             renderBaseMap(geoData);
             renderStations();
         }
-    }, [geoData, leafletReady, isMapInitialized]);
+    }, [geoData, leafletReady, isMapInitialized, visitedStations]);
 
     useEffect(() => {
         if (isMapInitialized && leafletReady && tripSegmentsGeometry) {
@@ -352,7 +355,18 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             (f) => f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`,
             (f) => {
                 const latlng = [f.geometry.coordinates[1], f.geometry.coordinates[0]] as [number, number];
-                const layer = L.circleMarker(latlng, { radius: 4, color: 'transparent', fillColor: '#64748b', fillOpacity: 0.5, weight: 0, className: 'station-dot' });
+                const isVisited = visitedStationsRef.current.has(f.properties.id || '');
+                const lineColor = f.properties.stroke || '#64748b'; // Fallback if no stroke defined
+                const layer = L.circleMarker(latlng, {
+                    radius: isVisited ? 5 : 4,
+                    color: isVisited ? '#ffffff' : 'transparent',
+                    fillColor: isVisited ? lineColor : '#64748b',
+                    fillOpacity: isVisited ? 1.0 : 0.5,
+                    weight: isVisited ? 2 : 0,
+                    className: 'station-dot'
+                });
+                // @ts-ignore
+                layer._cachedIsVisited = isVisited;
                 if (f.properties.name) layer.bindTooltip(f.properties.name);
 
                 // @ts-ignore
@@ -439,6 +453,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             },
             (layer, f) => {
                 const marker = layer as any;
+                const isVisited = visitedStationsRef.current.has(f.properties.id || '');
+                const lineColor = f.properties.stroke || '#64748b';
                 const newLat = f.geometry.coordinates[1];
                 const newLng = f.geometry.coordinates[0];
                 const newName = f.properties.name;
@@ -458,32 +474,34 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     changed = true;
                 }
 
+                if (marker._cachedIsVisited !== isVisited) {
+                    marker.setStyle({
+                        radius: isVisited ? 5 : 4,
+                        color: isVisited ? '#ffffff' : 'transparent',
+                        fillColor: isVisited ? lineColor : '#64748b',
+                        fillOpacity: isVisited ? 1.0 : 0.5,
+                        weight: isVisited ? 2 : 0
+                    });
+                    marker._cachedIsVisited = isVisited;
+                    changed = true;
+                }
+
                 // Do nothing else if not changed to optimize DOM updates
             }
         );
     };
 
+
     const renderBaseMap = (data: CustomFeatureCollection) => {
         if (!baseLinesLayer.current) return;
+        baseLinesLayer.current.clearLayers();
 
         // Base Lines
         const lineFeatures = data.features.filter((f: CustomGeoJSONFeature) => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString');
-        syncLeafletLayerGroup<CustomGeoJSONFeature>(
-            baseLinesLayer.current,
-            lineFeatures,
-            (f) => f.properties.id || `${f.properties.company}:${f.properties.name}`,
-            (f) => {
-                const layer = L.geoJSON(f as any, {
-                    style: { color: '#475569', weight: 1, opacity: 0.3 }
-                });
-                if (f.properties.name) layer.bindTooltip(f.properties.name);
-                return layer;
-            },
-            (layer, f) => {
-                // Lines are largely static
-            }
-        );
-
+        L.geoJSON(lineFeatures as any, {
+            style: { color: '#475569', weight: 1, opacity: 0.3 },
+            interactive: false
+        }).addTo(baseLinesLayer.current);
     };
 
     const renderTripRoutes = () => {

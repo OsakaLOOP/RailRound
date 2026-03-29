@@ -8,7 +8,7 @@ import { RouteSlice } from '../components/RouteSlice';
 export default function TripsPage() {
     const { trips, setTrips, saveData, folders, setFolders } = useUserData();
     const { user } = useAuth();
-    const { railwayData } = useGeo();
+    const { railwayData, isGeoReady } = useGeo();
     const navigate = useNavigate();
 
     // Logic from RecordsView
@@ -41,7 +41,12 @@ export default function TripsPage() {
 
     return (
         <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-24 pointer-events-auto bg-slate-100 min-h-full">
-            {trips.length === 0 ? (
+            {!isGeoReady ? (
+                <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
+                    <Train size={48} className="opacity-20 mb-4 animate-pulse"/>
+                    <p className="animate-pulse">正在准备您的旅程回忆...</p>
+                </div>
+            ) : trips.length === 0 ? (
                 <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
                     <Train size={48} className="opacity-20 mb-4"/>
                     <p>暂无行程记录</p>

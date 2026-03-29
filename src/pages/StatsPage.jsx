@@ -54,11 +54,20 @@ const useAsyncStats = (trips, workerRef) => {
 export default function StatsPage() {
     const { trips, folders, badgeSettings } = useUserData();
     const { user, userProfile } = useAuth();
-    const { railwayData, companyDB, workerRef } = useGeo();
+    const { railwayData, companyDB, workerRef, isGeoReady } = useGeo();
     const navigate = useNavigate();
 
     const stats = useAsyncStats(trips, workerRef);
     const meta = React.useContext(React.createContext(null)); // Mock or use useMeta
+
+    if (!isGeoReady) {
+        return (
+            <div id="stats-view-content" className="flex-1 flex flex-col items-center justify-center p-4 space-y-4 pb-24 pointer-events-auto bg-slate-100 min-h-full">
+                <Loader2 size={48} className="text-gray-400 animate-spin mb-4" />
+                <p className="text-gray-400 animate-pulse">正在准备统计数据...</p>
+            </div>
+        );
+    }
 
     return (
       <div id="stats-view-content" className="flex-1 overflow-y-auto p-4 space-y-4 pb-24 pointer-events-auto bg-slate-100 min-h-full">

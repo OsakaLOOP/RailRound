@@ -11,15 +11,23 @@
     }
 }
 
-.snap-circle-pulse {
-    animation: ping-pulse 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-    transform-origin: center;
-    transform-box: fill-box;
+.rubber-band-success {
+    animation: snap-success 0.3s ease-out forwards;
 }
 
-@keyframes ping-pulse {
-    0% { stroke-width: 2; stroke-opacity: 1; }
-    100% { stroke-width: 20; stroke-opacity: 0; }
+@keyframes snap-success {
+    0% { stroke-width: 6; opacity: 0.8; }
+    50% { stroke-width: 12; opacity: 1; }
+    100% { stroke-width: 6; opacity: 0; }
+}
+
+.rubber-band-fail {
+    animation: snap-fail 0.3s ease-in forwards;
+}
+
+@keyframes snap-fail {
+    0% { stroke-width: 6; opacity: 0.8; }
+    100% { stroke-width: 2; opacity: 0; }
 }
 
 @tailwind components;

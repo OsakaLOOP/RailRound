@@ -218,6 +218,11 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             if (pressTimerRef.current) {
                 clearTimeout(pressTimerRef.current);
                 pressTimerRef.current = null;
+
+                // If the drag wasn't active, we still disabled map dragging on mousedown, so re-enable it.
+                if (!routeDragRef.current.active) {
+                    map.dragging.enable();
+                }
             }
 
             if (!routeDragRef.current.active) return;
@@ -245,13 +250,16 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     const snapLineKey = `${snapProps.company}:${snapProps.line}`;
                     const startLineKey = `${startStation.properties.company}:${startStation.properties.line}`;
 
+                    const startStationId = startStation.properties.id || `${startStation.properties.company}:${startStation.properties.line}:${startStation.properties.name}`;
+                    const endStationId = snapProps.id || `${snapProps.company}:${snapProps.line}:${snapProps.name}`;
+
                     const { setEditorMode, setAutoForm, startEditingTrip } = useStore.getState();
                     setEditorMode('auto');
                     setAutoForm({
                         startLine: startLineKey,
-                        startStation: startStation.properties.name,
+                        startStation: startStationId,
                         endLine: snapLineKey,
-                        endStation: snapProps.name
+                        endStation: endStationId
                     });
                     startEditingTrip();
 
@@ -281,8 +289,24 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         window.addEventListener('mouseup', handleGlobalUp);
         window.addEventListener('touchend', handleGlobalUp);
 
+        // Store cleanup on map instance for unmounting
+        (map as any)._customDragCleanup = () => {
+            window.removeEventListener('mousemove', handleGlobalMove);
+            window.removeEventListener('touchmove', handleGlobalMove);
+            window.removeEventListener('mouseup', handleGlobalUp);
+            window.removeEventListener('touchend', handleGlobalUp);
+        };
+
         setIsMapInitialized(true);
     };
+
+    useEffect(() => {
+        return () => {
+            if (mapInstance.current && (mapInstance.current as any)._customDragCleanup) {
+                (mapInstance.current as any)._customDragCleanup();
+            }
+        };
+    }, []);
 
 
     const renderStations = () => {
@@ -344,14 +368,13 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
 
                     wasDraggingRef.current = false;
+                    map.dragging.disable(); // Immediately prevent map pan
 
                     pressTimerRef.current = setTimeout(() => {
                         // Long press confirmed
                         wasDraggingRef.current = true; // disable click
                         routeDragRef.current.active = true;
                         routeDragRef.current.startStation = f;
-
-                        map.dragging.disable(); // Prevent map pan
 
                         if (rubberBandLayerRef.current) rubberBandLayerRef.current.clearLayers();
 
@@ -387,6 +410,11 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     if (pressTimerRef.current) {
                         clearTimeout(pressTimerRef.current);
                         pressTimerRef.current = null;
+
+                        // If it wasn't a long press and active drag didn't start, re-enable dragging
+                        if (!routeDragRef.current.active) {
+                            map.dragging.enable();
+                        }
                     }
                 };
 
@@ -397,7 +425,10 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
                 layer.on('click', (e: L.LeafletMouseEvent) => {
                     L.DomEvent.stopPropagation(e);
-                    if (wasDraggingRef.current) return;
+                    if (wasDraggingRef.current) {
+                        wasDraggingRef.current = false;
+                        return;
+                    }
 
                     const originalEvent = e.originalEvent as MouseEvent | TouchEvent;
                     const x = 'clientX' in originalEvent ? originalEvent.clientX : (originalEvent as TouchEvent).touches[0].clientX;

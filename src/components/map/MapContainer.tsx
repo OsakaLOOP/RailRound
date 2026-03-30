@@ -139,8 +139,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         const map = mapInstance.current;
         const currentZoom = map.getZoom();
 
-        // At zoom < 5, strictly provide empty array to clear/hide stations
-        if (currentZoom < 5) {
+        // At zoom < 6, strictly provide empty array to clear/hide stations
+        if (currentZoom < 6) {
             syncLeafletLayerGroup<CustomGeoJSONFeature>(
                 baseStationsLayer.current,
                 [],

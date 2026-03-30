@@ -3,6 +3,7 @@ import { Edit2, Plus, X, ListFilter, AlertTriangle, ArrowRightLeft, ArrowDown, S
 import { useStore, EditorMode } from '../../store';
 import { DropZone } from '../DragContext';
 import { LineSelector } from './LineSelector';
+import { GlobalSearchModal } from './GlobalSearchModal';
 import { isCompanyCompatible, getTransferableLines, findRoute } from '../../utils/railwayRouting'; // Will need to ensure these are typed
 import { useShallow } from 'zustand/react/shallow';
 
@@ -33,6 +34,7 @@ export const TripEditor: React.FC = () => {
     // Ideally api.saveData calls should be in a thunk or store action, we will abstract later.
 
     const [selectorOpen, setSelectorOpen] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
     const [selectorTarget, setSelectorTarget] = useState<{ type: string; index?: number } | null>(null);
     const [allowedLines, setAllowedLines] = useState<string[] | null>(null);
 
@@ -112,6 +114,11 @@ export const TripEditor: React.FC = () => {
         setSelectorOpen(true);
     };
 
+    const openSearch = (targetType: string, index: number | null = null) => {
+        setSelectorTarget({ type: targetType, index: index !== null ? index : undefined });
+        setSearchOpen(true);
+    };
+
     const handleLineSelect = (lineKey: string) => {
         if (!selectorTarget) return;
         const { type, index } = selectorTarget;
@@ -135,6 +142,33 @@ export const TripEditor: React.FC = () => {
             setAutoForm({ ...autoForm, startLine: lineKey, startStation: '' });
         } else if (type === 'autoEnd') {
             setAutoForm({ ...autoForm, endLine: lineKey, endStation: '' });
+        }
+    };
+
+    const handleSearchSelect = (lineKey: string, stationId?: string) => {
+        if (!selectorTarget) return;
+        const { type, index } = selectorTarget;
+
+        if (type === 'segment' && index !== undefined && form.segments) {
+            const newSegs = [...form.segments];
+            const seg = { ...newSegs[index], lineKey, fromId: stationId || '', toId: '' };
+            // If it's not the first segment and they didn't select a station, try to auto-fill
+            if (index > 0 && !stationId) {
+                const prevSeg = newSegs[index - 1];
+                const prevLineData = railwayData[prevSeg.lineKey];
+                const prevEndSt = prevLineData?.stations.find(s => s.id === prevSeg.toId);
+                if (prevEndSt) {
+                    const newLineData = railwayData[lineKey];
+                    const startSt = newLineData.stations.find(s => s.name_ja === prevEndSt.name_ja);
+                    if (startSt) seg.fromId = startSt.id;
+                }
+            }
+            newSegs[index] = seg;
+            setForm({ segments: newSegs });
+        } else if (type === 'autoStart') {
+            setAutoForm({ ...autoForm, startLine: lineKey, startStation: stationId || '' });
+        } else if (type === 'autoEnd') {
+            setAutoForm({ ...autoForm, endLine: lineKey, endStation: stationId || '' });
         }
     };
 
@@ -224,20 +258,29 @@ export const TripEditor: React.FC = () => {
                           {idx > 0 && <button onClick={() => removeSegment(idx)} className="absolute -right-2 -top-2 p-1 bg-white text-red-500 rounded-full shadow border border-gray-100 hover:bg-red-50"><X size={14} /></button>}
 
                           <div className="mb-2 pl-2">
-                             <button
-                                onClick={() => openSelector('segment', idx, currentAllowed)}
-                                className="w-full p-2 border rounded bg-white text-sm font-bold text-gray-700 text-left flex items-center justify-between shadow-sm hover:bg-gray-50 transition-colors"
-                             >
-                                <span className={segment.lineKey ? "text-gray-800" : "text-gray-400"}>
-                                    {segment.lineKey ? (
-                                        <span className="flex items-center gap-2">
-                                            {railwayData[segment.lineKey]?.meta.icon && <img src={railwayData[segment.lineKey].meta.icon!} className="h-4 w-auto"/>}
-                                            {segment.lineKey}
-                                        </span>
-                                    ) : (idx === 0 ? "选择路线..." : "选择换乘路线...")}
-                                </span>
-                                <ListFilter size={16} className="text-gray-400" />
-                             </button>
+                             <div className="flex rounded shadow-sm w-full border bg-white overflow-hidden">
+                                <button
+                                   onClick={() => openSelector('segment', idx, currentAllowed)}
+                                   className="flex-1 p-2 text-sm font-bold text-gray-700 text-left flex items-center justify-between hover:bg-gray-50 transition-colors border-r"
+                                >
+                                   <span className={segment.lineKey ? "text-gray-800" : "text-gray-400"}>
+                                       {segment.lineKey ? (
+                                           <span className="flex items-center gap-2">
+                                               {railwayData[segment.lineKey]?.meta.icon && <img src={railwayData[segment.lineKey].meta.icon!} className="h-4 w-auto"/>}
+                                               {segment.lineKey}
+                                           </span>
+                                       ) : (idx === 0 ? "选择路线..." : "选择换乘路线...")}
+                                   </span>
+                                   <ListFilter size={16} className="text-gray-400" />
+                                </button>
+                                <button
+                                    onClick={() => openSearch('segment', idx)}
+                                    className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 transition-colors flex items-center justify-center w-10 shrink-0"
+                                    title="全局搜索"
+                                >
+                                    <Search size={16} />
+                                </button>
+                             </div>
                              {warning && <div className="text-xs text-red-500 mt-1"><AlertTriangle size={12} className="inline"/> {warning}</div>}
                           </div>
 
@@ -301,16 +344,22 @@ export const TripEditor: React.FC = () => {
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1">出发地</label>
                             <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => openSelector('autoStart')} className="p-2 rounded border text-sm text-left bg-white text-gray-700 truncate flex items-center gap-1 hover:border-blue-300 hover:shadow-sm transition-all">{autoForm.startLine ? <span>{autoForm.startLine}</span> : <span className="text-gray-400">选择线路...</span>}</button>
-                                <select className="p-2 rounded border text-sm hover:border-blue-300 hover:shadow-sm transition-all outline-none" disabled={!autoForm.startLine} value={autoForm.startStation} onChange={e => setAutoForm({ ...autoForm, startStation: e.target.value })}><option value="">车站...</option>{autoForm.startLine && railwayData[autoForm.startLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                <div className="flex rounded border bg-white overflow-hidden">
+                                    <button onClick={() => openSelector('autoStart')} className="flex-1 p-2 text-sm text-left text-gray-700 truncate flex items-center gap-1 hover:bg-gray-50 border-r">{autoForm.startLine ? <span>{autoForm.startLine}</span> : <span className="text-gray-400">选择线路...</span>}</button>
+                                    <button onClick={() => openSearch('autoStart')} className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 w-10 shrink-0 flex items-center justify-center"><Search size={16} /></button>
+                                </div>
+                                <select className="p-2 rounded border text-sm" disabled={!autoForm.startLine} value={autoForm.startStation} onChange={e => setAutoForm({ ...autoForm, startStation: e.target.value })}><option value="">车站...</option>{autoForm.startLine && railwayData[autoForm.startLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
                             </div>
                         </div>
                         <div className="flex justify-center text-blue-300"><ArrowDown className="animate-bounce" size={20}/></div>
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1">目的地</label>
                             <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => openSelector('autoEnd')} className="p-2 rounded border text-sm text-left bg-white text-gray-700 truncate flex items-center gap-1 hover:border-blue-300 hover:shadow-sm transition-all">{autoForm.endLine ? <span>{autoForm.endLine}</span> : <span className="text-gray-400">选择线路...</span>}</button>
-                                <select className="p-2 rounded border text-sm hover:border-blue-300 hover:shadow-sm transition-all outline-none" disabled={!autoForm.endLine} value={autoForm.endStation} onChange={e => setAutoForm({ ...autoForm, endStation: e.target.value })}><option value="">车站...</option>{autoForm.endLine && railwayData[autoForm.endLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                <div className="flex rounded border bg-white overflow-hidden">
+                                    <button onClick={() => openSelector('autoEnd')} className="flex-1 p-2 text-sm text-left text-gray-700 truncate flex items-center gap-1 hover:bg-gray-50 border-r">{autoForm.endLine ? <span>{autoForm.endLine}</span> : <span className="text-gray-400">选择线路...</span>}</button>
+                                    <button onClick={() => openSearch('autoEnd')} className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 w-10 shrink-0 flex items-center justify-center"><Search size={16} /></button>
+                                </div>
+                                <select className="p-2 rounded border text-sm" disabled={!autoForm.endLine} value={autoForm.endStation} onChange={e => setAutoForm({ ...autoForm, endStation: e.target.value })}><option value="">车站...</option>{autoForm.endLine && railwayData[autoForm.endLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
                             </div>
                         </div>
                     </div>
@@ -326,6 +375,7 @@ export const TripEditor: React.FC = () => {
           </div>
         </div>
         <LineSelector isOpen={selectorOpen} onClose={() => setSelectorOpen(false)} onSelect={handleLineSelect} allowedLines={allowedLines} />
+        <GlobalSearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} onSelect={handleSearchSelect} />
         </>
     );
 };

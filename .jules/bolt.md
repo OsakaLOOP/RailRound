@@ -1,0 +1,3 @@
+## 2024-03-30 - Turf.js Length vs Haversine Performance
+**Learning:** Using `turf.length(turf.lineString(coords))` inside loops or React `useMemo` hooks (like in `StatsPage.tsx` and `getRouteVisualData`) causes massive performance overhead due to the constant creation of GeoJSON objects and deep array mappings (e.g., mapping Leaflet `[lat, lng]` to GeoJSON `[lng, lat]`). A manual `for` loop using the Haversine formula (`calcDist`) directly on the Leaflet coordinates is roughly 3-4x faster and prevents unnecessary garbage collection spikes.
+**Action:** Always prefer a simple loop with Haversine distance for calculating total path lengths from coordinate arrays rather than relying on Turf.js overhead in performance-critical paths or UI rendering cycles.

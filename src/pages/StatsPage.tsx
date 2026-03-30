@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
 import { Github, Folder, TrendingUp, Move } from 'lucide-react';
 import { useStore } from '../store';
-import { calcDist } from '../utils/stats';
-import * as turf from '@turf/turf';
+import { calcDist, calcLineDistance } from '../utils/stats';
 import { useShallow } from 'zustand/react/shallow';
 
 export const StatsPage: React.FC = () => {
@@ -27,16 +26,16 @@ export const StatsPage: React.FC = () => {
         trips.forEach(t => _totalCost += (t.cost || 0));
 
         let _totalDist = 0;
-        if (segmentGeometries && turf) {
+        if (segmentGeometries) {
           _allSegments.forEach(seg => {
             if(!seg.lineKey) return;
             const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
             const geom = segmentGeometries.get(key);
             if (geom && geom.coords) {
                 if (geom.isMulti) {
-                    geom.coords.forEach((c: any) => _totalDist += turf.length(turf.lineString(c.map((p: any) => [p[1], p[0]]))));
+                    geom.coords.forEach((c: any) => _totalDist += calcLineDistance(c));
                 } else {
-                    _totalDist += turf.length(turf.lineString(geom.coords.map((p: any) => [p[1], p[0]])));
+                    _totalDist += calcLineDistance(geom.coords);
                 }
             } else {
                 const line = railwayData[seg.lineKey];

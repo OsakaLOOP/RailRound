@@ -1,5 +1,35 @@
 @import "tailwindcss";
 @tailwind base;
+
+.rubber-band-line {
+    animation: dash-flow 0.5s linear infinite;
+}
+
+@keyframes dash-flow {
+    to {
+        stroke-dashoffset: -16;
+    }
+}
+
+.rubber-band-success {
+    animation: snap-success 0.3s ease-out forwards;
+}
+
+@keyframes snap-success {
+    0% { stroke-width: 6; opacity: 0.8; }
+    50% { stroke-width: 12; opacity: 1; }
+    100% { stroke-width: 6; opacity: 0; }
+}
+
+.rubber-band-fail {
+    animation: snap-fail 0.3s ease-in forwards;
+}
+
+@keyframes snap-fail {
+    0% { stroke-width: 6; opacity: 0.8; }
+    100% { stroke-width: 2; opacity: 0; }
+}
+
 @tailwind components;
 @tailwind utilities;
 

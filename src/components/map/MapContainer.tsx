@@ -20,6 +20,13 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     const geoDataRef = useRef<CustomFeatureCollection | null>(null);
     const routeLayer = useRef<L.LayerGroup | null>(null);
     const railLayerRef = useRef<L.TileLayer | null>(null);
+    const rubberBandLayerRef = useRef<L.LayerGroup | null>(null);
+
+    // For local long-press routing drag
+    const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const routeDragRef = useRef<{ active: boolean, startStation: CustomGeoJSONFeature | null, currentSnap: CustomGeoJSONFeature | null, rubberLine: L.Polyline | null, snapCircleCenter: L.CircleMarker | null }>({ active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null });
+    const wasDraggingRef = useRef(false);
+
     const [isMapInitialized, setIsMapInitialized] = React.useState(false);
 
     const {
@@ -87,6 +94,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         baseStationsLayer.current = L.layerGroup().addTo(map);
         routeLayer.current = L.layerGroup().addTo(map);
         pinsLayer.current = L.layerGroup().addTo(map);
+        rubberBandLayerRef.current = L.layerGroup().addTo(map);
 
         const updateLayerVisibility = () => {
             const z = map.getZoom();
@@ -114,6 +122,11 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         });
 
         map.on('click', (e: L.LeafletMouseEvent) => {
+            if (wasDraggingRef.current) {
+                wasDraggingRef.current = false;
+                return;
+            }
+
             const currentPinMode = useStore.getState().pinMode;
             const currentEditingPin = useStore.getState().editingPin;
 
@@ -128,6 +141,145 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 setStationMenu(null);
             }
         });
+
+        // Global mouse/touch move and up listeners for localized drag
+        const handleGlobalMove = (e: MouseEvent | TouchEvent) => {
+            if (!routeDragRef.current.active || !routeDragRef.current.startStation || !rubberBandLayerRef.current) return;
+
+            const startStation = routeDragRef.current.startStation;
+            const startLat = startStation.geometry.coordinates[1];
+            const startLng = startStation.geometry.coordinates[0];
+
+            let clientX, clientY;
+            if ('touches' in e) {
+                clientX = (e as TouchEvent).touches[0].clientX;
+                clientY = (e as TouchEvent).touches[0].clientY;
+            } else {
+                clientX = (e as MouseEvent).clientX;
+                clientY = (e as MouseEvent).clientY;
+            }
+
+            const mapRect = map.getContainer().getBoundingClientRect();
+            const containerPoint = L.point(clientX - mapRect.left, clientY - mapRect.top);
+            const mouseLatLng = map.containerPointToLatLng(containerPoint);
+
+            let nearestDist = Infinity;
+            let nearestStation: any = null;
+            let nearestLatLng: L.LatLng | null = null;
+
+            if (geoDataRef.current) {
+                geoDataRef.current.features.forEach((f: any) => {
+                    if (f.properties.type === 'station' && f.geometry?.coordinates) {
+                        const lat = f.geometry.coordinates[1];
+                        const lng = f.geometry.coordinates[0];
+                        // Skip the start station itself
+                        if (f.properties.name === startStation.properties.name && f.properties.line === startStation.properties.line) return;
+
+                        const stPoint = map.latLngToContainerPoint([lat, lng]);
+                        const dist = containerPoint.distanceTo(stPoint);
+
+                        if (dist < 40 && dist < nearestDist) {
+                            nearestDist = dist;
+                            nearestStation = f;
+                            nearestLatLng = L.latLng(lat, lng);
+                        }
+                    }
+                });
+            }
+
+            routeDragRef.current.currentSnap = nearestStation;
+
+            const rubberLine = routeDragRef.current.rubberLine;
+            const snapCircleCenter = routeDragRef.current.snapCircleCenter;
+
+            if (rubberLine && snapCircleCenter) {
+                if (nearestStation && nearestLatLng) {
+                    rubberLine.setLatLngs([[startLat, startLng], nearestLatLng]);
+                    snapCircleCenter.setLatLng(nearestLatLng).setStyle({ opacity: 1, fillOpacity: 1 });
+
+                    // Clear fail class, add success class immediately if needed, but usually we just pulse
+                    const lineElement = rubberLine.getElement();
+                    if (lineElement) {
+                        lineElement.classList.add('rubber-band-success');
+                    }
+
+                } else {
+                    rubberLine.setLatLngs([[startLat, startLng], mouseLatLng]);
+                    snapCircleCenter.setStyle({ opacity: 0, fillOpacity: 0 });
+                    const lineElement = rubberLine.getElement();
+                    if (lineElement) {
+                        lineElement.classList.remove('rubber-band-success');
+                    }
+                }
+            }
+        };
+
+        const handleGlobalUp = (e: MouseEvent | TouchEvent) => {
+            if (pressTimerRef.current) {
+                clearTimeout(pressTimerRef.current);
+                pressTimerRef.current = null;
+            }
+
+            if (!routeDragRef.current.active) return;
+
+            routeDragRef.current.active = false;
+            map.dragging.enable();
+            wasDraggingRef.current = true; // prevent click
+
+            const currentSnap = routeDragRef.current.currentSnap;
+            const startStation = routeDragRef.current.startStation;
+            const rubberLine = routeDragRef.current.rubberLine;
+
+            if (currentSnap && startStation) {
+                // Success: Snap, animate, then trigger auto-plan and fade out
+                if (rubberLine) {
+                    const lineElement = rubberLine.getElement();
+                    if (lineElement) {
+                        lineElement.classList.add('rubber-band-success');
+                        lineElement.classList.remove('rubber-band-line'); // stop dash flow
+                    }
+                }
+
+                setTimeout(() => {
+                    const snapProps = currentSnap.properties;
+                    const snapLineKey = `${snapProps.company}:${snapProps.line}`;
+                    const startLineKey = `${startStation.properties.company}:${startStation.properties.line}`;
+
+                    const { setEditorMode, setAutoForm, startEditingTrip } = useStore.getState();
+                    setEditorMode('auto');
+                    setAutoForm({
+                        startLine: startLineKey,
+                        startStation: startStation.properties.name,
+                        endLine: snapLineKey,
+                        endStation: snapProps.name
+                    });
+                    startEditingTrip();
+
+                    if (rubberBandLayerRef.current) rubberBandLayerRef.current.clearLayers();
+                    routeDragRef.current = { active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null };
+                }, 300); // Wait for success animation
+
+            } else {
+                // Fail: Animate fail and disappear
+                if (rubberLine) {
+                    const lineElement = rubberLine.getElement();
+                    if (lineElement) {
+                        lineElement.classList.add('rubber-band-fail');
+                        lineElement.classList.remove('rubber-band-line');
+                    }
+                }
+
+                setTimeout(() => {
+                    if (rubberBandLayerRef.current) rubberBandLayerRef.current.clearLayers();
+                    routeDragRef.current = { active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null };
+                }, 300);
+            }
+        };
+
+        window.addEventListener('mousemove', handleGlobalMove);
+        window.addEventListener('touchmove', handleGlobalMove, { passive: false });
+        window.addEventListener('mouseup', handleGlobalUp);
+        window.addEventListener('touchend', handleGlobalUp);
 
         setIsMapInitialized(true);
     };
@@ -186,12 +338,71 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 // @ts-ignore
                 layer._cachedName = f.properties.name;
 
+                const handlePointerDown = (e: L.LeafletMouseEvent) => {
+                    L.DomEvent.stopPropagation(e);
+
+                    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+
+                    wasDraggingRef.current = false;
+
+                    pressTimerRef.current = setTimeout(() => {
+                        // Long press confirmed
+                        wasDraggingRef.current = true; // disable click
+                        routeDragRef.current.active = true;
+                        routeDragRef.current.startStation = f;
+
+                        map.dragging.disable(); // Prevent map pan
+
+                        if (rubberBandLayerRef.current) rubberBandLayerRef.current.clearLayers();
+
+                        const startLat = f.geometry.coordinates[1];
+                        const startLng = f.geometry.coordinates[0];
+                        const routeColor = '#ec4899'; // default active color
+
+                        const rubberLine = L.polyline([[startLat, startLng], [startLat, startLng]], {
+                            color: routeColor,
+                            weight: 6,
+                            opacity: 0.8,
+                            lineCap: 'round',
+                            dashArray: '8, 8',
+                            className: 'rubber-band-line'
+                        }).addTo(rubberBandLayerRef.current!);
+
+                        const snapCircleCenter = L.circleMarker([0,0], {
+                            radius: 8,
+                            color: '#fff',
+                            weight: 3,
+                            fillColor: routeColor,
+                            fillOpacity: 1,
+                            opacity: 0
+                        }).addTo(rubberBandLayerRef.current!);
+
+                        routeDragRef.current.rubberLine = rubberLine;
+                        routeDragRef.current.snapCircleCenter = snapCircleCenter;
+
+                    }, 300); // 300ms long press
+                };
+
+                const handlePointerUp = (e: L.LeafletMouseEvent) => {
+                    if (pressTimerRef.current) {
+                        clearTimeout(pressTimerRef.current);
+                        pressTimerRef.current = null;
+                    }
+                };
+
+                layer.on('mousedown', handlePointerDown);
+                layer.on('touchstart', handlePointerDown);
+                layer.on('mouseup', handlePointerUp);
+                layer.on('touchend', handlePointerUp);
+
                 layer.on('click', (e: L.LeafletMouseEvent) => {
                     L.DomEvent.stopPropagation(e);
+                    if (wasDraggingRef.current) return;
+
                     const originalEvent = e.originalEvent as MouseEvent | TouchEvent;
                     const x = 'clientX' in originalEvent ? originalEvent.clientX : (originalEvent as TouchEvent).touches[0].clientX;
                     const y = 'clientY' in originalEvent ? originalEvent.clientY : (originalEvent as TouchEvent).touches[0].clientY;
-                    setStationMenu({ x, y, stationData: { name_ja: f.properties.name || '' } });
+                    setStationMenu({ x, y, stationData: { name_ja: f.properties.name || '', lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] } });
                 });
                 return layer;
             },

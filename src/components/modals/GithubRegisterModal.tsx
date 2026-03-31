@@ -3,6 +3,7 @@ import { X, Github, AlertTriangle, Loader2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { api } from '../../services/api';
 import { useShallow } from 'zustand/react/shallow';
+import { useUserData } from '../../hooks/useUserData';
 
 export const GithubRegisterModal: React.FC = () => {
     const { isOpen, regToken } = useStore(useShallow(state => ({
@@ -11,6 +12,7 @@ export const GithubRegisterModal: React.FC = () => {
     })));
     const setModalState = useStore(state => state.setModalState);
     const login = useStore(state => state.login);
+    const { loadUserData } = useUserData();
 
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -27,6 +29,7 @@ export const GithubRegisterModal: React.FC = () => {
         try {
             const data = await api.completeGithubRegistration(username, password, regToken);
             login(data.token, data.username);
+            loadUserData(data.token, true);
             onClose();
         } catch (err: any) {
             setError(err.message);

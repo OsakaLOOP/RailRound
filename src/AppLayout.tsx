@@ -17,6 +17,7 @@ import { BottomNav } from './components/layout/BottomNav';
 import { TripsPage } from './pages/TripsPage';
 import { StatsPage } from './pages/StatsPage';
 import { useStore } from './store';
+import { useUserData } from './hooks/useUserData';
 import { db } from './utils/db';
 import buildKMLString from './buildKml';
 import { calculateLatestStats } from './utils/stats';
@@ -55,10 +56,44 @@ export const AppLayout: React.FC = () => {
         isLoginOpen: state.modals.isLoginOpen
     })));
 
+    const { loadUserData, saveData } = useUserData();
     const [stationMenu, setStationMenu] = useState<any>(null);
     const [isExportingKML, setIsExportingKML] = useState(false);
     const isDraggingRef = useRef(false);
     const workerRef = useRef<Worker | null>(null);
+
+    // --- Auth & URL Parsing ---
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenFromUrl = urlParams.get('token');
+        const usernameFromUrl = urlParams.get('username');
+        const regTokenFromUrl = urlParams.get('reg_token');
+        const status = urlParams.get('status');
+
+        if (tokenFromUrl && usernameFromUrl) {
+            // Handle OAuth Login
+            useStore.getState().login(tokenFromUrl, usernameFromUrl);
+            loadUserData(tokenFromUrl, true);
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (regTokenFromUrl) {
+            // Handle GitHub Registration
+            setModalState({ githubRegToken: regTokenFromUrl, isGithubRegOpen: true });
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (user?.token) {
+            // Handle persistent login state recovery
+            loadUserData(user.token, false);
+        }
+
+        if (status === 'bound_success') {
+            alert("GitHub 绑定成功！");
+            window.history.replaceState({}, document.title, window.location.pathname);
+            if (user?.token) {
+                loadUserData(user.token, false);
+            }
+        }
+    }, []); // Run only on mount
 
     // --- Worker Setup ---
     useEffect(() => {
@@ -556,7 +591,7 @@ export const AppLayout: React.FC = () => {
                 <TripEditor />
 
                 {/* Global Modals & Components */}
-                <LoginModal isOpen={isLoginOpen} onClose={() => setModalState({ isLoginOpen: false })} onLoginSuccess={(data: any) => { useStore.getState().login(data.token, data.username); }} />
+                <LoginModal isOpen={isLoginOpen} onClose={() => setModalState({ isLoginOpen: false })} onLoginSuccess={(data: any) => { useStore.getState().login(data.token, data.username); loadUserData(data.token, true); }} user={user} />
                 <GithubRegisterModal />
                 <GithubCardModal />
                 <FolderManagerModal />

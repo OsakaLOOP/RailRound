@@ -2,15 +2,25 @@ import React, { useEffect } from 'react';
 import { X, Star, CheckCircle2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
+import { useUserData } from '../../hooks/useUserData';
+import { calculateLatestStats } from '../../utils/stats';
 
 export const AddToFolderModal: React.FC = () => {
-    const { isOpen, trip, folders } = useStore(useShallow(state => ({
+    const { isOpen, trip, folders, user, trips, pins, badgeSettings, segmentGeometries, railwayData, geoData } = useStore(useShallow(state => ({
         isOpen: state.modals.addToFolderModalOpen,
         trip: state.modals.currentTripForFolder,
-        folders: state.folders
+        folders: state.folders,
+        user: state.user,
+        trips: state.trips,
+        pins: state.pins,
+        badgeSettings: state.badgeSettings,
+        segmentGeometries: state.segmentGeometries,
+        railwayData: state.railwayData,
+        geoData: state.geoData
     })));
     const setModalState = useStore(state => state.setModalState);
     const setFolders = useStore(state => state.setFolders);
+    const { saveData } = useUserData();
 
     const onClose = () => setModalState({ addToFolderModalOpen: false, currentTripForFolder: null });
 
@@ -38,7 +48,24 @@ export const AddToFolderModal: React.FC = () => {
             }
             return f;
         });
-        setFolders(updatedFolders);
+
+        // Recalculate stats for modified folders
+        const foldersWithStats = updatedFolders.map(f => {
+            if (f.trip_ids && f.trip_ids.length > 0) {
+                const folderTrips = trips.filter(t => f.trip_ids.includes(t.id));
+                // Sort by date desc
+                folderTrips.sort((a,b) => b.date.localeCompare(a.date));
+                const stats = calculateLatestStats(folderTrips, segmentGeometries, railwayData, geoData);
+                return { ...f, stats };
+            } else {
+                return { ...f, stats: null };
+            }
+        });
+
+        setFolders(foldersWithStats);
+        if (user) {
+            saveData(user.token, trips, pins, foldersWithStats, badgeSettings).catch((e: any) => alert("保存失败: " + e.message));
+        }
     };
 
     return (

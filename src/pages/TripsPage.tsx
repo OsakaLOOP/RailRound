@@ -52,11 +52,31 @@ const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
     );
 };
 
+import { useUserData } from '../hooks/useUserData';
+
 export const TripsPage: React.FC = () => {
-    const { trips, railwayData } = useStore(useShallow(state => ({ trips: state.trips, railwayData: state.railwayData })));
+    const { trips, railwayData, user, pins, folders, badgeSettings } = useStore(useShallow(state => ({
+        trips: state.trips,
+        railwayData: state.railwayData,
+        user: state.user,
+        pins: state.pins,
+        folders: state.folders,
+        badgeSettings: state.badgeSettings
+    })));
     const setModalState = useStore(state => state.setModalState);
     const startEditingTrip = useStore(state => state.startEditingTrip);
     const removeTrip = useStore(state => state.removeTrip);
+    const { saveData } = useUserData();
+
+    const handleDeleteTrip = (id: string | number) => {
+        if (confirm('确认删除?')) {
+            removeTrip(id);
+            if (user) {
+                const newTrips = trips.filter(t => t.id !== id);
+                saveData(user.token, newTrips, pins, folders, badgeSettings).catch((e: any) => alert('云端同步失败'));
+            }
+        }
+    };
 
     return (
         <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4">
@@ -77,7 +97,7 @@ export const TripsPage: React.FC = () => {
                                     {(t.cost || 0) > 0 && <span className="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">¥{t.cost}</span>}
                                     <button onClick={() => setModalState({ addToFolderModalOpen: true, currentTripForFolder: t })} className="text-gray-400 hover:text-yellow-500"><Star size={14}/></button>
                                     <button onClick={() => startEditingTrip(t)} className="text-gray-400 hover:text-blue-500"><Edit2 size={14}/></button>
-                                    <button onClick={(e) => { e.stopPropagation(); if (confirm('确认删除?')) removeTrip(t.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
                                 </div>
                             </div>
                             <div className="flex flex-row">

@@ -25,6 +25,8 @@ import GeoWorker from './workers/geo.worker.js?worker';
 import { meta } from '../public/changelog.json';
 import { api } from './services/api';
 import { useShallow } from 'zustand/react/shallow';
+import { Toaster, toast } from 'react-hot-toast';
+import DistanceWorker from './workers/distance.worker.js?worker';
 
 const CURRENT_VERSION = meta["currentVersion"];
 
@@ -62,6 +64,7 @@ export const AppLayout: React.FC = () => {
     const [isExportingKML, setIsExportingKML] = useState(false);
     const isDraggingRef = useRef(false);
     const workerRef = useRef<Worker | null>(null);
+    const distanceWorkerRef = useRef<Worker | null>(null);
 
     // --- Auth & URL Parsing ---
     useEffect(() => {
@@ -99,10 +102,11 @@ export const AppLayout: React.FC = () => {
     // --- Worker Setup ---
     useEffect(() => {
         workerRef.current = new GeoWorker();
+        distanceWorkerRef.current = new DistanceWorker();
+
         return () => {
-            if (workerRef.current) {
-                workerRef.current.terminate();
-            }
+            if (workerRef.current) workerRef.current.terminate();
+            if (distanceWorkerRef.current) distanceWorkerRef.current.terminate();
         };
     }, []);
 
@@ -287,6 +291,35 @@ export const AppLayout: React.FC = () => {
             if (validResults.length > 0) processGeoJsonBatch(validResults, currentCompanyData);
 
             console.log('[Autoload] 初始化全部完成，应用就绪。');
+
+            // Trigger distance calculation after data load
+            if (distanceWorkerRef.current) {
+                let toastId: string | null = null;
+                const currentRailwayData = useStore.getState().railwayData;
+
+                // Only trigger if we have data and missing distances
+                const needsCalc = Object.values(currentRailwayData).some(line =>
+                   line.stations.length > 1 && line.stations[0].distToNext === undefined
+                );
+
+                if (needsCalc) {
+                    toastId = toast.loading('正在计算站间距离 (0%)...', { duration: Infinity });
+
+                    const handleDistanceWorkerMsg = (e: MessageEvent) => {
+                        const { type, payload } = e.data;
+                        if (type === 'PROGRESS' && toastId) {
+                            toast.loading(`正在计算站间距离 (${payload.progress}%)...`, { id: toastId });
+                        } else if (type === 'COMPLETE') {
+                            if (toastId) toast.success('站距计算完成！', { id: toastId, duration: 3000 });
+                            distanceWorkerRef.current?.removeEventListener('message', handleDistanceWorkerMsg);
+                            setRailwayData(payload.updatedRailwayData);
+                        }
+                    };
+
+                    distanceWorkerRef.current.addEventListener('message', handleDistanceWorkerMsg);
+                    distanceWorkerRef.current.postMessage({ type: 'CALC_DISTANCES', payload: { railwayData: currentRailwayData } });
+                }
+            }
         } catch (err) { console.error('[Autoload] 致命错误:', err); }
     };
 
@@ -591,6 +624,7 @@ export const AppLayout: React.FC = () => {
     return (
         <DragProvider>
             <div className="flex flex-col h-screen bg-slate-100 font-sans text-slate-800 overflow-visible">
+                <Toaster position="top-center" />
                 <Header
                     handleExportKML={handleExportKML}
                     handleExportUserData={handleExportUserData}

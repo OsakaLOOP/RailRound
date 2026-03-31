@@ -2,15 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { X, Folder, Globe, Trash2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
+import { useUserData } from '../../hooks/useUserData';
 
 export const FolderManagerModal: React.FC = () => {
-    const { isOpen, folders } = useStore(useShallow(state => ({
+    const { isOpen, folders, user, trips, pins, badgeSettings } = useStore(useShallow(state => ({
         isOpen: state.modals.folderManagerOpen,
-        folders: state.folders
+        folders: state.folders,
+        user: state.user,
+        trips: state.trips,
+        pins: state.pins,
+        badgeSettings: state.badgeSettings
     })));
     const setModalState = useStore(state => state.setModalState);
     const setFolders = useStore(state => state.setFolders);
     const [newFolderName, setNewFolderName] = useState("");
+    const { saveData } = useUserData();
 
     const onClose = () => setModalState({ folderManagerOpen: false });
 
@@ -25,6 +31,13 @@ export const FolderManagerModal: React.FC = () => {
 
     if (!isOpen) return null;
 
+    const saveUserFolders = (newFolders: any[]) => {
+        setFolders(newFolders);
+        if (user) {
+            saveData(user.token, trips, pins, newFolders, badgeSettings).catch((e: any) => alert("保存失败: " + e.message));
+        }
+    };
+
     const handleCreate = () => {
         if (!newFolderName.trim()) return;
         const newFolder = {
@@ -35,13 +48,13 @@ export const FolderManagerModal: React.FC = () => {
             stats: null,
             hash: null
         };
-        setFolders([...folders, newFolder]);
+        saveUserFolders([...folders, newFolder]);
         setNewFolderName("");
     };
 
     const handleDelete = (id: string) => {
         if (confirm("Delete this folder?")) {
-            setFolders(folders.filter(f => f.id !== id));
+            saveUserFolders(folders.filter(f => f.id !== id));
         }
     };
 
@@ -57,7 +70,7 @@ export const FolderManagerModal: React.FC = () => {
             }
             return f;
         });
-        setFolders(updated);
+        saveUserFolders(updated);
     };
 
     return (

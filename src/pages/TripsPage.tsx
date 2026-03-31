@@ -87,10 +87,10 @@ export const TripsPage: React.FC = () => {
                     <p className="text-xs mt-2">点击下方按钮添加你的第一次乗り鉄<br/>注意: 自定义线路可以导入 company_data 和 geojson</p>
                 </div>
             ) : (
-                trips.map(t => {
+                trips.map((t, index) => {
                     const segments = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
                     return (
-                        <div key={t.id} className="bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1">
+                        <div key={t.id} className="bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 opacity-0 animate-slide-up-fade" style={{ animationDelay: `${index * 0.05}s` }}>
                             <div className="flex justify-between mb-2 pb-2 border-b border-gray-50">
                                 <span className="text-xs font-bold text-gray-400">{t.date}</span>
                                 <div className="flex items-center gap-2">

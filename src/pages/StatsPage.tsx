@@ -144,10 +144,11 @@ export const StatsPage: React.FC = () => {
             </button>
         )}
 
-        <div className="bg-gradient-to-br from-emerald-600 to-teal-700 hover:from-teal-600 hover:to-emerald-800 p-6 rounded-xl shadow-lg text-white transition-all duration-500 hover:-translate-y-1 hover:shadow-xl cursor-default group">
-            <div className="flex items-center justify-between mb-2"><h3 className="font-bold flex items-center gap-2"><TrendingUp size={18} className="group-hover:-translate-y-1 group-hover:scale-110 transition-transform duration-300"/> 里程统计</h3><span className="text-xs bg-white/20 px-2 py-1 rounded">总距离</span></div>
-            <div className="text-4xl font-bold mb-2">{Math.round(totalDist)} <span className="text-lg font-normal opacity-80">km</span></div>
-            <div className="border-t border-white/20 pt-2 flex items-center gap-2 text-sm opacity-90"><span className="font-bold">¥</span> 总开销: {totalCost.toLocaleString()}</div>
+        <div className="bg-gradient-to-br from-emerald-600 to-teal-700 hover:from-teal-600 hover:to-emerald-800 p-6 rounded-xl shadow-lg text-white transition-all duration-500 hover:-translate-y-1 hover:shadow-xl cursor-default group overflow-hidden relative">
+            <div className="absolute -right-6 -top-6 w-32 h-32 bg-white opacity-5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700 pointer-events-none"></div>
+            <div className="flex items-center justify-between mb-2 relative z-10"><h3 className="font-bold flex items-center gap-2"><TrendingUp size={18} className="group-hover:animate-bounce transition-transform duration-300"/> 里程统计</h3><span className="text-xs bg-white/20 px-2 py-1 rounded shadow-sm backdrop-blur-sm">总距离</span></div>
+            <div className="text-4xl font-bold mb-2 relative z-10 tracking-tight drop-shadow-sm">{Math.round(totalDist)} <span className="text-lg font-normal opacity-80">km</span></div>
+            <div className="border-t border-white/20 pt-2 flex items-center gap-2 text-sm opacity-90 relative z-10"><span className="font-bold">¥</span> 总开销: {totalCost.toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-xl border overflow-hidden"><div className="p-3 border-b bg-slate-50 font-bold text-sm text-slate-600">常乘路线排行</div>
           {rankedSegments.map(([line, count]: [string, any], idx) => {

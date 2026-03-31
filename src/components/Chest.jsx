@@ -140,7 +140,7 @@ const Chest = ({ onDropItem }) => {
                     className="relative group"
                 >
                     <div
-                        className={`w-16 h-16 transition-transform duration-200 cursor-pointer ${isDragging ? 'scale-110' : ''}`}
+                        className={`w-16 h-16 transition-all duration-300 cursor-pointer ${isDragging ? 'scale-110 drop-shadow-[0_0_15px_rgba(251,191,36,0.6)]' : 'hover:scale-110 hover:-translate-y-1 hover:drop-shadow-[0_10px_10px_rgba(0,0,0,0.25)] active:scale-95'}`}
                         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
                         onMouseEnter={() => { if(isDragging) setIsHovering(true); }}
                         onMouseLeave={() => { setIsHovering(false); setJustDropped(false); }}

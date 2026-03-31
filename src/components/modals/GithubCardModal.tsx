@@ -3,6 +3,7 @@ import { X, Github, Eye, EyeOff, Lock, Loader2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { api } from '../../services/api';
 import { useShallow } from 'zustand/react/shallow';
+import { useUserData } from '../../hooks/useUserData';
 
 export const GithubCardModal: React.FC = () => {
     const { isOpen, user, folders, badgeSettings } = useStore(useShallow(state => ({
@@ -16,6 +17,7 @@ export const GithubCardModal: React.FC = () => {
 
     // We need to sync settings back to API, which requires trips, pins
     const { trips, pins } = useStore(useShallow(state => ({ trips: state.trips, pins: state.pins })));
+    const { saveData } = useUserData();
 
     const [cardKey, setCardKey] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -60,9 +62,9 @@ export const GithubCardModal: React.FC = () => {
 
     const onUpdateSettings = (s: any) => {
         setBadgeSettings(s);
-        // Note: saveDataFull logic should be centralized, maybe in store actions.
-        // For now, minimal update. Wait, we don't calculate latest5 here easily.
-        // Ideally we just call a save function from store.
+        if (user) {
+            saveData(user.token, trips, pins, folders, s).catch((e: any) => alert("Failed to save settings: " + e.message));
+        }
     };
 
     return (

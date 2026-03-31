@@ -6,6 +6,7 @@ import { LineSelector } from './LineSelector';
 import { GlobalSearchModal } from './GlobalSearchModal';
 import { isCompanyCompatible, getTransferableLines, findRoute } from '../../utils/railwayRouting'; // Will need to ensure these are typed
 import { useShallow } from 'zustand/react/shallow';
+import { useUserData } from '../../hooks/useUserData';
 
 export const TripEditor: React.FC = () => {
     const {
@@ -31,7 +32,7 @@ export const TripEditor: React.FC = () => {
     const setIsRouteSearching = useStore(state => state.setIsRouteSearching);
     const closeEditor = useStore(state => state.closeTripEditor);
     const setTrips = useStore(state => state.setTrips);
-    // Ideally api.saveData calls should be in a thunk or store action, we will abstract later.
+    const { saveData } = useUserData();
 
     const [selectorOpen, setSelectorOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -74,6 +75,9 @@ export const TripEditor: React.FC = () => {
         const finalTrips = [...newTripsToAdd, ...nextTrips].sort((a,b) => b.date.localeCompare(a.date));
 
         setTrips(finalTrips);
+        if (user) {
+            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => alert('云端保存失败: ' + e.message));
+        }
         closeEditor();
     };
 

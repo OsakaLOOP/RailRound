@@ -2,18 +2,24 @@ import React, { useEffect } from 'react';
 import { Move, Magnet, Camera, MessageSquare, Trash2, X } from 'lucide-react';
 import { useStore, PinMode } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
+import { useUserData } from '../../hooks/useUserData';
 
 const COLOR_PALETTE = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#64748b'];
 
 export const PinEditor: React.FC = () => {
-    const { editingPin, pinMode, pins } = useStore(useShallow(state => ({
+    const { editingPin, pinMode, pins, user, trips, folders, badgeSettings } = useStore(useShallow(state => ({
         editingPin: state.editingPin,
         pinMode: state.pinMode,
-        pins: state.pins
+        pins: state.pins,
+        user: state.user,
+        trips: state.trips,
+        folders: state.folders,
+        badgeSettings: state.badgeSettings
     })));
     const setEditingPin = useStore(state => state.setEditingPin);
     const setPinMode = useStore(state => state.setPinMode);
     const setPins = useStore(state => state.setPins);
+    const { saveData } = useUserData();
 
     const savePin = () => {
         if (!editingPin) return;
@@ -22,6 +28,11 @@ export const PinEditor: React.FC = () => {
 
         const newPins = editingPin.isTemp ? [...pins, newPin] : pins.map(p => p.id === newPin.id ? newPin : p);
         setPins(newPins);
+
+        if (user) {
+            saveData(user.token, trips, newPins, folders, badgeSettings).catch(e => console.error('Pin sync failed', e));
+        }
+
         setEditingPin(null);
         setPinMode(PinMode.Idle);
     };
@@ -31,6 +42,10 @@ export const PinEditor: React.FC = () => {
             const newPins = pins.filter(p => p.id !== id);
             setPins(newPins);
             if (editingPin?.id === id) setEditingPin(null);
+
+            if (user) {
+                saveData(user.token, trips, newPins, folders, badgeSettings).catch(e => console.error('Pin sync failed', e));
+            }
         }
     };
 

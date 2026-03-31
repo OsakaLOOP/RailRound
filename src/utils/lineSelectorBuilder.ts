@@ -66,8 +66,9 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
         JR: {}, Private: {}, City: {}
     };
 
-    Object.keys(railwayData).forEach(key => {
-        if (allowedLines && !allowedLines.includes(key)) return;
+    for (const key in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, key)) continue;
+        if (allowedLines && !allowedLines.includes(key)) continue;
 
         const line = railwayData[key];
         const { region, type, company, logo, icon } = line.meta;
@@ -93,7 +94,7 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
             displayName,
             icon: icon || null
         });
-    });
+    }
 
     // 2. Sorting function for Lines inside a Company
     const sortLines = (lines: SelectableLine[], companyName: string, companyLogo: string | null) => {
@@ -150,15 +151,19 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
 
     const REGION_ORDER = ['北海道・東北', '関東', '中部', '近畿', '中国地方', '四国', '九州・沖縄', '其他', '中国大陆'];
 
-    (Object.keys(rawGroups) as CategoryKey[]).forEach(category => {
+    for (const categoryKey in rawGroups) {
+        if (!Object.prototype.hasOwnProperty.call(rawGroups, categoryKey)) continue;
+        const category = categoryKey as CategoryKey;
         const regionObj = rawGroups[category];
         const regions: RegionGroup[] = [];
 
-        Object.keys(regionObj).forEach(regionName => {
+        for (const regionName in regionObj) {
+            if (!Object.prototype.hasOwnProperty.call(regionObj, regionName)) continue;
             const companyObj = regionObj[regionName];
             const companies: CompanyGroup[] = [];
 
-            Object.keys(companyObj).forEach(companyName => {
+            for (const companyName in companyObj) {
+                if (!Object.prototype.hasOwnProperty.call(companyObj, companyName)) continue;
                 const companyData = companyObj[companyName];
 
                 sortLines(companyData.lines, companyName, companyData.logo);
@@ -168,7 +173,7 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
                     logo: companyData.logo,
                     lines: companyData.lines
                 });
-            });
+            }
 
             // Sort companies by name, or put major ones first (optional)
             companies.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
@@ -177,7 +182,7 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
                 name: regionName,
                 companies
             });
-        });
+        }
 
         // Sort Regions according to predefined geographical order
         regions.sort((a, b) => {
@@ -188,7 +193,7 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
         });
 
         formattedResult[category] = regions;
-    });
+    }
 
     return formattedResult;
 };

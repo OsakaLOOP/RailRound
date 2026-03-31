@@ -8,10 +8,16 @@
   },
   "logs": [
     {
-        "version": "0.35",
-        "date": "2026-03-31",
+      "version": "0.41",
+        "date": "2026-04-01",
         "type": "next",
-        "content": "前瞻: JRE 3月调图和改订, 计划爬取新数据并更新. 另外正在阅读 react.dev, 并学习路由."
+        "content": "神秘愚人节更新"
+    },
+    {
+        "version": "0.40",
+        "date": "2026-03-31",
+        "type": "feat",
+        "content": "优化 UI 和动画. 全部用 Zustand 和 React Context(之前还不会)重写. 实现了若干地图界面的性能改善和规划的解耦, 引入动态视口. 现在可以直接在地图界面长按拖拽并连接站点, 触发自动规划."
     },
     {
         "version": "0.34",
@@ -23,7 +29,7 @@
       "version": "0.33",
       "date": "2026-01-26",
       "type": "feat",
-      "content": "加入神秘切斯特, 另外体验了JR Pass, せり鍋, Mos Burger, 山形拉面, 日归温泉, BA Fes 和长崎咖喱, 最后 npm run build. 切斯特的实际用途将不早于 v0.40 想出来."
+      "content": "加入神秘切斯特, 另外体验了JR Pass, せり鍋, Mos Burger, 山形拉面, 日归温泉, BA Fes 和长崎咖喱, 最后 npm run build. 切斯特的实际用途将不早于 v0.50 想出来."
     },
     {
       "version": "0.32",

@@ -1,6 +1,30 @@
 import { RailwayMap, CompanyMeta, Station } from '../store';
 import { calcDist } from './stats'; // Ensure calcDist is exported from here or a common math utility
 
+// 预构建的换乘站索引缓存
+let stationNameIndexCache: Map<string, {lineKey: string, stationIndex: number}[]> | null = null;
+let lastRailwayDataRef: RailwayMap | null = null;
+
+export const buildStationIndex = (railwayData: RailwayMap) => {
+    if (stationNameIndexCache && lastRailwayDataRef === railwayData) {
+        return stationNameIndexCache;
+    }
+
+    const index = new Map<string, {lineKey: string, stationIndex: number}[]>();
+    for (const [lineKey, line] of Object.entries(railwayData)) {
+        line.stations.forEach((st, idx) => {
+            if (!index.has(st.name_ja)) {
+                index.set(st.name_ja, []);
+            }
+            index.get(st.name_ja)!.push({ lineKey, stationIndex: idx });
+        });
+    }
+
+    stationNameIndexCache = index;
+    lastRailwayDataRef = railwayData;
+    return index;
+};
+
 export const isCompanyCompatible = (meta1: CompanyMeta | undefined, meta2: CompanyMeta | undefined) => {
   if (!meta1 || !meta2) return false;
   if (meta1.company === meta2.company && meta1.company !== "上传数据" && meta1.company !== "未知") return true;
@@ -39,87 +63,219 @@ export const getTransferableLines = (station: Station | undefined, currentLineKe
     return Array.from(validLines);
 };
 
+// --- Types for Advanced Routing ---
+interface RouteNode {
+    lineKey: string;
+    stationIndex: number;
+    cost: number;        // Estimated time (minutes) + penalties
+    timeMins: number;    // Pure estimated time without penalties
+    transfers: number;   // Number of line transfers
+    stops: number;       // Number of stations passed
+    parent: RouteNode | null;
+}
+
 export const findRoute = (startLineKey: string, startStId: string, endLineKey: string, endStId: string, railwayData: RailwayMap) => {
     if (!startLineKey || !endLineKey) return { error: "无效的起点或终点" };
-    const getStName = (line: string, id: string) => railwayData[line]?.stations.find(s => s.id === id)?.name_ja;
-    const startName = getStName(startLineKey, startStId);
-    const endName = getStName(endLineKey, endStId);
-    if (!startName || !endName) return { error: "找不到车站信息" };
 
-    const isShinkansen = (lineKey: string) => {
+    const startLine = railwayData[startLineKey];
+    const endLine = railwayData[endLineKey];
+    if (!startLine || !endLine) return { error: "找不到线路数据" };
+
+    const startIdx = startLine.stations.findIndex(s => s.id === startStId);
+    const endIdx = endLine.stations.findIndex(s => s.id === endStId);
+    if (startIdx === -1 || endIdx === -1) return { error: "找不到车站信息" };
+
+    const targetStationName = endLine.stations[endIdx].name_ja;
+
+    // Helper: Determine travel speed (km/h) based on line type
+    const getSpeed = (lineKey: string) => {
+        const line = railwayData[lineKey];
+        if (!line) return 80;
         const lineName = lineKey.includes(':') ? lineKey.split(':').slice(1).join(':') : lineKey;
-        return lineName.includes('新幹線');
+        if (lineName.includes('新幹線')) return 250;
+        if (line.meta?.type === '地下鉄') return 40;
+        return 80; // Default regular train
     };
 
-    const getPriority = (path: string[], isEnd = false) => {
-        let score = path.length;
-        const shinkansenCount = path.filter(l => isShinkansen(l)).length;
-        score -= shinkansenCount * 10;
-        if (isEnd) score -= 100;
-        return score;
+    const stationIndexMap = buildStationIndex(railwayData);
+
+    // Use a simple Min-Heap/Priority Queue array structure for Dijkstra / A*
+    let openSet: RouteNode[] = [];
+    const closedSet = new Set<string>(); // Set of "lineKey:stationIndex"
+
+    const startNode: RouteNode = {
+        lineKey: startLineKey,
+        stationIndex: startIdx,
+        cost: 0,
+        timeMins: 0,
+        transfers: 0,
+        stops: 0,
+        parent: null
     };
 
-    const queue: { line: string; path: string[] }[] = [{ line: startLineKey, path: [startLineKey] }];
-    const visitedLines = new Set([startLineKey]);
-    let foundLinePath: string[] | null = null;
-    const MAX_DEPTH = 15;
+    openSet.push(startNode);
 
-    while (queue.length > 0) {
-        let minIdx = 0;
-        for (let i = 1; i < queue.length; i++) {
-            const currentPriority = getPriority(queue[i].path);
-            const minPriority = getPriority(queue[minIdx].path);
-            if (currentPriority < minPriority) minIdx = i;
+    const MAX_TRANSFERS = 6;
+    let bestEndNode: RouteNode | null = null;
+
+    // Helper: Push and sort (simulated priority queue)
+    const pushNode = (node: RouteNode) => {
+        let l = 0, r = openSet.length;
+        while (l < r) {
+            const m = (l + r) >> 1;
+            if (openSet[m].cost > node.cost) r = m;
+            else l = m + 1;
         }
-        const { line, path } = queue.splice(minIdx, 1)[0];
+        openSet.splice(l, 0, node);
+    };
 
-        if (path.length > MAX_DEPTH) continue;
-        if (line === endLineKey) { foundLinePath = path; break; }
+    while (openSet.length > 0) {
+        // Pop the lowest cost node
+        const current = openSet.shift()!;
+        const currentId = `${current.lineKey}:${current.stationIndex}`;
 
-        const currentStations = railwayData[line].stations;
-        const potentialNextLines = new Set<string>();
-        currentStations.forEach(st => {
-            const transferLines = getTransferableLines(st, line, railwayData, false);
-            transferLines.forEach(l => potentialNextLines.add(l));
-        });
+        if (closedSet.has(currentId)) continue;
+        closedSet.add(currentId);
 
-        potentialNextLines.forEach(nextLine => {
-            if (!visitedLines.has(nextLine)) {
-                visitedLines.add(nextLine);
-                queue.push({ line: nextLine, path: [...path, nextLine] });
-            }
-        });
+        const currentLine = railwayData[current.lineKey];
+        const currentStation = currentLine.stations[current.stationIndex];
+
+        // 终点检查: If we reached the target station name (even on a different line, consider it success if distance < 2km)
+        // Strictly speaking, if it's the exact end station:
+        if (current.lineKey === endLineKey && current.stationIndex === endIdx) {
+            bestEndNode = current;
+            break;
+        }
+        // Loose check: reached a station with the same name as the target station
+        if (currentStation.name_ja === targetStationName) {
+            bestEndNode = current;
+            break;
+        }
+
+        if (current.transfers >= MAX_TRANSFERS) continue;
+
+        // 1. Move Forward / Backward on the CURRENT line
+        const speed = getSpeed(current.lineKey);
+
+        // Next Station
+        if (current.stationIndex < currentLine.stations.length - 1) {
+            const dist = currentStation.distToNext || calcDist(currentStation.lat, currentStation.lng, currentLine.stations[current.stationIndex+1].lat, currentLine.stations[current.stationIndex+1].lng);
+            const timeCost = (dist / speed) * 60; // minutes
+            // Penalty: 1 point per station passed to discourage extremely long local routes if faster ones exist
+            const node: RouteNode = {
+                lineKey: current.lineKey,
+                stationIndex: current.stationIndex + 1,
+                cost: current.cost + timeCost + 1,
+                timeMins: current.timeMins + timeCost,
+                transfers: current.transfers,
+                stops: current.stops + 1,
+                parent: current
+            };
+            if (!closedSet.has(`${node.lineKey}:${node.stationIndex}`)) pushNode(node);
+        }
+
+        // Previous Station
+        if (current.stationIndex > 0) {
+            const prevStation = currentLine.stations[current.stationIndex - 1];
+            const dist = prevStation.distToNext || calcDist(prevStation.lat, prevStation.lng, currentStation.lat, currentStation.lng);
+            const timeCost = (dist / speed) * 60;
+            const node: RouteNode = {
+                lineKey: current.lineKey,
+                stationIndex: current.stationIndex - 1,
+                cost: current.cost + timeCost + 1,
+                timeMins: current.timeMins + timeCost,
+                transfers: current.transfers,
+                stops: current.stops + 1,
+                parent: current
+            };
+            if (!closedSet.has(`${node.lineKey}:${node.stationIndex}`)) pushNode(node);
+        }
+
+        // 2. Transfers
+        // A transfer happens when changing lines at the same station (or nearby same-name stations).
+        // Time penalty: 5 mins physical time + 15 penalty points to strongly discourage unnecessary transfers
+        const transferableNodes = stationIndexMap.get(currentStation.name_ja) || [];
+
+        for (const tNode of transferableNodes) {
+            if (tNode.lineKey === current.lineKey) continue;
+
+            // Check compatibility if needed (using existing logic)
+            const nextMeta = railwayData[tNode.lineKey].meta;
+            const isCompat = isCompanyCompatible(currentLine.meta as CompanyMeta, nextMeta as CompanyMeta);
+
+            // If they are strictly same station name, we allow transfer.
+            // In a strict app we might enforce isCompat, but for general routing we allow physical transfers.
+
+            const node: RouteNode = {
+                lineKey: tNode.lineKey,
+                stationIndex: tNode.stationIndex,
+                cost: current.cost + 5 + 15, // 5 min transfer time + 15 penalty
+                timeMins: current.timeMins + 5,
+                transfers: current.transfers + 1,
+                stops: current.stops,
+                parent: current
+            };
+
+            if (!closedSet.has(`${node.lineKey}:${node.stationIndex}`)) pushNode(node);
+        }
     }
 
-    if (!foundLinePath) return { error: "未找到连通路径。" };
+    if (!bestEndNode) return { error: "未找到连通路径 (超出最大换乘次数或无解)。" };
 
+    // Backtrack to build the path
+    const path: RouteNode[] = [];
+    let curr: RouteNode | null = bestEndNode;
+    while (curr) {
+        path.push(curr);
+        curr = curr.parent;
+    }
+    path.reverse();
+
+    // Convert continuous path nodes into 'Segments'
     const segments: any[] = [];
-    let currentStName = startName;
-    for (let i = 0; i < foundLinePath.length; i++) {
-        const currentLineKey = foundLinePath[i];
-        const nextLineKey = foundLinePath[i+1];
-        let nextStName = endName;
-        if (nextLineKey) {
-            const currSts = railwayData[currentLineKey].stations;
-            const nextLineData = railwayData[nextLineKey];
-            let transferSt = currSts.find(s => {
-                if (s.transfers && s.transfers.includes(nextLineKey)) return true;
-                const match = nextLineData.stations.find(ns => ns.name_ja === s.name_ja);
-                if (match) return calcDist(s.lat, s.lng, match.lat, match.lng) < 2.0;
-                return false;
-            });
-            if (!transferSt) return { error: "换乘站计算错误" };
-            nextStName = transferSt.name_ja;
+    if (path.length <= 1) return { segments };
+
+    let currentSegmentLine = path[0].lineKey;
+    let currentSegmentStartIdx = path[0].stationIndex;
+    let lastIdx = path[0].stationIndex;
+
+    for (let i = 1; i < path.length; i++) {
+        const node = path[i];
+        if (node.lineKey !== currentSegmentLine) {
+            // Line changed, flush previous segment if it moved
+            if (currentSegmentStartIdx !== lastIdx) {
+                const lineObj = railwayData[currentSegmentLine];
+                segments.push({
+                    id: Date.now() + segments.length,
+                    lineKey: currentSegmentLine,
+                    fromId: lineObj.stations[currentSegmentStartIdx].id,
+                    toId: lineObj.stations[lastIdx].id
+                });
+            }
+            // Start new segment
+            currentSegmentLine = node.lineKey;
+            currentSegmentStartIdx = node.stationIndex;
+            lastIdx = node.stationIndex;
+        } else {
+            lastIdx = node.stationIndex;
         }
-        const lineObj = railwayData[currentLineKey];
-        const fromSt = lineObj.stations.find(s => s.name_ja === currentStName);
-        const toSt = lineObj.stations.find(s => s.name_ja === nextStName);
-        if (fromSt && toSt && fromSt.id !== toSt.id) {
-            segments.push({ id: Date.now() + i, lineKey: currentLineKey, fromId: fromSt.id, toId: toSt.id });
-        }
-        currentStName = nextStName;
     }
-    return { segments };
+
+    // Flush the last segment
+    if (currentSegmentStartIdx !== lastIdx) {
+        const lineObj = railwayData[currentSegmentLine];
+        segments.push({
+            id: Date.now() + segments.length,
+            lineKey: currentSegmentLine,
+            fromId: lineObj.stations[currentSegmentStartIdx].id,
+            toId: lineObj.stations[lastIdx].id
+        });
+    }
+
+    return {
+        segments,
+        estimatedTime: Math.round(bestEndNode.timeMins)
+    };
 };
 
 // --- Geo Math for Snapping ---

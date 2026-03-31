@@ -30,6 +30,7 @@ export interface Station {
   lat: number;
   lng: number;
   transfers: LineKey[];
+  distToNext?: number;
 }
 
 export interface RailwayLineMeta extends CompanyMeta {

@@ -33,7 +33,7 @@ const STEPS = [
         id: 'editor-modes',
         target: '#trip-editor-toggle-mode',
         title: "编辑模式",
-        content: "你可以选择“手动录入”以此致敬旧时代的工匠精神，或者尝试“自动规划”, 将命运交给无限非概率驱动",
+        content: "你可以选择“手动录入”以致敬旧时代的工匠精神，或者尝试“自动规划”, 将命运交给无限非概率驱动",
         position: 'bottom',
         action: 'wait-interaction',
         check: ({ editorMode }) => editorMode === 'auto'
@@ -67,7 +67,7 @@ const STEPS = [
         id: 'tab-map',
         target: '#tab-btn-map',
         title: "地图模式",
-        content: "切换并查看铁路网络. 灰色的是未乘区段, 而已乘线路将以对应的颜色高亮显示. 放大到 10x 可查看 openrailwaymap 提供的配线和站台详情.",
+        content: "切换并查看铁路网络. 灰色的是未乘区段, 而已乘线路将以对应的颜色高亮显示. 底图包含来自 OpenRailwayMap 的配线详情. 新版本不再渲染已乘区间的svg图形, 而丰富了站点交互. 你可以长按站点并拖动连接, 以自动规划.",
         position: 'top',
         action: 'switch-tab',
         tab: 'map'
@@ -294,11 +294,6 @@ const Tutorial = ({
         const winH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         const winW = window.visualViewport ? window.visualViewport.width : window.innerWidth;
         const offsetTop = window.visualViewport ? window.visualViewport.offsetTop : 0;
-
-        // Adjust for viewport scrolling/offset if using visualViewport
-        // Actually for fixed position elements, visualViewport logic is complex.
-        // If we use simple innerHeight, it might be safer unless keyboard is up.
-        // But for FAB (bottom) clipping, visualViewport height is the visible part.
 
         // Center of the target element
         const targetCenterX = rect.left + rect.width / 2;

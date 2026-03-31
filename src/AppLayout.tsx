@@ -472,6 +472,13 @@ export const AppLayout: React.FC = () => {
                 if (newTrips.length > 0) { setTrips(prev => [...prev, ...newTrips].sort((a,b) => b.date.localeCompare(a.date))); }
                 if (newPins.length > 0) { setPins(prev => [...prev, ...newPins]); }
                 alert(`数据导入完成！\n\n行程: 新增 ${newTrips.length} 条 (跳过重复/无效 ${incomingTrips.length - newTrips.length} 条)\n图钉: 新增 ${newPins.length} 个 (跳过重复/无效 ${incomingPins.length - newPins.length} 个)`);
+
+                // Auto sync to cloud after import if user is logged in
+                const mergedTrips = [...trips, ...newTrips].sort((a,b) => b.date.localeCompare(a.date));
+                const mergedPins = [...pins, ...newPins];
+                if (user?.token && (newTrips.length > 0 || newPins.length > 0)) {
+                    saveData(user.token, mergedTrips, mergedPins, folders, badgeSettings).catch(e => console.error('Cloud sync after import failed', e));
+                }
             } catch (err) { alert("文件解析失败"); }
         };
         reader.readAsText(file); event.target.value = '';

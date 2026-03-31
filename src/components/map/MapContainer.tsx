@@ -5,6 +5,10 @@ import { useStore, PinMode, StationMenuData, CustomFeatureCollection, CustomGeoJ
 import { findNearestPointOnLine } from '../../utils/railwayRouting';
 import { syncLeafletLayerGroup } from '../../utils/leafletSync';
 import { useShallow } from 'zustand/react/shallow';
+import toast from 'react-hot-toast';
+
+// 记录各域名最后一次报错的时间，用于节流
+const lastTileErrorTime: Record<string, number> = {};
 
 interface Props {
     setStationMenu: (menu: StationMenuData | null) => void;
@@ -104,6 +108,29 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', subdomains: ['a','b','c','d'], maxZoom: 20 });
         const rail = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 20, opacity: 0, attribution: '© OpenRailwayMap' });
         railLayerRef.current = rail;
+
+        const handleTileError = (e: any) => {
+            if (!e || !e.tile || !e.tile.src) return;
+            try {
+                const url = new URL(e.tile.src);
+                const domain = url.hostname;
+                const now = Date.now();
+
+                if (!lastTileErrorTime[domain] || now - lastTileErrorTime[domain] > 60000) {
+                    lastTileErrorTime[domain] = now;
+                    toast.error(`地图加载失败 (${domain})\n请检查网络或切换 VPN 节点`, {
+                        id: `tile-error-${domain}`,
+                        duration: 5000,
+                    });
+                }
+            } catch (err) {
+                // 忽略 URL 解析错误
+            }
+        };
+
+        light.on('tileerror', handleTileError);
+        dark.on('tileerror', handleTileError);
+        rail.on('tileerror', handleTileError);
 
         dark.addTo(map); rail.addTo(map);
         L.control.layers({ "标准 (light)": light, "暗色 (Dark)": dark }, { "详细配线图 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);

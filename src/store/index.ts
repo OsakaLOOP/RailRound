@@ -327,7 +327,8 @@ export const useStore = create<GlobalStore>()(
         trips: state.trips,
         pins: state.pins,
         folders: state.folders,
-        badgeSettings: state.badgeSettings
+        badgeSettings: state.badgeSettings,
+        railwayData: state.railwayData // 持久化包含计算完 distToNext 的铁路数据，防止每次刷新重复计算
       }),
     }
   )

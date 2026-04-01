@@ -97,6 +97,7 @@ export const WalkTripEditor: React.FC = () => {
             memo: form.memo || '',
             cost: form.cost || 0,
             isWalk: true,
+            walkType: form.walkType || 'ufo',
             fromId: form.fromId,
             toId: form.toId,
             walkPath: walkPath,
@@ -133,12 +134,26 @@ export const WalkTripEditor: React.FC = () => {
         if (e) endName = e.name_ja;
     });
 
+    const isTree = form.walkType === 'tree';
+
+    const colors = {
+        bgHeader: isTree ? 'bg-green-50' : 'bg-purple-50',
+        textHeader: isTree ? 'text-green-800' : 'text-purple-800',
+        bgBox: isTree ? 'bg-green-100/50' : 'bg-purple-100/50',
+        textBoxTitle: isTree ? 'text-green-900' : 'text-purple-900',
+        textBoxValue: isTree ? 'text-green-700' : 'text-purple-700',
+        borderBox: isTree ? 'border-green-200' : 'border-purple-200',
+        textWarning: isTree ? 'text-green-600' : 'text-purple-500',
+        ringFocus: isTree ? 'focus:ring-green-500' : 'focus:ring-purple-500',
+        bgSaveBtn: isTree ? 'bg-green-600 hover:bg-green-700' : 'bg-purple-600 hover:bg-purple-700',
+    };
+
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4 animate-fade-in">
           <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-slide-up relative overflow-hidden">
-            <div className="p-4 border-b bg-purple-50 relative z-10">
+            <div className={`p-4 border-b ${colors.bgHeader} relative z-10`}>
               <div className="flex justify-between items-center">
-                 <h3 className="font-bold text-lg flex items-center gap-2 text-purple-800">
+                 <h3 className={`font-bold text-lg flex items-center gap-2 ${colors.textHeader}`}>
                     <Edit2 size={18} />
                     {isEditing ? '编辑步行路线' : '新建步行路线'}
                  </h3>
@@ -148,17 +163,17 @@ export const WalkTripEditor: React.FC = () => {
 
             <div className="p-6 overflow-y-auto space-y-4">
                 {/* Read-Only Origin/Dest display */}
-                <div className="bg-purple-100/50 p-4 rounded-lg flex flex-col gap-2">
-                    <div className="flex justify-between items-center text-sm font-semibold text-purple-900">
+                <div className={`${colors.bgBox} p-4 rounded-lg flex flex-col gap-2`}>
+                    <div className={`flex justify-between items-center text-sm font-semibold ${colors.textBoxTitle}`}>
                         <span>起点</span>
-                        <span className="text-purple-700">{startName}</span>
+                        <span className={colors.textBoxValue}>{startName}</span>
                     </div>
-                    <div className="border-b border-purple-200 border-dashed my-1"></div>
-                    <div className="flex justify-between items-center text-sm font-semibold text-purple-900">
+                    <div className={`border-b ${colors.borderBox} border-dashed my-1`}></div>
+                    <div className={`flex justify-between items-center text-sm font-semibold ${colors.textBoxTitle}`}>
                         <span>终点</span>
-                        <span className="text-purple-700">{endName}</span>
+                        <span className={colors.textBoxValue}>{endName}</span>
                     </div>
-                    <p className="text-xs text-purple-500 mt-2 text-center flex items-center justify-center gap-1">
+                    <p className={`text-xs ${colors.textWarning} mt-2 text-center flex items-center justify-center gap-1`}>
                         <AlertTriangle size={12}/> 步行起止点和类型无法更改
                     </p>
                 </div>
@@ -166,15 +181,15 @@ export const WalkTripEditor: React.FC = () => {
                 <div className="space-y-4 pt-4 border-t">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">日期</label>
-                        <input type="date" value={form.date || ''} onChange={(e) => setForm({ date: e.target.value })} className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-purple-500" />
+                        <input type="date" value={form.date || ''} onChange={(e) => setForm({ date: e.target.value })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} outline-none`} />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
-                        <textarea placeholder="例如：逛街、散步..." value={form.memo || ''} onChange={(e) => setForm({ memo: e.target.value })} className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-purple-500 min-h-[80px]" />
+                        <textarea placeholder="例如：逛街、散步..." value={form.memo || ''} onChange={(e) => setForm({ memo: e.target.value })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} outline-none min-h-[80px]`} />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">花费 (可选)</label>
-                        <input type="number" placeholder="花费 (円)" value={form.cost || ''} onChange={(e) => setForm({ cost: parseInt(e.target.value) || 0 })} className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-purple-500" />
+                        <input type="number" placeholder="花费 (円)" value={form.cost || ''} onChange={(e) => setForm({ cost: parseInt(e.target.value) || 0 })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} outline-none`} />
                     </div>
                 </div>
             </div>
@@ -185,7 +200,7 @@ export const WalkTripEditor: React.FC = () => {
                      <Trash2 size={16} /> 删除
                  </button>
                )}
-               <button onClick={onSave} className="flex-1 bg-purple-600 text-white py-2 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-purple-700 transition shadow-sm">
+               <button onClick={onSave} className={`flex-1 text-white py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition shadow-sm ${colors.bgSaveBtn}`}>
                    <Save size={16} /> 保存行程
                </button>
             </div>

@@ -96,6 +96,7 @@ export const TripEditor: React.FC = () => {
                     memo: isTree ? '🌲 环保少女教育成果 - 步行旅程' : '🛸 无限非概率驱动 - 步行旅程',
                     cost: 0,
                     isWalk: true,
+                    walkType: isTree ? 'tree' : 'ufo',
                     fromId: startStation,
                     toId: endStation,
                     lineKey: 'WALK',

@@ -148,6 +148,7 @@ export interface Trip {
   toId?: string;
   isWalk?: boolean;
   walkPath?: [number, number][]; // [lat, lng] array for the Bezier curve
+  walkType?: 'ufo' | 'tree' | 'normal';
 }
 
 export interface Pin {

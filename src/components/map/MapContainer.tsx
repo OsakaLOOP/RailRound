@@ -851,8 +851,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 routeItems.push({
                     id: `walk_${t.id}`,
                     coords: t.walkPath,
-                    color: '#9333ea', // Purple
-                    popup: `步行: ${t.date}`,
+                    color: t.walkType === 'tree' ? '#16a34a' : '#9333ea', // Green vs Purple
+                    popup: `${t.walkType === 'tree' ? '环保/步行' : 'UFO/步行'}: ${t.date}`,
                     fallback: true // Forces dashArray '5, 10' later in the sync renderer
                 });
             }

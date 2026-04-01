@@ -1269,28 +1269,45 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
               if (e) endName = e.name_ja;
           });
 
+          const isTree = t.walkType === 'tree';
+          const cls = {
+              bg: isTree ? 'bg-green-50' : 'bg-purple-50',
+              border: isTree ? 'border-green-100' : 'border-purple-100',
+              date: isTree ? 'text-green-400' : 'text-purple-400',
+              tagText: isTree ? 'text-green-600' : 'text-purple-500',
+              tagBg: isTree ? 'bg-green-200/50' : 'bg-purple-200/50',
+              btnEdit: isTree ? 'text-green-400 hover:text-green-600' : 'text-purple-400 hover:text-purple-600',
+              btnDel: isTree ? 'text-green-400 hover:text-red-500' : 'text-purple-400 hover:text-red-500',
+              icon: isTree ? 'text-green-500' : 'text-purple-500',
+              title: isTree ? 'text-green-700' : 'text-purple-700',
+              stations: isTree ? 'text-green-900' : 'text-purple-900',
+              arrow: isTree ? 'text-green-300' : 'text-purple-300',
+              memo: isTree ? 'text-green-600' : 'text-purple-600',
+              label: isTree ? '环保/步行' : 'UFO/步行'
+          };
+
           return (
-              <div key={t.id} className="bg-purple-50 p-4 rounded-lg border border-purple-100 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-pointer" onClick={() => useStore.getState().startEditingWalkTrip(t)}>
-                  <div className="flex justify-between mb-2 pb-2 border-b border-purple-100">
-                      <span className="text-xs font-bold text-purple-400">{t.date}</span>
+              <div key={t.id} className={`${cls.bg} p-4 rounded-lg border ${cls.border} shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-pointer`} onClick={() => useStore.getState().startEditingWalkTrip(t)}>
+                  <div className={`flex justify-between mb-2 pb-2 border-b ${cls.border}`}>
+                      <span className={`text-xs font-bold ${cls.date}`}>{t.date}</span>
                       <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono text-purple-500 bg-purple-200/50 px-1.5 py-0.5 rounded">步行</span>
-                          <button onClick={(e) => { e.stopPropagation(); useStore.getState().startEditingWalkTrip(t); }} className="text-purple-400 hover:text-purple-600"><Edit2 size={14}/></button>
-                          <button onClick={(e) => { e.stopPropagation(); onDelete(t.id); }} className="text-purple-400 hover:text-red-500"><Trash2 size={14}/></button>
+                          <span className={`text-xs font-mono ${cls.tagText} ${cls.tagBg} px-1.5 py-0.5 rounded`}>步行</span>
+                          <button onClick={(e) => { e.stopPropagation(); useStore.getState().startEditingWalkTrip(t); }} className={cls.btnEdit}><Edit2 size={14}/></button>
+                          <button onClick={(e) => { e.stopPropagation(); onDelete(t.id); }} className={cls.btnDel}><Trash2 size={14}/></button>
                       </div>
                   </div>
                   <div className="flex flex-row">
                       <div className="flex-1 space-y-2 relative">
                           <div className="relative z-10 flex flex-col text-sm">
                               <div className="flex items-center gap-2">
-                                  <MapPin size={14} className="text-purple-500 shrink-0"/>
-                                  <span className="font-bold text-purple-700 text-xs">步行</span>
+                                  <MapPin size={14} className={`${cls.icon} shrink-0`}/>
+                                  <span className={`font-bold ${cls.title} text-xs`}>{cls.label}</span>
                               </div>
-                              <div className="pl-5 font-medium text-purple-900">{startName} <span className="text-purple-300 mx-1">→</span> {endName}</div>
+                              <div className={`pl-5 font-medium ${cls.stations}`}>{startName} <span className={`${cls.arrow} mx-1`}>→</span> {endName}</div>
                           </div>
                       </div>
                   </div>
-                  {t.memo && <div className="text-xs text-purple-600 bg-white/60 p-2 rounded mt-3">{t.memo}</div>}
+                  {t.memo && <div className={`text-xs ${cls.memo} bg-white/60 p-2 rounded mt-3`}>{t.memo}</div>}
               </div>
           );
       }

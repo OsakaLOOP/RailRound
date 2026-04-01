@@ -86,6 +86,7 @@ export interface Station {
 }
 
 export interface RailwayLineMeta extends CompanyMeta {
+  company: string;
   icon?: URLString | null;
 }
 

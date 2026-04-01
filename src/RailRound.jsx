@@ -1982,8 +1982,8 @@ function RailLOOPContent() {
              const compName = line.meta.company;
              if (companyDB[compName]) {
                  const info = companyDB[compName];
-                 if(!line.meta.region ||!line.meta.type ||line.meta.region === "未知" || line.meta.type === "未知") {
-                     next[lineKey] = { ...line, meta: { ...line.meta, region: info.region, type: info.type, logo: info.logo } };
+                 if(!line.meta.region ||!line.meta.type ||line.meta.region === "未知" || line.meta.type === "未知" || !line.meta.company) {
+                     next[lineKey] = { ...line, meta: { ...line.meta, company: compName || "未知", region: info.region, type: info.type, logo: info.logo } };
                      changed = true;
                  }
              }

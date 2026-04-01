@@ -279,7 +279,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             if (useStore.getState().isAprilFool) {
                 const startContainerPoint = map.latLngToContainerPoint([startLat, startLng]);
                 const distToStart = containerPoint.distanceTo(startContainerPoint);
-                const viewportThreshold = Math.max(mapRect.width, mapRect.height) * 0.2;
+                const viewportThreshold = Math.max(mapRect.width, mapRect.height) * 0.3;
 
                 if (distToStart > viewportThreshold) {
                     // Trigger the trap!

@@ -1284,7 +1284,7 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
                           <div className="relative z-10 flex flex-col text-sm">
                               <div className="flex items-center gap-2">
                                   <MapPin size={14} className="text-purple-500 shrink-0"/>
-                                  <span className="font-bold text-purple-700 text-xs">UFO/步行</span>
+                                  <span className="font-bold text-purple-700 text-xs">步行</span>
                               </div>
                               <div className="pl-5 font-medium text-purple-900">{startName} <span className="text-purple-300 mx-1">→</span> {endName}</div>
                           </div>

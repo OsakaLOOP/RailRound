@@ -27,6 +27,12 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     const railLayerRef = useRef<L.TileLayer | null>(null);
     const rubberBandLayerRef = useRef<L.LayerGroup | null>(null);
 
+    // Explicit SVG Renderers for pointer-events passthrough
+    const baseLinesRendererRef = useRef<L.Renderer | null>(null);
+    const baseStationsRendererRef = useRef<L.Renderer | null>(null);
+    const routeRendererRef = useRef<L.Renderer | null>(null);
+    const visitedStationsRendererRef = useRef<L.Renderer | null>(null);
+
     // For local long-press routing drag
     const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const routeDragRef = useRef<{ active: boolean, startStation: CustomGeoJSONFeature | null, currentSnap: CustomGeoJSONFeature | null, rubberLine: L.Polyline | null, snapCircleCenter: L.CircleMarker | null, openedTooltips: Set<L.Layer> }>({ active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null, openedTooltips: new Set() });
@@ -136,15 +142,31 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         L.control.layers({ "标准 (light)": light, "暗色 (Dark)": dark }, { "详细配线图 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);
 
         map.createPane('baseLinesPane');
-        map.getPane('baseLinesPane')!.style.zIndex = '390';
+        const baseLinesPane = map.getPane('baseLinesPane')!;
+        baseLinesPane.style.zIndex = '390';
+        baseLinesPane.style.pointerEvents = 'none';
+
         map.createPane('baseStationsPane');
-        map.getPane('baseStationsPane')!.style.zIndex = '400';
+        const baseStationsPane = map.getPane('baseStationsPane')!;
+        baseStationsPane.style.zIndex = '400';
+        baseStationsPane.style.pointerEvents = 'none';
+
         map.createPane('routePane');
-        map.getPane('routePane')!.style.zIndex = '410';
+        const routePane = map.getPane('routePane')!;
+        routePane.style.zIndex = '410';
+        routePane.style.pointerEvents = 'none';
+
         map.createPane('visitedStationsPane');
-        map.getPane('visitedStationsPane')!.style.zIndex = '420';
+        const visitedStationsPane = map.getPane('visitedStationsPane')!;
+        visitedStationsPane.style.zIndex = '420';
+        visitedStationsPane.style.pointerEvents = 'none';
 
         mapInstance.current = map;
+
+        baseLinesRendererRef.current = L.svg({ pane: 'baseLinesPane' });
+        baseStationsRendererRef.current = L.svg({ pane: 'baseStationsPane' });
+        routeRendererRef.current = L.svg({ pane: 'routePane' });
+        visitedStationsRendererRef.current = L.svg({ pane: 'visitedStationsPane' });
 
         baseLinesLayer.current = L.layerGroup();
         baseStationsLayer.current = L.layerGroup().addTo(map);
@@ -486,7 +508,13 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         syncLeafletLayerGroup<CustomGeoJSONFeature>(
             baseStationsLayer.current,
             stationFeatures,
-            (f) => f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`,
+            (f) => {
+                const stationId = f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`;
+                const isVisited = visitedStationsRef.current.has(stationId);
+                // Changing panes requires a different renderer. To avoid issues with Leaflet transferring SVG nodes,
+                // we treat a station moving between visited/base as a different entity id.
+                return `${stationId}_${isVisited ? 'v' : 'b'}`;
+            },
             (f) => {
                 const latlng = [f.geometry.coordinates[1], f.geometry.coordinates[0]] as [number, number];
                 const stationId = f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`;
@@ -496,7 +524,10 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 const targetRadius = isVisited ? baseVisitedRadius : baseUnvisitedRadius;
                 const targetWeight = isVisited ? baseVisitedWeight : 0;
 
+                const currentRenderer = isVisited ? visitedStationsRendererRef.current! : baseStationsRendererRef.current!;
+
                 const layer = L.circleMarker(latlng, {
+                    renderer: currentRenderer,
                     radius: targetRadius,
                     color: isVisited ? '#ffffff' : 'transparent',
                     fillColor: isVisited ? lineColor : '#64748b',
@@ -632,14 +663,11 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     });
 
                     // Changing panes in Leaflet requires removing and re-adding the layer to its parent layer group.
-                    if (marker.options.pane !== (isVisited ? 'visitedStationsPane' : 'baseStationsPane')) {
-                        marker.options.pane = isVisited ? 'visitedStationsPane' : 'baseStationsPane';
-                        if (baseStationsLayer.current && baseStationsLayer.current.hasLayer(marker)) {
-                            baseStationsLayer.current.removeLayer(marker);
-                            baseStationsLayer.current.addLayer(marker);
-                        }
-                    }
-
+                    // Since identity now includes the visited state (v/b suffix),
+                    // this branch will technically never be hit if isVisited changes,
+                    // as syncLeafletLayerGroup will remove the old marker and create a new one.
+                    // This is intended because transferring an SVG path node between SVG parent renderers
+                    // in Leaflet is error-prone.
                     marker._cachedIsVisited = isVisited;
                     marker._cachedRadius = targetRadius;
                     marker._cachedWeight = targetWeight;
@@ -661,7 +689,9 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         L.geoJSON(lineFeatures as any, {
             style: { color: '#475569', weight: 1, opacity: 0.3 },
             pane: 'baseLinesPane',
-            interactive: false
+            interactive: false,
+            // @ts-ignore
+            renderer: baseLinesRendererRef.current
         }).addTo(baseLinesLayer.current);
     };
 
@@ -691,13 +721,15 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             (item) => {
                 const isTransfer = item.isTransfer;
                 const options = {
+                    renderer: routeRendererRef.current,
                     color: item.color,
                     weight: zoomWeight,
                     opacity: isTransfer ? 0.5 : 0.9,
                     lineCap: 'round',
                     smoothFactor: 0.2,
-                    dashArray: item.fallback ? '5, 10' : (isTransfer ? '4, 8' : undefined)
-               , pane: 'routePane' };
+                    dashArray: item.fallback ? '5, 10' : (isTransfer ? '4, 8' : undefined),
+                    pane: 'routePane'
+                };
                 const pl = L.polyline(item.coords, options as L.PolylineOptions).bindPopup(item.popup);
                 (pl as any)._cachedCoords = item.coords;
                 return pl;

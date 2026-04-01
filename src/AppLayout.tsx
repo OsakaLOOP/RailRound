@@ -253,14 +253,44 @@ export const AppLayout: React.FC = () => {
             let cachedFiles: any[] = [];
             try {
                 const dbInstance = await db.open();
-                const tx = dbInstance.transaction(db.STORE_FILES, 'readonly');
-                const store = tx.objectStore(db.STORE_FILES);
-                const req = store.getAll();
+
+                // 1. Load GeoJSON files
+                const txFiles = dbInstance.transaction(db.STORE_FILES, 'readonly');
+                const storeFiles = txFiles.objectStore(db.STORE_FILES);
+                const reqFiles = storeFiles.getAll();
                 cachedFiles = await new Promise((resolve) => {
-                    req.onsuccess = () => resolve(req.result || []);
-                    req.onerror = () => resolve([]);
+                    reqFiles.onsuccess = () => resolve(reqFiles.result || []);
+                    reqFiles.onerror = () => resolve([]);
                 });
                 if (cachedFiles.length > 0) processGeoJsonBatch(cachedFiles, currentCompanyData);
+
+                // 2. Pre-load all segment geometries into memory at once to eliminate massive I/O lag
+                const txSegments = dbInstance.transaction(db.STORE_SEGMENTS, 'readonly');
+                const storeSegments = txSegments.objectStore(db.STORE_SEGMENTS);
+
+                // Using a cursor or getAllKeys/getAll is required.
+                // Since STORE_SEGMENTS might use out-of-line keys or we need keys to build the Map.
+                // Assuming keys are what we need, let's use a cursor to build the map directly.
+                const preloadedGeometries = new Map();
+                await new Promise((resolve) => {
+                    const reqCursor = storeSegments.openCursor();
+                    reqCursor.onsuccess = (e: any) => {
+                        const cursor = e.target.result;
+                        if (cursor) {
+                            preloadedGeometries.set(cursor.key, cursor.value);
+                            cursor.continue();
+                        } else {
+                            resolve(null);
+                        }
+                    };
+                    reqCursor.onerror = () => resolve(null);
+                });
+
+                if (preloadedGeometries.size > 0) {
+                    setSegmentGeometries(preloadedGeometries);
+                    console.log(`[Autoload] 预加载了 ${preloadedGeometries.size} 条行程缩略图缓存`);
+                }
+
             } catch (e) { console.warn('Cache read failed', e); }
 
             const manifestRes = await fetch('/geojson_manifest.json').catch(() => null);
@@ -305,14 +335,35 @@ export const AppLayout: React.FC = () => {
             );
 
             if (needsCalc) {
-                toastId = toast.loading('正在计算站间距离 (0%)...', { duration: Infinity });
+                // Using a custom dynamic progress bar toast instead of plain text updates
+                toastId = toast.loading(
+                    (t: any) => (
+                        <div className="flex flex-col gap-2 w-48">
+                            <span className="text-sm font-bold text-gray-700">预计算全图站间距... (0%)</span>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '0%' }}></div>
+                            </div>
+                        </div>
+                    ),
+                    { duration: Infinity }
+                );
 
                 const handleDistanceWorkerMsg = (e: MessageEvent) => {
                     const { type, payload } = e.data;
                     if (type === 'PROGRESS' && toastId) {
-                        toast.loading(`正在计算站间距离 (${payload.progress}%)...`, { id: toastId });
+                        toast.loading(
+                            (t: any) => (
+                                <div className="flex flex-col gap-2 w-48">
+                                    <span className="text-sm font-bold text-gray-700">预计算全图站间距... ({payload.progress}%)</span>
+                                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-200 ease-out" style={{ width: `${payload.progress}%` }}></div>
+                                    </div>
+                                </div>
+                            ),
+                            { id: toastId }
+                        );
                     } else if (type === 'COMPLETE') {
-                        if (toastId) toast.success('站距计算完成！', { id: toastId, duration: 3000 });
+                        if (toastId) toast.success('站距预计算已完成，缓存更新。', { id: toastId, duration: 3000 });
                         distanceWorkerRef.current?.removeEventListener('message', handleDistanceWorkerMsg);
 
                         // Merge updated distances into CURRENT railway data instead of overwriting,

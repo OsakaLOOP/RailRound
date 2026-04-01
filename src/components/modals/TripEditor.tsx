@@ -104,7 +104,7 @@ export const TripEditor: React.FC = () => {
                 // Create a basic walk trip
                 const walkTrip = {
                     date: form.date || new Date().toISOString().split('T')[0],
-                    memo: '🛸 UFO 投递 - 步行旅程',
+                    memo: '🛸 无限非概率驱动 - 步行旅程',
                     cost: 0,
                     isWalk: true,
                     fromId: startStation,

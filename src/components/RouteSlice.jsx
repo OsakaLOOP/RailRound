@@ -43,7 +43,8 @@ export const RouteSlice = ({ segments }) => {
               width: shouldRotate ? heightPx : widthPx,
               height: shouldRotate ? widthPx : heightPx,
               maxWidth: shouldRotate ? 'none' : '100%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              maxHeight: '120px', overflow: 'hidden'
           }}>
             <svg
                 viewBox="0 0 100 50"

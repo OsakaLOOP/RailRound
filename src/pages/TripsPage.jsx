@@ -40,7 +40,7 @@ export default function TripsPage() {
     };
 
     return (
-        <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-24 pointer-events-auto bg-slate-100 min-h-full">
+        <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-24 pointer-events-auto bg-slate-100 h-full">
             {trips.length === 0 ? (
                 <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
                     <Train size={48} className="opacity-20 mb-4"/>

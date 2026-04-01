@@ -134,6 +134,10 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
         dark.addTo(map); rail.addTo(map);
         L.control.layers({ "标准 (light)": light, "暗色 (Dark)": dark }, { "详细配线图 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);
+
+        map.createPane('stationPane');
+        map.getPane('stationPane')!.style.zIndex = '450'; // overlayPane is 400, markerPane is 600
+
         mapInstance.current = map;
 
         baseLinesLayer.current = L.layerGroup();
@@ -435,7 +439,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             (f) => f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`,
             (f) => {
                 const latlng = [f.geometry.coordinates[1], f.geometry.coordinates[0]] as [number, number];
-                const isVisited = visitedStationsRef.current.has(f.properties.id || '');
+                const stationId = f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`;
+                const isVisited = visitedStationsRef.current.has(stationId);
                 const lineColor = f.properties.stroke || '#64748b'; // Fallback if no stroke defined
                 const layer = L.circleMarker(latlng, {
                     radius: isVisited ? 5 : 4,
@@ -443,7 +448,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     fillColor: isVisited ? lineColor : '#64748b',
                     fillOpacity: isVisited ? 1.0 : 0.5,
                     weight: isVisited ? 2 : 0,
-                    className: 'station-dot'
+                    className: 'station-dot',
+                    pane: 'stationPane'
                 });
                 // @ts-ignore
                 layer._cachedIsVisited = isVisited;
@@ -533,7 +539,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             },
             (layer, f) => {
                 const marker = layer as any;
-                const isVisited = visitedStationsRef.current.has(f.properties.id || '');
+                const stationId = f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`;
+                const isVisited = visitedStationsRef.current.has(stationId);
                 const lineColor = f.properties.stroke || '#64748b';
                 const newLat = f.geometry.coordinates[1];
                 const newLng = f.geometry.coordinates[0];

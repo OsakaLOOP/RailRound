@@ -192,21 +192,85 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
         }
 
         // 2. Transfers
-        const transferableNodes = stationIndexMap.get(currentStation.name_ja) || [];
+        const validTransfers = new Map<string, RouteNode>();
 
-        for (const tNode of transferableNodes) {
+        // Type A: Explicit transfers defined in the data structure
+        if (currentStation.transfers && Array.isArray(currentStation.transfers)) {
+            for (const nextLineKey of currentStation.transfers) {
+                if (nextLineKey === current.lineKey) continue;
+                const nextLine = railwayData[nextLineKey];
+                if (!nextLine) continue;
+
+                // For explicit transfers, we trust the data, but we still apply company compatibility
+                // if it's not a free transfer (like JR to Private). The strict mode in original logic
+                // mandated compatibility unless bypassed. For auto-routing, we enforce it to avoid
+                // impossible through-routes.
+                const nextMeta = nextLine.meta;
+                if (!isCompanyCompatible(currentLine.meta as CompanyMeta, nextMeta as CompanyMeta)) continue;
+
+                // Find the physically closest station on the target line to act as the transfer point
+                let bestIdx = -1;
+                let minDist = Infinity;
+                for (let i = 0; i < nextLine.stations.length; i++) {
+                    const st = nextLine.stations[i];
+                    const d = calcDist(currentStation.lat, currentStation.lng, st.lat, st.lng);
+                    if (d < minDist) { minDist = d; bestIdx = i; }
+                }
+
+                if (bestIdx !== -1 && minDist <= 2.0) { // Allow up to 2km for explicit mega-station transfers
+                    const targetId = `${nextLineKey}:${bestIdx}`;
+                    if (!closedSet.has(targetId) && !validTransfers.has(targetId)) {
+                        validTransfers.set(targetId, {
+                            lineKey: nextLineKey,
+                            stationIndex: bestIdx,
+                            cost: current.cost + 5 + 15,
+                            timeMins: current.timeMins + 5,
+                            transfers: current.transfers + 1,
+                            stops: current.stops,
+                            parent: current
+                        });
+                    }
+                }
+            }
+        }
+
+        // Type B: Same-name stations acting as implicit physical transfers
+        const sameNameNodes = stationIndexMap.get(currentStation.name_ja) || [];
+        for (const tNode of sameNameNodes) {
             if (tNode.lineKey === current.lineKey) continue;
 
+            const nextLine = railwayData[tNode.lineKey];
+            const nextMeta = nextLine.meta;
+
+            // Strictly enforce company compatibility for implicit transfers
+            if (!isCompanyCompatible(currentLine.meta as CompanyMeta, nextMeta as CompanyMeta)) continue;
+
             // Validate that the transfer station is actually nearby (<= 1.0 km)
+<<<<<<< HEAD
             const targetStation = railwayData[tNode.lineKey].stations[tNode.stationIndex];
+=======
+            // to prevent incorrect transfers between identically named stations in completely different cities.
+            const targetStation = nextLine.stations[tNode.stationIndex];
+>>>>>>> bb9ea90 (Restore explicit station transfers and company compatibility checks in findRoute)
             const dist = calcDist(currentStation.lat, currentStation.lng, targetStation.lat, targetStation.lng);
 
             if (dist > 1.0) continue;
 
-            // Check compatibility if needed (using existing logic)
-            const nextMeta = railwayData[tNode.lineKey].meta;
-            const isCompat = isCompanyCompatible(currentLine.meta as CompanyMeta, nextMeta as CompanyMeta);
+            const targetId = `${tNode.lineKey}:${tNode.stationIndex}`;
+            if (!closedSet.has(targetId) && !validTransfers.has(targetId)) {
+                validTransfers.set(targetId, {
+                    lineKey: tNode.lineKey,
+                    stationIndex: tNode.stationIndex,
+                    cost: current.cost + 5 + 15,
+                    timeMins: current.timeMins + 5,
+                    transfers: current.transfers + 1,
+                    stops: current.stops,
+                    parent: current
+                });
+            }
+        }
 
+<<<<<<< HEAD
 
             const node: RouteNode = {
                 lineKey: tNode.lineKey,
@@ -219,6 +283,11 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
             };
 
             if (!closedSet.has(`${node.lineKey}:${node.stationIndex}`)) pushNode(node);
+=======
+        // Push all valid transfers found into the queue
+        for (const node of validTransfers.values()) {
+            pushNode(node);
+>>>>>>> bb9ea90 (Restore explicit station transfers and company compatibility checks in findRoute)
         }
     }
 

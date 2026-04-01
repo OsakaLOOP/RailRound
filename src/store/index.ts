@@ -1,5 +1,57 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
+import { db } from '../utils/db';
+
+// --- Custom IndexedDB Storage for Zustand ---
+// Because railwayData can easily exceed the 5MB localStorage limit,
+// we must back Zustand's persist middleware with IndexedDB.
+const idbStorage: StateStorage = {
+  getItem: async (name: string): Promise<string | null> => {
+    try {
+      const dbInstance = await db.open();
+      const tx = dbInstance.transaction(db.STORE_FILES, 'readonly');
+      const store = tx.objectStore(db.STORE_FILES);
+      return new Promise((resolve) => {
+        const req = store.get(`zustand_${name}`);
+        req.onsuccess = () => {
+          resolve(req.result ? req.result.value : null);
+        };
+        req.onerror = () => resolve(null);
+      });
+    } catch (e) {
+      console.warn('IDB storage getItem failed:', e);
+      return null;
+    }
+  },
+  setItem: async (name: string, value: string): Promise<void> => {
+    try {
+      const dbInstance = await db.open();
+      const tx = dbInstance.transaction(db.STORE_FILES, 'readwrite');
+      const store = tx.objectStore(db.STORE_FILES);
+      return new Promise((resolve, reject) => {
+        const req = store.put({ fileName: `zustand_${name}`, value }, `zustand_${name}`);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.warn('IDB storage setItem failed:', e);
+    }
+  },
+  removeItem: async (name: string): Promise<void> => {
+    try {
+      const dbInstance = await db.open();
+      const tx = dbInstance.transaction(db.STORE_FILES, 'readwrite');
+      const store = tx.objectStore(db.STORE_FILES);
+      return new Promise((resolve, reject) => {
+        const req = store.delete(`zustand_${name}`);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.warn('IDB storage removeItem failed:', e);
+    }
+  },
+};
 
 // basic value
 export type ID = string | number;
@@ -321,6 +373,7 @@ export const useStore = create<GlobalStore>()(
     }),
     {
       name: 'railround-storage',
+      storage: createJSONStorage(() => idbStorage),
       partialize: (state) => ({
         user: state.user,
         isLoggedIn: state.isLoggedIn,

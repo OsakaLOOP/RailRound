@@ -205,12 +205,9 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
                 const nextLine = railwayData[nextLineKey];
                 if (!nextLine) continue;
 
-                // For explicit transfers, we trust the data, but we still apply company compatibility
-                // if it's not a free transfer (like JR to Private). The strict mode in original logic
-                // mandated compatibility unless bypassed. For auto-routing, we enforce it to avoid
-                // impossible through-routes.
-                const nextMeta = nextLine.meta;
-                if (!isCompanyCompatible(currentLine.meta as CompanyMeta, nextMeta as CompanyMeta)) continue;
+                // For explicit transfers, we trust the data completely.
+                // We remove strict company compatibility checks to allow real-world transfers
+                // (e.g., from JR to Subway) seamlessly.
 
                 // Find the physically closest station on the target line to act as the transfer point
                 let bestIdx = -1;
@@ -244,10 +241,9 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
             if (tNode.lineKey === current.lineKey) continue;
 
             const nextLine = railwayData[tNode.lineKey];
-            const nextMeta = nextLine.meta;
 
-            // Strictly enforce company compatibility for implicit transfers
-            if (!isCompanyCompatible(currentLine.meta as CompanyMeta, nextMeta as CompanyMeta)) continue;
+            // We remove strict company compatibility checks here as well to allow seamless auto-routing
+            // between different operators sharing the same station name/building.
 
             // Validate that the transfer station is actually nearby (<= 1.0 km)
             // to prevent incorrect transfers between identically named stations in completely different cities.

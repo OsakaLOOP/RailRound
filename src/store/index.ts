@@ -250,11 +250,13 @@ export interface GlobalStore {
   editorMode: 'manual' | 'auto';
   autoForm: { startLine: string; startStation: string; endLine: string; endStation: string; };
   isRouteSearching: boolean;
+  autoRouteEasterEggType: 'ufo' | 'tree' | null;
 
   setTripForm: (form: Partial<Trip> | ((prev: Partial<Trip>) => Partial<Trip>)) => void;
   setAutoForm: (form: any | ((prev: any) => any)) => void;
   setEditorMode: (mode: 'manual' | 'auto') => void;
   setIsRouteSearching: (isSearching: boolean) => void;
+  setAutoRouteEasterEggType: (type: 'ufo' | 'tree' | null) => void;
   startEditingTrip: (trip?: Partial<Trip>) => void;
   closeTripEditor: () => void;
 
@@ -352,6 +354,8 @@ export const useStore = create<GlobalStore>()(
       }),
       setEditorMode: (mode) => set({ editorMode: mode }),
       setIsRouteSearching: (isSearching) => set({ isRouteSearching: isSearching }),
+      autoRouteEasterEggType: null,
+      setAutoRouteEasterEggType: (type) => set({ autoRouteEasterEggType: type }),
 
       startEditingTrip: (trip) => {
           if (trip) {
@@ -361,7 +365,7 @@ export const useStore = create<GlobalStore>()(
             set({ isTripEditing: true, editingTripId: null, tripForm: { date: new Date().toISOString().split('T')[0], memo: '', segments: [], cost: 0 } });
           }
       },
-      closeTripEditor: () => set({ isTripEditing: false, editingTripId: null, tripForm: { date: new Date().toISOString().split('T')[0], memo: '', segments: [], cost: 0 } }),
+      closeTripEditor: () => set({ isTripEditing: false, editingTripId: null, autoRouteEasterEggType: null, tripForm: { date: new Date().toISOString().split('T')[0], memo: '', segments: [], cost: 0 } }),
 
       isWalkTripEditing: false,
       startEditingWalkTrip: (trip) => {

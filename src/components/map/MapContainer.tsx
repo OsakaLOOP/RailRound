@@ -26,6 +26,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     const routeLayer = useRef<L.LayerGroup | null>(null);
     const railLayerRef = useRef<L.TileLayer | null>(null);
     const rubberBandLayerRef = useRef<L.LayerGroup | null>(null);
+    const stationRendererRef = useRef<L.Renderer | null>(null);
 
     // For local long-press routing drag
     const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -135,8 +136,10 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         dark.addTo(map); rail.addTo(map);
         L.control.layers({ "标准 (light)": light, "暗色 (Dark)": dark }, { "详细配线图 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);
 
-        // map.createPane('stationPane'); // Removing custom pane as it causes pointer-event issues
-        // map.getPane('stationPane')!.style.zIndex = '450';
+        map.createPane('stationPane');
+        map.getPane('stationPane')!.style.zIndex = '450';
+        // Use SVG renderer for stationPane to prevent empty canvas space from blocking events to underlying layers
+        stationRendererRef.current = L.svg({ pane: 'stationPane' });
 
         mapInstance.current = map;
 
@@ -491,13 +494,14 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 const targetWeight = isVisited ? baseVisitedWeight : 0;
 
                 const layer = L.circleMarker(latlng, {
+                    renderer: stationRendererRef.current || undefined,
                     radius: targetRadius,
                     color: isVisited ? '#ffffff' : 'transparent',
                     fillColor: isVisited ? lineColor : '#64748b',
                     fillOpacity: isVisited ? 1.0 : 0.5,
                     weight: targetWeight,
                     className: 'station-dot',
-                    pane: 'markerPane' // Use default markerPane (z: 600) to ensure tooltips and hovers are not blocked
+                    pane: 'stationPane'
                 });
                 // @ts-ignore
                 layer._cachedIsVisited = isVisited;

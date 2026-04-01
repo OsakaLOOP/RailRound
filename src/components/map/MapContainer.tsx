@@ -135,8 +135,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         dark.addTo(map); rail.addTo(map);
         L.control.layers({ "标准 (light)": light, "暗色 (Dark)": dark }, { "详细配线图 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);
 
-        map.createPane('stationPane');
-        map.getPane('stationPane')!.style.zIndex = '450'; // overlayPane is 400, markerPane is 600
+        // map.createPane('stationPane'); // Removing custom pane as it causes pointer-event issues
+        // map.getPane('stationPane')!.style.zIndex = '450';
 
         mapInstance.current = map;
 
@@ -497,11 +497,13 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     fillOpacity: isVisited ? 1.0 : 0.5,
                     weight: targetWeight,
                     className: 'station-dot',
-                    pane: 'stationPane'
+                    pane: 'markerPane' // Use default markerPane (z: 600) to ensure tooltips and hovers are not blocked
                 });
                 // @ts-ignore
                 layer._cachedIsVisited = isVisited;
-                if (f.properties.name) layer.bindTooltip(f.properties.name);
+                if (f.properties.name) {
+                    layer.bindTooltip(f.properties.name, { sticky: true, direction: 'top', offset: [0, -5] });
+                }
 
                 // @ts-ignore
                 layer._cachedLat = latlng[0];
@@ -608,7 +610,9 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
                 if (marker._cachedName !== newName) {
                     marker.unbindTooltip();
-                    if (newName) marker.bindTooltip(newName);
+                    if (newName) {
+                        marker.bindTooltip(newName, { sticky: true, direction: 'top', offset: [0, -5] });
+                    }
                     marker._cachedName = newName;
                     changed = true;
                 }

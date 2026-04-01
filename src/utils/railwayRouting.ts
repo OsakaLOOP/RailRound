@@ -5,6 +5,13 @@ import { calcDist } from './stats'; // Ensure calcDist is exported from here or 
 let stationNameIndexCache: Map<string, {lineKey: string, stationIndex: number}[]> | null = null;
 let lastRailwayDataRef: RailwayMap | null = null;
 
+export const isCompanyCompatible = (meta1: CompanyMeta | undefined, meta2: CompanyMeta | undefined) => {
+  if (!meta1 || !meta2) return false;
+  if (meta1.company === meta2.company && meta1.company !== "上传数据" && meta1.company !== "未知") return true;
+  if (meta1.type === 'JR' && meta2.type === 'JR') return true;
+  return false;
+};
+
 export const buildStationIndex = (railwayData: RailwayMap) => {
     if (stationNameIndexCache && lastRailwayDataRef === railwayData) {
         return stationNameIndexCache;

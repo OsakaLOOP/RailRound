@@ -14,6 +14,7 @@ const calcDist = (lat1, lon1, lat2, lon2) => {
   self.addEventListener('message', (e) => {
       const { type, payload } = e.data;
       if (type === 'CALC_DISTANCES') {
+          console.log('Worker: Received data for distance calculation');
           const { railwayData } = payload;
           const entries = Object.entries(railwayData);
           const total = entries.length;

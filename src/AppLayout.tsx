@@ -411,27 +411,37 @@ export const AppLayout: React.FC = () => {
                 // Attempt to read fully precompiled geoData & railwayData structures directly (FAST PATH)
                 let precompiledGeoData = null;
                 let precompiledRailwayData = null;
-                try {
-                    const txGeo = dbInstance.transaction(db.STORE_FILES, 'readonly');
-                    const storeGeo = txGeo.objectStore(db.STORE_FILES);
 
-                    const reqGeo = storeGeo.get('__precompiled_geodata');
-                    precompiledGeoData = await new Promise((resolve) => {
-                        reqGeo.onsuccess = () => resolve(reqGeo.result || null);
-                        reqGeo.onerror = () => resolve(null);
-                    });
+                const lastReloadVersion = localStorage.getItem('rail_last_data_reload_version');
+                const isNewVersion = !lastReloadVersion || lastReloadVersion !== String(CURRENT_VERSION);
+                const shouldForceReload = meta.forceDataReload === true && isNewVersion;
 
-                    const reqRail = storeGeo.get('__precompiled_railwaydata');
-                    precompiledRailwayData = await new Promise((resolve) => {
-                        reqRail.onsuccess = () => resolve(reqRail.result || null);
-                        reqRail.onerror = () => resolve(null);
-                    });
-                } catch(e) {}
+                if (shouldForceReload) {
+                    console.log(`[Autoload] 发现版本更新 (v${CURRENT_VERSION}) 且 forceDataReload 开启, 强制重新加载数据`);
+                    localStorage.setItem('rail_last_data_reload_version', String(CURRENT_VERSION));
+                } else {
+                    try {
+                        const txGeo = dbInstance.transaction(db.STORE_FILES, 'readonly');
+                        const storeGeo = txGeo.objectStore(db.STORE_FILES);
+
+                        const reqGeo = storeGeo.get('__precompiled_geodata');
+                        precompiledGeoData = await new Promise((resolve) => {
+                            reqGeo.onsuccess = () => resolve(reqGeo.result || null);
+                            reqGeo.onerror = () => resolve(null);
+                        });
+
+                        const reqRail = storeGeo.get('__precompiled_railwaydata');
+                        precompiledRailwayData = await new Promise((resolve) => {
+                            reqRail.onsuccess = () => resolve(reqRail.result || null);
+                            reqRail.onerror = () => resolve(null);
+                        });
+                    } catch(e) {}
+                }
 
                 // Exclude caches from cachedFiles list used for manifest comparison
                 realFiles = cachedFiles.filter(f => f.fileName && !f.fileName.startsWith('__precompiled_') && !f.fileName.startsWith('zustand_'));
 
-                if (precompiledGeoData && precompiledRailwayData && realFiles.length > 0) {
+                if (!shouldForceReload && precompiledGeoData && precompiledRailwayData && realFiles.length > 0) {
                     if (toastId) {
                         toast.loading(
                 (t: any) => (

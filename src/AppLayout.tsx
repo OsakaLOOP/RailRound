@@ -263,34 +263,45 @@ export const AppLayout: React.FC = () => {
                     reqFiles.onsuccess = () => resolve(reqFiles.result || []);
                     reqFiles.onerror = () => resolve([]);
                 });
-                // Attempt to read fully precompiled geoData structure directly (FAST PATH)
+                // Attempt to read fully precompiled geoData & railwayData structures directly (FAST PATH)
                 let precompiledGeoData = null;
+                let precompiledRailwayData = null;
                 try {
                     const txGeo = dbInstance.transaction(db.STORE_FILES, 'readonly');
                     const storeGeo = txGeo.objectStore(db.STORE_FILES);
+
                     const reqGeo = storeGeo.get('__precompiled_geodata');
                     precompiledGeoData = await new Promise((resolve) => {
                         reqGeo.onsuccess = () => resolve(reqGeo.result || null);
                         reqGeo.onerror = () => resolve(null);
                     });
+
+                    const reqRail = storeGeo.get('__precompiled_railwaydata');
+                    precompiledRailwayData = await new Promise((resolve) => {
+                        reqRail.onsuccess = () => resolve(reqRail.result || null);
+                        reqRail.onerror = () => resolve(null);
+                    });
                 } catch(e) {}
 
-                // Exclude '__precompiled_geodata' and 'zustand_railround-storage' from cachedFiles list used for manifest comparison
-                realFiles = cachedFiles.filter(f => f.fileName && f.fileName !== '__precompiled_geodata' && !f.fileName.startsWith('zustand_'));
+                // Exclude caches from cachedFiles list used for manifest comparison
+                realFiles = cachedFiles.filter(f => f.fileName && !f.fileName.startsWith('__precompiled_') && !f.fileName.startsWith('zustand_'));
 
-                if (precompiledGeoData && realFiles.length > 0) {
-                    // Fast path hit! Skip heavy processing. We assume railwayData is correctly persisted in Zustand.
+                if (precompiledGeoData && precompiledRailwayData && realFiles.length > 0) {
+                    // Fast path hit! Skip heavy processing.
                     setGeoData(precompiledGeoData);
-                    console.log(`[Autoload] 极速命中预编译 GeoData 缓存，跳过繁重的解析步骤`);
+                    setRailwayData(precompiledRailwayData);
+                    console.log(`[Autoload] 极速命中预编译 GeoData 和 RailwayData 缓存，跳过繁重的解析步骤`);
                 } else if (realFiles.length > 0) {
                     // Fallback to heavy processing and then cache the result
                     processGeoJsonBatch(realFiles, currentCompanyData);
-                    // Use setTimeout to allow state to settle before reading it back
+                    // Use setTimeout to allow state to settle before caching
                     setTimeout(async () => {
                         const currentGeo = useStore.getState().geoData;
+                        const currentRail = useStore.getState().railwayData;
                         if (currentGeo && currentGeo.features.length > 0) {
                             try {
                                  await db.set(db.STORE_FILES, '__precompiled_geodata', currentGeo);
+                                 await db.set(db.STORE_FILES, '__precompiled_railwaydata', currentRail);
                             } catch(e) {}
                         }
                     }, 100);
@@ -356,9 +367,11 @@ export const AppLayout: React.FC = () => {
                         // State updates are async, wait a moment to capture the latest.
                         setTimeout(async () => {
                             const updatedGeo = useStore.getState().geoData;
+                            const updatedRail = useStore.getState().railwayData;
                             if (updatedGeo && updatedGeo.features.length > 0) {
                                 try {
                                     await db.set(db.STORE_FILES, '__precompiled_geodata', updatedGeo);
+                                    await db.set(db.STORE_FILES, '__precompiled_railwaydata', updatedRail);
                                 } catch(e) {}
                             }
                         }, 500);
@@ -413,22 +426,28 @@ export const AppLayout: React.FC = () => {
 
                         // Merge updated distances into CURRENT railway data instead of overwriting,
                         // to prevent losing data fetched concurrently while the worker was running.
-                        setRailwayData(prev => {
-                            const next = { ...prev };
-                            const updatedData = payload.updatedRailwayData;
-                            for (const [lineKey, line] of Object.entries(next)) {
-                                if (updatedData[lineKey]) {
-                                    next[lineKey] = {
-                                        ...line,
-                                        stations: line.stations.map((st, idx) => {
-                                            const updatedSt = updatedData[lineKey].stations.find((us: any) => us.id === st.id);
-                                            return updatedSt ? { ...st, distToNext: updatedSt.distToNext } : st;
-                                        })
-                                    };
-                                }
+                        const currentRail = useStore.getState().railwayData;
+                        const next = { ...currentRail };
+                        const updatedData = payload.updatedRailwayData;
+                        for (const [lineKey, line] of Object.entries(next)) {
+                            if (updatedData[lineKey]) {
+                                next[lineKey] = {
+                                    ...line,
+                                    stations: line.stations.map((st, idx) => {
+                                        const updatedSt = updatedData[lineKey].stations.find((us: any) => us.id === st.id);
+                                        return updatedSt ? { ...st, distToNext: updatedSt.distToNext } : st;
+                                    })
+                                };
                             }
-                            return next;
-                        });
+                        }
+
+                        setRailwayData(next);
+
+                        // Immediately persist the computed distances into our precompiled cache
+                        // so they survive the next refresh/fast-path boot.
+                        db.set(db.STORE_FILES, '__precompiled_railwaydata', next).catch(e =>
+                            console.warn("Failed to persist precompiled distances:", e)
+                        );
                     }
                 };
 

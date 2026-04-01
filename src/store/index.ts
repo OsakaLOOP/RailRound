@@ -239,6 +239,8 @@ export interface GlobalStore {
 
   isAprilFool: boolean;
   setIsAprilFool: (isAprilFool: boolean) => void;
+  showFakeProgress: boolean;
+  setShowFakeProgress: (show: boolean) => void;
 
   mapZoom: number;
   setMapZoom: (zoom: number) => void;
@@ -332,6 +334,8 @@ export const useStore = create<GlobalStore>()(
 
       isAprilFool: false,
       setIsAprilFool: (isAprilFool) => set({ isAprilFool }),
+      showFakeProgress: false,
+      setShowFakeProgress: (showFakeProgress) => set({ showFakeProgress }),
 
       mapZoom: 10,
       setMapZoom: (zoom) => set({ mapZoom: zoom }),

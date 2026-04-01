@@ -590,16 +590,16 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         const currentZoom = useStore.getState().mapZoom;
         const zoomWeight = currentZoom < 8 ? 2 : currentZoom < 12 ? 4 : currentZoom < 15 ? 6 : 9;
 
-        interface RouteItem { id: string, coords: any[], color: string, popup: string, fallback: boolean }
+        interface RouteItem { id: string, coords: any[], color: string, popup: string, fallback: boolean, isTransfer?: boolean }
         const routeItems: RouteItem[] = [];
 
         tripSegmentsGeometry.forEach((seg: any) => {
             if (seg.isMulti) {
                 seg.coords.forEach((part: any[], index: number) => {
-                    routeItems.push({ id: `${seg.id}_part_${index}`, coords: part, color: seg.color, popup: seg.popup, fallback: seg.fallback });
+                    routeItems.push({ id: `${seg.id}_part_${index}`, coords: part, color: seg.color, popup: seg.popup, fallback: seg.fallback, isTransfer: seg.isTransfer });
                 });
             } else {
-                routeItems.push({ id: seg.id, coords: seg.coords, color: seg.color, popup: seg.popup, fallback: seg.fallback });
+                routeItems.push({ id: seg.id, coords: seg.coords, color: seg.color, popup: seg.popup, fallback: seg.fallback, isTransfer: seg.isTransfer });
             }
         });
 
@@ -608,7 +608,15 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             routeItems,
             (item) => item.id,
             (item) => {
-                const options = { color: item.color, weight: zoomWeight, opacity: 0.9, lineCap: 'round', smoothFactor: 0.2, dashArray: item.fallback ? '5, 10' : undefined };
+                const isTransfer = item.isTransfer;
+                const options = {
+                    color: item.color,
+                    weight: zoomWeight,
+                    opacity: isTransfer ? 0.5 : 0.9,
+                    lineCap: 'round',
+                    smoothFactor: 0.2,
+                    dashArray: item.fallback ? '5, 10' : (isTransfer ? '4, 8' : undefined)
+                };
                 const pl = L.polyline(item.coords, options as L.PolylineOptions).bindPopup(item.popup);
                 (pl as any)._cachedCoords = item.coords;
                 return pl;
@@ -627,10 +635,14 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 const currentWeight = (pl.options as L.PolylineOptions).weight;
                 const currentColor = (pl.options as L.PolylineOptions).color;
                 const currentDash = (pl.options as L.PolylineOptions).dashArray;
-                const targetDash = item.fallback ? '5, 10' : undefined;
+                const currentOpacity = (pl.options as L.PolylineOptions).opacity;
 
-                if (currentWeight !== zoomWeight || currentColor !== item.color || currentDash !== targetDash) {
-                    pl.setStyle({ color: item.color, weight: zoomWeight, dashArray: targetDash });
+                const isTransfer = item.isTransfer;
+                const targetDash = item.fallback ? '5, 10' : (isTransfer ? '4, 8' : undefined);
+                const targetOpacity = isTransfer ? 0.5 : 0.9;
+
+                if (currentWeight !== zoomWeight || currentColor !== item.color || currentDash !== targetDash || currentOpacity !== targetOpacity) {
+                    pl.setStyle({ color: item.color, weight: zoomWeight, dashArray: targetDash, opacity: targetOpacity });
                 }
 
                 if(pl.getPopup()?.getContent() !== item.popup) {

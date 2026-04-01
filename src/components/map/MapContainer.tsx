@@ -166,6 +166,16 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                      if (map.hasLayer(baseLinesLayer.current)) map.removeLayer(baseLinesLayer.current);
                 }
             }
+
+            const baseStationsPane = map.getPane('baseStationsPane');
+            if (baseStationsPane) {
+                baseStationsPane.style.display = z < 5 ? 'none' : '';
+            }
+            const visitedStationsPane = map.getPane('visitedStationsPane');
+            if (visitedStationsPane) {
+                visitedStationsPane.style.display = z <= 6 ? 'none' : '';
+            }
+
             setMapZoom(z);
         };
 

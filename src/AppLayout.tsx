@@ -339,6 +339,8 @@ export const AppLayout: React.FC = () => {
                 distanceWorkerRef.current.addEventListener('message', handleDistanceWorkerMsg);
                 distanceWorkerRef.current.postMessage({ type: 'CALC_DISTANCES', payload: { railwayData: currentRailwayData } });
             }
+        } else {
+            console.warn('Distance Worker not initialized, skipping distance calculations');
         }
     };
 

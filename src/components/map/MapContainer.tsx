@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import L from 'leaflet';
+import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useStore, PinMode, StationMenuData, CustomFeatureCollection, CustomGeoJSONFeature } from '../../store';
 import { findNearestPointOnLine } from '../../utils/railwayRouting';
@@ -28,7 +28,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     const rubberBandLayerRef = useRef<L.LayerGroup | null>(null);
 
     // For local long-press routing drag
-    const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const routeDragRef = useRef<{ active: boolean, startStation: CustomGeoJSONFeature | null, currentSnap: CustomGeoJSONFeature | null, rubberLine: L.Polyline | null, snapCircleCenter: L.CircleMarker | null, openedTooltips: Set<L.Layer> }>({ active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null, openedTooltips: new Set() });
     const wasDraggingRef = useRef(false);
 
@@ -520,7 +520,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 // @ts-ignore
                 layer._cachedWeight = targetWeight;
 
-                const handlePointerDown = (e: L.LeafletMouseEvent) => {
+                const handlePointerDown = (e: L.LeafletEvent | L.LeafletMouseEvent) => {
                     L.DomEvent.stopPropagation(e);
 
                     if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
@@ -564,7 +564,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     }, 300); // 300ms long press
                 };
 
-                const handlePointerUp = (e: L.LeafletMouseEvent) => {
+                const handlePointerUp = (e: L.LeafletEvent | L.LeafletMouseEvent) => {
                     if (pressTimerRef.current) {
                         clearTimeout(pressTimerRef.current);
                         pressTimerRef.current = null;

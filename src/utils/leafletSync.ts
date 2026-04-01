@@ -1,4 +1,4 @@
-import L from 'leaflet';
+import * as L from 'leaflet';
 
 /**
  * 通用的 Leaflet LayerGroup 增量同步工具。

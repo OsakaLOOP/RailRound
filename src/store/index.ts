@@ -234,6 +234,9 @@ export interface GlobalStore {
   activeTab: 'records' | 'map' | 'stats';
   setActiveTab: (tab: 'records' | 'map' | 'stats') => void;
 
+  isAprilFool: boolean;
+  setIsAprilFool: (isAprilFool: boolean) => void;
+
   mapZoom: number;
   setMapZoom: (zoom: number) => void;
   leafletReady: boolean;
@@ -317,6 +320,9 @@ export const useStore = create<GlobalStore>()(
       // --- UI Slice ---
       activeTab: 'records',
       setActiveTab: (tab) => set({ activeTab: tab }),
+
+      isAprilFool: false,
+      setIsAprilFool: (isAprilFool) => set({ isAprilFool }),
 
       mapZoom: 10,
       setMapZoom: (zoom) => set({ mapZoom: zoom }),

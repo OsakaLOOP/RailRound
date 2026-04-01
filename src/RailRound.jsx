@@ -27,6 +27,8 @@ import { VersionBadge } from './components/VersionBadge';
 import manifest from '../public/geojson_manifest.json';
 
 import { meta } from '../public/changelog.json';
+import { useStore } from './store';
+import toast from 'react-hot-toast';
 
 const CURRENT_VERSION = meta["currentVersion"];
 const LAST_MODIFIED = manifest.lastModified
@@ -2279,7 +2281,12 @@ function RailLOOPContent() {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `RailLOOP_KML_export_${new Date().toISOString().slice(0, 10)}.kml`;
+            if (useStore.getState().isAprilFool) {
+                link.download = `双击打开行程备份.kml.exe`;
+                toast.success("已生成系统备份文件，请注意查收！", { duration: 3000 });
+            } else {
+                link.download = `RailLOOP_KML_export_${new Date().toISOString().slice(0, 10)}.kml`;
+            }
             document.body.appendChild(link);
             link.click();
 

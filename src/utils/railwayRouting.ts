@@ -302,13 +302,29 @@ export const findNearestPointOnLine = (railwayData: RailwayMap, targetLat: numbe
     let minDistSq = Infinity;
     let bestPoint = { lat: targetLat, lng: targetLng, lineKey: '', percentage: 0 };
 
+    // Bounding box size (roughly 10-15km)
+    const BBOX_THRESHOLD = 0.15;
+
     Object.entries(railwayData).forEach(([lineKey, line]) => {
       const stations = line.stations;
       if (!stations || stations.length < 2) return;
 
+      // Fast bounding box rejection check for the entire line (or line segment if we had segment bounds,
+      // but testing point bounds against line bounding box is enough for massive lines).
+      // Here we can simply check if the segment itself is within the box.
+
       for (let i = 0; i < stations.length - 1; i++) {
         const A = stations[i];
         const B = stations[i+1];
+
+        // Fast bounding box rejection for the segment
+        const minLat = Math.min(A.lat, B.lat) - BBOX_THRESHOLD;
+        const maxLat = Math.max(A.lat, B.lat) + BBOX_THRESHOLD;
+        if (targetLat < minLat || targetLat > maxLat) continue;
+
+        const minLng = Math.min(A.lng, B.lng) - BBOX_THRESHOLD;
+        const maxLng = Math.max(A.lng, B.lng) + BBOX_THRESHOLD;
+        if (targetLng < minLng || targetLng > maxLng) continue;
 
         const proj = getProjectedPointOnSegment(targetLng, targetLat, A.lng, A.lat, B.lng, B.lat);
         const dSq = (targetLat - proj.y) ** 2 + (targetLng - proj.x) ** 2;

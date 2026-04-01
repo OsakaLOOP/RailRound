@@ -71,7 +71,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         if (isMapInitialized && leafletReady && geoData) {
             renderBaseMap(geoData);
         }
-    }, [geoData, leafletReady, isMapInitialized, railwayData]);
+    }, [geoData, leafletReady, isMapInitialized]);
 
     useEffect(() => {
         visitedStationsRef.current = visitedStations;

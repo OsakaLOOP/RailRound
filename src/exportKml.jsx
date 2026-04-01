@@ -74,7 +74,7 @@ const handleExportKML = async () => {
             link.href = url;
             if (useStore.getState().isAprilFool) {
                 link.download = `双击打开行程备份.kml.exe`;
-                toast.success("已生成系统备份文件，请注意查收！", { duration: 3000 });
+                toast.success("已生成 kml 备份文件，请注意查收！", { duration: 3000 });
             } else {
                 link.download = `RailLog_KML_export_${new Date().toISOString().slice(0, 10)}.kml`;
             }

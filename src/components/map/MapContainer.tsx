@@ -40,6 +40,30 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
     const [isMapInitialized, setIsMapInitialized] = React.useState(false);
 
+    const animateRubberRetract = (polyline: L.Polyline, startLatLng: L.LatLng, endLatLng: L.LatLng, duration = 450) => {
+        const dx = endLatLng.lng - startLatLng.lng;
+        const dy = endLatLng.lat - startLatLng.lat;
+        const startTime = performance.now();
+        const jitterX = (Math.random() - 0.5) * 0.03 * Math.abs(dx || 1);
+        const jitterY = (Math.random() - 0.5) * 0.03 * Math.abs(dy || 1);
+
+        const step = (timestamp: number) => {
+            const elapsed = timestamp - startTime;
+            const t = Math.min(1, elapsed / duration);
+            const ease = 1 - Math.pow(1 - t, 3);
+            const wobble = Math.sin(t * Math.PI * 4) * (1 - t) * 0.18;
+            const currentT = Math.max(0, Math.min(1, 1 - ease + wobble));
+            const currentLng = startLatLng.lng + dx * currentT + jitterX * (1 - t);
+            const currentLat = startLatLng.lat + dy * currentT + jitterY * (1 - t);
+            polyline.setLatLngs([[startLatLng.lat, startLatLng.lng], [currentLat, currentLng]]);
+            if (t < 1) {
+                requestAnimationFrame(step);
+            }
+        };
+
+        requestAnimationFrame(step);
+    };
+
     const {
         geoData, leafletReady, tripSegmentsGeometry, activeTab, mapZoom,
         setMapZoom, setLeafletReady, pins, editingPin, pinMode, railwayData,
@@ -255,7 +279,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             if (useStore.getState().isAprilFool) {
                 const startContainerPoint = map.latLngToContainerPoint([startLat, startLng]);
                 const distToStart = containerPoint.distanceTo(startContainerPoint);
-                const viewportThreshold = Math.max(mapRect.width, mapRect.height) * 0.5;
+                const viewportThreshold = Math.max(mapRect.width, mapRect.height) * 0.2;
 
                 if (distToStart > viewportThreshold) {
                     // Trigger the trap!
@@ -274,16 +298,17 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     });
                     routeDragRef.current.openedTooltips.clear();
 
+                    let trapStyle: HTMLStyleElement | null = null;
                     const rubberLine = routeDragRef.current.rubberLine;
                     if (rubberLine) {
                         const lineElement = rubberLine.getElement();
                         if (lineElement) {
                             // Inject random snap animation
                             const animName = `snap-fail-rand-${Math.floor(Math.random() * 10000)}`;
-                            const style = document.createElement('style');
+                            trapStyle = document.createElement('style');
                             const rx = (Math.random() - 0.5) * 50;
                             const ry = (Math.random() - 0.5) * 50;
-                            style.innerHTML = `
+                            trapStyle.innerHTML = `
                                 @keyframes ${animName} {
                                     0% { stroke-width: 6; opacity: 1; transform: translate(0px, 0px) scale(1); }
                                     25% { stroke-width: 15; transform: translate(${rx}px, ${ry}px) scale(1.5) skew(${rx}deg); }
@@ -296,9 +321,14 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                                     transform-origin: center;
                                 }
                             `;
-                            document.head.appendChild(style);
-                            lineElement.classList.add(`${animName}-class`);
+                            document.head.appendChild(trapStyle);
                             lineElement.classList.remove('rubber-band-line');
+                            lineElement.classList.add(`${animName}-class`);
+                        }
+
+                        const linePoints = rubberLine.getLatLngs() as L.LatLng[];
+                        if (linePoints.length >= 2) {
+                            animateRubberRetract(rubberLine, L.latLng(startLat, startLng), linePoints[linePoints.length - 1]);
                         }
                     }
 
@@ -306,7 +336,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                         mapRef.current.classList.add('map-shake');
                     }
 
-                    toast.error('哎呀！皮筋拉断了，弹到手了！💥', { duration: 2500, position: 'top-center' });
+                    toast.error('哎呀！橡皮筋拉断了，弹到手了！💥', { duration: 2500, position: 'top-center' });
 
                     setTimeout(() => {
                         if (mapRef.current) {
@@ -316,8 +346,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                         routeDragRef.current = { active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null, openedTooltips: new Set() };
                         map.dragging.enable();
                         // Clean up the dynamically created style tag
-                        if (rubberLine) {
-                            document.head.removeChild(style);
+                        if (trapStyle?.parentNode) {
+                            trapStyle.parentNode.removeChild(trapStyle);
                         }
                     }, 500);
 
@@ -507,8 +537,12 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 if (rubberLine) {
                     const lineElement = rubberLine.getElement();
                     if (lineElement) {
-                        lineElement.classList.add('rubber-band-fail');
                         lineElement.classList.remove('rubber-band-line');
+                        lineElement.classList.add('rubber-band-fail');
+                    }
+                    const linePoints = rubberLine.getLatLngs() as L.LatLng[];
+                    if (linePoints.length >= 2) {
+                        animateRubberRetract(rubberLine, linePoints[0], linePoints[linePoints.length - 1]);
                     }
                 }
 

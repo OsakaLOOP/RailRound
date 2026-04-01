@@ -13,6 +13,7 @@
 
 .rubber-band-success {
     animation: snap-success 0.3s ease-out forwards;
+    transform-origin: center;
 }
 
 @keyframes snap-success {
@@ -22,12 +23,36 @@
 }
 
 .rubber-band-fail {
-    animation: snap-fail 0.3s ease-in forwards;
+    animation: rubber-band-retract 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    transform-origin: center;
 }
 
-@keyframes snap-fail {
-    0% { stroke-width: 6; opacity: 0.8; }
-    100% { stroke-width: 2; opacity: 0; }
+@keyframes rubber-band-retract {
+    0% {
+        stroke-width: 6;
+        opacity: 1;
+        transform: scaleX(1) translate(0, 0);
+    }
+    20% {
+        stroke-width: 12;
+        transform: scaleX(1.05) skewY(4deg) translate(4px, -3px);
+        opacity: 1;
+    }
+    45% {
+        stroke-width: 10;
+        transform: scaleX(0.95) skewY(-3deg) translate(-5px, 3px);
+        opacity: 0.9;
+    }
+    70% {
+        stroke-width: 8;
+        transform: scaleX(0.6) skewY(2deg) translate(2px, -1px);
+        opacity: 0.7;
+    }
+    100% {
+        stroke-width: 2;
+        opacity: 0;
+        transform: scaleX(0) translate(0, 0);
+    }
 }
 
 .map-shake {

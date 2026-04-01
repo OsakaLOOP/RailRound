@@ -1257,6 +1257,44 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
     ) : (
     trips.map(t => {
       const segments = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
+      const isWalk = t.isWalk;
+
+      if (isWalk) {
+          let startName = t.fromId || '';
+          let endName = t.toId || '';
+          Object.values(railwayData).forEach(line => {
+              const s = line.stations.find(st => st.id === t.fromId);
+              if (s) startName = s.name_ja;
+              const e = line.stations.find(st => st.id === t.toId);
+              if (e) endName = e.name_ja;
+          });
+
+          return (
+              <div key={t.id} className="bg-purple-50 p-4 rounded-lg border border-purple-100 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-pointer" onClick={() => useStore.getState().startEditingWalkTrip(t)}>
+                  <div className="flex justify-between mb-2 pb-2 border-b border-purple-100">
+                      <span className="text-xs font-bold text-purple-400">{t.date}</span>
+                      <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-purple-500 bg-purple-200/50 px-1.5 py-0.5 rounded">步行</span>
+                          <button onClick={(e) => { e.stopPropagation(); useStore.getState().startEditingWalkTrip(t); }} className="text-purple-400 hover:text-purple-600"><Edit2 size={14}/></button>
+                          <button onClick={(e) => { e.stopPropagation(); onDelete(t.id); }} className="text-purple-400 hover:text-red-500"><Trash2 size={14}/></button>
+                      </div>
+                  </div>
+                  <div className="flex flex-row">
+                      <div className="flex-1 space-y-2 relative">
+                          <div className="relative z-10 flex flex-col text-sm">
+                              <div className="flex items-center gap-2">
+                                  <MapPin size={14} className="text-purple-500 shrink-0"/>
+                                  <span className="font-bold text-purple-700 text-xs">UFO/步行</span>
+                              </div>
+                              <div className="pl-5 font-medium text-purple-900">{startName} <span className="text-purple-300 mx-1">→</span> {endName}</div>
+                          </div>
+                      </div>
+                  </div>
+                  {t.memo && <div className="text-xs text-purple-600 bg-white/60 p-2 rounded mt-3">{t.memo}</div>}
+              </div>
+          );
+      }
+
       return (
         <div key={t.id} className="bg-white p-4 rounded-lg border shadow-sm">
           <div className="flex justify-between mb-2 pb-2 border-b border-gray-50">
@@ -2253,6 +2291,7 @@ function RailLOOPContent() {
             
             // 循环所有行程，切割 GeoJSON 以获取准确坐标
             trips.forEach(t => {
+                if (t.isWalk) return; // Exclude walk trips
                 const tripName = `${t.date} - Trip ${t.id}`;
                 t.segments.forEach((seg, segIndex) => {
                     const line = railwayData[seg.lineKey];

@@ -9,6 +9,7 @@ import { GithubCardModal } from './components/modals/GithubCardModal';
 import { FolderManagerModal } from './components/modals/FolderManagerModal';
 import { AddToFolderModal } from './components/modals/AddToFolderModal';
 import { TripEditor } from './components/modals/TripEditor';
+import { WalkTripEditor } from './components/modals/WalkTripEditor';
 import { MapContainer } from './components/map/MapContainer';
 import { PinEditor } from './components/map/PinEditor';
 import { FabButton } from './components/map/FabButton';
@@ -780,6 +781,7 @@ export const AppLayout: React.FC = () => {
                 // 由于 sliceGeoJsonPath 已移至 Worker，我们需要用另一种方式处理 KML 导出。
                 // 最简单的方法是重用现有的 segmentGeometries 缓存！
                 trips.forEach(t => {
+                    if (t.isWalk) return; // Exclude walk trips
                     const tripName = `${t.date} - Trip ${t.id}`;
                     t.segments.forEach((seg: any, segIndex: number) => {
                         const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
@@ -966,6 +968,7 @@ export const AppLayout: React.FC = () => {
                 </div>
 
                 <TripEditor />
+                <WalkTripEditor />
 
                 {/* Global Modals & Components */}
                 <LoginModal isOpen={isLoginOpen} onClose={() => setModalState({ isLoginOpen: false })} onLoginSuccess={(data: any) => { useStore.getState().login(data.token, data.username); loadUserData(data.token, true); }} user={user} />

@@ -388,6 +388,8 @@ self.onmessage = (e) => {
                 // payload.trips
                 {
                     const allGeoms = [];
+                    const visitedStations = new Map(); // Use Map to dedup stations by ID
+
                     payload.trips.forEach(t => {
                         const segs = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
                         segs.forEach(seg => {
@@ -401,9 +403,35 @@ self.onmessage = (e) => {
                                     popup: `${seg.lineKey}` // Simplified popup
                                 });
                             }
+
+                            // Extract visited stations for this segment
+                            if (railwayData && railwayData[seg.lineKey]) {
+                                const line = railwayData[seg.lineKey];
+                                const startIdx = line.stations.findIndex(st => st.id === seg.fromId);
+                                const endIdx = line.stations.findIndex(st => st.id === seg.toId);
+
+                                if (startIdx !== -1 && endIdx !== -1) {
+                                    const step = startIdx <= endIdx ? 1 : -1;
+                                    for (let i = startIdx; i !== endIdx + step; i += step) {
+                                        if (i >= 0 && i < line.stations.length) {
+                                            const st = line.stations[i];
+                                            visitedStations.set(st.id, {
+                                                lat: st.lat,
+                                                lng: st.lng,
+                                                name: st.name_ja,
+                                                color: g ? g.color : '#38bdf8'
+                                            });
+                                        }
+                                    }
+                                }
+                            }
                         });
                     });
-                    result = allGeoms;
+
+                    result = {
+                        geometries: allGeoms,
+                        stations: Array.from(visitedStations.values())
+                    };
                 }
                 break;
 

@@ -115,7 +115,7 @@ export const TripsPage: React.FC = () => {
                             stations: isTree ? 'text-green-900' : 'text-purple-900',
                             arrow: isTree ? 'text-green-300' : 'text-purple-300',
                             memo: isTree ? 'text-green-600' : 'text-purple-600',
-                            label: isTree ? '环保/步行' : 'UFO/步行'
+                            label: isTree ? '步行' : '搭便车'
                         };
 
                         return (

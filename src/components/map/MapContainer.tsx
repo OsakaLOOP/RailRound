@@ -258,6 +258,11 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         const handleGlobalMove = (e: MouseEvent | TouchEvent) => {
             if (!routeDragRef.current.active || !routeDragRef.current.startStation || !rubberBandLayerRef.current) return;
 
+            // Prevent default to stop mobile scrolling/zooming during drag
+            if ('touches' in e && e.cancelable) {
+                e.preventDefault();
+            }
+
             const startStation = routeDragRef.current.startStation;
             const startLat = startStation.geometry.coordinates[1];
             const startLng = startStation.geometry.coordinates[0];
@@ -570,12 +575,116 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         window.addEventListener('mouseup', handleGlobalUp);
         window.addEventListener('touchend', handleGlobalUp);
 
+        // Map-level fallback long-press detector for inaccurate mobile taps
+        let mapPressTimer: ReturnType<typeof setTimeout> | null = null;
+        let mapPressStartLatLng: L.LatLng | null = null;
+        let mapPressStartContainerPoint: L.Point | null = null;
+
+        const handleMapPointerDown = (e: L.LeafletMouseEvent) => {
+            if (mapPressTimer) clearTimeout(mapPressTimer);
+            mapPressStartLatLng = e.latlng;
+            mapPressStartContainerPoint = e.containerPoint;
+
+            mapPressTimer = setTimeout(() => {
+                if (!geoDataRef.current || !mapInstance.current || routeDragRef.current.active) return;
+
+                // Find nearest station within 40px
+                let nearestDist = Infinity;
+                let nearestStation: any = null;
+
+                geoDataRef.current.features.forEach((f: any) => {
+                    if (f.properties.type === 'station' && f.geometry?.coordinates) {
+                        const lat = f.geometry.coordinates[1];
+                        const lng = f.geometry.coordinates[0];
+                        const stPoint = mapInstance.current!.latLngToContainerPoint([lat, lng]);
+                        const dist = mapPressStartContainerPoint!.distanceTo(stPoint);
+
+                        if (dist < 50 && dist < nearestDist) {
+                            nearestDist = dist;
+                            nearestStation = f;
+                        }
+                    }
+                });
+
+                if (nearestStation) {
+                    // Trigger drag logic
+                    wasDraggingRef.current = true;
+                    routeDragRef.current.active = true;
+                    routeDragRef.current.startStation = nearestStation;
+
+                    if (rubberBandLayerRef.current) rubberBandLayerRef.current.clearLayers();
+
+                    const startLat = nearestStation.geometry.coordinates[1];
+                    const startLng = nearestStation.geometry.coordinates[0];
+                    const routeColor = '#ec4899'; // default active color
+
+                    const rubberLine = L.polyline([[startLat, startLng], [startLat, startLng]], {
+                        color: routeColor,
+                        weight: 6,
+                        opacity: 0.8,
+                        lineCap: 'round',
+                        dashArray: '8, 8',
+                        className: 'rubber-band-line'
+                    }).addTo(rubberBandLayerRef.current!);
+
+                    const snapCircleCenter = L.circleMarker([0,0], {
+                        radius: 8,
+                        color: '#fff',
+                        weight: 3,
+                        fillColor: routeColor,
+                        fillOpacity: 1,
+                        opacity: 0
+                    }).addTo(rubberBandLayerRef.current!);
+
+                    routeDragRef.current.rubberLine = rubberLine;
+                    routeDragRef.current.snapCircleCenter = snapCircleCenter;
+
+                    mapInstance.current!.dragging.disable();
+
+                    // Vibrate if supported
+                    if (navigator.vibrate) {
+                        navigator.vibrate(50);
+                    }
+                }
+            }, 400); // Slightly longer than exact marker tap
+        };
+
+        const handleMapPointerMove = (e: L.LeafletMouseEvent) => {
+            if (mapPressTimer && mapPressStartContainerPoint) {
+                const dist = e.containerPoint.distanceTo(mapPressStartContainerPoint);
+                if (dist > 10) { // Tolerance for tiny finger jitters
+                    clearTimeout(mapPressTimer);
+                    mapPressTimer = null;
+                }
+            }
+        };
+
+        const handleMapPointerUp = () => {
+            if (mapPressTimer) {
+                clearTimeout(mapPressTimer);
+                mapPressTimer = null;
+            }
+        };
+
+        map.on('mousedown', handleMapPointerDown);
+        map.on('touchstart', handleMapPointerDown as any);
+        map.on('mousemove', handleMapPointerMove);
+        map.on('touchmove', handleMapPointerMove as any);
+        map.on('mouseup', handleMapPointerUp);
+        map.on('touchend', handleMapPointerUp);
+
         // Store cleanup on map instance for unmounting
         (map as any)._customDragCleanup = () => {
             window.removeEventListener('mousemove', handleGlobalMove);
             window.removeEventListener('touchmove', handleGlobalMove);
             window.removeEventListener('mouseup', handleGlobalUp);
             window.removeEventListener('touchend', handleGlobalUp);
+            map.off('mousedown', handleMapPointerDown);
+            map.off('touchstart', handleMapPointerDown as any);
+            map.off('mousemove', handleMapPointerMove);
+            map.off('touchmove', handleMapPointerMove as any);
+            map.off('mouseup', handleMapPointerUp);
+            map.off('touchend', handleMapPointerUp);
         };
 
         setIsMapInitialized(true);
@@ -687,9 +796,33 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
 
                     wasDraggingRef.current = false;
-                    map.dragging.disable(); // Immediately prevent map pan
+
+                    // Do not disable map dragging immediately on mobile, it breaks single-finger scroll
+                    // Only disable it when the long press is confirmed
+
+                    // Initial position to handle small touch jitters
+                    let startPoint: L.Point | null = null;
+                    if ('containerPoint' in e) {
+                        startPoint = (e as L.LeafletMouseEvent).containerPoint;
+                    }
+
+                    const checkJitterAndCancel = (moveEvent: Event) => {
+                        if (startPoint && 'touches' in moveEvent) {
+                            const mapRect = map.getContainer().getBoundingClientRect();
+                            const touch = (moveEvent as TouchEvent).touches[0];
+                            const currentPoint = L.point(touch.clientX - mapRect.left, touch.clientY - mapRect.top);
+                            if (currentPoint.distanceTo(startPoint) > 15) {
+                                if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+                                window.removeEventListener('touchmove', checkJitterAndCancel);
+                            }
+                        }
+                    };
+
+                    window.addEventListener('touchmove', checkJitterAndCancel, { passive: true });
 
                     pressTimerRef.current = setTimeout(() => {
+                        window.removeEventListener('touchmove', checkJitterAndCancel);
+                        map.dragging.disable(); // Now prevent map pan
                         // Long press confirmed
                         wasDraggingRef.current = true; // disable click
                         routeDragRef.current.active = true;
@@ -721,6 +854,11 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
                         routeDragRef.current.rubberLine = rubberLine;
                         routeDragRef.current.snapCircleCenter = snapCircleCenter;
+
+                        // Vibrate if supported
+                        if (navigator.vibrate) {
+                            navigator.vibrate(50);
+                        }
 
                     }, 300); // 300ms long press
                 };

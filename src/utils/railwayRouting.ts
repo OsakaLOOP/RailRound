@@ -25,13 +25,6 @@ export const buildStationIndex = (railwayData: RailwayMap) => {
     return index;
 };
 
-export const isCompanyCompatible = (meta1: CompanyMeta | undefined, meta2: CompanyMeta | undefined) => {
-  if (!meta1 || !meta2) return false;
-  if (meta1.company === meta2.company && meta1.company !== "上传数据" && meta1.company !== "未知") return true;
-  if (meta1.type === 'JR' && meta2.type === 'JR') return true;
-  return false;
-};
-
 export const getTransferableLines = (station: Station | undefined, currentLineKey: string, railwayData: RailwayMap, strictMode = true) => {
     if (!station) return [];
     const currentMeta = railwayData[currentLineKey]?.meta;
@@ -42,9 +35,8 @@ export const getTransferableLines = (station: Station | undefined, currentLineKe
         station.transfers.forEach(lineKey => {
             if (railwayData[lineKey]) {
                 const nextMeta = railwayData[lineKey].meta;
-                if (!strictMode || isCompanyCompatible(currentMeta as CompanyMeta, nextMeta as CompanyMeta)) {
-                    validLines.add(lineKey);
-                }
+                validLines.add(lineKey);
+                
             }
         });
     }
@@ -53,7 +45,6 @@ export const getTransferableLines = (station: Station | undefined, currentLineKe
         if (lineKey === currentLineKey) return;
         if (validLines.has(lineKey)) return;
         const nextMeta = railwayData[lineKey].meta;
-        if (strictMode && !isCompanyCompatible(currentMeta as CompanyMeta, nextMeta as CompanyMeta)) return;
         const sameNameStation = railwayData[lineKey].stations.find(s => s.name_ja === station.name_ja);
         if (sameNameStation) {
             const dist = calcDist(station.lat, station.lng, sameNameStation.lat, sameNameStation.lng);
@@ -201,12 +192,7 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
                 const nextLine = railwayData[nextLineKey];
                 if (!nextLine) continue;
 
-                // For explicit transfers, we trust the data, but we still apply company compatibility
-                // if it's not a free transfer (like JR to Private). The strict mode in original logic
-                // mandated compatibility unless bypassed. For auto-routing, we enforce it to avoid
-                // impossible through-routes.
                 const nextMeta = nextLine.meta;
-                if (!isCompanyCompatible(currentLine.meta as CompanyMeta, nextMeta as CompanyMeta)) continue;
 
                 // Find the physically closest station on the target line to act as the transfer point
                 let bestIdx = -1;
@@ -242,16 +228,7 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
             const nextLine = railwayData[tNode.lineKey];
             const nextMeta = nextLine.meta;
 
-            // Strictly enforce company compatibility for implicit transfers
-            if (!isCompanyCompatible(currentLine.meta as CompanyMeta, nextMeta as CompanyMeta)) continue;
-
-            // Validate that the transfer station is actually nearby (<= 1.0 km)
-<<<<<<< HEAD
-            const targetStation = railwayData[tNode.lineKey].stations[tNode.stationIndex];
-=======
-            // to prevent incorrect transfers between identically named stations in completely different cities.
             const targetStation = nextLine.stations[tNode.stationIndex];
->>>>>>> bb9ea90 (Restore explicit station transfers and company compatibility checks in findRoute)
             const dist = calcDist(currentStation.lat, currentStation.lng, targetStation.lat, targetStation.lng);
 
             if (dist > 1.0) continue;
@@ -270,24 +247,9 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
             }
         }
 
-<<<<<<< HEAD
-
-            const node: RouteNode = {
-                lineKey: tNode.lineKey,
-                stationIndex: tNode.stationIndex,
-                cost: current.cost + 5 + 15, // 5 min transfer time + 15 penalty
-                timeMins: current.timeMins + 5,
-                transfers: current.transfers + 1,
-                stops: current.stops,
-                parent: current
-            };
-
-            if (!closedSet.has(`${node.lineKey}:${node.stationIndex}`)) pushNode(node);
-=======
         // Push all valid transfers found into the queue
         for (const node of validTransfers.values()) {
             pushNode(node);
->>>>>>> bb9ea90 (Restore explicit station transfers and company compatibility checks in findRoute)
         }
     }
 

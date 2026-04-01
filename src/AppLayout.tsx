@@ -471,9 +471,9 @@ export const AppLayout: React.FC = () => {
                     }
                 }
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('[Autoload] 致命网络错误, 跳过检查:', err);
-            if (toastId) toast.error('初始化发生错误', { id: toastId, duration: 3000 });
+            if (toastId) toast.error(`初始化发生错误 - ${err.message}`, { id: toastId, duration: 3000 });
         }
 
         console.log('[Autoload] 初始化全部完成，应用就绪。');
@@ -517,7 +517,7 @@ export const AppLayout: React.FC = () => {
                             { id: toastId, duration: Infinity }
                         );
                     } else if (type === 'COMPLETE') {
-                        if (toastId) toast.success('初始化全部完成', { id: toastId, duration: 3000 });
+                        if (toastId) toast.success('初始化完成', { id: toastId, duration: 3000 });
                         distanceWorkerRef.current?.removeEventListener('message', handleDistanceWorkerMsg);
 
                         // Merge updated distances into CURRENT railway data instead of overwriting,
@@ -550,11 +550,11 @@ export const AppLayout: React.FC = () => {
                 distanceWorkerRef.current.addEventListener('message', handleDistanceWorkerMsg);
                 distanceWorkerRef.current.postMessage({ type: 'CALC_DISTANCES', payload: { railwayData: currentRailwayData } });
             } else {
-                if (toastId) toast.success('初始化全部完成', { id: toastId, duration: 3000 });
+                if (toastId) toast.success('初始化完成', { id: toastId, duration: 3000 });
             }
         } else {
-            console.warn('Distance Worker not initialized, skipping distance calculations');
-            if (toastId) toast.success('初始化全部完成', { id: toastId, duration: 3000 });
+            console.log('Distance Worker not initialized, skipping distance calculations');
+            if (toastId) toast.success('初始化完成', { id: toastId, duration: 3000 });
         }
     };
 

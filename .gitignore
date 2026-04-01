@@ -34,3 +34,6 @@ dist-ssr
 !.edgeone/project.json
 .tef_dist/*
 dist.rar
+public/assets/company_logos/*
+*.py
+*.bak

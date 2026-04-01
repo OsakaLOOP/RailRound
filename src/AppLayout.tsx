@@ -168,6 +168,29 @@ export const AppLayout: React.FC = () => {
         return name;
     };
 
+    const resolveAssetUrl = (value: any) => {
+        if (!value || typeof value !== 'string') return value;
+        if (value.startsWith('/assets/')) {
+            const base = ((import.meta as any).env?.BASE_URL || '/') as string;
+            return `${base.replace(/\/$/, '')}${value}`;
+        }
+        if (value.startsWith('assets/')) {
+            const base = ((import.meta as any).env?.BASE_URL || '/') as string;
+            return `${base.replace(/\/$/, '')}/${value}`;
+        }
+        return value;
+    };
+
+    const normalizeCompanyDataLogos = (companyData: any) => {
+        if (!companyData || typeof companyData !== 'object') return companyData;
+        return Object.fromEntries(
+            Object.entries(companyData).map(([company, item]) => {
+                if (!item || typeof item !== 'object') return [company, item];
+                return [company, { ...item, logo: resolveAssetUrl((item as any).logo) }];
+            })
+        );
+    };
+
     // --- 2. AutoLoad Logic (Moved from RailRound) ---
     const autoLoadData = async () => {
         let toastId: string | null = null;
@@ -200,7 +223,7 @@ export const AppLayout: React.FC = () => {
                 const companyRes = await fetch('/company_data.json');
                 if (companyRes.ok) {
                     const txt = await companyRes.text();
-                    currentCompanyData = JSON.parse(txt.replace(/^\uFEFF/, ''));
+                    currentCompanyData = normalizeCompanyDataLogos(JSON.parse(txt.replace(/^\uFEFF/, '')));
                     setCompanyDB((prev: any) => ({ ...prev, ...currentCompanyData }));
                     (window as any).__companyData = currentCompanyData;
                 }

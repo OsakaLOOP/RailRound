@@ -195,7 +195,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             }
             const visitedStationsPane = map.getPane('visitedStationsPane');
             if (visitedStationsPane) {
-                visitedStationsPane.style.display = z <= 6 ? 'none' : '';
+                visitedStationsPane.style.display = z <= 7 ? 'none' : '';
             }
 
             setMapZoom(z);
@@ -490,11 +490,11 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
         // Calculate dynamic zoom scale
         let scale = Math.pow(2, currentZoom - 10);
-        scale = Math.max(0.4, Math.min(scale, 3));
+        scale = Math.min(scale, 1.5);
 
         const baseUnvisitedRadius = 4 * scale;
-        const baseVisitedRadius = 5 * scale;
-        const baseVisitedWeight = 2 * scale;
+        const baseVisitedRadius = 5 * Math.max(0.4, scale);
+        const baseVisitedWeight = 2 * Math.max(0.4, scale);
 
         // Calculate 3x3 viewport bounds
         const bounds = map.getBounds();

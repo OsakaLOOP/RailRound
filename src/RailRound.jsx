@@ -1512,6 +1512,29 @@ function RailLOOPContent() {
     return idx;
   };
 
+  const resolveAssetUrl = (value) => {
+    if (!value || typeof value !== 'string') return value;
+    if (value.startsWith('/assets/')) {
+      const base = import.meta.env.BASE_URL || '/';
+      return `${base.replace(/\/$/, '')}${value}`;
+    }
+    if (value.startsWith('assets/')) {
+      const base = import.meta.env.BASE_URL || '/';
+      return `${base.replace(/\/$/, '')}/${value}`;
+    }
+    return value;
+  };
+
+  const normalizeCompanyDataLogos = (companyData) => {
+    if (!companyData || typeof companyData !== 'object') return companyData;
+    return Object.fromEntries(
+      Object.entries(companyData).map(([company, item]) => {
+        if (!item || typeof item !== 'object') return [company, item];
+        return [company, { ...item, logo: resolveAssetUrl(item.logo) }];
+      })
+    );
+  };
+
   const findBestCompanyKey = (name, companyIndex) => {
     const n = normalizeCompanyName(name);
     if (!n) return name;
@@ -1657,7 +1680,7 @@ function RailLOOPContent() {
         if (companyRes.ok) {
           const txt = await companyRes.text();
           // 处理 BOM 头并解析
-          currentCompanyData = JSON.parse(txt.replace(/^\uFEFF/, ''));
+          currentCompanyData = normalizeCompanyDataLogos(JSON.parse(txt.replace(/^\uFEFF/, '')));
           
           // 立即更新 State 和 Ref/Window，确保后续逻辑能立马读到
           setCompanyDB(prev => ({ ...prev, ...currentCompanyData }));

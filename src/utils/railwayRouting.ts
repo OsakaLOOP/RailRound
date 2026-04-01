@@ -196,9 +196,11 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
         if (currentStation.transfers && Array.isArray(currentStation.transfers)) {
             for (const nextLineKey of currentStation.transfers) {
                 if (nextLineKey === current.lineKey) continue;
+                
                 const nextLine = railwayData[nextLineKey];
                 if (!nextLine) continue;
 
+                const currentMeta = railwayData[current.lineKey]?.meta;
                 const nextMeta = nextLine.meta;
 
                 // Find the physically closest station on the target line to act as the transfer point
@@ -216,8 +218,8 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
                         validTransfers.set(targetId, {
                             lineKey: nextLineKey,
                             stationIndex: bestIdx,
-                            cost: current.cost + 5 + 15,
-                            timeMins: current.timeMins + 5,
+                            cost: current.cost + (currentMeta.company===nextMeta.company?3:8),
+                            timeMins: current.timeMins + (nextMeta.company===currentMeta.company?3:8),
                             transfers: current.transfers + 1,
                             stops: current.stops,
                             parent: current
@@ -232,6 +234,7 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
         for (const tNode of sameNameNodes) {
             if (tNode.lineKey === current.lineKey) continue;
 
+            const currentMeta = railwayData[current.lineKey]?.meta;
             const nextLine = railwayData[tNode.lineKey];
             const nextMeta = nextLine.meta;
 
@@ -245,8 +248,8 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
                 validTransfers.set(targetId, {
                     lineKey: tNode.lineKey,
                     stationIndex: tNode.stationIndex,
-                    cost: current.cost + 10,
-                    timeMins: current.timeMins + 5,
+                    cost: current.cost + (nextMeta.company===currentMeta.company?3:8),
+                    timeMins: current.timeMins + (nextMeta.company===currentMeta.company?3:8),
                     transfers: current.transfers + 1,
                     stops: current.stops,
                     parent: current

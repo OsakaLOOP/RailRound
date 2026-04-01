@@ -598,6 +598,27 @@ export const AppLayout: React.FC = () => {
         }
     }, []);
 
+    useEffect(() => {
+        if (!companyDB || Object.keys(companyDB).length === 0) return;
+        setRailwayData((prev: any) => {
+            const next = { ...prev };
+            let changed = false;
+            Object.keys(next).forEach(lineKey => {
+                const line = next[lineKey];
+                if (!line || !line.meta) return;
+                const compName = line.meta.company;
+                if (companyDB[compName]) {
+                    const info = companyDB[compName] as any;
+                    if(!line.meta.region || !line.meta.type || line.meta.region === "未知" || line.meta.type === "未知") {
+                        next[lineKey] = { ...line, meta: { ...line.meta, region: info.region, type: info.type, logo: info.logo } };
+                        changed = true;
+                    }
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [companyDB, setRailwayData]);
+
     // --- 4. File Handlers ---
     const handleExportKML = async () => {
         if (isExportingKML) return;

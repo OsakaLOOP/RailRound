@@ -1733,7 +1733,7 @@ function RailLOOPContent() {
       // 1. 先加载基础元数据 (Company DB)
       let currentCompanyData = {};
       try {
-        const companyRes = await fetch('/company_data.json');
+        const companyRes = await fetch(`/company_data.json?v=${CURRENT_VERSION}`);
         if (companyRes.ok) {
           const txt = await companyRes.text();
           // 处理 BOM 头并解析
@@ -1842,7 +1842,7 @@ function RailLOOPContent() {
       }
 
       // 3. Network Fetch (Background Update)
-      const manifestRes = await fetch('/geojson_manifest.json').catch(() => null);
+      const manifestRes = await fetch(`/geojson_manifest.json?v=${CURRENT_VERSION}`).catch(() => null);
       if (!manifestRes || !manifestRes.ok) {
           console.warn('[Autoload] 无法获取 manifest, 跳过更新检查');
           return;
@@ -1873,7 +1873,7 @@ function RailLOOPContent() {
       const downloadTasks = missingFiles.map(async (fileName) => {
         try {
           const fileNameWithExt = fileName.includes('.geojson') ? fileName : `${fileName}.geojson`;
-          const res = await fetch(`/geojson/${fileNameWithExt}`);
+          const res = await fetch(`/geojson/${fileNameWithExt}?v=${CURRENT_VERSION}`);
           if (!res.ok) throw new Error(`Status ${res.status}`);
           const json = await res.json();
           const rawCompanyName = fileName.replace(/\.(geojson|json)$/i, '');

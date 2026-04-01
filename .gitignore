@@ -37,3 +37,4 @@ dist.rar
 public/assets/company_logos/*
 *.py
 *.bak
+!edgeone.json

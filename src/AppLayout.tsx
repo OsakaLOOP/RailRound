@@ -301,7 +301,7 @@ export const AppLayout: React.FC = () => {
             { id: toastId, duration: Infinity }
         );
             try {
-                const companyRes = await fetch('/company_data.json');
+                const companyRes = await fetch(`/company_data.json?v=${CURRENT_VERSION}`);
                 if (companyRes.ok) {
                     const txt = await companyRes.text();
                     currentCompanyData = normalizeCompanyDataLogos(JSON.parse(txt.replace(/^\uFEFF/, '')));
@@ -518,7 +518,7 @@ export const AppLayout: React.FC = () => {
             ),
             { id: toastId, duration: Infinity }
         );
-            const manifestRes = await fetch('/geojson_manifest.json').catch(() => null);
+            const manifestRes = await fetch(`/geojson_manifest.json?v=${CURRENT_VERSION}`).catch(() => null);
             if (manifestRes && manifestRes.ok) {
                 const manifest = await manifestRes.json();
                 const geojsonFiles = manifest.files || [];
@@ -531,7 +531,7 @@ export const AppLayout: React.FC = () => {
                     const totalToDownload = missingFiles.length;
                     const downloadTasks = missingFiles.map(async (fileName: string) => {
                         try {
-                            const res = await fetch(`/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}`);
+                            const res = await fetch(`/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}?v=${CURRENT_VERSION}`);
                             downloadedCount++;
                             const progress = 30 + Math.round((downloadedCount / totalToDownload) * 20); // Scale up to 50%
                             toast.loading(

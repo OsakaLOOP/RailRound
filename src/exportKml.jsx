@@ -21,6 +21,7 @@ const handleExportKML = async () => {
             
             // 循环所有行程，切割 GeoJSON 以获取准确坐标
             trips.forEach(t => {
+                if (t.isWalk) return; // Exclude walk trips
                 const tripName = `${t.date} - Trip ${t.id}`;
                 t.segments.forEach((seg, segIndex) => {
                     const line = railwayData[seg.lineKey];

@@ -488,15 +488,34 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     const startStationId = startStation.properties.id || `${startStation.properties.company}:${startStation.properties.line}:${startStation.properties.name}`;
                     const endStationId = snapProps.id || `${snapProps.company}:${snapProps.line}:${snapProps.name}`;
 
-                    const { setEditorMode, setAutoForm, startEditingTrip } = useStore.getState();
-                    setEditorMode('auto');
-                    setAutoForm({
-                        startLine: startLineKey,
-                        startStation: startStationId,
-                        endLine: snapLineKey,
-                        endStation: endStationId
-                    });
-                    startEditingTrip();
+                    const { setEditorMode, setAutoForm, startEditingTrip, isAprilFool } = useStore.getState();
+
+                    // --- April Fool's UFO Map Auto-Plan Hijack ---
+                    if (isAprilFool && Math.random() < 1/3) {
+                        toast.success('🛸 启动无限非概率驱动...', { duration: 2000, position: 'top-center' });
+                        setTimeout(() => {
+                            const walkTrip = {
+                                date: new Date().toISOString().split('T')[0],
+                                memo: '🛸 UFO 投递 - 步行旅程',
+                                cost: 0,
+                                isWalk: true,
+                                fromId: startStationId,
+                                toId: endStationId,
+                                lineKey: 'WALK',
+                                segments: []
+                            };
+                            useStore.getState().startEditingWalkTrip(walkTrip);
+                        }, 2000);
+                    } else {
+                        setEditorMode('auto');
+                        setAutoForm({
+                            startLine: startLineKey,
+                            startStation: startStationId,
+                            endLine: snapLineKey,
+                            endStation: endStationId
+                        });
+                        startEditingTrip();
+                    }
 
                     if (rubberBandLayerRef.current) rubberBandLayerRef.current.clearLayers();
                     routeDragRef.current = { active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null, openedTooltips: new Set() };
@@ -795,6 +814,20 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 });
             } else {
                 routeItems.push({ id: seg.id, coords: seg.coords, color: seg.color, popup: seg.popup, fallback: seg.fallback, isTransfer: seg.isTransfer });
+            }
+        });
+
+        // Add walk paths from trips
+        const trips = useStore.getState().trips;
+        trips.forEach(t => {
+            if (t.isWalk && t.walkPath) {
+                routeItems.push({
+                    id: `walk_${t.id}`,
+                    coords: t.walkPath,
+                    color: '#9333ea', // Purple
+                    popup: `步行: ${t.date}`,
+                    fallback: true // Forces dashArray '5, 10' later in the sync renderer
+                });
             }
         });
 

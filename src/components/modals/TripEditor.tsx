@@ -10,7 +10,7 @@ import { useUserData } from '../../hooks/useUserData';
 
 export const TripEditor: React.FC = () => {
     const {
-        isOpen, isEditing, form, editorMode, autoForm, isRouteSearching, railwayData, trips, pins, folders, badgeSettings, user
+        isOpen, isEditing, form, editorMode, autoForm, isRouteSearching, railwayData, trips, pins, folders, badgeSettings, user, isAprilFool
     } = useStore(useShallow(state => ({
         isOpen: state.isTripEditing,
         isEditing: !!state.editingTripId,
@@ -23,8 +23,11 @@ export const TripEditor: React.FC = () => {
         pins: state.pins,
         folders: state.folders,
         badgeSettings: state.badgeSettings,
-        user: state.user
+        user: state.user,
+        isAprilFool: state.isAprilFool
     })));
+
+    const [isUfoActive, setIsUfoActive] = useState(false);
 
     const setForm = useStore(state => state.setTripForm);
     const setEditorMode = useStore(state => state.setEditorMode);
@@ -85,6 +88,39 @@ export const TripEditor: React.FC = () => {
         const isInfinite = retryWithInfiniteSearch === true;
         const { startLine, startStation, endLine, endStation } = autoForm;
         if(!startLine || !startStation || !endLine || !endStation) return;
+
+        // --- April Fool's UFO Hijack ---
+        if (isAprilFool && !isInfinite && Math.random() < 1/3) {
+            setIsUfoActive(true);
+            setIsRouteSearching(true);
+            setTimeout(() => {
+                const sLine = railwayData[startLine];
+                const eLine = railwayData[endLine];
+                if (!sLine || !eLine) { setIsRouteSearching(false); setIsUfoActive(false); return; }
+                const sStation = sLine.stations.find((s: any) => s.id === startStation);
+                const eStation = eLine.stations.find((s: any) => s.id === endStation);
+                if (!sStation || !eStation) { setIsRouteSearching(false); setIsUfoActive(false); return; }
+
+                // Create a basic walk trip
+                const walkTrip = {
+                    date: form.date || new Date().toISOString().split('T')[0],
+                    memo: '🛸 UFO 投递 - 步行旅程',
+                    cost: 0,
+                    isWalk: true,
+                    fromId: startStation,
+                    toId: endStation,
+                    lineKey: 'WALK',
+                    segments: [] // Walk trips don't strictly need segments if we use fromId/toId
+                };
+
+                setIsRouteSearching(false);
+                setIsUfoActive(false);
+                closeEditor(); // Close standard editor
+                useStore.getState().startEditingWalkTrip(walkTrip); // Open Walk Editor
+            }, 2000); // 2 second animation delay
+            return;
+        }
+
         setIsRouteSearching(true);
         setTimeout(() => {
             const result = findRoute(
@@ -225,10 +261,26 @@ export const TripEditor: React.FC = () => {
           <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-slide-up relative overflow-hidden">
             {isRouteSearching && (
               <div className="train-animation-layer">
-                <svg viewBox="0 0 100 30" className="train-body" preserveAspectRatio="none"><path d="M 5 20 L 15 5 H 95 L 100 20 H 5 Z" fill="#e2e8f0" stroke="#3b82f6" strokeWidth="1"/><path d="M 5 20 Q 0 20 2 10 L 15 5" fill="none" stroke="#3b82f6" strokeWidth="1"/><rect x="20" y="8" width="10" height="5" fill="#3b82f6" rx="1"/><rect x="35" y="8" width="10" height="5" fill="#3b82f6" rx="1"/><rect x="50" y="8" width="10" height="5" fill="#3b82f6" rx="1"/><rect x="65" y="8" width="10" height="5" fill="#3b82f6" rx="1"/><rect x="10" y="16" width="90" height="2" fill="#3b82f6"/></svg>
-                <div className="speed-line" style={{top:'40%', left:'10%', width:'50px', animationDelay:'0s'}}></div>
-                <div className="speed-line" style={{top:'60%', left:'20%', width:'80px', animationDelay:'0.2s'}}></div>
-                <div className="speed-line" style={{top:'30%', left:'50%', width:'40px', animationDelay:'0.1s'}}></div>
+                {isUfoActive ? (
+                    <div className="flex flex-col items-center justify-center h-full pt-10">
+                        <svg viewBox="0 0 100 50" className="ufo-body w-24 h-12 mb-2 animate-bounce" preserveAspectRatio="none">
+                           <ellipse cx="50" cy="20" rx="20" ry="10" fill="#a855f7" opacity="0.8"/>
+                           <path d="M 10 30 Q 50 50 90 30 Q 50 40 10 30 Z" fill="#9333ea" />
+                           <circle cx="50" cy="15" r="8" fill="#d8b4fe" opacity="0.6"/>
+                           <circle cx="25" cy="30" r="3" fill="#f3e8ff" className="animate-pulse"/>
+                           <circle cx="50" cy="33" r="3" fill="#f3e8ff" className="animate-pulse" style={{animationDelay: '0.2s'}}/>
+                           <circle cx="75" cy="30" r="3" fill="#f3e8ff" className="animate-pulse" style={{animationDelay: '0.4s'}}/>
+                        </svg>
+                        <div className="text-purple-600 font-bold tracking-widest text-sm bg-white/80 px-4 py-1 rounded-full shadow-sm animate-pulse">启动无限非概率驱动...</div>
+                    </div>
+                ) : (
+                    <>
+                        <svg viewBox="0 0 100 30" className="train-body" preserveAspectRatio="none"><path d="M 5 20 L 15 5 H 95 L 100 20 H 5 Z" fill="#e2e8f0" stroke="#3b82f6" strokeWidth="1"/><path d="M 5 20 Q 0 20 2 10 L 15 5" fill="none" stroke="#3b82f6" strokeWidth="1"/><rect x="20" y="8" width="10" height="5" fill="#3b82f6" rx="1"/><rect x="35" y="8" width="10" height="5" fill="#3b82f6" rx="1"/><rect x="50" y="8" width="10" height="5" fill="#3b82f6" rx="1"/><rect x="65" y="8" width="10" height="5" fill="#3b82f6" rx="1"/><rect x="10" y="16" width="90" height="2" fill="#3b82f6"/></svg>
+                        <div className="speed-line" style={{top:'40%', left:'10%', width:'50px', animationDelay:'0s'}}></div>
+                        <div className="speed-line" style={{top:'60%', left:'20%', width:'80px', animationDelay:'0.2s'}}></div>
+                        <div className="speed-line" style={{top:'30%', left:'50%', width:'40px', animationDelay:'0.1s'}}></div>
+                    </>
+                )}
               </div>
             )}
 

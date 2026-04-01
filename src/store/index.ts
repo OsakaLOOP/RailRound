@@ -146,6 +146,8 @@ export interface Trip {
   lineKey?: string;
   fromId?: string;
   toId?: string;
+  isWalk?: boolean;
+  walkPath?: [number, number][]; // [lat, lng] array for the Bezier curve
 }
 
 export interface Pin {
@@ -256,6 +258,10 @@ export interface GlobalStore {
   startEditingTrip: (trip?: Partial<Trip>) => void;
   closeTripEditor: () => void;
 
+  isWalkTripEditing: boolean;
+  startEditingWalkTrip: (trip?: Partial<Trip>) => void;
+  closeWalkTripEditor: () => void;
+
   pinMode: PinMode;
   editingPin: Pin | null;
   setPinMode: (mode: PinMode) => void;
@@ -356,6 +362,16 @@ export const useStore = create<GlobalStore>()(
           }
       },
       closeTripEditor: () => set({ isTripEditing: false, editingTripId: null, tripForm: { date: new Date().toISOString().split('T')[0], memo: '', segments: [], cost: 0 } }),
+
+      isWalkTripEditing: false,
+      startEditingWalkTrip: (trip) => {
+        if (trip) {
+          set({ isWalkTripEditing: true, editingTripId: trip.id, tripForm: JSON.parse(JSON.stringify(trip)) });
+        } else {
+          set({ isWalkTripEditing: true, editingTripId: null, tripForm: { date: new Date().toISOString().split('T')[0], memo: '', cost: 0, isWalk: true, segments: [] } });
+        }
+      },
+      closeWalkTripEditor: () => set({ isWalkTripEditing: false, editingTripId: null, tripForm: { date: new Date().toISOString().split('T')[0], memo: '', segments: [], cost: 0 } }),
 
       pinMode: PinMode.Idle,
       editingPin: null,

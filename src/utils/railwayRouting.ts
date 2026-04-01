@@ -192,15 +192,12 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
         }
 
         // 2. Transfers
-        // A transfer happens when changing lines at the same station (or nearby same-name stations).
-        // Time penalty: 5 mins physical time + 15 penalty points to strongly discourage unnecessary transfers
         const transferableNodes = stationIndexMap.get(currentStation.name_ja) || [];
 
         for (const tNode of transferableNodes) {
             if (tNode.lineKey === current.lineKey) continue;
 
             // Validate that the transfer station is actually nearby (<= 1.0 km)
-            // to prevent incorrect transfers between identically named stations in completely different cities.
             const targetStation = railwayData[tNode.lineKey].stations[tNode.stationIndex];
             const dist = calcDist(currentStation.lat, currentStation.lng, targetStation.lat, targetStation.lng);
 
@@ -210,8 +207,6 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
             const nextMeta = railwayData[tNode.lineKey].meta;
             const isCompat = isCompanyCompatible(currentLine.meta as CompanyMeta, nextMeta as CompanyMeta);
 
-            // If they are strictly same station name, we allow transfer.
-            // In a strict app we might enforce isCompat, but for general routing we allow physical transfers.
 
             const node: RouteNode = {
                 lineKey: tNode.lineKey,

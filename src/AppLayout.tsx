@@ -75,6 +75,75 @@ export const AppLayout: React.FC = () => {
         }
     }, []);
 
+    // --- Standalone April Fool's Fake Loading Effect ---
+    useEffect(() => {
+        const isAprilFool = useStore.getState().isAprilFool;
+        if (isAprilFool && Math.random() < 0.5) {
+            const fakeToastId = 'april-fools-loading';
+
+            // Start fake loading sequence
+            setTimeout(() => {
+                toast.loading(
+                    (t: any) => (
+                        <div className="flex flex-col gap-2 w-48">
+                            <span className="text-sm font-bold text-gray-700">正在获取远端数据... (10%)</span>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '10%' }}></div>
+                            </div>
+                        </div>
+                    ),
+                    { id: fakeToastId, duration: Infinity }
+                );
+
+                setTimeout(() => {
+                    toast.loading(
+                        (t: any) => (
+                            <div className="flex flex-col gap-2 w-48">
+                                <span className="text-sm font-bold text-gray-700">预计算全图站距... (50%)</span>
+                                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                    <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '50%' }}></div>
+                                </div>
+                            </div>
+                        ),
+                        { id: fakeToastId, duration: Infinity }
+                    );
+
+                    setTimeout(() => {
+                        toast.loading(
+                            (t: any) => (
+                                <div className="flex flex-col gap-2 w-48">
+                                    <span className="text-sm font-bold text-gray-700">发现计算太难了，正在放弃... (30%)</span>
+                                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                        <div className="bg-red-400 h-1.5 rounded-full transition-all duration-[2000ms] ease-in-out" style={{ width: '30%' }}></div>
+                                    </div>
+                                </div>
+                            ),
+                            { id: fakeToastId, duration: Infinity }
+                        );
+
+                        setTimeout(() => {
+                            toast.loading(
+                                (t: any) => (
+                                    <div className="flex flex-col gap-2 w-48">
+                                        <span className="text-sm font-bold text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis">正在下载全宇宙铁路线... (114514%)</span>
+                                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-visible relative">
+                                            <div className="bg-purple-500 h-1.5 rounded-full transition-all duration-700 ease-in absolute left-0" style={{ width: '500%' }}></div>
+                                        </div>
+                                    </div>
+                                ),
+                                { id: fakeToastId, duration: Infinity }
+                            );
+
+                            setTimeout(() => {
+                                toast.error('初始化失败，但应用已就绪，凑合用吧', { id: fakeToastId, duration: 4000, position: 'bottom-center' });
+                            }, 1500);
+                        }, 2500);
+                    }, 1000);
+                }, 1000);
+            }, 500); // Wait for initial app mount
+        }
+    }, []);
+
     // --- Auth & URL Parsing ---
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -497,9 +566,6 @@ export const AppLayout: React.FC = () => {
             );
 
             if (needsCalc) {
-                // Check if April Fool's Easter Egg mode is enabled
-                const isAprilFool = useStore.getState().isAprilFool;
-
                 // Using a custom dynamic progress bar toast instead of plain text updates
                 toast.loading(
                     (t: any) => (
@@ -513,47 +579,10 @@ export const AppLayout: React.FC = () => {
                     { id: toastId, duration: Infinity }
                 );
 
-                if (isAprilFool && toastId) {
-                    // --- April Fool's Custom Progress Fakeout ---
-                    // At 50%, pause, retreat to 30%, then rocket to 114514%
-                    setTimeout(() => {
-                        toast.loading(
-                            (t: any) => (
-                                <div className="flex flex-col gap-2 w-48">
-                                    <span className="text-sm font-bold text-gray-700">发现计算太难了，正在放弃... (30%)</span>
-                                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                        <div className="bg-red-400 h-1.5 rounded-full transition-all duration-[2000ms] ease-in-out" style={{ width: '30%' }}></div>
-                                    </div>
-                                </div>
-                            ),
-                            { id: toastId, duration: Infinity }
-                        );
-
-                        setTimeout(() => {
-                            toast.loading(
-                                (t: any) => (
-                                    <div className="flex flex-col gap-2 w-48">
-                                        <span className="text-sm font-bold text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis">正在下载全宇宙铁路线... (114514%)</span>
-                                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-visible relative">
-                                            <div className="bg-purple-500 h-1.5 rounded-full transition-all duration-700 ease-in absolute left-0" style={{ width: '500%' }}></div>
-                                        </div>
-                                    </div>
-                                ),
-                                { id: toastId, duration: Infinity }
-                            );
-
-                            setTimeout(() => {
-                                toast.error('初始化失败，但应用已就绪，凑合用吧', { id: toastId, duration: 4000, position: 'bottom-center' });
-                            }, 1500);
-                        }, 2500);
-                    }, 1000);
-                }
-
                 const handleDistanceWorkerMsg = (e: MessageEvent) => {
                     const { type, payload } = e.data;
 
-                    // Normal progress tracking only happens if it's NOT April Fools
-                    if (type === 'PROGRESS' && toastId && !isAprilFool) {
+                    if (type === 'PROGRESS' && toastId) {
                         const scaledProgress = 50 + Math.round(payload.progress * 0.5); // Map 0-100 to 50-100
                         toast.loading(
                             (t: any) => (
@@ -567,7 +596,7 @@ export const AppLayout: React.FC = () => {
                             { id: toastId, duration: Infinity }
                         );
                     } else if (type === 'COMPLETE') {
-                        if (toastId && !isAprilFool) toast.success('初始化完成', { id: toastId, duration: 3000 });
+                        if (toastId) toast.success('初始化完成', { id: toastId, duration: 3000 });
                         distanceWorkerRef.current?.removeEventListener('message', handleDistanceWorkerMsg);
 
                         // Merge updated distances into CURRENT railway data instead of overwriting,

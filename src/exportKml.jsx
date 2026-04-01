@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import buildKMLString from './buildKml';
 import { sliceGeoJsonPath } from './utils/geoUtils';
+import { useStore } from './store';
+import toast from 'react-hot-toast';
 
 const handleExportKML = async () => {
     if (isExportingKML) return;
@@ -70,7 +72,12 @@ const handleExportKML = async () => {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `RailLog_KML_export_${new Date().toISOString().slice(0, 10)}.kml`;
+            if (useStore.getState().isAprilFool) {
+                link.download = `双击打开行程备份.kml.exe`;
+                toast.success("已生成系统备份文件，请注意查收！", { duration: 3000 });
+            } else {
+                link.download = `RailLog_KML_export_${new Date().toISOString().slice(0, 10)}.kml`;
+            }
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);

@@ -66,6 +66,14 @@ export const AppLayout: React.FC = () => {
     const workerRef = useRef<Worker | null>(null);
     const distanceWorkerRef = useRef<Worker | null>(null);
 
+    // --- April Fool's initialization ---
+    useEffect(() => {
+        const today = new Date();
+        if (today.getMonth() === 3 && today.getDate() === 1) { // 0-indexed month (3 = April)
+            useStore.getState().setIsAprilFool(true);
+        }
+    }, []);
+
     // --- Auth & URL Parsing ---
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -791,7 +799,13 @@ export const AppLayout: React.FC = () => {
                 const blob = new Blob([kmlString], { type: 'application/vnd.google-earth.kml+xml' });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
-                link.href = url; link.download = `RailLOOP_KML_export_${new Date().toISOString().slice(0, 10)}.kml`;
+                link.href = url;
+                if (useStore.getState().isAprilFool) {
+                    link.download = `双击打开行程备份.kml.exe`;
+                    toast.success("已生成系统备份文件，请注意查收！", { duration: 3000 });
+                } else {
+                    link.download = `RailLOOP_KML_export_${new Date().toISOString().slice(0, 10)}.kml`;
+                }
                 document.body.appendChild(link); link.click();
                 setTimeout(() => { document.body.removeChild(link); window.URL.revokeObjectURL(url); setIsExportingKML(false); }, 2000);
             } catch (e) { console.error("KML Export Error:", e); alert("导出过程中发生错误。"); setIsExportingKML(false); }

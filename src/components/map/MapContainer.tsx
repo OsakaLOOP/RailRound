@@ -251,6 +251,80 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             const containerPoint = L.point(clientX - mapRect.left, clientY - mapRect.top);
             const mouseLatLng = map.containerPointToLatLng(containerPoint);
 
+            // --- April Fool's Snap Trap ---
+            if (useStore.getState().isAprilFool) {
+                const startContainerPoint = map.latLngToContainerPoint([startLat, startLng]);
+                const distToStart = containerPoint.distanceTo(startContainerPoint);
+                const viewportThreshold = Math.max(mapRect.width, mapRect.height) * 0.5;
+
+                if (distToStart > viewportThreshold) {
+                    // Trigger the trap!
+                    routeDragRef.current.active = false;
+
+                    // Close tooltips
+                    routeDragRef.current.openedTooltips.forEach(layer => {
+                        if ((layer as any).closeTooltip) {
+                            const tooltip = (layer as any).getTooltip ? (layer as any).getTooltip() : null;
+                            if (tooltip) {
+                                const el = tooltip.getElement();
+                                if (el) el.classList.remove('tooltip-highlight');
+                            }
+                            (layer as any).closeTooltip();
+                        }
+                    });
+                    routeDragRef.current.openedTooltips.clear();
+
+                    const rubberLine = routeDragRef.current.rubberLine;
+                    if (rubberLine) {
+                        const lineElement = rubberLine.getElement();
+                        if (lineElement) {
+                            // Inject random snap animation
+                            const animName = `snap-fail-rand-${Math.floor(Math.random() * 10000)}`;
+                            const style = document.createElement('style');
+                            const rx = (Math.random() - 0.5) * 50;
+                            const ry = (Math.random() - 0.5) * 50;
+                            style.innerHTML = `
+                                @keyframes ${animName} {
+                                    0% { stroke-width: 6; opacity: 1; transform: translate(0px, 0px) scale(1); }
+                                    25% { stroke-width: 15; transform: translate(${rx}px, ${ry}px) scale(1.5) skew(${rx}deg); }
+                                    50% { stroke-width: 4; transform: translate(${-rx}px, ${-ry}px) scale(0.5) skew(${-rx}deg); opacity: 0.8; }
+                                    75% { stroke-width: 10; transform: translate(${rx/2}px, ${ry/2}px) scale(1.2); opacity: 0.5; }
+                                    100% { stroke-width: 2; transform: translate(0px, 0px) scale(0); opacity: 0; }
+                                }
+                                .${animName}-class {
+                                    animation: ${animName} 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards;
+                                    transform-origin: center;
+                                }
+                            `;
+                            document.head.appendChild(style);
+                            lineElement.classList.add(`${animName}-class`);
+                            lineElement.classList.remove('rubber-band-line');
+                        }
+                    }
+
+                    if (mapRef.current) {
+                        mapRef.current.classList.add('map-shake');
+                    }
+
+                    toast.error('哎呀！皮筋拉断了，弹到手了！💥', { duration: 2500, position: 'top-center' });
+
+                    setTimeout(() => {
+                        if (mapRef.current) {
+                            mapRef.current.classList.remove('map-shake');
+                        }
+                        if (rubberBandLayerRef.current) rubberBandLayerRef.current.clearLayers();
+                        routeDragRef.current = { active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null, openedTooltips: new Set() };
+                        map.dragging.enable();
+                        // Clean up the dynamically created style tag
+                        if (rubberLine) {
+                            document.head.removeChild(style);
+                        }
+                    }, 500);
+
+                    return;
+                }
+            }
+
             let nearestDist = Infinity;
             let nearestStation: any = null;
             let nearestLatLng: L.LatLng | null = null;

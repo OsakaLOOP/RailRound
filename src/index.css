@@ -30,6 +30,23 @@
     100% { stroke-width: 2; opacity: 0; }
 }
 
+.map-shake {
+    animation: map-shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes map-shake {
+    0% { transform: translate3d(0, 0, 0); }
+    10% { transform: translate3d(-15px, 0, 0) rotate(-2deg); }
+    20% { transform: translate3d(20px, -5px, 0) rotate(3deg); }
+    30% { transform: translate3d(-20px, 10px, 0) rotate(-3deg); }
+    40% { transform: translate3d(15px, -10px, 0) rotate(2deg); }
+    50% { transform: translate3d(-15px, 5px, 0) rotate(-1deg); }
+    60% { transform: translate3d(10px, 0, 0) rotate(1deg); }
+    70% { transform: translate3d(-5px, 0, 0); }
+    80% { transform: translate3d(2px, 0, 0); }
+    100% { transform: translate3d(0, 0, 0); }
+}
+
 @tailwind components;
 @tailwind utilities;
 

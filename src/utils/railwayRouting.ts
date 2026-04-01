@@ -245,7 +245,7 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
                 validTransfers.set(targetId, {
                     lineKey: tNode.lineKey,
                     stationIndex: tNode.stationIndex,
-                    cost: current.cost + 5 + 15,
+                    cost: current.cost + 10,
                     timeMins: current.timeMins + 5,
                     transfers: current.transfers + 1,
                     stops: current.stops,

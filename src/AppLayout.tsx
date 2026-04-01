@@ -170,9 +170,32 @@ export const AppLayout: React.FC = () => {
 
     // --- 2. AutoLoad Logic (Moved from RailRound) ---
     const autoLoadData = async () => {
+        let toastId: string | null = null;
         try {
             console.log('[Autoload] 正在初始化...');
+            toastId = toast.loading(
+                (t: any) => (
+                    <div className="flex flex-col gap-2 w-48">
+                        <span className="text-sm font-bold text-gray-700">正在初始化... (0%)</span>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '0%' }}></div>
+                        </div>
+                    </div>
+                ),
+                { duration: Infinity }
+            );
             let currentCompanyData = {};
+            toast.loading(
+            (t: any) => (
+                <div className="flex flex-col gap-2 w-48">
+                    <span className="text-sm font-bold text-gray-700">加载公司数据... (10%)</span>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '10%' }}></div>
+                    </div>
+                </div>
+            ),
+            { id: toastId, duration: Infinity }
+        );
             try {
                 const companyRes = await fetch('/company_data.json');
                 if (companyRes.ok) {
@@ -252,6 +275,17 @@ export const AppLayout: React.FC = () => {
 
             let cachedFiles: any[] = [];
             let realFiles: any[] = [];
+            toast.loading(
+            (t: any) => (
+                <div className="flex flex-col gap-2 w-48">
+                    <span className="text-sm font-bold text-gray-700">读取本地缓存... (30%)</span>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '30%' }}></div>
+                    </div>
+                </div>
+            ),
+            { id: toastId, duration: Infinity }
+        );
             try {
                 const dbInstance = await db.open();
 
@@ -287,11 +321,33 @@ export const AppLayout: React.FC = () => {
                 realFiles = cachedFiles.filter(f => f.fileName && !f.fileName.startsWith('__precompiled_') && !f.fileName.startsWith('zustand_'));
 
                 if (precompiledGeoData && precompiledRailwayData && realFiles.length > 0) {
+                    toast.loading(
+            (t: any) => (
+                <div className="flex flex-col gap-2 w-48">
+                    <span className="text-sm font-bold text-gray-700">极速命中缓存... (50%)</span>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '50%' }}></div>
+                    </div>
+                </div>
+            ),
+            { id: toastId, duration: Infinity }
+        );
                     // Fast path hit! Skip heavy processing.
                     setGeoData(precompiledGeoData);
                     setRailwayData(precompiledRailwayData);
                     console.log(`[Autoload] 极速命中预编译 GeoData 和 RailwayData 缓存，跳过繁重的解析步骤`);
                 } else if (realFiles.length > 0) {
+                    toast.loading(
+            (t: any) => (
+                <div className="flex flex-col gap-2 w-48">
+                    <span className="text-sm font-bold text-gray-700">解析本地数据... (50%)</span>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '50%' }}></div>
+                    </div>
+                </div>
+            ),
+            { id: toastId, duration: Infinity }
+        );
                     // Fallback to heavy processing and then cache the result
                     processGeoJsonBatch(realFiles, currentCompanyData);
                     // Use setTimeout to allow state to settle before caching
@@ -307,6 +363,17 @@ export const AppLayout: React.FC = () => {
                     }, 100);
                 }
 
+                toast.loading(
+            (t: any) => (
+                <div className="flex flex-col gap-2 w-48">
+                    <span className="text-sm font-bold text-gray-700">加载行程缩略图... (60%)</span>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '60%' }}></div>
+                    </div>
+                </div>
+            ),
+            { id: toastId, duration: Infinity }
+        );
                 // 2. Pre-load all segment geometries into memory at once to eliminate massive I/O lag
                 const txSegments = dbInstance.transaction(db.STORE_SEGMENTS, 'readonly');
                 const storeSegments = txSegments.objectStore(db.STORE_SEGMENTS);
@@ -336,6 +403,17 @@ export const AppLayout: React.FC = () => {
 
             } catch (e) { console.warn('Cache read failed', e); }
 
+            toast.loading(
+            (t: any) => (
+                <div className="flex flex-col gap-2 w-48">
+                    <span className="text-sm font-bold text-gray-700">检查云端更新... (70%)</span>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '70%' }}></div>
+                    </div>
+                </div>
+            ),
+            { id: toastId, duration: Infinity }
+        );
             const manifestRes = await fetch('/geojson_manifest.json').catch(() => null);
             if (manifestRes && manifestRes.ok) {
                 const manifest = await manifestRes.json();
@@ -345,9 +423,24 @@ export const AppLayout: React.FC = () => {
                 const missingFiles = geojsonFiles.filter((f: string) => !cachedFileNames.has(f.replace(/\.(geojson|json)$/i, '')));
 
                 if (missingFiles.length > 0) {
+                    let downloadedCount = 0;
+                    const totalToDownload = missingFiles.length;
                     const downloadTasks = missingFiles.map(async (fileName: string) => {
                         try {
                             const res = await fetch(`/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}`);
+                            downloadedCount++;
+                            const progress = 70 + Math.round((downloadedCount / totalToDownload) * 20); // Scale up to 90%
+                            toast.loading(
+                                (t: any) => (
+                                    <div className="flex flex-col gap-2 w-48">
+                                        <span className="text-sm font-bold text-gray-700">{`下载更新 ${downloadedCount}/${totalToDownload}... (${progress}%)`}</span>
+                                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                                        </div>
+                                    </div>
+                                ),
+                                { id: toastId, duration: Infinity }
+                            );
                             if (!res.ok) throw new Error(`Status ${res.status}`);
                             const json = await res.json();
                             const rawCompanyName = fileName.replace(/\.(geojson|json)$/i, '');
@@ -378,13 +471,15 @@ export const AppLayout: React.FC = () => {
                     }
                 }
             }
-        } catch (err) { console.error('[Autoload] 致命网络错误, 跳过检查:', err); }
+        } catch (err) {
+            console.error('[Autoload] 致命网络错误, 跳过检查:', err);
+            if (toastId) toast.error('初始化发生错误', { id: toastId, duration: 3000 });
+        }
 
         console.log('[Autoload] 初始化全部完成，应用就绪。');
 
         // Trigger distance calculation after data load regardless of whether network loaded new files
         if (distanceWorkerRef.current) {
-            let toastId: string | null = null;
             const currentRailwayData = useStore.getState().railwayData;
 
             // Only trigger if we have data and missing distances
@@ -394,34 +489,35 @@ export const AppLayout: React.FC = () => {
 
             if (needsCalc) {
                 // Using a custom dynamic progress bar toast instead of plain text updates
-                toastId = toast.loading(
+                toast.loading(
                     (t: any) => (
                         <div className="flex flex-col gap-2 w-48">
-                            <span className="text-sm font-bold text-gray-700">预计算全图站间距... (0%)</span>
+                            <span className="text-sm font-bold text-gray-700">预计算全图站距... (90%)</span>
                             <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '0%' }}></div>
+                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '90%' }}></div>
                             </div>
                         </div>
                     ),
-                    { duration: Infinity }
+                    { id: toastId, duration: Infinity }
                 );
 
                 const handleDistanceWorkerMsg = (e: MessageEvent) => {
                     const { type, payload } = e.data;
                     if (type === 'PROGRESS' && toastId) {
+                        const scaledProgress = 90 + Math.round(payload.progress * 0.1); // Map 0-100 to 90-100
                         toast.loading(
                             (t: any) => (
                                 <div className="flex flex-col gap-2 w-48">
-                                    <span className="text-sm font-bold text-gray-700">预计算全图站距... ({payload.progress}%)</span>
+                                    <span className="text-sm font-bold text-gray-700">预计算全图站距... ({scaledProgress}%)</span>
                                     <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-200 ease-out" style={{ width: `${payload.progress}%` }}></div>
+                                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-200 ease-out" style={{ width: `${scaledProgress}%` }}></div>
                                     </div>
                                 </div>
                             ),
-                            { id: toastId }
+                            { id: toastId, duration: Infinity }
                         );
                     } else if (type === 'COMPLETE') {
-                        if (toastId) toast.success('站距预计算已缓存', { id: toastId, duration: 3000 });
+                        if (toastId) toast.success('初始化全部完成', { id: toastId, duration: 3000 });
                         distanceWorkerRef.current?.removeEventListener('message', handleDistanceWorkerMsg);
 
                         // Merge updated distances into CURRENT railway data instead of overwriting,
@@ -453,9 +549,12 @@ export const AppLayout: React.FC = () => {
 
                 distanceWorkerRef.current.addEventListener('message', handleDistanceWorkerMsg);
                 distanceWorkerRef.current.postMessage({ type: 'CALC_DISTANCES', payload: { railwayData: currentRailwayData } });
+            } else {
+                if (toastId) toast.success('初始化全部完成', { id: toastId, duration: 3000 });
             }
         } else {
             console.warn('Distance Worker not initialized, skipping distance calculations');
+            if (toastId) toast.success('初始化全部完成', { id: toastId, duration: 3000 });
         }
     };
 

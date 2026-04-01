@@ -72,7 +72,7 @@ interface RouteNode {
     parent: RouteNode | null;
 }
 
-export const findRoute = (startLineKey: string, startStId: string, endLineKey: string, endStId: string, railwayData: RailwayMap) => {
+export const findRoute = (startLineKey: string, startStId: string, endLineKey: string, endStId: string, railwayData: RailwayMap, maxTransfersOverride?: number) => {
     if (!startLineKey || !endLineKey) return { error: "无效的起点或终点" };
 
     const startLine = railwayData[startLineKey];
@@ -113,7 +113,7 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
 
     openSet.push(startNode);
 
-    const MAX_TRANSFERS = 6;
+    const MAX_TRANSFERS = maxTransfersOverride !== undefined ? maxTransfersOverride : 6;
     let bestEndNode: RouteNode | null = null;
 
     // Helper: Push and sort (simulated priority queue)
@@ -150,7 +150,7 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
             break;
         }
 
-        if (current.transfers >= MAX_TRANSFERS) continue;
+        if (MAX_TRANSFERS >= 0 && current.transfers >= MAX_TRANSFERS) continue;
 
         // 1. Move Forward / Backward on the CURRENT line
         const speed = getSpeed(current.lineKey);

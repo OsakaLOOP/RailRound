@@ -43,9 +43,9 @@ const calcDist = (lat1, lon1, lat2, lon2) => {
 
               processed++;
 
-              // Report progress every 5%
+              // Report progress more frequently for smoother UI updates (every 1%)
               const currentProgress = Math.floor((processed / total) * 100);
-              if (currentProgress >= lastReportedProgress + 5) {
+              if (currentProgress > lastReportedProgress) {
                   self.postMessage({ type: 'PROGRESS', payload: { progress: currentProgress } });
                   lastReportedProgress = currentProgress;
               }

@@ -188,9 +188,9 @@ export const AppLayout: React.FC = () => {
             toast.loading(
             (t: any) => (
                 <div className="flex flex-col gap-2 w-48">
-                    <span className="text-sm font-bold text-gray-700">加载公司数据... (10%)</span>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '10%' }}></div>
+                    <span className="text-sm font-bold text-gray-700">加载公司数据... (5%)</span>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '5%' }}></div>
                     </div>
                 </div>
             ),
@@ -278,9 +278,9 @@ export const AppLayout: React.FC = () => {
             toast.loading(
             (t: any) => (
                 <div className="flex flex-col gap-2 w-48">
-                    <span className="text-sm font-bold text-gray-700">读取本地缓存... (30%)</span>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '30%' }}></div>
+                    <span className="text-sm font-bold text-gray-700">读取本地缓存... (10%)</span>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '10%' }}></div>
                     </div>
                 </div>
             ),
@@ -324,9 +324,9 @@ export const AppLayout: React.FC = () => {
                     toast.loading(
             (t: any) => (
                 <div className="flex flex-col gap-2 w-48">
-                    <span className="text-sm font-bold text-gray-700">极速命中缓存... (50%)</span>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '50%' }}></div>
+                    <span className="text-sm font-bold text-gray-700">极速命中缓存... (20%)</span>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '20%' }}></div>
                     </div>
                 </div>
             ),
@@ -340,9 +340,9 @@ export const AppLayout: React.FC = () => {
                     toast.loading(
             (t: any) => (
                 <div className="flex flex-col gap-2 w-48">
-                    <span className="text-sm font-bold text-gray-700">解析本地数据... (50%)</span>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '50%' }}></div>
+                    <span className="text-sm font-bold text-gray-700">解析本地数据... (20%)</span>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '20%' }}></div>
                     </div>
                 </div>
             ),
@@ -366,9 +366,9 @@ export const AppLayout: React.FC = () => {
                 toast.loading(
             (t: any) => (
                 <div className="flex flex-col gap-2 w-48">
-                    <span className="text-sm font-bold text-gray-700">加载行程缩略图... (60%)</span>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '60%' }}></div>
+                    <span className="text-sm font-bold text-gray-700">加载行程缩略图... (25%)</span>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '25%' }}></div>
                     </div>
                 </div>
             ),
@@ -406,9 +406,9 @@ export const AppLayout: React.FC = () => {
             toast.loading(
             (t: any) => (
                 <div className="flex flex-col gap-2 w-48">
-                    <span className="text-sm font-bold text-gray-700">检查云端更新... (70%)</span>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '70%' }}></div>
+                    <span className="text-sm font-bold text-gray-700">检查云端更新... (30%)</span>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '30%' }}></div>
                     </div>
                 </div>
             ),
@@ -429,7 +429,7 @@ export const AppLayout: React.FC = () => {
                         try {
                             const res = await fetch(`/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}`);
                             downloadedCount++;
-                            const progress = 70 + Math.round((downloadedCount / totalToDownload) * 20); // Scale up to 90%
+                            const progress = 30 + Math.round((downloadedCount / totalToDownload) * 20); // Scale up to 50%
                             toast.loading(
                                 (t: any) => (
                                     <div className="flex flex-col gap-2 w-48">
@@ -492,9 +492,9 @@ export const AppLayout: React.FC = () => {
                 toast.loading(
                     (t: any) => (
                         <div className="flex flex-col gap-2 w-48">
-                            <span className="text-sm font-bold text-gray-700">预计算全图站距... (90%)</span>
-                            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '90%' }}></div>
+                            <span className="text-sm font-bold text-gray-700">预计算全图站距... (50%)</span>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '50%' }}></div>
                             </div>
                         </div>
                     ),
@@ -504,7 +504,7 @@ export const AppLayout: React.FC = () => {
                 const handleDistanceWorkerMsg = (e: MessageEvent) => {
                     const { type, payload } = e.data;
                     if (type === 'PROGRESS' && toastId) {
-                        const scaledProgress = 90 + Math.round(payload.progress * 0.1); // Map 0-100 to 90-100
+                        const scaledProgress = 50 + Math.round(payload.progress * 0.5); // Map 0-100 to 50-100
                         toast.loading(
                             (t: any) => (
                                 <div className="flex flex-col gap-2 w-48">

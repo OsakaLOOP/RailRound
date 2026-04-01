@@ -450,6 +450,12 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             return;
         }
 
+        // Calculate dynamic zoom scale
+        const scale = currentZoom / 10;
+        const baseUnvisitedRadius = 4 * scale;
+        const baseVisitedRadius = 5 * scale;
+        const baseVisitedWeight = 2 * scale;
+
         // Calculate 3x3 viewport bounds
         const bounds = map.getBounds();
         const latDiff = bounds.getNorth() - bounds.getSouth();
@@ -478,12 +484,16 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 const stationId = f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`;
                 const isVisited = visitedStationsRef.current.has(stationId);
                 const lineColor = f.properties.stroke || '#64748b'; // Fallback if no stroke defined
+
+                const targetRadius = isVisited ? baseVisitedRadius : baseUnvisitedRadius;
+                const targetWeight = isVisited ? baseVisitedWeight : 0;
+
                 const layer = L.circleMarker(latlng, {
-                    radius: isVisited ? 5 : 4,
+                    radius: targetRadius,
                     color: isVisited ? '#ffffff' : 'transparent',
                     fillColor: isVisited ? lineColor : '#64748b',
                     fillOpacity: isVisited ? 1.0 : 0.5,
-                    weight: isVisited ? 2 : 0,
+                    weight: targetWeight,
                     className: 'station-dot',
                     pane: 'stationPane'
                 });
@@ -497,6 +507,10 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 layer._cachedLng = latlng[1];
                 // @ts-ignore
                 layer._cachedName = f.properties.name;
+                // @ts-ignore
+                layer._cachedRadius = targetRadius;
+                // @ts-ignore
+                layer._cachedWeight = targetWeight;
 
                 const handlePointerDown = (e: L.LeafletMouseEvent) => {
                     L.DomEvent.stopPropagation(e);
@@ -597,15 +611,20 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     changed = true;
                 }
 
-                if (marker._cachedIsVisited !== isVisited) {
+                const targetRadius = isVisited ? baseVisitedRadius : baseUnvisitedRadius;
+                const targetWeight = isVisited ? baseVisitedWeight : 0;
+
+                if (marker._cachedIsVisited !== isVisited || marker._cachedRadius !== targetRadius || marker._cachedWeight !== targetWeight) {
                     marker.setStyle({
-                        radius: isVisited ? 5 : 4,
+                        radius: targetRadius,
                         color: isVisited ? '#ffffff' : 'transparent',
                         fillColor: isVisited ? lineColor : '#64748b',
                         fillOpacity: isVisited ? 1.0 : 0.5,
-                        weight: isVisited ? 2 : 0
+                        weight: targetWeight
                     });
                     marker._cachedIsVisited = isVisited;
+                    marker._cachedRadius = targetRadius;
+                    marker._cachedWeight = targetWeight;
                     changed = true;
                 }
 

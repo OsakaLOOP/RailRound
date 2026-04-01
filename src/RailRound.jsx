@@ -860,7 +860,7 @@ const TripEditor = ({
                     </div>
                 </div>
             </div>
-            <button onClick={onAutoSearch} disabled={isRouteSearching} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-lg disabled:opacity-70">
+            <button onClick={() => onAutoSearch(false)} disabled={isRouteSearching} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-lg disabled:opacity-70">
                 {isRouteSearching ? <Loader2 className="animate-spin"/> : <Search size={18}/>}
                 {isRouteSearching ? '规划中...' : '搜索推荐路线'}
             </button>
@@ -2342,13 +2342,28 @@ function RailLOOPContent() {
       }
   };
   
-  const handleAutoRouteSearch = () => {
+  const handleAutoRouteSearch = (retryWithInfiniteSearch = false) => {
+    const isInfinite = retryWithInfiniteSearch === true;
     const { startLine, startStation, endLine, endStation } = autoForm;
     if(!startLine || !startStation || !endLine || !endStation) return;
     setIsRouteSearching(true);
     setTimeout(() => {
-        const result = findRoute(startLine, startStation, endLine, endStation, railwayData);
-        if (result.error) { setIsRouteSearching(false); alert(`无法规划: ${result.error}`); } 
+        const result = findRoute(startLine, startStation, endLine, endStation, railwayData, isInfinite ? -1 : 6);
+        if (result.error) {
+            setIsRouteSearching(false);
+            if (!isInfinite && result.error.includes("超出最大换乘次数")) {
+                setTimeout(() => {
+                    const wantRetry = window.confirm("自动规划超出6次换乘限制或无解。\n是否继续无限制深度搜索？(这可能需要较长等待时间)");
+                    if (wantRetry) {
+                        handleAutoRouteSearch(true);
+                    }
+                }, 100);
+            } else {
+                setTimeout(() => {
+                    alert(`无法规划: ${result.error}`);
+                }, 100);
+            }
+        }
         else { 
             if(result.segments.length > 20) { setIsRouteSearching(false); alert("路径过长"); return; } 
             setTripForm(prev => ({ ...prev, segments: result.segments })); setEditorMode('manual'); 

@@ -262,7 +262,38 @@ export const AppLayout: React.FC = () => {
                     reqFiles.onsuccess = () => resolve(reqFiles.result || []);
                     reqFiles.onerror = () => resolve([]);
                 });
-                if (cachedFiles.length > 0) processGeoJsonBatch(cachedFiles, currentCompanyData);
+                // Attempt to read fully precompiled geoData structure directly (FAST PATH)
+                let precompiledGeoData = null;
+                try {
+                    const txGeo = dbInstance.transaction(db.STORE_FILES, 'readonly');
+                    const storeGeo = txGeo.objectStore(db.STORE_FILES);
+                    const reqGeo = storeGeo.get('__precompiled_geodata');
+                    precompiledGeoData = await new Promise((resolve) => {
+                        reqGeo.onsuccess = () => resolve(reqGeo.result || null);
+                        reqGeo.onerror = () => resolve(null);
+                    });
+                } catch(e) {}
+
+                // Exclude '__precompiled_geodata' from cachedFiles list used for manifest comparison
+                const realFiles = cachedFiles.filter(f => f.fileName && f.fileName !== '__precompiled_geodata');
+
+                if (precompiledGeoData && realFiles.length > 0) {
+                    // Fast path hit! Skip heavy processing. We assume railwayData is correctly persisted in Zustand.
+                    setGeoData(precompiledGeoData);
+                    console.log(`[Autoload] 极速命中预编译 GeoData 缓存，跳过繁重的解析步骤`);
+                } else if (realFiles.length > 0) {
+                    // Fallback to heavy processing and then cache the result
+                    processGeoJsonBatch(realFiles, currentCompanyData);
+                    // Use setTimeout to allow state to settle before reading it back
+                    setTimeout(async () => {
+                        const currentGeo = useStore.getState().geoData;
+                        if (currentGeo && currentGeo.features.length > 0) {
+                            try {
+                                 await db.set(db.STORE_FILES, '__precompiled_geodata', currentGeo);
+                            } catch(e) {}
+                        }
+                    }, 100);
+                }
 
                 // 2. Pre-load all segment geometries into memory at once to eliminate massive I/O lag
                 const txSegments = dbInstance.transaction(db.STORE_SEGMENTS, 'readonly');
@@ -298,7 +329,7 @@ export const AppLayout: React.FC = () => {
                 const manifest = await manifestRes.json();
                 const geojsonFiles = manifest.files || [];
 
-                const cachedFileNames = new Set(cachedFiles.map(f => f.fileName));
+                const cachedFileNames = new Set(realFiles.map(f => f.fileName));
                 const missingFiles = geojsonFiles.filter((f: string) => !cachedFileNames.has(f.replace(/\.(geojson|json)$/i, '')));
 
                 if (missingFiles.length > 0) {
@@ -317,7 +348,20 @@ export const AppLayout: React.FC = () => {
 
                     const results = await Promise.all(downloadTasks);
                     const validResults = results.filter(r => r !== null);
-                    if (validResults.length > 0) processGeoJsonBatch(validResults, currentCompanyData);
+                    if (validResults.length > 0) {
+                        processGeoJsonBatch(validResults, currentCompanyData);
+
+                        // Overwrite precompiled geodata cache after updating with new downloaded files.
+                        // State updates are async, wait a moment to capture the latest.
+                        setTimeout(async () => {
+                            const updatedGeo = useStore.getState().geoData;
+                            if (updatedGeo && updatedGeo.features.length > 0) {
+                                try {
+                                    await db.set(db.STORE_FILES, '__precompiled_geodata', updatedGeo);
+                                } catch(e) {}
+                            }
+                        }, 500);
+                    }
                 }
             }
         } catch (err) { console.error('[Autoload] 致命网络错误, 跳过检查:', err); }
@@ -392,6 +436,8 @@ export const AppLayout: React.FC = () => {
             }
         }
     };
+
+    const hasInitializedRef = useRef(false);
 
     // --- 3. Geo Calculation Effects ---
     useEffect(() => {
@@ -521,7 +567,12 @@ export const AppLayout: React.FC = () => {
         return () => clearTimeout(timerId);
     }, [trips, geoData, railwayData, segmentGeometries]);
 
-    useEffect(() => { autoLoadData(); }, []);
+    useEffect(() => {
+        if (!hasInitializedRef.current) {
+            hasInitializedRef.current = true;
+            autoLoadData();
+        }
+    }, []);
 
     // --- 4. File Handlers ---
     const handleExportKML = async () => {

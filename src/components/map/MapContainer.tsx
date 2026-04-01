@@ -216,6 +216,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             const newOpenedTooltips = new Set<L.Layer>();
 
             if (geoDataRef.current && baseStationsLayer.current) {
+                const candidates: { layer: any, dist: number }[] = [];
+
                 // To display tooltips within 100px, we should iterate over rendered layers in baseStationsLayer
                 // because we need access to the layer object to call `openTooltip()`.
                 baseStationsLayer.current.eachLayer((layer: any) => {
@@ -226,13 +228,21 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
                         // Tooltip logic (100px)
                         if (dist <= 100) {
-                            if (layer.getTooltip && layer.getTooltip() && !layer.isTooltipOpen()) {
-                                layer.openTooltip();
-                            }
-                            newOpenedTooltips.add(layer);
+                            candidates.push({ layer, dist });
                         }
                     }
                 });
+
+                // Sort by distance and limit to the closest 5
+                candidates.sort((a, b) => a.dist - b.dist);
+                const closestCandidates = candidates.slice(0, 5);
+
+                for (const { layer } of closestCandidates) {
+                    if (layer.getTooltip && layer.getTooltip() && !layer.isTooltipOpen()) {
+                        layer.openTooltip();
+                    }
+                    newOpenedTooltips.add(layer);
+                }
 
                 // Original GeoData search to find nearest feature for snap logic
                 geoDataRef.current.features.forEach((f: any) => {

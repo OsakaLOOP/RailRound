@@ -264,81 +264,82 @@ export const AppLayout: React.FC = () => {
             } catch (e) { console.warn('Cache read failed', e); }
 
             const manifestRes = await fetch('/geojson_manifest.json').catch(() => null);
-            if (!manifestRes || !manifestRes.ok) return;
-            const manifest = await manifestRes.json();
-            const geojsonFiles = manifest.files || [];
+            if (manifestRes && manifestRes.ok) {
+                const manifest = await manifestRes.json();
+                const geojsonFiles = manifest.files || [];
 
-            const cachedFileNames = new Set(cachedFiles.map(f => f.fileName));
-            const missingFiles = geojsonFiles.filter((f: string) => !cachedFileNames.has(f.replace(/\.(geojson|json)$/i, '')));
+                const cachedFileNames = new Set(cachedFiles.map(f => f.fileName));
+                const missingFiles = geojsonFiles.filter((f: string) => !cachedFileNames.has(f.replace(/\.(geojson|json)$/i, '')));
 
-            if (missingFiles.length === 0) return;
+                if (missingFiles.length > 0) {
+                    const downloadTasks = missingFiles.map(async (fileName: string) => {
+                        try {
+                            const res = await fetch(`/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}`);
+                            if (!res.ok) throw new Error(`Status ${res.status}`);
+                            const json = await res.json();
+                            const rawCompanyName = fileName.replace(/\.(geojson|json)$/i, '');
+                            const matchedCompany = findBestCompanyKey(rawCompanyName, companyIndex);
+                            const dataItem = { json, company: matchedCompany, fileName: rawCompanyName };
+                            db.set(db.STORE_FILES, rawCompanyName, dataItem).catch(e => console.warn('Cache write failed', e));
+                            return dataItem;
+                        } catch (e: any) { return null; }
+                    });
 
-            const downloadTasks = missingFiles.map(async (fileName: string) => {
-                try {
-                    const res = await fetch(`/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}`);
-                    if (!res.ok) throw new Error(`Status ${res.status}`);
-                    const json = await res.json();
-                    const rawCompanyName = fileName.replace(/\.(geojson|json)$/i, '');
-                    const matchedCompany = findBestCompanyKey(rawCompanyName, companyIndex);
-                    const dataItem = { json, company: matchedCompany, fileName: rawCompanyName };
-                    db.set(db.STORE_FILES, rawCompanyName, dataItem).catch(e => console.warn('Cache write failed', e));
-                    return dataItem;
-                } catch (e: any) { return null; }
-            });
-
-            const results = await Promise.all(downloadTasks);
-            const validResults = results.filter(r => r !== null);
-            if (validResults.length > 0) processGeoJsonBatch(validResults, currentCompanyData);
-
-            console.log('[Autoload] 初始化全部完成，应用就绪。');
-
-            // Trigger distance calculation after data load
-            if (distanceWorkerRef.current) {
-                let toastId: string | null = null;
-                const currentRailwayData = useStore.getState().railwayData;
-
-                // Only trigger if we have data and missing distances
-                const needsCalc = Object.values(currentRailwayData).some(line =>
-                   line.stations.length > 1 && line.stations[0].distToNext === undefined
-                );
-
-                if (needsCalc) {
-                    toastId = toast.loading('正在计算站间距离 (0%)...', { duration: Infinity });
-
-                    const handleDistanceWorkerMsg = (e: MessageEvent) => {
-                        const { type, payload } = e.data;
-                        if (type === 'PROGRESS' && toastId) {
-                            toast.loading(`正在计算站间距离 (${payload.progress}%)...`, { id: toastId });
-                        } else if (type === 'COMPLETE') {
-                            if (toastId) toast.success('站距计算完成！', { id: toastId, duration: 3000 });
-                            distanceWorkerRef.current?.removeEventListener('message', handleDistanceWorkerMsg);
-
-                            // Merge updated distances into CURRENT railway data instead of overwriting,
-                            // to prevent losing data fetched concurrently while the worker was running.
-                            setRailwayData(prev => {
-                                const next = { ...prev };
-                                const updatedData = payload.updatedRailwayData;
-                                for (const [lineKey, line] of Object.entries(next)) {
-                                    if (updatedData[lineKey]) {
-                                        next[lineKey] = {
-                                            ...line,
-                                            stations: line.stations.map((st, idx) => {
-                                                const updatedSt = updatedData[lineKey].stations.find((us: any) => us.id === st.id);
-                                                return updatedSt ? { ...st, distToNext: updatedSt.distToNext } : st;
-                                            })
-                                        };
-                                    }
-                                }
-                                return next;
-                            });
-                        }
-                    };
-
-                    distanceWorkerRef.current.addEventListener('message', handleDistanceWorkerMsg);
-                    distanceWorkerRef.current.postMessage({ type: 'CALC_DISTANCES', payload: { railwayData: currentRailwayData } });
+                    const results = await Promise.all(downloadTasks);
+                    const validResults = results.filter(r => r !== null);
+                    if (validResults.length > 0) processGeoJsonBatch(validResults, currentCompanyData);
                 }
             }
-        } catch (err) { console.error('[Autoload] 致命错误:', err); }
+        } catch (err) { console.error('[Autoload] 致命网络错误, 跳过检查:', err); }
+
+        console.log('[Autoload] 初始化全部完成，应用就绪。');
+
+        // Trigger distance calculation after data load regardless of whether network loaded new files
+        if (distanceWorkerRef.current) {
+            let toastId: string | null = null;
+            const currentRailwayData = useStore.getState().railwayData;
+
+            // Only trigger if we have data and missing distances
+            const needsCalc = Object.values(currentRailwayData).some(line =>
+               line.stations.length > 1 && line.stations[0].distToNext === undefined
+            );
+
+            if (needsCalc) {
+                toastId = toast.loading('正在计算站间距离 (0%)...', { duration: Infinity });
+
+                const handleDistanceWorkerMsg = (e: MessageEvent) => {
+                    const { type, payload } = e.data;
+                    if (type === 'PROGRESS' && toastId) {
+                        toast.loading(`正在计算站间距离 (${payload.progress}%)...`, { id: toastId });
+                    } else if (type === 'COMPLETE') {
+                        if (toastId) toast.success('站距计算完成！', { id: toastId, duration: 3000 });
+                        distanceWorkerRef.current?.removeEventListener('message', handleDistanceWorkerMsg);
+
+                        // Merge updated distances into CURRENT railway data instead of overwriting,
+                        // to prevent losing data fetched concurrently while the worker was running.
+                        setRailwayData(prev => {
+                            const next = { ...prev };
+                            const updatedData = payload.updatedRailwayData;
+                            for (const [lineKey, line] of Object.entries(next)) {
+                                if (updatedData[lineKey]) {
+                                    next[lineKey] = {
+                                        ...line,
+                                        stations: line.stations.map((st, idx) => {
+                                            const updatedSt = updatedData[lineKey].stations.find((us: any) => us.id === st.id);
+                                            return updatedSt ? { ...st, distToNext: updatedSt.distToNext } : st;
+                                        })
+                                    };
+                                }
+                            }
+                            return next;
+                        });
+                    }
+                };
+
+                distanceWorkerRef.current.addEventListener('message', handleDistanceWorkerMsg);
+                distanceWorkerRef.current.postMessage({ type: 'CALC_DISTANCES', payload: { railwayData: currentRailwayData } });
+            }
+        }
     };
 
     // --- 3. Geo Calculation Effects ---

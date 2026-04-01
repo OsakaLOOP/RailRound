@@ -135,8 +135,14 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         dark.addTo(map); rail.addTo(map);
         L.control.layers({ "标准 (light)": light, "暗色 (Dark)": dark }, { "详细配线图 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);
 
-        map.createPane('stationPane');
-        map.getPane('stationPane')!.style.zIndex = '450'; // overlayPane is 400, markerPane is 600
+        map.createPane('baseLinesPane');
+        map.getPane('baseLinesPane')!.style.zIndex = '390';
+        map.createPane('baseStationsPane');
+        map.getPane('baseStationsPane')!.style.zIndex = '400';
+        map.createPane('routePane');
+        map.getPane('routePane')!.style.zIndex = '410';
+        map.createPane('visitedStationsPane');
+        map.getPane('visitedStationsPane')!.style.zIndex = '420';
 
         mapInstance.current = map;
 
@@ -449,7 +455,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     fillOpacity: isVisited ? 1.0 : 0.5,
                     weight: isVisited ? 2 : 0,
                     className: 'station-dot',
-                    pane: 'stationPane'
+                    pane: isVisited ? 'visitedStationsPane' : 'baseStationsPane'
                 });
                 // @ts-ignore
                 layer._cachedIsVisited = isVisited;
@@ -569,6 +575,16 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                         fillOpacity: isVisited ? 1.0 : 0.5,
                         weight: isVisited ? 2 : 0
                     });
+
+                    // Changing panes in Leaflet requires removing and re-adding the layer to its parent layer group.
+                    if (marker.options.pane !== (isVisited ? 'visitedStationsPane' : 'baseStationsPane')) {
+                        marker.options.pane = isVisited ? 'visitedStationsPane' : 'baseStationsPane';
+                        if (baseStationsLayer.current && baseStationsLayer.current.hasLayer(marker)) {
+                            baseStationsLayer.current.removeLayer(marker);
+                            baseStationsLayer.current.addLayer(marker);
+                        }
+                    }
+
                     marker._cachedIsVisited = isVisited;
                     changed = true;
                 }
@@ -587,6 +603,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         const lineFeatures = data.features.filter((f: CustomGeoJSONFeature) => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString');
         L.geoJSON(lineFeatures as any, {
             style: { color: '#475569', weight: 1, opacity: 0.3 },
+            pane: 'baseLinesPane',
             interactive: false
         }).addTo(baseLinesLayer.current);
     };
@@ -615,7 +632,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             routeItems,
             (item) => item.id,
             (item) => {
-                const options = { color: item.color, weight: zoomWeight, opacity: 0.9, lineCap: 'round', smoothFactor: 0.2, dashArray: item.fallback ? '5, 10' : undefined };
+                const options = { color: item.color, weight: zoomWeight, opacity: 0.9, lineCap: 'round', smoothFactor: 0.2, dashArray: item.fallback ? '5, 10' : undefined, pane: 'routePane' };
                 const pl = L.polyline(item.coords, options as L.PolylineOptions).bindPopup(item.popup);
                 (pl as any)._cachedCoords = item.coords;
                 return pl;

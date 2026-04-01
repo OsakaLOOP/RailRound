@@ -380,8 +380,9 @@ export const useStore = create<GlobalStore>()(
         trips: state.trips,
         pins: state.pins,
         folders: state.folders,
-        badgeSettings: state.badgeSettings,
-        railwayData: state.railwayData // 持久化包含计算完 distToNext 的铁路数据，防止每次刷新重复计算
+        badgeSettings: state.badgeSettings
+        // railwayData is now manually persisted as an object in IndexedDB (__precompiled_railwaydata)
+        // within AppLayout.tsx to avoid massive JSON.stringify overhead and timing issues during boot.
       }),
     }
   )

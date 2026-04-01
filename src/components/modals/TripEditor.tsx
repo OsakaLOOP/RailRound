@@ -10,7 +10,7 @@ import { useUserData } from '../../hooks/useUserData';
 
 export const TripEditor: React.FC = () => {
     const {
-        isOpen, isEditing, form, editorMode, autoForm, isRouteSearching, railwayData, trips, pins, folders, badgeSettings, user, isAprilFool
+        isOpen, isEditing, form, editorMode, autoForm, isRouteSearching, railwayData, trips, pins, folders, badgeSettings, user, isAprilFool, autoRouteEasterEggType
     } = useStore(useShallow(state => ({
         isOpen: state.isTripEditing,
         isEditing: !!state.editingTripId,
@@ -24,10 +24,9 @@ export const TripEditor: React.FC = () => {
         folders: state.folders,
         badgeSettings: state.badgeSettings,
         user: state.user,
-        isAprilFool: state.isAprilFool
+        isAprilFool: state.isAprilFool,
+        autoRouteEasterEggType: state.autoRouteEasterEggType
     })));
-
-    const [isUfoActive, setIsUfoActive] = useState(false);
 
     const setForm = useStore(state => state.setTripForm);
     const setEditorMode = useStore(state => state.setEditorMode);
@@ -84,41 +83,46 @@ export const TripEditor: React.FC = () => {
         closeEditor();
     };
 
-    const onAutoSearch = (retryWithInfiniteSearch = false) => {
-        const isInfinite = retryWithInfiniteSearch === true;
-        const { startLine, startStation, endLine, endStation } = autoForm;
-        if(!startLine || !startStation || !endLine || !endStation) return;
+    // React to the Easter Egg triggered by the Map Drag
+    useEffect(() => {
+        if (autoRouteEasterEggType && isOpen) {
+            const { startLine, startStation, endLine, endStation } = autoForm;
+            const isTree = autoRouteEasterEggType === 'tree';
 
-        // --- April Fool's UFO Hijack ---
-        if (isAprilFool && !isInfinite && Math.random() < 1/3) {
-            setIsUfoActive(true);
-            setIsRouteSearching(true);
-            setTimeout(() => {
-                const sLine = railwayData[startLine];
-                const eLine = railwayData[endLine];
-                if (!sLine || !eLine) { setIsRouteSearching(false); setIsUfoActive(false); return; }
-                const sStation = sLine.stations.find((s: any) => s.id === startStation);
-                const eStation = eLine.stations.find((s: any) => s.id === endStation);
-                if (!sStation || !eStation) { setIsRouteSearching(false); setIsUfoActive(false); return; }
-
+            const timer = setTimeout(() => {
                 // Create a basic walk trip
                 const walkTrip = {
                     date: form.date || new Date().toISOString().split('T')[0],
-                    memo: '🛸 无限非概率驱动 - 步行旅程',
+                    memo: isTree ? '🌲 环保少女教育成果 - 步行旅程' : '🛸 无限非概率驱动 - 步行旅程',
                     cost: 0,
                     isWalk: true,
                     fromId: startStation,
                     toId: endStation,
                     lineKey: 'WALK',
-                    segments: [] // Walk trips don't strictly need segments if we use fromId/toId
+                    segments: []
                 };
 
                 setIsRouteSearching(false);
-                setIsUfoActive(false);
-                closeEditor(); // Close standard editor
+                closeEditor(); // Close standard editor, which also resets the easter egg type
                 useStore.getState().startEditingWalkTrip(walkTrip); // Open Walk Editor
             }, 2000); // 2 second animation delay
-            return;
+
+            return () => clearTimeout(timer);
+        }
+    }, [autoRouteEasterEggType, isOpen, autoForm, form.date]);
+
+    const onAutoSearch = (retryWithInfiniteSearch = false) => {
+        const isInfinite = retryWithInfiniteSearch === true;
+        const { startLine, startStation, endLine, endStation } = autoForm;
+        if(!startLine || !startStation || !endLine || !endStation) return;
+
+        // --- April Fool's Map Auto-Plan Hijack ---
+        const rand = Math.random();
+        if (isAprilFool && !isInfinite && rand < 1/3) {
+            const type = rand < 1/6 ? 'ufo' : 'tree';
+            useStore.getState().setAutoRouteEasterEggType(type);
+            setIsRouteSearching(true);
+            return; // `useEffect` will take over
         }
 
         setIsRouteSearching(true);
@@ -261,7 +265,7 @@ export const TripEditor: React.FC = () => {
           <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-slide-up relative overflow-hidden">
             {isRouteSearching && (
               <div className="train-animation-layer">
-                {isUfoActive ? (
+                {autoRouteEasterEggType === 'ufo' ? (
                     <div className="flex flex-col items-center justify-center h-full pt-10">
                         <svg viewBox="0 0 100 50" className="ufo-body w-24 h-12 mb-2 animate-bounce" preserveAspectRatio="none">
                            <ellipse cx="50" cy="20" rx="20" ry="10" fill="#a855f7" opacity="0.8"/>
@@ -272,6 +276,45 @@ export const TripEditor: React.FC = () => {
                            <circle cx="75" cy="30" r="3" fill="#f3e8ff" className="animate-pulse" style={{animationDelay: '0.4s'}}/>
                         </svg>
                         <div className="text-purple-600 font-bold tracking-widest text-sm bg-white/80 px-4 py-1 rounded-full shadow-sm animate-pulse">启动无限非概率驱动...</div>
+                    </div>
+                ) : autoRouteEasterEggType === 'tree' ? (
+                    <div className="flex flex-col items-center justify-center h-full w-full relative">
+                        <style>
+                            {`
+                            @keyframes growLine { from { stroke-dasharray: 0, 1000; } to { stroke-dasharray: 1000, 1000; } }
+                            @keyframes scaleUp { 0% { transform: scale(0); opacity: 0; } 50% { opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+                            .tree-ground { stroke-dasharray: 0, 1000; animation: growLine 1s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+                            .tree-1 { transform-origin: 20px 40px; transform: scale(0); animation: scaleUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards; }
+                            .tree-2 { transform-origin: 50px 40px; transform: scale(0); animation: scaleUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.6s forwards; }
+                            .tree-3 { transform-origin: 80px 40px; transform: scale(0); animation: scaleUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.9s forwards; }
+                            `}
+                        </style>
+                        <svg viewBox="0 0 100 50" className="w-48 h-24 mb-2 overflow-visible">
+                            {/* Ground Line */}
+                            <path d="M 0 40 L 100 40" stroke="#4ade80" strokeWidth="2" className="tree-ground" fill="none" />
+
+                            {/* Tree 1: Dark, Tallest */}
+                            <g className="tree-1">
+                                <rect x="18" y="25" width="4" height="15" fill="#78350f" rx="1"/>
+                                <circle cx="20" cy="18" r="14" fill="#14532d"/>
+                                <circle cx="20" cy="18" r="14" fill="#166534" style={{clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)'}}/>
+                            </g>
+
+                            {/* Tree 2: Medium, Mid-height */}
+                            <g className="tree-2">
+                                <rect x="48.5" y="30" width="3" height="10" fill="#92400e" rx="1"/>
+                                <circle cx="50" cy="24" r="10" fill="#166534"/>
+                                <circle cx="50" cy="24" r="10" fill="#15803d" style={{clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)'}}/>
+                            </g>
+
+                            {/* Tree 3: Light, Shortest */}
+                            <g className="tree-3">
+                                <rect x="79" y="33" width="2" height="7" fill="#b45309" rx="0.5"/>
+                                <circle cx="80" cy="28" r="7" fill="#15803d"/>
+                                <circle cx="80" cy="28" r="7" fill="#22c55e" style={{clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)'}}/>
+                            </g>
+                        </svg>
+                        <div className="text-green-700 font-bold tracking-widest text-sm bg-white/80 px-4 py-1 rounded-full shadow-sm animate-pulse">接受环保少女教育中...</div>
                     </div>
                 ) : (
                     <>

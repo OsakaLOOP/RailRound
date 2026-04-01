@@ -518,32 +518,25 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     const startStationId = startStation.properties.id || `${startStation.properties.company}:${startStation.properties.line}:${startStation.properties.name}`;
                     const endStationId = snapProps.id || `${snapProps.company}:${snapProps.line}:${snapProps.name}`;
 
-                    const { setEditorMode, setAutoForm, startEditingTrip, isAprilFool } = useStore.getState();
+                    const { setEditorMode, setAutoForm, startEditingTrip, isAprilFool, setAutoRouteEasterEggType, setIsRouteSearching } = useStore.getState();
 
-                    // --- April Fool's UFO Map Auto-Plan Hijack ---
-                    if (isAprilFool && Math.random() < 1/3) {
-                        toast.success('🛸 启动无限非概率驱动...', { duration: 2000, position: 'top-center' });
-                        setTimeout(() => {
-                            const walkTrip = {
-                                date: new Date().toISOString().split('T')[0],
-                                memo: '🛸 UFO 投递 - 步行旅程',
-                                cost: 0,
-                                isWalk: true,
-                                fromId: startStationId,
-                                toId: endStationId,
-                                lineKey: 'WALK',
-                                segments: []
-                            };
-                            useStore.getState().startEditingWalkTrip(walkTrip);
-                        }, 2000);
+                    // --- April Fool's Map Auto-Plan Hijack ---
+                    setEditorMode('auto');
+                    setAutoForm({
+                        startLine: startLineKey,
+                        startStation: startStationId,
+                        endLine: snapLineKey,
+                        endStation: endStationId
+                    });
+
+                    const rand = Math.random();
+                    if (isAprilFool && rand < 1/3) {
+                        const type = rand < 1/6 ? 'ufo' : 'tree';
+                        // Open the TripEditor normally, but force it into an immediate Easter Egg searching state
+                        setAutoRouteEasterEggType(type);
+                        setIsRouteSearching(true);
+                        startEditingTrip();
                     } else {
-                        setEditorMode('auto');
-                        setAutoForm({
-                            startLine: startLineKey,
-                            startStation: startStationId,
-                            endLine: snapLineKey,
-                            endStation: endStationId
-                        });
                         startEditingTrip();
                     }
 

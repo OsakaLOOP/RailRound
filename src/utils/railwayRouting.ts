@@ -199,6 +199,13 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
         for (const tNode of transferableNodes) {
             if (tNode.lineKey === current.lineKey) continue;
 
+            // Validate that the transfer station is actually nearby (<= 1.0 km)
+            // to prevent incorrect transfers between identically named stations in completely different cities.
+            const targetStation = railwayData[tNode.lineKey].stations[tNode.stationIndex];
+            const dist = calcDist(currentStation.lat, currentStation.lng, targetStation.lat, targetStation.lng);
+
+            if (dist > 1.0) continue;
+
             // Check compatibility if needed (using existing logic)
             const nextMeta = railwayData[tNode.lineKey].meta;
             const isCompat = isCompanyCompatible(currentLine.meta as CompanyMeta, nextMeta as CompanyMeta);

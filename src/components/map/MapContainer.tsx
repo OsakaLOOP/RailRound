@@ -241,12 +241,24 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 candidates.sort((a, b) => a.dist - b.dist);
                 const closestCandidates = candidates.slice(0, 5);
 
-                for (const { layer } of closestCandidates) {
-                    if (layer.getTooltip && layer.getTooltip() && !layer.isTooltipOpen()) {
-                        layer.openTooltip();
+                closestCandidates.forEach(({ layer }, index) => {
+                    const tooltip = layer.getTooltip ? layer.getTooltip() : null;
+                    if (tooltip) {
+                        if (!layer.isTooltipOpen()) {
+                            layer.openTooltip();
+                        }
+
+                        const el = tooltip.getElement();
+                        if (el) {
+                            if (index === 0) {
+                                el.classList.add('tooltip-highlight');
+                            } else {
+                                el.classList.remove('tooltip-highlight');
+                            }
+                        }
+                        newOpenedTooltips.add(layer);
                     }
-                    newOpenedTooltips.add(layer);
-                }
+                });
 
                 // Original GeoData search to find nearest feature for snap logic
                 geoDataRef.current.features.forEach((f: any) => {
@@ -271,6 +283,13 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             // Close tooltips that are no longer within 100px
             routeDragRef.current.openedTooltips.forEach(layer => {
                 if (!newOpenedTooltips.has(layer) && (layer as any).closeTooltip) {
+                    const tooltip = (layer as any).getTooltip ? (layer as any).getTooltip() : null;
+                    if (tooltip) {
+                        const el = tooltip.getElement();
+                        if (el) {
+                            el.classList.remove('tooltip-highlight');
+                        }
+                    }
                     (layer as any).closeTooltip();
                 }
             });
@@ -319,6 +338,13 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             // Immediately close dynamically opened tooltips
             routeDragRef.current.openedTooltips.forEach(layer => {
                 if ((layer as any).closeTooltip) {
+                    const tooltip = (layer as any).getTooltip ? (layer as any).getTooltip() : null;
+                    if (tooltip) {
+                        const el = tooltip.getElement();
+                        if (el) {
+                            el.classList.remove('tooltip-highlight');
+                        }
+                    }
                     (layer as any).closeTooltip();
                 }
             });

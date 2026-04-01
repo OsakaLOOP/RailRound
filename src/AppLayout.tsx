@@ -251,6 +251,7 @@ export const AppLayout: React.FC = () => {
             };
 
             let cachedFiles: any[] = [];
+            let realFiles: any[] = [];
             try {
                 const dbInstance = await db.open();
 
@@ -275,7 +276,7 @@ export const AppLayout: React.FC = () => {
                 } catch(e) {}
 
                 // Exclude '__precompiled_geodata' and 'zustand_railround-storage' from cachedFiles list used for manifest comparison
-                const realFiles = cachedFiles.filter(f => f.fileName && f.fileName !== '__precompiled_geodata' && !f.fileName.startsWith('zustand_'));
+                realFiles = cachedFiles.filter(f => f.fileName && f.fileName !== '__precompiled_geodata' && !f.fileName.startsWith('zustand_'));
 
                 if (precompiledGeoData && realFiles.length > 0) {
                     // Fast path hit! Skip heavy processing. We assume railwayData is correctly persisted in Zustand.

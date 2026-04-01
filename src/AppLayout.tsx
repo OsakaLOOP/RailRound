@@ -312,7 +312,25 @@ export const AppLayout: React.FC = () => {
                         } else if (type === 'COMPLETE') {
                             if (toastId) toast.success('站距计算完成！', { id: toastId, duration: 3000 });
                             distanceWorkerRef.current?.removeEventListener('message', handleDistanceWorkerMsg);
-                            setRailwayData(payload.updatedRailwayData);
+
+                            // Merge updated distances into CURRENT railway data instead of overwriting,
+                            // to prevent losing data fetched concurrently while the worker was running.
+                            setRailwayData(prev => {
+                                const next = { ...prev };
+                                const updatedData = payload.updatedRailwayData;
+                                for (const [lineKey, line] of Object.entries(next)) {
+                                    if (updatedData[lineKey]) {
+                                        next[lineKey] = {
+                                            ...line,
+                                            stations: line.stations.map((st, idx) => {
+                                                const updatedSt = updatedData[lineKey].stations.find((us: any) => us.id === st.id);
+                                                return updatedSt ? { ...st, distToNext: updatedSt.distToNext } : st;
+                                            })
+                                        };
+                                    }
+                                }
+                                return next;
+                            });
                         }
                     };
 

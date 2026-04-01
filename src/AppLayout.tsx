@@ -354,7 +354,7 @@ export const AppLayout: React.FC = () => {
                         toast.loading(
                             (t: any) => (
                                 <div className="flex flex-col gap-2 w-48">
-                                    <span className="text-sm font-bold text-gray-700">预计算全图站间距... ({payload.progress}%)</span>
+                                    <span className="text-sm font-bold text-gray-700">预计算全图站距... ({payload.progress}%)</span>
                                     <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                         <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-200 ease-out" style={{ width: `${payload.progress}%` }}></div>
                                     </div>
@@ -363,7 +363,7 @@ export const AppLayout: React.FC = () => {
                             { id: toastId }
                         );
                     } else if (type === 'COMPLETE') {
-                        if (toastId) toast.success('站距预计算已完成，缓存更新。', { id: toastId, duration: 3000 });
+                        if (toastId) toast.success('站距预计算已缓存', { id: toastId, duration: 3000 });
                         distanceWorkerRef.current?.removeEventListener('message', handleDistanceWorkerMsg);
 
                         // Merge updated distances into CURRENT railway data instead of overwriting,

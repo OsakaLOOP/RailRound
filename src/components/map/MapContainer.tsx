@@ -29,7 +29,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
     // For local long-press routing drag
     const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const routeDragRef = useRef<{ active: boolean, startStation: CustomGeoJSONFeature | null, currentSnap: CustomGeoJSONFeature | null, rubberLine: L.Polyline | null, snapCircleCenter: L.CircleMarker | null }>({ active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null });
+    const routeDragRef = useRef<{ active: boolean, startStation: CustomGeoJSONFeature | null, currentSnap: CustomGeoJSONFeature | null, rubberLine: L.Polyline | null, snapCircleCenter: L.CircleMarker | null, openedTooltips: Set<L.Layer> }>({ active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null, openedTooltips: new Set() });
     const wasDraggingRef = useRef(false);
 
     const [isMapInitialized, setIsMapInitialized] = React.useState(false);
@@ -213,7 +213,28 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             let nearestStation: any = null;
             let nearestLatLng: L.LatLng | null = null;
 
-            if (geoDataRef.current) {
+            const newOpenedTooltips = new Set<L.Layer>();
+
+            if (geoDataRef.current && baseStationsLayer.current) {
+                // To display tooltips within 100px, we should iterate over rendered layers in baseStationsLayer
+                // because we need access to the layer object to call `openTooltip()`.
+                baseStationsLayer.current.eachLayer((layer: any) => {
+                    if (typeof layer.getLatLng === 'function') {
+                        const latlng = layer.getLatLng();
+                        const stPoint = map.latLngToContainerPoint([latlng.lat, latlng.lng]);
+                        const dist = containerPoint.distanceTo(stPoint);
+
+                        // Tooltip logic (100px)
+                        if (dist <= 100) {
+                            if (layer.getTooltip && layer.getTooltip() && !layer.isTooltipOpen()) {
+                                layer.openTooltip();
+                            }
+                            newOpenedTooltips.add(layer);
+                        }
+                    }
+                });
+
+                // Original GeoData search to find nearest feature for snap logic
                 geoDataRef.current.features.forEach((f: any) => {
                     if (f.properties.type === 'station' && f.geometry?.coordinates) {
                         const lat = f.geometry.coordinates[1];
@@ -232,6 +253,14 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     }
                 });
             }
+
+            // Close tooltips that are no longer within 100px
+            routeDragRef.current.openedTooltips.forEach(layer => {
+                if (!newOpenedTooltips.has(layer) && (layer as any).closeTooltip) {
+                    (layer as any).closeTooltip();
+                }
+            });
+            routeDragRef.current.openedTooltips = newOpenedTooltips;
 
             routeDragRef.current.currentSnap = nearestStation;
 
@@ -273,6 +302,14 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
             if (!routeDragRef.current.active) return;
 
+            // Immediately close dynamically opened tooltips
+            routeDragRef.current.openedTooltips.forEach(layer => {
+                if ((layer as any).closeTooltip) {
+                    (layer as any).closeTooltip();
+                }
+            });
+            routeDragRef.current.openedTooltips.clear();
+
             routeDragRef.current.active = false;
             map.dragging.enable();
             wasDraggingRef.current = true; // prevent click
@@ -310,7 +347,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     startEditingTrip();
 
                     if (rubberBandLayerRef.current) rubberBandLayerRef.current.clearLayers();
-                    routeDragRef.current = { active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null };
+                    routeDragRef.current = { active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null, openedTooltips: new Set() };
                 }, 300); // Wait for success animation
 
             } else {
@@ -325,7 +362,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
                 setTimeout(() => {
                     if (rubberBandLayerRef.current) rubberBandLayerRef.current.clearLayers();
-                    routeDragRef.current = { active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null };
+                    routeDragRef.current = { active: false, startStation: null, currentSnap: null, rubberLine: null, snapCircleCenter: null, openedTooltips: new Set() };
                 }, 300);
             }
         };

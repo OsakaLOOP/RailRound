@@ -72,21 +72,24 @@ export const AppLayout: React.FC = () => {
         const today = new Date();
         if (today.getMonth() === 3 && today.getDate() === 1) { // 0-indexed month (3 = April)
             useStore.getState().setIsAprilFool(true);
+            if (Math.random() < 0.5) {
+                useStore.getState().setShowFakeProgress(true);
+            }
         }
     }, []);
 
     // --- Standalone April Fool's Fake Loading Effect ---
     useEffect(() => {
-        const isAprilFool = useStore.getState().isAprilFool;
-        if (isAprilFool && Math.random() < 0.5) {
+        const storeState = useStore.getState();
+        if (storeState.isAprilFool && storeState.showFakeProgress) {
             const fakeToastId = 'april-fools-loading';
 
             // Start fake loading sequence
             setTimeout(() => {
                 toast.loading(
                     (t: any) => (
-                        <div className="flex flex-col gap-2 w-48">
-                            <span className="text-sm font-bold text-gray-700">正在获取远端数据... (10%)</span>
+                        <div className="flex flex-col gap-2">
+                            <span className="text-sm font-bold text-gray-700 whitespace-nowrap">正在获取远端数据... (10%)</span>
                             <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                 <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '10%' }}></div>
                             </div>
@@ -98,8 +101,8 @@ export const AppLayout: React.FC = () => {
                 setTimeout(() => {
                     toast.loading(
                         (t: any) => (
-                            <div className="flex flex-col gap-2 w-48">
-                                <span className="text-sm font-bold text-gray-700">预计算全图站距... (50%)</span>
+                            <div className="flex flex-col gap-2">
+                                <span className="text-sm font-bold text-gray-700 whitespace-nowrap">预计算全图站距... (50%)</span>
                                 <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                     <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '50%' }}></div>
                                 </div>
@@ -111,8 +114,8 @@ export const AppLayout: React.FC = () => {
                     setTimeout(() => {
                         toast.loading(
                             (t: any) => (
-                                <div className="flex flex-col gap-2 w-48">
-                                    <span className="text-sm font-bold text-gray-700">发现计算太难了，正在放弃... (30%)</span>
+                                <div className="flex flex-col gap-2">
+                                    <span className="text-sm font-bold text-gray-700 whitespace-nowrap">发现计算太难了，正在放弃... (30%)</span>
                                     <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                         <div className="bg-red-400 h-1.5 rounded-full transition-all duration-[2000ms] ease-in-out" style={{ width: '30%' }}></div>
                                     </div>
@@ -124,8 +127,8 @@ export const AppLayout: React.FC = () => {
                         setTimeout(() => {
                             toast.loading(
                                 (t: any) => (
-                                    <div className="flex flex-col gap-2 w-48">
-                                        <span className="text-sm font-bold text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis">正在下载全宇宙铁路线... (114514%)</span>
+                                    <div className="flex flex-col gap-2">
+                                        <span className="text-sm font-bold text-gray-700 whitespace-nowrap">正在下载全宇宙铁路线... (114514%)</span>
                                         <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-visible relative">
                                             <div className="bg-purple-500 h-1.5 rounded-full transition-all duration-700 ease-in absolute left-0" style={{ width: '500%' }}></div>
                                         </div>
@@ -135,7 +138,7 @@ export const AppLayout: React.FC = () => {
                             );
 
                             setTimeout(() => {
-                                toast.error('初始化失败，但应用已就绪，凑合用吧', { id: fakeToastId, duration: 4000, position: 'bottom-center' });
+                                toast.error('初始化失败，但应用已就绪，凑合用吧', { id: fakeToastId, duration: 4000, position: 'top-center' });
                             }, 1500);
                         }, 2500);
                     }, 1000);
@@ -589,28 +592,32 @@ export const AppLayout: React.FC = () => {
             );
 
             if (needsCalc) {
-                // Using a custom dynamic progress bar toast instead of plain text updates
-                toast.loading(
-                    (t: any) => (
-                        <div className="flex flex-col gap-2 w-48">
-                            <span className="text-sm font-bold text-gray-700">预计算全图站距... (50%)</span>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '50%' }}></div>
+                const showFakeProgress = useStore.getState().showFakeProgress;
+
+                if (!showFakeProgress) {
+                    // Using a custom dynamic progress bar toast instead of plain text updates
+                    toast.loading(
+                        (t: any) => (
+                            <div className="flex flex-col gap-2">
+                                <span className="text-sm font-bold text-gray-700 whitespace-nowrap">预计算全图站距... (50%)</span>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '50%' }}></div>
+                                </div>
                             </div>
-                        </div>
-                    ),
-                    { id: toastId, duration: Infinity }
-                );
+                        ),
+                        { id: toastId, duration: Infinity }
+                    );
+                }
 
                 const handleDistanceWorkerMsg = (e: MessageEvent) => {
                     const { type, payload } = e.data;
 
-                    if (type === 'PROGRESS' && toastId) {
+                    if (type === 'PROGRESS' && toastId && !showFakeProgress) {
                         const scaledProgress = 50 + Math.round(payload.progress * 0.5); // Map 0-100 to 50-100
                         toast.loading(
                             (t: any) => (
-                                <div className="flex flex-col gap-2 w-48">
-                                    <span className="text-sm font-bold text-gray-700">预计算全图站距... ({scaledProgress}%)</span>
+                                <div className="flex flex-col gap-2">
+                                    <span className="text-sm font-bold text-gray-700 whitespace-nowrap">预计算全图站距... ({scaledProgress}%)</span>
                                     <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                         <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-200 ease-out" style={{ width: `${scaledProgress}%` }}></div>
                                     </div>
@@ -619,7 +626,7 @@ export const AppLayout: React.FC = () => {
                             { id: toastId, duration: Infinity }
                         );
                     } else if (type === 'COMPLETE') {
-                        if (toastId) toast.success('初始化完成', { id: toastId, duration: 3000 });
+                        if (toastId && !showFakeProgress) toast.success('初始化完成', { id: toastId, duration: 3000 });
                         distanceWorkerRef.current?.removeEventListener('message', handleDistanceWorkerMsg);
 
                         // Merge updated distances into CURRENT railway data instead of overwriting,

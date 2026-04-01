@@ -451,7 +451,9 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         }
 
         // Calculate dynamic zoom scale
-        const scale = currentZoom / 10;
+        let scale = Math.pow(2, currentZoom - 10);
+        scale = Math.max(0.5, Math.min(scale, 3));
+
         const baseUnvisitedRadius = 4 * scale;
         const baseVisitedRadius = 5 * scale;
         const baseVisitedWeight = 2 * scale;

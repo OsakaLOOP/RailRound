@@ -13,10 +13,12 @@ export const CachedTileLayer = L.TileLayer.extend({
     L.TileLayer.prototype.onAdd.call(this, map);
     this._prefetchControllers = new Map();
     map.on('movestart zoomstart', this._abortPrefetch, this);
+    map.on('moveend', this._onTilesLoad, this);
   },
 
   onRemove: function(map) {
     map.off('movestart zoomstart', this._abortPrefetch, this);
+    map.off('moveend', this._onTilesLoad, this);
     this._abortPrefetch();
     L.TileLayer.prototype.onRemove.call(this, map);
   },

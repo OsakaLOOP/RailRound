@@ -61,12 +61,12 @@ export const parseSuicaDate = (dateStr: string): string => {
 };
 
 export interface ParsedDetails {
-    inStation: string;
-    inLine: string;
-    inCompany: string;
-    outStation: string;
-    outLine: string;
-    outCompany: string;
+    inStation?: string;
+    inLine?: string;
+    inCompany?: string;
+    outStation?: string;
+    outLine?: string;
+    outCompany?: string;
 }
 
 const findStation = (stationName: string, lineName: string, companyName: string, railwayData: RailwayMap) => {
@@ -104,9 +104,10 @@ const findStation = (stationName: string, lineName: string, companyName: string,
     return null;
 }
 
-export const processSuicaCSV = async (csvStr: string, railwayData: RailwayMap): Promise<Trip[]> => {
+export const processSuicaCSV = async (csvStr: string, railwayData: RailwayMap, existingTrips: Trip[] = []): Promise<{ newTrips: Trip[], skippedCount: number }> => {
     const rows = parseCSV(csvStr);
     const trips: Trip[] = [];
+    let skippedCount = 0;
 
     // Header should be the first row, we skip it
     for (let i = 1; i < rows.length; i++) {
@@ -128,8 +129,32 @@ export const processSuicaCSV = async (csvStr: string, railwayData: RailwayMap): 
         const date = parseSuicaDate(dateStr);
         const cost = parseInt(amountStr, 10) || 0;
 
-        const inMatch = findStation(details.inStation, details.inLine, details.inCompany, railwayData);
-        const outMatch = findStation(details.outStation, details.outLine, details.outCompany, railwayData);
+        const inMatch = details.inStation && details.inLine && details.inCompany ? findStation(details.inStation, details.inLine, details.inCompany, railwayData) : null;
+        const outMatch = details.outStation && details.outLine && details.outCompany ? findStation(details.outStation, details.outLine, details.outCompany, railwayData) : null;
+
+        // Duplicate Check Logic
+        if (inMatch && outMatch) {
+            const isDuplicate = existingTrips.some(t => {
+                if (t.date !== date) return false;
+                if (!t.segments || t.segments.length === 0) return false;
+                const firstSeg = t.segments[0];
+                const lastSeg = t.segments[t.segments.length - 1];
+                return firstSeg.fromId === inMatch.stationId && lastSeg.toId === outMatch.stationId;
+            });
+            const isDuplicateInNew = trips.some(t => {
+                if (t.date !== date) return false;
+                if (!t.segments || t.segments.length === 0) return false;
+                const firstSeg = t.segments[0];
+                const lastSeg = t.segments[t.segments.length - 1];
+                return firstSeg.fromId === inMatch.stationId && lastSeg.toId === outMatch.stationId;
+            });
+
+            if (isDuplicate || isDuplicateInNew) {
+                console.log(`[SuicaParser] Skipping duplicate trip: ${details.inStation} -> ${details.outStation} on ${date}`);
+                skippedCount++;
+                continue;
+            }
+        }
 
         if (inMatch && outMatch) {
             let segments: TripSegment[] = [];
@@ -177,28 +202,91 @@ export const processSuicaCSV = async (csvStr: string, railwayData: RailwayMap): 
                 memo: `Suica Import: ${details.inStation} -> ${details.outStation}`,
                 segments
             });
+        } else if (inMatch || outMatch) {
+            // Handle incomplete records (only entry or only exit)
+            console.warn(`[SuicaParser] Incomplete record: Entry=${details.inStation || 'None'}, Exit=${details.outStation || 'None'}`);
+            let segments: TripSegment[] = [];
+
+            if (inMatch) {
+                segments = [{
+                    id: Date.now().toString() + Math.random().toString(),
+                    lineKey: inMatch.lineKey,
+                    fromId: inMatch.stationId,
+                    toId: ''
+                }];
+            } else if (outMatch) {
+                segments = [{
+                    id: Date.now().toString() + Math.random().toString(),
+                    lineKey: outMatch.lineKey,
+                    fromId: '',
+                    toId: outMatch.stationId
+                }];
+            }
+
+            // Duplicate check for partials
+            const isDuplicate = existingTrips.some(t => {
+                if (t.date !== date) return false;
+                if (!t.segments || t.segments.length === 0) return false;
+                const seg = t.segments[0];
+                if (inMatch) return seg.fromId === inMatch.stationId;
+                if (outMatch) return seg.toId === outMatch.stationId;
+                return false;
+            });
+            const isDuplicateInNew = trips.some(t => {
+                if (t.date !== date) return false;
+                if (!t.segments || t.segments.length === 0) return false;
+                const seg = t.segments[0];
+                if (inMatch) return seg.fromId === inMatch.stationId;
+                if (outMatch) return seg.toId === outMatch.stationId;
+                return false;
+            });
+
+            if (isDuplicate || isDuplicateInNew) {
+                 console.log(`[SuicaParser] Skipping duplicate partial trip on ${date}`);
+                 skippedCount++;
+                 continue;
+            }
+
+            trips.push({
+                id: Date.now().toString() + Math.random().toString(),
+                date,
+                cost,
+                memo: `Suica Import (Incomplete): ${details.inStation || '?'} -> ${details.outStation || '?'}`,
+                segments
+            });
         } else {
             console.warn(`[SuicaParser] Skipping trip due to missing station map: ${details.inStation} -> ${details.outStation}`);
         }
     }
 
-    return trips;
+    return { newTrips: trips, skippedCount };
 };
 
 export const parseSuicaDetails = (detailsStr: string): ParsedDetails | null => {
     // 入: モノレール浜松町（東京モノレール羽田空港線 東京モノレール）
     // 出: 羽田空港第2ターミナル（東京モノレール羽田空港線 東京モノレール）
-    const regex = /入:\s*(.+?)（(.+?)\s+(.+?)）\n?出:\s*(.+?)（(.+?)\s+(.+?)）/;
-    const match = detailsStr.match(regex);
-    if (match) {
-        return {
-            inStation: match[1].trim(),
-            inLine: match[2].trim(),
-            inCompany: match[3].trim(),
-            outStation: match[4].trim(),
-            outLine: match[5].trim(),
-            outCompany: match[6].trim()
-        };
+
+    const details: ParsedDetails = {};
+    const inRegex = /入:\s*(.+?)（(.+?)\s+(.+?)）/;
+    const outRegex = /出:\s*(.+?)（(.+?)\s+(.+?)）/;
+
+    const inMatch = detailsStr.match(inRegex);
+    if (inMatch) {
+        details.inStation = inMatch[1].trim();
+        details.inLine = inMatch[2].trim();
+        details.inCompany = inMatch[3].trim();
     }
+
+    const outMatch = detailsStr.match(outRegex);
+    if (outMatch) {
+        details.outStation = outMatch[1].trim();
+        details.outLine = outMatch[2].trim();
+        details.outCompany = outMatch[3].trim();
+    }
+
+    if (inMatch || outMatch) {
+        return details;
+    }
+
     return null;
 };

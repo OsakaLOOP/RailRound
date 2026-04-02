@@ -39,7 +39,7 @@ const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
     const shouldRotate = isMobile && widthPx > maxWidth && maxWidth > 0;
 
     return (
-        <div ref={containerRef} className="absolute right-0 top-12 bottom-0 w-1/3 flex flex-col items-end justify-center pointer-events-none overflow-hidden pr-2 opacity-20">
+        <div ref={containerRef} className="absolute right-0 top-0 bottom-0 w-1/3 flex flex-col items-end justify-center pointer-events-none overflow-hidden pr-2 opacity-20">
             <div style={{ width: shouldRotate ? heightPx : widthPx, height: shouldRotate ? widthPx : heightPx, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
               <svg viewBox="0 0 100 50" preserveAspectRatio="none" style={{ width: widthPx, height: heightPx, transform: shouldRotate ? 'rotate(90deg)' : 'none', transformOrigin: 'center right' }}>
                   {visualPaths.map((item: any, idx: number) => (
@@ -119,7 +119,7 @@ export const TripsPage: React.FC = () => {
                         };
 
                         return (
-                            <div key={t.id} className={`${cls.bg} p-4 rounded-lg border ${cls.border} shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-pointer`} onClick={() => useStore.getState().startEditingWalkTrip(t)}>
+                            <div key={t.id} className={`shrink-0 ${cls.bg} p-4 rounded-lg border ${cls.border} shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-pointer`} onClick={() => useStore.getState().startEditingWalkTrip(t)}>
                                 <div className={`flex justify-between mb-2 pb-2 border-b ${cls.border}`}>
                                     <span className={`text-xs font-bold ${cls.date}`}>{t.date}</span>
                                     <div className="flex items-center gap-2">
@@ -145,7 +145,7 @@ export const TripsPage: React.FC = () => {
                     }
 
                     return (
-                        <div key={t.id} className="relative bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 overflow-hidden">
+                        <div key={t.id} className="shrink-0 relative bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 overflow-hidden">
                             <RouteSlice segments={segments} />
                             <div className="relative z-10 flex justify-between mb-2 pb-2 border-b border-gray-50">
                                 <span className="text-xs font-bold text-gray-400">{t.date}</span>
@@ -188,7 +188,7 @@ export const TripsPage: React.FC = () => {
                     startEditingTrip({ date: new Date().toISOString().split('T')[0], memo: '', segments: newSegments, cost: 0 });
                 }
             }}>
-                <button id="btn-add-trip" onClick={() => startEditingTrip()} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
+                <button id="btn-add-trip" onClick={() => startEditingTrip()} className="shrink-0 w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
                     <Plus className="group-hover:rotate-90 transition-transform duration-300" size={18} /> 记录新行程
                 </button>
             </DropZone>

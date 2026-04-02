@@ -6,6 +6,7 @@ import { PinEditor } from './PinEditor';
 import { FabButton } from './FabButton';
 import StationMenu from './StationMenu';
 import { findNearestPointOnLine } from '../utils/routeFinder';
+import { cachedTileLayer } from '../utils/CachedTileLayer';
 
 // Fix Leaflet icons (standard fix)
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
@@ -38,13 +39,22 @@ export default function MapComponent() {
         if (!mapRef.current || mapInstance.current) return;
         const map = L.map(mapRef.current, { zoomControl: true, preferCanvas: true }).setView([35.68, 139.76], 10);
 
-        const light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { attribution: '© CARTO', subdomains: 'abcd', maxZoom: 20 });
-        const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', subdomains: 'abcd', maxZoom: 20 });
-        const rail = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 20, opacity: 0, attribution: '© OpenRailwayMap' });
+        const light = cachedTileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { attribution: '© CARTO', subdomains: 'abcd', maxZoom: 20, layerName: 'light' });
+        const dark = cachedTileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', subdomains: 'abcd', maxZoom: 20, layerName: 'dark' });
+        const rail = cachedTileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 20, opacity: 0, attribution: '© OpenRailwayMap', layerName: 'rail' });
         railLayerRef.current = rail;
 
         dark.addTo(map); rail.addTo(map);
         L.control.layers({ "标准 (light)": light, "暗色 (Dark)": dark }, { "详细配线图 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);
+
+        const preloadActiveLayers = () => {
+            if (map.hasLayer(light)) light.preloadTiles(map);
+            if (map.hasLayer(dark)) dark.preloadTiles(map);
+            if (map.hasLayer(rail)) rail.preloadTiles(map);
+        };
+
+        map.on('moveend', preloadActiveLayers);
+        map.on('zoomend', preloadActiveLayers);
 
         // Layers
         baseLinesLayer.current = L.layerGroup(); // Not added initially

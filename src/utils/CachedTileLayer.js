@@ -9,9 +9,35 @@ export const CachedTileLayer = L.TileLayer.extend({
     this.on('load', this._onTilesLoad, this);
   },
 
+  onAdd: function(map) {
+    L.TileLayer.prototype.onAdd.call(this, map);
+    this._prefetchControllers = new Map();
+    map.on('movestart zoomstart', this._abortPrefetch, this);
+  },
+
+  onRemove: function(map) {
+    map.off('movestart zoomstart', this._abortPrefetch, this);
+    this._abortPrefetch();
+    L.TileLayer.prototype.onRemove.call(this, map);
+  },
+
+  _abortPrefetch: function() {
+    if (this._prefetchControllers) {
+      for (const controller of this._prefetchControllers.values()) {
+        controller.abort();
+      }
+      this._prefetchControllers.clear();
+      this._preloadingUrls.clear();
+    }
+  },
+
   _onTileRemove: function(e) {
     if (e.tile) {
       e.tile._unloaded = true;
+      if (e.tile._abortController) {
+          e.tile._abortController.abort();
+          e.tile._abortController = null;
+      }
       if (e.tile._objectUrl) {
         URL.revokeObjectURL(e.tile._objectUrl);
         e.tile._objectUrl = null;
@@ -52,15 +78,26 @@ export const CachedTileLayer = L.TileLayer.extend({
     return tile;
   },
 
-  _fetchAndCacheTile: function (url, tileElement) {
-    fetch(url)
+  _fetchAndCacheTile: function (url, tileElement, attempt = 1) {
+    if (tileElement && tileElement._unloaded) return;
+
+    const controller = new AbortController();
+    if (tileElement) {
+        tileElement._abortController = controller;
+    }
+
+    const timeoutId = setTimeout(() => controller.abort('timeout'), 5000);
+
+    fetch(url, { signal: controller.signal })
       .then(response => {
+        clearTimeout(timeoutId);
         if (!response.ok) {
            throw new Error('Network response was not ok');
         }
         return response.blob();
       })
       .then(blob => {
+        if (tileElement && tileElement._unloaded) return;
         tileCache.set(url, blob).catch(e => console.error("Failed to save tile to cache", e));
         if (tileElement && !tileElement._unloaded) {
           const objectUrl = URL.createObjectURL(blob);
@@ -69,9 +106,19 @@ export const CachedTileLayer = L.TileLayer.extend({
         }
       })
       .catch(error => {
-        // Fallback to regular src assignment on fetch error
-        if (tileElement && !tileElement._unloaded) {
-          tileElement.src = url;
+        clearTimeout(timeoutId);
+        if (tileElement && tileElement._unloaded) return;
+
+        // Timeout or network error
+        if (attempt <= 3) {
+          setTimeout(() => {
+              this._fetchAndCacheTile(url, tileElement, attempt + 1);
+          }, 500);
+        } else {
+          // Fallback to regular src assignment on fetch error
+          if (tileElement && !tileElement._unloaded) {
+            tileElement.src = url;
+          }
         }
       });
   },
@@ -133,8 +180,18 @@ export const CachedTileLayer = L.TileLayer.extend({
                       return;
                   }
 
+                  // Ensure we haven't aborted via _abortPrefetch
+                  if (!this._preloadingUrls.has(url)) {
+                      return;
+                  }
+
                   if (!blob) {
-                    fetch(url)
+                    const controller = new AbortController();
+                    if (this._prefetchControllers) {
+                        this._prefetchControllers.set(url, controller);
+                    }
+
+                    fetch(url, { signal: controller.signal })
                       .then(response => {
                           if (response.ok) return response.blob();
                           throw new Error("Bad response");
@@ -145,6 +202,9 @@ export const CachedTileLayer = L.TileLayer.extend({
                       .catch(() => {})
                       .finally(() => {
                            this._preloadingUrls.delete(url);
+                           if (this._prefetchControllers) {
+                               this._prefetchControllers.delete(url);
+                           }
                       });
                   } else {
                      this._preloadingUrls.delete(url);

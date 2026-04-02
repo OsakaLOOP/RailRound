@@ -100,6 +100,7 @@ const findStation = (stationName: string, lineName: string, companyName: string,
         }
     }
 
+    console.warn(`[SuicaParser] Could not map station: ${stationName} (${lineName} ${companyName})`);
     return null;
 }
 
@@ -141,7 +142,9 @@ export const processSuicaCSV = async (csvStr: string, railwayData: RailwayMap): 
                     fromId: p.fromId,
                     toId: p.toId
                 }));
+                console.log(`[SuicaParser] Found route for: ${details.inStation} -> ${details.outStation} (${segments.length} segments)`);
             } else {
+                console.warn(`[SuicaParser] Could not find route for: ${details.inStation} -> ${details.outStation}. Falling back to single segment.`);
                 segments = [{
                     id: Date.now().toString() + Math.random().toString(),
                     lineKey: inMatch.lineKey,
@@ -157,6 +160,8 @@ export const processSuicaCSV = async (csvStr: string, railwayData: RailwayMap): 
                 memo: `Suica Import: ${details.inStation} -> ${details.outStation}`,
                 segments
             });
+        } else {
+            console.warn(`[SuicaParser] Skipping trip due to missing station map: ${details.inStation} -> ${details.outStation}`);
         }
     }
 

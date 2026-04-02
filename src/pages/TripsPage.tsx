@@ -111,7 +111,7 @@ export const TripsPage: React.FC = () => {
 
     return (
         <div className="relative h-full w-full flex flex-col overflow-hidden">
-            <div id="trips-scroll-container" className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-24">
+            <div id="trips-scroll-container" className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4">
             {trips.length === 0 ? (
                 <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
                     <Train size={48} className="opacity-20 mb-4"/>

@@ -129,7 +129,7 @@ export const TripsPage: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="relative z-10 flex flex-row">
-                                    <div className="flex-1 space-y-2 relative overflow-hidden">
+                                    <div className="flex-1 space-y-2 relative">
                                         <div className="relative z-10 flex flex-col text-sm">
                                             <div className="flex items-center gap-2">
                                                 <MapPin size={14} className={`${cls.icon} shrink-0`}/>
@@ -156,7 +156,7 @@ export const TripsPage: React.FC = () => {
                                 </div>
                             </div>
                             <div className="relative z-10 flex flex-row">
-                                <div className="flex-1 space-y-2 relative overflow-hidden">
+                                <div className="flex-1 space-y-2 relative">
                                     {segments.length > 1 && <div className="absolute left-[5px] top-2 bottom-2 w-0.5 bg-gray-200 z-0"></div>}
                                     {segments.map((seg, idx) => {
                                         const line = railwayData[seg.lineKey];

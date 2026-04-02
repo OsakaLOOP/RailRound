@@ -2661,7 +2661,7 @@ function RailLOOPContent() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-100 font-sans text-slate-800 overflow-visible">
+    <div className="flex flex-col h-[100dvh] bg-slate-100 font-sans text-slate-800 overflow-visible">
       <style>{LEAFLET_CSS}</style>
       <header className="bg-slate-900 text-white p-4 shadow-md z-30 flex justify-between shrink-0">
         <div id="header-title" className="flex items-center gap-2">

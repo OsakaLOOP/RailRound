@@ -1002,7 +1002,7 @@ export const AppLayout: React.FC = () => {
 
     return (
         <DragProvider>
-            <div className="flex flex-col h-screen bg-slate-100 font-sans text-slate-800 overflow-visible">
+            <div className="flex flex-col h-[100dvh] bg-slate-100 font-sans text-slate-800 overflow-visible">
                 <Toaster position="top-center" />
                 <Header
                     handleExportKML={handleExportKML}

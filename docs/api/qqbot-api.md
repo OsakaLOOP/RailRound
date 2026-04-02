@@ -3,7 +3,7 @@
 This document describes the API endpoints provided for the QQBot integration. The bot is expected to fetch structured JSON data from these endpoints and handle the actual rendering (e.g., generating PNG images) on its end.
 
 ## Base URL
-\`https://<your-domain>/api/qqbot\`
+\`https://rail.s3xyseia.xyz/api/qqbot\`
 
 ---
 

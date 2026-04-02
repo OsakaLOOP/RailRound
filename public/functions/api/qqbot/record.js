@@ -27,7 +27,7 @@ export async function onRequest(event) {
             return errorJson("Invalid JSON body");
         }
 
-        const { key, title, date, distance, stations, lines } = body;
+        const { key, title, date, distance, stations, lines, segments, svg_points } = body;
 
         if (!key) return errorJson("User Key is required");
 
@@ -65,6 +65,7 @@ export async function onRequest(event) {
             distance: tripDistance,
             stations: parsedStations,
             lines: parsedLines,
+            segments: Array.isArray(segments) ? segments : null,
             // Provide a dummy horizontal path if nothing else is available
             // so the card.js doesn't crash if it expects svg_points
             path: [{x: 0, y: 0}, {x: 100, y: 0}]
@@ -97,8 +98,8 @@ export async function onRequest(event) {
             title: newTrip.title,
             date: newTrip.date,
             dist: newTrip.distance,
-            // A simple horizontal line for the SVG badge preview since bot doesn't know exact map coordinates
-            svg_points: "M 0 15 L 100 15"
+            // Use the provided accurate SVG path if the bot calculated it, otherwise fallback
+            svg_points: svg_points || "M 0 15 L 100 15"
         };
 
         data.latest_5.latest.unshift(newLatestTrip);

@@ -68,6 +68,8 @@ Submit a new trip for a user. The API will prepend the trip to the user's histor
 | \`distance\` | number   | No       | Total distance in kilometers. Default: 0. |
 | \`stations\` | array    | No       | Array of station names or objects \`{ id: string, name: string }\`. |
 | \`lines\`    | array    | No       | Array of line names or objects \`{ id: string, name: string }\`. |
+| `segments` | array    | No       | Array of accurate route segments `[{lineKey, fromId, toId}]` for frontend rendering. |
+| `svg_points`| string   | No       | Pre-calculated SVG 'd' path string for the Card Badge. |
 
 ### Example Request
 

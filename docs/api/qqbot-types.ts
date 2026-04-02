@@ -36,6 +36,15 @@ export interface RecordTripRequest {
     distance?: number;
     stations?: string[] | { id: string; name: string }[];
     lines?: string[] | { id: string; name: string }[];
+    segments?: RouteSegment[]; // Accurate geographical segments for frontend rendering
+    svg_points?: string; // Pre-calculated SVG 'd' path string for badge generation
+}
+
+export interface RouteSegment {
+    id: string | number;
+    lineKey: string;
+    fromId: string;
+    toId: string;
 }
 
 /**

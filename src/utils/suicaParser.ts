@@ -144,13 +144,30 @@ export const processSuicaCSV = async (csvStr: string, railwayData: RailwayMap): 
                 }));
                 console.log(`[SuicaParser] Found route for: ${details.inStation} -> ${details.outStation} (${segments.length} segments)`);
             } else {
-                console.warn(`[SuicaParser] Could not find route for: ${details.inStation} -> ${details.outStation}. Error: ${routeResult?.error || 'Unknown'}. Falling back to single segment.`);
-                segments = [{
-                    id: Date.now().toString() + Math.random().toString(),
-                    lineKey: inMatch.lineKey,
-                    fromId: inMatch.stationId,
-                    toId: outMatch.stationId // Note: this might be across lines, so it's a fallback segment
-                }];
+                console.warn(`[SuicaParser] Could not find route for: ${details.inStation} -> ${details.outStation}. Error: ${routeResult?.error || 'Unknown'}. Falling back to unlinked segments.`);
+                if (inMatch.lineKey === outMatch.lineKey) {
+                    segments = [{
+                        id: Date.now().toString() + Math.random().toString(),
+                        lineKey: inMatch.lineKey,
+                        fromId: inMatch.stationId,
+                        toId: outMatch.stationId
+                    }];
+                } else {
+                    segments = [
+                        {
+                            id: Date.now().toString() + Math.random().toString(),
+                            lineKey: inMatch.lineKey,
+                            fromId: inMatch.stationId,
+                            toId: ''
+                        },
+                        {
+                            id: Date.now().toString() + Math.random().toString(),
+                            lineKey: outMatch.lineKey,
+                            fromId: '',
+                            toId: outMatch.stationId
+                        }
+                    ];
+                }
             }
 
             trips.push({

@@ -54,6 +54,7 @@ const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
 
 import { useUserData } from '../hooks/useUserData';
 import { processSuicaCSV } from '../utils/suicaParser';
+import toast from 'react-hot-toast';
 
 export const TripsPage: React.FC = () => {
     const { trips, railwayData, user, pins, folders, badgeSettings } = useStore(useShallow(state => ({
@@ -77,23 +78,38 @@ export const TripsPage: React.FC = () => {
         if (!file) return;
 
         const reader = new FileReader();
+        const toastId = toast.loading('解析 Suica CSV 数据...');
+
         reader.onload = async (e) => {
             const text = e.target?.result as string;
             if (text) {
-                const newTrips = await processSuicaCSV(text, railwayData);
-                if (newTrips.length > 0) {
-                    if (window.confirm(`成功解析 ${newTrips.length} 条行程。是否导入？`)) {
-                        newTrips.forEach(trip => addTrip(trip));
-                        if (user) {
-                            const updatedTrips = [...newTrips, ...trips].sort((a,b) => b.date.localeCompare(a.date));
-                            saveData(user.token, updatedTrips, pins, folders, badgeSettings).catch((err: any) => alert('云端同步失败'));
+                try {
+                    console.log("Started parsing Suica CSV...");
+                    const newTrips = await processSuicaCSV(text, railwayData);
+                    console.log(`Successfully mapped ${newTrips.length} trips.`);
+
+                    if (newTrips.length > 0) {
+                        toast.dismiss(toastId);
+                        if (window.confirm(`成功解析 ${newTrips.length} 条行程。是否导入？\n(按 F12 打开控制台查看详细匹配日志)`)) {
+                            newTrips.forEach(trip => addTrip(trip));
+                            toast.success(`导入了 ${newTrips.length} 条行程！`);
+                            if (user) {
+                                const updatedTrips = [...newTrips, ...trips].sort((a,b) => b.date.localeCompare(a.date));
+                                saveData(user.token, updatedTrips, pins, folders, badgeSettings).catch((err: any) => toast.error('云端同步失败'));
+                            }
                         }
+                    } else {
+                        toast.error('未找到可导入的行程，或者解析失败。', { id: toastId });
                     }
-                } else {
-                    alert('未找到可导入的行程，或者解析失败。');
+                } catch (error) {
+                    console.error("Error parsing Suica CSV:", error);
+                    toast.error('读取或解析文件出错。', { id: toastId });
                 }
             }
         };
+        reader.onerror = () => {
+            toast.error('读取文件失败', { id: toastId });
+        }
         reader.readAsText(file);
         // Reset the input value so the same file can be selected again
         event.target.value = '';

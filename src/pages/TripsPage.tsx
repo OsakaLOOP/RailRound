@@ -97,21 +97,26 @@ export const TripsPage: React.FC = () => {
             if (text) {
                 try {
                     console.log("Started parsing Suica CSV...");
-                    const newTrips = await processSuicaCSV(text, railwayData);
-                    console.log(`Successfully mapped ${newTrips.length} trips.`);
+                    const { newTrips, skippedCount } = await processSuicaCSV(text, railwayData, trips);
+                    console.log(`Successfully mapped ${newTrips.length} trips. Skipped ${skippedCount} duplicates.`);
 
                     if (newTrips.length > 0) {
                         toast.dismiss(toastId);
-                        if (window.confirm(`成功解析 ${newTrips.length} 条行程。是否导入？\n(按 F12 打开控制台查看详细匹配日志)`)) {
+                        const skipMsg = skippedCount > 0 ? `\n(已跳过 ${skippedCount} 条重复记录)` : '';
+                        if (window.confirm(`成功解析 ${newTrips.length} 条新行程。是否导入？${skipMsg}\n(按 F12 打开控制台查看详细匹配日志)`)) {
                             newTrips.forEach(trip => addTrip(trip));
-                            toast.success(`导入了 ${newTrips.length} 条行程！`);
+                            toast.success(`导入了 ${newTrips.length} 条行程！${skippedCount > 0 ? ` (跳过 ${skippedCount} 重复)` : ''}`);
                             if (user) {
                                 const updatedTrips = [...newTrips, ...trips].sort((a,b) => b.date.localeCompare(a.date));
                                 saveData(user.token, updatedTrips, pins, folders, badgeSettings).catch((err: any) => toast.error('云端同步失败'));
                             }
                         }
                     } else {
-                        toast.error('未找到可导入的行程，或者解析失败。', { id: toastId });
+                        if (skippedCount > 0) {
+                            toast.success(`解析完成，但所有记录（${skippedCount}条）已存在，无需重复导入。`, { id: toastId });
+                        } else {
+                            toast.error('未找到可导入的行程，或者解析失败。', { id: toastId });
+                        }
                     }
                 } catch (error) {
                     console.error("Error parsing Suica CSV:", error);

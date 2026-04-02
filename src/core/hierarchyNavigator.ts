@@ -41,20 +41,32 @@ export const searchGlobal = (keyword: string, railwayData: RailwayMap): GlobalSe
         const company = line.meta?.company || "未知";
         const lineName = lineKey.includes(':') ? lineKey.split(':').slice(1).join(':') : lineKey;
 
-        // 1. Match Company
-        if (!seenCompanies.has(company)) {
-            seenCompanies.add(company);
-            if (company.toLowerCase().includes(normalizedKeyword)) {
+        let companyMatched = false;
+
+        // 1. Check Company Match
+        if (company.toLowerCase().includes(normalizedKeyword)) {
+            companyMatched = true;
+            if (!seenCompanies.has(company)) {
+                seenCompanies.add(company);
                 result.companies.push(company);
             }
+            // Skip checking Line and Stations because the entire Company matched
+            return;
         }
 
-        // 2. Match Line (Match either the raw line name or the full Company:LineName key)
+        // Ensure seen companies are still tracked to avoid duplicates if they match later
+        if (!seenCompanies.has(company)) {
+            seenCompanies.add(company);
+        }
+
+        // 2. Check Line Match
         if (lineName.toLowerCase().includes(normalizedKeyword) || lineKey.toLowerCase().includes(normalizedKeyword)) {
             result.lines.push(lineKey);
+            // Skip checking Stations because the entire Line matched
+            return;
         }
 
-        // 3. Match Stations
+        // 3. Check Stations ONLY if neither Company nor Line matched
         if (line.stations && Array.isArray(line.stations)) {
             line.stations.forEach(station => {
                 if (station.name_ja.toLowerCase().includes(normalizedKeyword)) {

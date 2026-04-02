@@ -4,7 +4,8 @@
     "currentVersion": "0.41",
     "appName": "RailLOOP",
     "author": "@OsakaLOOP",
-    "minVer": "0.20"
+    "minVer": "0.20",
+    "forceDataReload": true
   },
   "logs": [
     {

@@ -35,5 +35,6 @@ dist-ssr
 .tef_dist/*
 dist.rar
 public/assets/company_logos/*
+public/assets/geojson_logos/*
 *.py
 *.bak

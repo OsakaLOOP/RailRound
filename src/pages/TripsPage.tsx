@@ -33,21 +33,21 @@ const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
         [segments, segmentGeometries, railwayData, geoData]
     );
 
-    if (visualPaths.length === 0) return null;
+    if (visualPaths.length === 0) return <div className="w-28 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">无预览</div>;
 
     const maxWidth = Math.max(0, containerWidth - 300);
     const shouldRotate = isMobile && widthPx > maxWidth && maxWidth > 0;
 
     return (
-        <div ref={containerRef} className="shrink-0 ml-2 border-l border-gray-50 flex flex-col items-end justify-center pl-2 gap-2 overflow-hidden" style={{ width: shouldRotate ? '40px' : '100px', maxWidth: '100px' }}>
-            <div style={{ width: shouldRotate ? heightPx : widthPx, height: shouldRotate ? widthPx : heightPx, maxWidth: '100%', maxHeight: '80px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden' }}>
-              <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="opacity-80" style={{ width: widthPx, height: heightPx, transform: shouldRotate ? 'rotate(90deg)' : 'none', transformOrigin: 'center right', flexShrink: 0 }}>
+        <div ref={containerRef} className="shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-end pl-2 gap-2" style={{ minWidth: shouldRotate ? '40px' : '100px' }}>
+            <div style={{ width: shouldRotate ? heightPx : widthPx, height: shouldRotate ? widthPx : heightPx, maxWidth: shouldRotate ? 'none' : '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="opacity-80" style={{ width: widthPx, height: heightPx, transform: shouldRotate ? 'rotate(90deg)' : 'none', transformOrigin: 'center center' }}>
                   {visualPaths.map((item: any, idx: number) => (
                       <path key={idx} d={item.path} fill="none" stroke={item.color || '#94a3b8'} strokeWidth="4" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
                   ))}
               </svg>
             </div>
-            <div className="text-[10px] font-bold text-gray-400 shrink-0 text-right w-full">{Math.round(totalDist)}km</div>
+            <div className="text-[10px] font-bold text-gray-400 shrink-0 text-right">{Math.round(totalDist)}km</div>
         </div>
     );
 };
@@ -110,7 +110,7 @@ export const TripsPage: React.FC = () => {
     };
 
     return (
-        <div className="flex-1 flex flex-col overflow-y-auto h-full p-4 space-y-3 pb-4">
+        <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4">
             {trips.length === 0 ? (
                 <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
                     <Train size={48} className="opacity-20 mb-4"/>
@@ -159,8 +159,13 @@ export const TripsPage: React.FC = () => {
                                         <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className={cls.btnDel}><Trash2 size={14}/></button>
                                     </div>
                                 </div>
+<<<<<<< HEAD
                                 <div className="relative z-10 flex flex-row">
                                     <div className="flex-1 space-y-2 relative overflow-hidden">
+=======
+                                <div className="flex flex-row">
+                                    <div className="flex-1 space-y-2 relative">
+>>>>>>> parent of 4585ee0 (fix: mobile viewport height and svg stretching layout)
                                         <div className="relative z-10 flex flex-col text-sm">
                                             <div className="flex items-center gap-2">
                                                 <MapPin size={14} className={`${cls.icon} shrink-0`}/>
@@ -176,9 +181,8 @@ export const TripsPage: React.FC = () => {
                     }
 
                     return (
-                        <div key={t.id} className="relative bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 overflow-hidden">
-                            <RouteSlice segments={segments} />
-                            <div className="relative z-10 flex justify-between mb-2 pb-2 border-b border-gray-50">
+                        <div key={t.id} className="bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1">
+                            <div className="flex justify-between mb-2 pb-2 border-b border-gray-50">
                                 <span className="text-xs font-bold text-gray-400">{t.date}</span>
                                 <div className="flex items-center gap-2">
                                     {(t.cost || 0) > 0 && <span className="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">¥{t.cost}</span>}
@@ -187,8 +191,13 @@ export const TripsPage: React.FC = () => {
                                     <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
                                 </div>
                             </div>
+<<<<<<< HEAD
                             <div className="relative z-10 flex flex-row">
                                 <div className="flex-1 space-y-2 relative overflow-hidden">
+=======
+                            <div className="flex flex-row">
+                                <div className="flex-1 space-y-2 relative">
+>>>>>>> parent of 4585ee0 (fix: mobile viewport height and svg stretching layout)
                                     {segments.length > 1 && <div className="absolute left-[5px] top-2 bottom-2 w-0.5 bg-gray-200 z-0"></div>}
                                     {segments.map((seg, idx) => {
                                         const line = railwayData[seg.lineKey];

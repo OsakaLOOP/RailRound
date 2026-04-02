@@ -235,6 +235,27 @@ export const FloatingActionButtons: React.FC<{
     const lastScrollYRef = useRef(0);
     const lastScrollTimeRef = useRef(Date.now());
 
+    const handleMouseEnter = () => {
+        if (alwaysVisible) return;
+        setIsVisible(true);
+        if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current);
+        }
+    };
+
+    const handleMouseLeave = () => {
+        if (alwaysVisible) return;
+        const container = document.getElementById('trips-scroll-container');
+        if (container && container.scrollHeight > container.clientHeight) {
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+            }
+            scrollTimeoutRef.current = setTimeout(() => {
+                setIsVisible(false);
+            }, 2000);
+        }
+    };
+
     useEffect(() => {
         if (alwaysVisible) {
             setIsVisible(true);
@@ -321,7 +342,11 @@ export const FloatingActionButtons: React.FC<{
 
     return (
         <div
-            className={`absolute bottom-4 left-4 right-4 z-50 transition-opacity duration-500 ease-in-out ${isVisible || alwaysVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+            className={`absolute bottom-4 left-4 right-4 z-50 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isVisible || alwaysVisible ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-8 scale-95 pointer-events-none'}`}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onTouchStart={handleMouseEnter}
+            onTouchEnd={handleMouseLeave}
         >
             <DropZone onDrop={(item: any) => {
                 if (item.type === 'station') {

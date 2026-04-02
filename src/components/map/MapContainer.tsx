@@ -682,10 +682,18 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 // @ts-ignore
                 layer._cachedWeight = targetWeight;
 
+                let startX = 0;
+                let startY = 0;
+
                 const handlePointerDown = (e: L.LeafletEvent | L.LeafletMouseEvent) => {
                     L.DomEvent.stopPropagation(e);
 
                     if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+
+                    const me = e as L.LeafletMouseEvent;
+                    const originalEvent = me.originalEvent as MouseEvent | TouchEvent;
+                    startX = 'clientX' in originalEvent ? originalEvent.clientX : (originalEvent as TouchEvent).touches[0].clientX;
+                    startY = 'clientY' in originalEvent ? originalEvent.clientY : (originalEvent as TouchEvent).touches[0].clientY;
 
                     wasDraggingRef.current = false;
                     map.dragging.disable(); // Immediately prevent map pan
@@ -726,6 +734,22 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     }, 300); // 300ms long press
                 };
 
+                const handlePointerMove = (e: L.LeafletEvent | L.LeafletMouseEvent) => {
+                    if (pressTimerRef.current && !routeDragRef.current.active) {
+                        const me = e as L.LeafletMouseEvent;
+                        const originalEvent = me.originalEvent as MouseEvent | TouchEvent;
+                        const currentX = 'clientX' in originalEvent ? originalEvent.clientX : (originalEvent as TouchEvent).touches[0].clientX;
+                        const currentY = 'clientY' in originalEvent ? originalEvent.clientY : (originalEvent as TouchEvent).touches[0].clientY;
+
+                        // 15px tolerance
+                        if (Math.abs(currentX - startX) > 15 || Math.abs(currentY - startY) > 15) {
+                            clearTimeout(pressTimerRef.current);
+                            pressTimerRef.current = null;
+                            map.dragging.enable();
+                        }
+                    }
+                };
+
                 const handlePointerUp = (e: L.LeafletEvent | L.LeafletMouseEvent) => {
                     if (pressTimerRef.current) {
                         clearTimeout(pressTimerRef.current);
@@ -740,19 +764,25 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
                 layer.on('mousedown', handlePointerDown);
                 layer.on('touchstart', handlePointerDown);
+                layer.on('mousemove', handlePointerMove);
+                layer.on('touchmove', handlePointerMove);
                 layer.on('mouseup', handlePointerUp);
                 layer.on('touchend', handlePointerUp);
 
                 layer.on('click', (e: L.LeafletMouseEvent) => {
                     L.DomEvent.stopPropagation(e);
-                    if (wasDraggingRef.current) {
-                        wasDraggingRef.current = false;
-                        return;
-                    }
 
                     const originalEvent = e.originalEvent as MouseEvent | TouchEvent;
                     const x = 'clientX' in originalEvent ? originalEvent.clientX : (originalEvent as TouchEvent).touches[0].clientX;
                     const y = 'clientY' in originalEvent ? originalEvent.clientY : (originalEvent as TouchEvent).touches[0].clientY;
+
+                    // If was dragged heavily, ignore click
+                    if (wasDraggingRef.current && (Math.abs(x - startX) > 15 || Math.abs(y - startY) > 15)) {
+                        wasDraggingRef.current = false;
+                        return;
+                    }
+                    wasDraggingRef.current = false;
+
                     setStationMenu({ x, y, stationData: { name_ja: f.properties.name || '', lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] } });
                 });
                 return layer;

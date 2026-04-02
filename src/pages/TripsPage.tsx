@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { Train, Edit2, Trash2, Star, Plus, MapPin } from 'lucide-react';
+import { Train, Edit2, Trash2, Star, Plus, MapPin, Upload } from 'lucide-react';
 import { useStore } from '../store';
 import { DropZone } from '../components/DragContext';
 import { getRouteVisualData } from '../core/tripCalculator';
@@ -53,6 +53,7 @@ const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
 };
 
 import { useUserData } from '../hooks/useUserData';
+import { processSuicaCSV } from '../utils/suicaParser';
 
 export const TripsPage: React.FC = () => {
     const { trips, railwayData, user, pins, folders, badgeSettings } = useStore(useShallow(state => ({
@@ -66,7 +67,37 @@ export const TripsPage: React.FC = () => {
     const setModalState = useStore(state => state.setModalState);
     const startEditingTrip = useStore(state => state.startEditingTrip);
     const removeTrip = useStore(state => state.removeTrip);
+    const addTrip = useStore(state => state.addTrip);
     const { saveData } = useUserData();
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImportSuica = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const text = e.target?.result as string;
+            if (text) {
+                const newTrips = await processSuicaCSV(text, railwayData);
+                if (newTrips.length > 0) {
+                    if (window.confirm(`成功解析 ${newTrips.length} 条行程。是否导入？`)) {
+                        newTrips.forEach(trip => addTrip(trip));
+                        if (user) {
+                            const updatedTrips = [...newTrips, ...trips].sort((a,b) => b.date.localeCompare(a.date));
+                            saveData(user.token, updatedTrips, pins, folders, badgeSettings).catch((err: any) => alert('云端同步失败'));
+                        }
+                    }
+                } else {
+                    alert('未找到可导入的行程，或者解析失败。');
+                }
+            }
+        };
+        reader.readAsText(file);
+        // Reset the input value so the same file can be selected again
+        event.target.value = '';
+    };
 
     const handleDeleteTrip = (id: string | number) => {
         if (confirm('确认删除?')) {
@@ -188,9 +219,15 @@ export const TripsPage: React.FC = () => {
                     startEditingTrip({ date: new Date().toISOString().split('T')[0], memo: '', segments: newSegments, cost: 0 });
                 }
             }}>
-                <button id="btn-add-trip" onClick={() => startEditingTrip()} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
-                    <Plus className="group-hover:rotate-90 transition-transform duration-300" size={18} /> 记录新行程
-                </button>
+                <div className="flex gap-2">
+                    <button id="btn-add-trip" onClick={() => startEditingTrip()} className="flex-1 py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
+                        <Plus className="group-hover:rotate-90 transition-transform duration-300" size={18} /> 记录新行程
+                    </button>
+                    <button onClick={() => fileInputRef.current?.click()} className="flex-none px-4 py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2" title="导入 Suica CSV">
+                        <Upload size={18} />
+                    </button>
+                    <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportSuica} />
+                </div>
             </DropZone>
         </div>
     );

@@ -546,7 +546,7 @@ export const AppLayout: React.FC = () => {
                     const totalToDownload = missingFiles.length;
                     const downloadTasks = missingFiles.map(async (fileName: string) => {
                         try {
-                            const res = await fetch(`/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}?v=${Date.now()}`);
+                            const res = await   `/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}?v=${Date.now()}`);
                             downloadedCount++;
                             const progress = 30 + Math.round((downloadedCount / totalToDownload) * 20); // Scale up to 50%
                             if (toastId) {

@@ -6,18 +6,23 @@ export const CachedTileLayer = L.TileLayer.extend({
     L.TileLayer.prototype.initialize.call(this, url, options);
     this._preloadingUrls = new Set();
     this.on('tileunload', this._onTileRemove, this);
+    this.on('load', this._onTilesLoad, this);
   },
 
   _onTileRemove: function(e) {
-    if (e.tile && e.tile._objectUrl) {
-      URL.revokeObjectURL(e.tile._objectUrl);
-      e.tile._objectUrl = null;
+    if (e.tile) {
+      e.tile._unloaded = true;
+      if (e.tile._objectUrl) {
+        URL.revokeObjectURL(e.tile._objectUrl);
+        e.tile._objectUrl = null;
+      }
     }
   },
 
   createTile: function (coords, done) {
     const tile = document.createElement('img');
     tile.setAttribute('role', 'presentation');
+    tile._unloaded = false;
 
     L.DomEvent.on(tile, 'load', L.bind(this._tileOnLoad, this, done, tile));
     L.DomEvent.on(tile, 'error', L.bind(this._tileOnError, this, done, tile));
@@ -30,6 +35,7 @@ export const CachedTileLayer = L.TileLayer.extend({
     const url = this.getTileUrl(coords);
 
     tileCache.get(url).then(blob => {
+      if (tile._unloaded) return;
       if (blob) {
         const objectUrl = URL.createObjectURL(blob);
         tile._objectUrl = objectUrl;
@@ -38,6 +44,7 @@ export const CachedTileLayer = L.TileLayer.extend({
         this._fetchAndCacheTile(url, tile);
       }
     }).catch(err => {
+      if (tile._unloaded) return;
       console.error('Error getting tile from cache', err);
       tile.src = url;
     });
@@ -55,7 +62,7 @@ export const CachedTileLayer = L.TileLayer.extend({
       })
       .then(blob => {
         tileCache.set(url, blob).catch(e => console.error("Failed to save tile to cache", e));
-        if (tileElement) {
+        if (tileElement && !tileElement._unloaded) {
           const objectUrl = URL.createObjectURL(blob);
           tileElement._objectUrl = objectUrl;
           tileElement.src = objectUrl;
@@ -63,13 +70,13 @@ export const CachedTileLayer = L.TileLayer.extend({
       })
       .catch(error => {
         // Fallback to regular src assignment on fetch error
-        if (tileElement) {
+        if (tileElement && !tileElement._unloaded) {
           tileElement.src = url;
         }
       });
   },
 
-  _update: function (center) {
+  _onTilesLoad: function () {
     if (!this._map) { return; }
 
     const map = this._map;
@@ -79,7 +86,9 @@ export const CachedTileLayer = L.TileLayer.extend({
       return;
     }
 
-    L.TileLayer.prototype._update.call(this, center);
+    if (this.isLoading && this.isLoading()) {
+      return;
+    }
 
     // Aggressive preloading (3x3 grid)
     const bounds = map.getPixelBounds();
@@ -106,12 +115,24 @@ export const CachedTileLayer = L.TileLayer.extend({
         const coords = new L.Point(i, j);
         coords.z = zoom;
 
+        // Skip tiles within the currently visible bounds (already loaded)
+        if (i >= tileBounds.min.x && i <= tileBounds.max.x &&
+            j >= tileBounds.min.y && j <= tileBounds.max.y) {
+            continue;
+        }
+
         if (this._isValidTile(coords)) {
             const wrappedCoords = this._wrapCoords(coords);
             const url = this.getTileUrl(wrappedCoords);
             if (!this._preloadingUrls.has(url)) {
                 this._preloadingUrls.add(url);
                 tileCache.get(url).then(blob => {
+                  // Check if visible tiles started loading again while we were querying IDB
+                  if (this.isLoading && this.isLoading()) {
+                      this._preloadingUrls.delete(url);
+                      return;
+                  }
+
                   if (!blob) {
                     fetch(url)
                       .then(response => {

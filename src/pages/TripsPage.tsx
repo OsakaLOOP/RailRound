@@ -35,19 +35,19 @@ const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
 
     if (visualPaths.length === 0) return null;
 
-    const maxWidth = Math.max(0, containerWidth - 200);
+    const maxWidth = Math.max(0, containerWidth - 300);
     const shouldRotate = isMobile && widthPx > maxWidth && maxWidth > 0;
 
     return (
-        <div ref={containerRef} className="absolute right-0 top-12 bottom-0 w-1/3 flex flex-col items-end justify-center pointer-events-none overflow-hidden pr-2 opacity-20">
-            <div style={{ width: shouldRotate ? heightPx : widthPx, height: shouldRotate ? widthPx : heightPx, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-              <svg viewBox="0 0 100 50" preserveAspectRatio="none" style={{ width: widthPx, height: heightPx, transform: shouldRotate ? 'rotate(90deg)' : 'none', transformOrigin: 'center right' }}>
+        <div ref={containerRef} className="shrink-0 ml-2 border-l border-gray-50 flex flex-col items-end justify-center pl-2 gap-2 overflow-hidden" style={{ width: shouldRotate ? '40px' : '100px', maxWidth: '100px' }}>
+            <div style={{ width: shouldRotate ? heightPx : widthPx, height: shouldRotate ? widthPx : heightPx, maxWidth: '100%', maxHeight: '80px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden' }}>
+              <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="opacity-80" style={{ width: widthPx, height: heightPx, transform: shouldRotate ? 'rotate(90deg)' : 'none', transformOrigin: 'center right', flexShrink: 0 }}>
                   {visualPaths.map((item: any, idx: number) => (
                       <path key={idx} d={item.path} fill="none" stroke={item.color || '#94a3b8'} strokeWidth="4" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
                   ))}
               </svg>
             </div>
-            <div className="absolute bottom-2 right-2 text-[10px] font-bold text-gray-600 opacity-100">{Math.round(totalDist)}km</div>
+            <div className="text-[10px] font-bold text-gray-400 shrink-0 text-right w-full">{Math.round(totalDist)}km</div>
         </div>
     );
 };
@@ -128,8 +128,8 @@ export const TripsPage: React.FC = () => {
                                         <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className={cls.btnDel}><Trash2 size={14}/></button>
                                     </div>
                                 </div>
-                                <div className="relative z-10 flex flex-row pointer-events-none">
-                                    <div className="flex-1 space-y-2 relative pointer-events-auto">
+                                <div className="relative z-10 flex flex-row">
+                                    <div className="flex-1 space-y-2 relative overflow-hidden">
                                         <div className="relative z-10 flex flex-col text-sm">
                                             <div className="flex items-center gap-2">
                                                 <MapPin size={14} className={`${cls.icon} shrink-0`}/>
@@ -156,8 +156,8 @@ export const TripsPage: React.FC = () => {
                                     <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
                                 </div>
                             </div>
-                            <div className="relative z-10 flex flex-row pointer-events-none">
-                                <div className="flex-1 space-y-2 relative pointer-events-auto">
+                            <div className="relative z-10 flex flex-row">
+                                <div className="flex-1 space-y-2 relative overflow-hidden">
                                     {segments.length > 1 && <div className="absolute left-[5px] top-2 bottom-2 w-0.5 bg-gray-200 z-0"></div>}
                                     {segments.map((seg, idx) => {
                                         const line = railwayData[seg.lineKey];
@@ -175,7 +175,7 @@ export const TripsPage: React.FC = () => {
                                         );
                                     })}
                                 </div>
-
+                                <RouteSlice segments={segments} />
                             </div>
                             {t.memo && <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded mt-3">{t.memo}</div>}
                         </div>

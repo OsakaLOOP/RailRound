@@ -1,5 +1,5 @@
 import { Trip, TripSegment, RailwayMap } from '../store';
-import { findRoute } from './railwayRouting';
+import { findRoute } from '../core/railwayRouting';
 
 export interface SuicaRow {
     no: string;

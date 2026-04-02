@@ -135,7 +135,7 @@ export const processSuicaCSV = async (csvStr: string, railwayData: RailwayMap): 
             let segments: TripSegment[] = [];
             const routeResult = findRoute(inMatch.lineKey, inMatch.stationId, outMatch.lineKey, outMatch.stationId, railwayData, 6);
 
-            if (routeResult) {
+            if (routeResult && !routeResult.error && routeResult.path) {
                 segments = routeResult.path.map((p: any) => ({
                     id: Date.now().toString() + Math.random().toString(),
                     lineKey: p.lineKey,
@@ -144,7 +144,7 @@ export const processSuicaCSV = async (csvStr: string, railwayData: RailwayMap): 
                 }));
                 console.log(`[SuicaParser] Found route for: ${details.inStation} -> ${details.outStation} (${segments.length} segments)`);
             } else {
-                console.warn(`[SuicaParser] Could not find route for: ${details.inStation} -> ${details.outStation}. Falling back to single segment.`);
+                console.warn(`[SuicaParser] Could not find route for: ${details.inStation} -> ${details.outStation}. Error: ${routeResult?.error || 'Unknown'}. Falling back to single segment.`);
                 segments = [{
                     id: Date.now().toString() + Math.random().toString(),
                     lineKey: inMatch.lineKey,

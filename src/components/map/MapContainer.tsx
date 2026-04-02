@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { useStore, PinMode, StationMenuData, CustomFeatureCollection, CustomGeoJSONFeature } from '../../store';
 import { findNearestPointOnLine } from '../../core/railwayRouting';
 import { syncLeafletLayerGroup } from '../../utils/leafletSync';
+import { cachedTileLayer } from '../../utils/CachedTileLayer';
 import { useShallow } from 'zustand/react/shallow';
 import toast from 'react-hot-toast';
 
@@ -134,9 +135,9 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     const initMap = () => {
         if (!mapRef.current || mapInstance.current ) return;
         const map = L.map(mapRef.current, { zoomControl: true, preferCanvas: true }).setView([35.68, 139.76], 10);
-        const light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { attribution: '© CARTO', subdomains: ['a','b','c','d'], maxZoom: 20 });
-        const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', subdomains: ['a','b','c','d'], maxZoom: 20 });
-        const rail = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 20, opacity: 0, attribution: '© OpenRailwayMap' });
+        const light = cachedTileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { attribution: '© CARTO', subdomains: ['a','b','c','d'], maxZoom: 20 });
+        const dark = cachedTileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', subdomains: ['a','b','c','d'], maxZoom: 20 });
+        const rail = cachedTileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 20, opacity: 0, attribution: '© OpenRailwayMap' });
         railLayerRef.current = rail;
 
         const handleTileError = (e: any) => {

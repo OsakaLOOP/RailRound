@@ -37,7 +37,22 @@ export default function MapComponent() {
     // --- Map Initialization ---
     useEffect(() => {
         if (!mapRef.current || mapInstance.current) return;
-        const map = L.map(mapRef.current, { zoomControl: true, preferCanvas: true }).setView([35.68, 139.76], 10);
+
+        let initialCenter = [35.68, 139.76]; // Default to Tokyo
+
+        try {
+            const prefStr = localStorage.getItem('rail_default_location_pref');
+            if (prefStr) {
+                const pref = JSON.parse(prefStr);
+                if (pref.mode === 'fixed' && pref.center) {
+                    initialCenter = pref.center;
+                }
+            }
+        } catch (e) {
+            console.error("Failed to parse location pref", e);
+        }
+
+        const map = L.map(mapRef.current, { zoomControl: true, preferCanvas: true }).setView(initialCenter, 10);
 
         const light = cachedTileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { attribution: '© CARTO', subdomains: 'abcd', maxZoom: 20, layerName: 'light' });
         const dark = cachedTileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', subdomains: 'abcd', maxZoom: 20, layerName: 'dark' });
@@ -195,6 +210,46 @@ export default function MapComponent() {
         // Refresh zoom visibility logic
         mapInstance.current.fire('zoomend');
     }, [geoData]);
+
+    // --- Dynamic Initial Center ---
+    useEffect(() => {
+        if (!mapInstance.current || !railwayData || !trips) return;
+
+        // This effect runs when railwayData and trips become available
+        // If the user's preference was 'latest', we pan to it now
+        try {
+            const prefStr = localStorage.getItem('rail_default_location_pref');
+
+            // Only pan once per app session to avoid moving user back continuously
+            // We use sessionStorage to track this so it resets on refresh
+            if (prefStr && !sessionStorage.getItem('rail_has_initial_panned')) {
+                const pref = JSON.parse(prefStr);
+                if (pref.mode === 'latest' && trips.length > 0) {
+                    const latestTrip = trips[0];
+                    if (latestTrip && latestTrip.segments && latestTrip.segments.length > 0) {
+                        const lastSegment = latestTrip.segments[latestTrip.segments.length - 1];
+                        const toId = lastSegment.toId;
+
+                        let foundCoord = null;
+                        for (const lineKey of Object.keys(railwayData)) {
+                            const st = railwayData[lineKey].stations.find(s => s.id === toId);
+                            if (st && st.lat && st.lng) {
+                                foundCoord = [st.lat, st.lng];
+                                break;
+                            }
+                        }
+
+                        if (foundCoord) {
+                            mapInstance.current.setView(foundCoord, 12, { animate: false });
+                            sessionStorage.setItem('rail_has_initial_panned', 'true');
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Failed to apply dynamic center", e);
+        }
+    }, [railwayData, trips]);
 
     // --- Render Trip Routes (Async) ---
     useEffect(() => {

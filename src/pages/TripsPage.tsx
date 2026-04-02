@@ -6,7 +6,7 @@ import { getRouteVisualData } from '../core/tripCalculator';
 import { isMobile } from 'react-device-detect';
 import { useShallow } from 'zustand/react/shallow';
 
-const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
+const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
     const { segmentGeometries, railwayData, geoData } = useStore(useShallow(state => ({
         segmentGeometries: state.segmentGeometries,
         railwayData: state.railwayData,
@@ -50,7 +50,19 @@ const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
             <div className="text-[10px] font-bold text-gray-400 shrink-0 text-right w-full">{Math.round(totalDist)}km</div>
         </div>
     );
-};
+}, (prevProps, nextProps) => {
+    // Custom comparison for segments array to avoid unnecessary re-renders
+    if (prevProps.segments === nextProps.segments) return true;
+    if (prevProps.segments?.length !== nextProps.segments?.length) return false;
+
+    return prevProps.segments.every((seg, idx) => {
+        const nextSeg = nextProps.segments[idx];
+        return seg.id === nextSeg.id &&
+               seg.lineKey === nextSeg.lineKey &&
+               seg.fromId === nextSeg.fromId &&
+               seg.toId === nextSeg.toId;
+    });
+});
 
 import { useUserData } from '../hooks/useUserData';
 import { processSuicaCSV } from '../utils/suicaParser';

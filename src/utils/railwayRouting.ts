@@ -1,4 +1,4 @@
-import { RailwayMap, CompanyMeta, Station } from '../store';
+import type { RailwayMap, CompanyMeta, Station } from '../store';
 import { calcDist } from './stats'; // Ensure calcDist is exported from here or a common math utility
 
 // 预构建的换乘站索引缓存

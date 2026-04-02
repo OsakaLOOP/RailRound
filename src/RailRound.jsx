@@ -22,7 +22,7 @@ import StationMenu from './components/StationMenu';
 import Tutorial from './components/Tutorial';
 import { api } from './services/api';
 import { db } from './utils/db';
-import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './utils/stats';
+import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './core/tripCalculator';
 import { VersionBadge } from './components/VersionBadge';
 import manifest from '../public/geojson_manifest.json';
 

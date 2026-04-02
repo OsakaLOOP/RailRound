@@ -1,5 +1,5 @@
 import type { RailwayMap, CompanyMeta, Station } from '../store';
-import { calcDist } from './stats'; // Ensure calcDist is exported from here or a common math utility
+import { calcDist } from '../core/tripCalculator'; // Ensure calcDist is exported from here or a common math utility
 
 // 预构建的换乘站索引缓存
 let stationNameIndexCache: Map<string, {lineKey: string, stationIndex: number}[]> | null = null;

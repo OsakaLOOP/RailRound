@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Train, Edit2, Trash2, Star, Plus, MapPin } from 'lucide-react';
 import { useStore } from '../store';
 import { DropZone } from '../components/DragContext';
-import { getRouteVisualData } from '../utils/stats';
+import { getRouteVisualData } from '../core/tripCalculator';
 import { isMobile } from 'react-device-detect';
 import { useShallow } from 'zustand/react/shallow';
 

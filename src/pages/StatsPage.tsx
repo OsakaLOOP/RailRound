@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Github, Folder, TrendingUp, Move } from 'lucide-react';
 import { useStore } from '../store';
-import { calcDist } from '../utils/stats';
+import { calcDist } from '../core/tripCalculator';
 import * as turf from '@turf/turf';
 import { useShallow } from 'zustand/react/shallow';
 

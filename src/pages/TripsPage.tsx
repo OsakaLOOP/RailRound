@@ -39,7 +39,7 @@ const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
     const shouldRotate = isMobile && widthPx > maxWidth && maxWidth > 0;
 
     return (
-        <div ref={containerRef} className="shrink-0 ml-2 border-l border-gray-50 flex flex-row items-center justify-end pl-2 gap-2" style={{ minWidth: shouldRotate ? '40px' : '100px' }}>
+        <div ref={containerRef} className="absolute right-2 top-1/2 -translate-y-1/2 z-0 opacity-20 pointer-events-none flex flex-row items-center justify-end gap-2" style={{ minWidth: shouldRotate ? '40px' : '100px' }}>
             <div style={{ width: shouldRotate ? heightPx : widthPx, height: shouldRotate ? widthPx : heightPx, maxWidth: shouldRotate ? 'none' : '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="opacity-80" style={{ width: widthPx, height: heightPx, transform: shouldRotate ? 'rotate(90deg)' : 'none', transformOrigin: 'center center' }}>
                   {visualPaths.map((item: any, idx: number) => (
@@ -47,7 +47,7 @@ const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
                   ))}
               </svg>
             </div>
-            <div className="text-[10px] font-bold text-gray-400 shrink-0 text-right">{Math.round(totalDist)}km</div>
+            <div className="text-[10px] font-bold text-gray-800 shrink-0 text-right opacity-100">{Math.round(totalDist)}km</div>
         </div>
     );
 };
@@ -110,7 +110,7 @@ export const TripsPage: React.FC = () => {
     };
 
     return (
-        <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4">
+        <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4 h-full">
             {trips.length === 0 ? (
                 <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
                     <Train size={48} className="opacity-20 mb-4"/>
@@ -159,8 +159,8 @@ export const TripsPage: React.FC = () => {
                                         <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className={cls.btnDel}><Trash2 size={14}/></button>
                                     </div>
                                 </div>
-                                <div className="flex flex-row">
-                                    <div className="flex-1 space-y-2 relative">
+                                <div className="relative z-10 flex flex-row">
+                                    <div className="flex-1 space-y-2 relative overflow-hidden">
                                         <div className="relative z-10 flex flex-col text-sm">
                                             <div className="flex items-center gap-2">
                                                 <MapPin size={14} className={`${cls.icon} shrink-0`}/>
@@ -186,8 +186,8 @@ export const TripsPage: React.FC = () => {
                                     <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
                                 </div>
                             </div>
-                            <div className="flex flex-row">
-                                <div className="flex-1 space-y-2 relative">
+                            <div className="relative z-10 flex flex-row">
+                                <div className="flex-1 space-y-2 relative overflow-hidden">
                                     {segments.length > 1 && <div className="absolute left-[5px] top-2 bottom-2 w-0.5 bg-gray-200 z-0"></div>}
                                     {segments.map((seg, idx) => {
                                         const line = railwayData[seg.lineKey];

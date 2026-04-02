@@ -99,7 +99,7 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
     // 2. Sorting function for Lines inside a Company
     const sortLines = (lines: SelectableLine[], companyName: string, companyLogo: string | null) => {
         const hasLineLogo = (lineKey: string) => {
-            const meta = railwayData[lineKey]?.meta || {};
+            const meta = (railwayData[lineKey] as any)?.meta || {};
             // If it has an icon and it is DIFFERENT from the company logo, it's a specific line logo
             if (meta.icon && companyLogo && meta.icon !== companyLogo) return true;
             return false;

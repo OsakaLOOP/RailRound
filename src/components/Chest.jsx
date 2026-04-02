@@ -20,7 +20,7 @@ const McSlotSvg = () => (
     </svg>
 );
 
-const Chest = ({ onDropItem }) => {
+const Chest = ({ onDropItem } = {}) => {
     const { isDragging } = useDrag();
     const [isOpen, setIsOpen] = useState(false); // Manual open state
     const [items, setItems] = useState([]);

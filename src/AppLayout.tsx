@@ -307,7 +307,7 @@ export const AppLayout: React.FC = () => {
             );
             }
             try {
-                const companyRes = await fetch('/company_data.json?v=${Date.now()}');
+                const companyRes = await fetch(`/company_data.json?v=${Date.now()}`);
                 if (companyRes.ok) {
                     const txt = await companyRes.text();
                     currentCompanyData = normalizeCompanyDataLogos(JSON.parse(txt.replace(/^\uFEFF/, '')));
@@ -355,7 +355,8 @@ export const AppLayout: React.FC = () => {
         );
             }
             try {
-                const dbInstance = await db.open();
+                const dbInstance: any = await db.open();
+                if (!dbInstance) throw new Error('[Autoload] Failed to open IndexedDB');
 
                 // 1. Load GeoJSON files
                 const txFiles = dbInstance.transaction(db.STORE_FILES, 'readonly');
@@ -366,8 +367,8 @@ export const AppLayout: React.FC = () => {
                     reqFiles.onerror = () => resolve([]);
                 });
                 // Attempt to read fully precompiled geoData & railwayData structures directly (FAST PATH)
-                let precompiledGeoData = null;
-                let precompiledRailwayData = null;
+                let precompiledGeoData: any = null;
+                let precompiledRailwayData: any = null;
                 try {
                     const txGeo = dbInstance.transaction(db.STORE_FILES, 'readonly');
                     const storeGeo = txGeo.objectStore(db.STORE_FILES);
@@ -503,7 +504,7 @@ export const AppLayout: React.FC = () => {
                     const totalToDownload = missingFiles.length;
                     const downloadTasks = missingFiles.map(async (fileName: string) => {
                         try {
-                            const res = await   `/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}?v=${Date.now()}`);
+                            const res = await fetch(`/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}?v=${Date.now()}`);
                             downloadedCount++;
                             const progress = 30 + Math.round((downloadedCount / totalToDownload) * 20); // Scale up to 50%
                             if (toastId) {
@@ -551,7 +552,11 @@ export const AppLayout: React.FC = () => {
             }
         } catch (err: any) {
             console.error('[Autoload] 致命网络错误, 跳过检查:', err);
-            if (toastId) toast.error(`初始化发生错误 - ${err.message}`, { id: toastId, duration: 3000 });
+            if (toastId) {
+                toast.error(`初始化发生错误 - ${err.message}`, { id: toastId, duration: 3000 });
+            } else {
+                toast.error(`初始化发生错误 - ${err.message}`, { duration: 3000 });
+            }
         }
 
         console.log('[Autoload] 初始化全部完成，应用就绪。');
@@ -579,7 +584,7 @@ export const AppLayout: React.FC = () => {
                                 </div>
                             </div>
                         ),
-                        { id: toastId, duration: Infinity }
+                        { id: toastId ?? undefined, duration: Infinity }
                     );
                 }
 

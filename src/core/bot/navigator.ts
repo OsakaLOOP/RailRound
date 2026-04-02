@@ -1,4 +1,4 @@
-import type { RailwayMap, Station } from '../store';
+import type { RailwayMap, Station } from '../../store';
 
 // ==========================================
 // Part 1: Global Fuzzy Search (Keyword -> Exact IDs)

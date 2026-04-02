@@ -70,10 +70,12 @@ export type CompanyName = string;
 export type CompanyCategory = 'JR' | 'CR' | 'Private' | 'City';
 
 export interface CompanyMeta {
+  company?: string;
   region: string;
   type: string;
   category?: CompanyCategory;
   logo: URLString | null;
+  icon?: URLString | null;
 }
 
 export interface Station {

@@ -91,12 +91,13 @@ export const TripEditor: React.FC = () => {
 
             const timer = setTimeout(() => {
                 // Create a basic walk trip
+                const walkType: 'tree' | 'ufo' = isTree ? 'tree' : 'ufo';
                 const walkTrip = {
                     date: form.date || new Date().toISOString().split('T')[0],
                     memo: isTree ? '🌲 环保少女教育成果 - 步行旅程' : '🛸 无限非概率驱动 - 步行旅程',
                     cost: 0,
                     isWalk: true,
-                    walkType: isTree ? 'tree' : 'ufo',
+                    walkType,
                     fromId: startStation,
                     toId: endStation,
                     lineKey: 'WALK',

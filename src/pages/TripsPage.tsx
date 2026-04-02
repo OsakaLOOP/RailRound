@@ -39,9 +39,9 @@ const RouteSlice: React.FC<{ segments: any[] }> = ({ segments }) => {
     const shouldRotate = isMobile && widthPx > maxWidth && maxWidth > 0;
 
     return (
-        <div ref={containerRef} className="absolute right-2 top-1/2 -translate-y-1/2 z-0 opacity-20 pointer-events-none flex flex-row items-center justify-end gap-2" style={{ minWidth: shouldRotate ? '40px' : '100px' }}>
+        <div ref={containerRef} className="absolute right-2 top-1/2 -translate-y-1/2 z-0 opacity-50 pointer-events-none flex flex-row items-center justify-end gap-2" style={{ minWidth: shouldRotate ? '40px' : '100px' }}>
             <div style={{ width: shouldRotate ? heightPx : widthPx, height: shouldRotate ? widthPx : heightPx, maxWidth: shouldRotate ? 'none' : '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="opacity-80" style={{ width: widthPx, height: heightPx, transform: shouldRotate ? 'rotate(90deg)' : 'none', transformOrigin: 'center center' }}>
+              <svg viewBox="0 0 100 50" preserveAspectRatio="none" style={{ width: widthPx, height: heightPx, transform: shouldRotate ? 'rotate(90deg)' : 'none', transformOrigin: 'center center' }}>
                   {visualPaths.map((item: any, idx: number) => (
                       <path key={idx} d={item.path} fill="none" stroke={item.color || '#94a3b8'} strokeWidth="4" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
                   ))}

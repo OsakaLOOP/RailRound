@@ -110,7 +110,8 @@ export const TripsPage: React.FC = () => {
     };
 
     return (
-        <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4 h-full">
+        <div className="relative h-full w-full flex flex-col overflow-hidden">
+            <div id="trips-scroll-container" className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-24">
             {trips.length === 0 ? (
                 <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
                     <Train size={48} className="opacity-20 mb-4"/>
@@ -212,17 +213,127 @@ export const TripsPage: React.FC = () => {
                     );
                 })
             )}
+            </div>
+            <FloatingActionButtons
+                fileInputRef={fileInputRef}
+                handleImportSuica={handleImportSuica}
+                startEditingTrip={startEditingTrip}
+                alwaysVisible={trips.length === 0}
+            />
+        </div>
+    );
+};
+
+export const FloatingActionButtons: React.FC<{
+    fileInputRef: React.RefObject<HTMLInputElement>,
+    handleImportSuica: (event: React.ChangeEvent<HTMLInputElement>) => void,
+    startEditingTrip: (data?: any) => void,
+    alwaysVisible?: boolean
+}> = ({ fileInputRef, handleImportSuica, startEditingTrip, alwaysVisible = false }) => {
+    const [isVisible, setIsVisible] = useState(true);
+    const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastScrollYRef = useRef(0);
+    const lastScrollTimeRef = useRef(Date.now());
+
+    useEffect(() => {
+        if (alwaysVisible) {
+            setIsVisible(true);
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+            }
+            return;
+        }
+
+        const handleScroll = (e: Event) => {
+            const target = e.target as HTMLElement;
+            if (!target) return;
+
+            const currentScrollY = target.scrollTop;
+            const currentTime = Date.now();
+
+            const timeDiff = currentTime - lastScrollTimeRef.current;
+            const scrollDiff = Math.abs(currentScrollY - lastScrollYRef.current);
+
+            if (timeDiff > 0) {
+                const speed = scrollDiff / timeDiff;
+                // Show buttons if scroll speed exceeds threshold
+                if (speed > 0.5) {
+                    setIsVisible(true);
+
+                    if (scrollTimeoutRef.current) {
+                        clearTimeout(scrollTimeoutRef.current);
+                    }
+
+                    scrollTimeoutRef.current = setTimeout(() => {
+                        setIsVisible(false);
+                    }, 2000); // Hide after 2 seconds of inactivity
+                }
+            }
+
+            lastScrollYRef.current = currentScrollY;
+            lastScrollTimeRef.current = currentTime;
+        };
+
+        const container = document.getElementById('trips-scroll-container');
+
+        // Also check if container is actually scrollable. If not scrollable, keep visible.
+        const checkScrollable = () => {
+            if (container) {
+                if (container.scrollHeight <= container.clientHeight) {
+                    setIsVisible(true);
+                    if (scrollTimeoutRef.current) {
+                        clearTimeout(scrollTimeoutRef.current);
+                    }
+                } else if (isVisible && !scrollTimeoutRef.current) {
+                    scrollTimeoutRef.current = setTimeout(() => {
+                        setIsVisible(false);
+                    }, 3000);
+                }
+            }
+        };
+
+        if (container) {
+            container.addEventListener('scroll', handleScroll);
+            // Run initial check
+            setTimeout(checkScrollable, 100);
+            window.addEventListener('resize', checkScrollable);
+        }
+
+        // Initial fade out timer (only if not empty and scrollable)
+        if (!alwaysVisible) {
+            scrollTimeoutRef.current = setTimeout(() => {
+                if (container && container.scrollHeight > container.clientHeight) {
+                    setIsVisible(false);
+                }
+            }, 3000);
+        }
+
+        return () => {
+            if (container) {
+                container.removeEventListener('scroll', handleScroll);
+            }
+            window.removeEventListener('resize', checkScrollable);
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+            }
+        };
+    }, [alwaysVisible]);
+
+    return (
+        <div
+            className={`absolute bottom-4 left-4 right-4 z-50 transition-opacity duration-500 ease-in-out ${isVisible || alwaysVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        >
             <DropZone onDrop={(item: any) => {
                 if (item.type === 'station') {
                     const newSegments = [{ id: Date.now().toString(), lineKey: item.lineKey, fromId: item.id, toId: '' }];
                     startEditingTrip({ date: new Date().toISOString().split('T')[0], memo: '', segments: newSegments, cost: 0 });
                 }
             }}>
-                <div className="flex gap-2">
-                    <button id="btn-add-trip" onClick={() => startEditingTrip()} className="flex-1 py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
+                <div className="flex gap-2 bg-white/90 backdrop-blur-sm p-2 rounded-2xl shadow-lg border border-gray-100">
+                    <button id="btn-add-trip" onClick={() => startEditingTrip()} className="flex-1 py-3 border-2 border-dashed border-gray-300 text-gray-500 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
                         <Plus className="group-hover:rotate-90 transition-transform duration-300" size={18} /> 记录新行程
                     </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="flex-none px-4 py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2" title="导入 Suica CSV">
+                    <button onClick={() => fileInputRef.current?.click()} className="flex-none px-4 py-3 border-2 border-dashed border-gray-300 text-gray-500 rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2" title="导入 Suica CSV">
                         <Upload size={18} />
                     </button>
                     <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportSuica} />

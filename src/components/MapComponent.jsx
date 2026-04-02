@@ -79,6 +79,11 @@ export default function MapComponent() {
         map.on('moveend', handleMapMove);
         map.on('zoomend', handleMapMove);
 
+        // Cleanup on unmount (closure reference to preloadTimeout)
+        map.on('unload', () => {
+             if (preloadTimeout) clearTimeout(preloadTimeout);
+        });
+
         // Layers
         baseLinesLayer.current = L.layerGroup(); // Not added initially
         baseStationsLayer.current = L.layerGroup().addTo(map);

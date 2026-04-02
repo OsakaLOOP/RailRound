@@ -69,9 +69,14 @@ export const CachedTileLayer = L.TileLayer.extend({
         const url = this.getTileUrl(coords);
         const cacheKey = `${this.layerName}_${coords.z}_${coords.x}_${coords.y}`;
 
+        // Store a flag on the tile to check if it has been removed before async ops finish
+        tile._isRemoved = false;
+
         // Attempt to load from cache
         getTile(cacheKey)
             .then(blob => {
+                if (tile._isRemoved) return; // Tile was removed before DB read finished
+
                 if (blob) {
                     const objectUrl = URL.createObjectURL(blob);
                     tile._objectUrl = objectUrl; // Store reference to revoke later
@@ -80,17 +85,20 @@ export const CachedTileLayer = L.TileLayer.extend({
                 // Fetch and cache with high priority since it's requested by createTile (visible)
                 queueFetch(url, cacheKey, 'high')
                         .then(newBlob => {
+                            if (tile._isRemoved) return; // Tile was removed before fetch finished
                             const objectUrl = URL.createObjectURL(newBlob);
                             tile._objectUrl = objectUrl;
                             tile.src = objectUrl;
                         })
                         .catch(() => {
+                            if (tile._isRemoved) return;
                             // Fallback to normal URL on fetch failure (though it might fail again)
                             tile.src = url;
                         });
                 }
             })
             .catch(() => {
+                if (tile._isRemoved) return;
                 // If IDB fails, fallback to normal URL
                 tile.src = url;
             });
@@ -100,9 +108,12 @@ export const CachedTileLayer = L.TileLayer.extend({
 
     _removeTile: function (key) {
         const tile = this._tiles[key].el;
-        if (tile && tile._objectUrl) {
-            URL.revokeObjectURL(tile._objectUrl);
-            delete tile._objectUrl;
+        if (tile) {
+            tile._isRemoved = true;
+            if (tile._objectUrl) {
+                URL.revokeObjectURL(tile._objectUrl);
+                delete tile._objectUrl;
+            }
         }
         L.TileLayer.prototype._removeTile.call(this, key);
     },

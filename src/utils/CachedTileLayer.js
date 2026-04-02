@@ -3,12 +3,20 @@ import { getTile, putTile } from './tileCache';
 
 const MAX_CONCURRENT_FETCHES = 6;
 let activeFetches = 0;
-const fetchQueue = [];
+let fetchQueue = [];
+
+export function clearPreloadQueue() {
+    // Keep only high priority (visible) tiles in the queue, discard preloads
+    fetchQueue = fetchQueue.filter(req => req.priority === 'high');
+}
 
 function processFetchQueue() {
     if (activeFetches >= MAX_CONCURRENT_FETCHES || fetchQueue.length === 0) {
         return;
     }
+
+    // Sort queue to prioritize visible tiles (high priority)
+    fetchQueue.sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1));
 
     const { url, cacheKey, resolve, reject } = fetchQueue.shift();
     activeFetches++;
@@ -31,9 +39,9 @@ function processFetchQueue() {
         });
 }
 
-function queueFetch(url, cacheKey) {
+function queueFetch(url, cacheKey, priority = 'high') {
     return new Promise((resolve, reject) => {
-        fetchQueue.push({ url, cacheKey, resolve, reject });
+        fetchQueue.push({ url, cacheKey, priority, resolve, reject });
         processFetchQueue();
     });
 }
@@ -69,8 +77,8 @@ export const CachedTileLayer = L.TileLayer.extend({
                     tile._objectUrl = objectUrl; // Store reference to revoke later
                     tile.src = objectUrl;
                 } else {
-                    // Fetch and cache
-                    queueFetch(url, cacheKey)
+                // Fetch and cache with high priority since it's requested by createTile (visible)
+                queueFetch(url, cacheKey, 'high')
                         .then(newBlob => {
                             const objectUrl = URL.createObjectURL(newBlob);
                             tile._objectUrl = objectUrl;
@@ -141,7 +149,7 @@ export const CachedTileLayer = L.TileLayer.extend({
 
                 getTile(cacheKey).then(blob => {
                     if (!blob) {
-                        queueFetch(url, cacheKey).catch(() => {});
+                        queueFetch(url, cacheKey, 'low').catch(() => {});
                     }
                 }).catch(() => {});
             }

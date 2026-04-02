@@ -6,7 +6,7 @@ import { PinEditor } from './PinEditor';
 import { FabButton } from './FabButton';
 import StationMenu from './StationMenu';
 import { findNearestPointOnLine } from '../utils/routeFinder';
-import { cachedTileLayer } from '../utils/CachedTileLayer';
+import { cachedTileLayer, clearPreloadQueue } from '../utils/CachedTileLayer';
 
 // Fix Leaflet icons (standard fix)
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
@@ -47,14 +47,37 @@ export default function MapComponent() {
         dark.addTo(map); rail.addTo(map);
         L.control.layers({ "标准 (light)": light, "暗色 (Dark)": dark }, { "详细配线图 (OpenRailwayMap)": rail }, { position: 'topright' }).addTo(map);
 
-        const preloadActiveLayers = () => {
-            if (map.hasLayer(light)) light.preloadTiles(map);
-            if (map.hasLayer(dark)) dark.preloadTiles(map);
-            if (map.hasLayer(rail)) rail.preloadTiles(map);
+        let preloadTimeout = null;
+
+        const handleMapMove = () => {
+            // Cancel any pending preloads from previous moves
+            clearPreloadQueue();
+            if (preloadTimeout) clearTimeout(preloadTimeout);
+
+            const attemptPreload = () => {
+                // Check if map is currently loading tiles for the visible area
+                const isAnyLoading =
+                    (map.hasLayer(light) && light.isLoading()) ||
+                    (map.hasLayer(dark) && dark.isLoading()) ||
+                    (map.hasLayer(rail) && rail.isLoading());
+
+                if (isAnyLoading) {
+                    // Wait and check again later if still loading main view
+                    preloadTimeout = setTimeout(attemptPreload, 500);
+                } else {
+                    // Main view is loaded, trigger preloads
+                    if (map.hasLayer(light)) light.preloadTiles(map);
+                    if (map.hasLayer(dark)) dark.preloadTiles(map);
+                    if (map.hasLayer(rail)) rail.preloadTiles(map);
+                }
+            };
+
+            // Give main viewport tiles a moment to start loading before checking status
+            preloadTimeout = setTimeout(attemptPreload, 300);
         };
 
-        map.on('moveend', preloadActiveLayers);
-        map.on('zoomend', preloadActiveLayers);
+        map.on('moveend', handleMapMove);
+        map.on('zoomend', handleMapMove);
 
         // Layers
         baseLinesLayer.current = L.layerGroup(); // Not added initially

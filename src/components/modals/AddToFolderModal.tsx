@@ -3,7 +3,7 @@ import { X, Star, CheckCircle2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
-import { calculateLatestStats } from '../../utils/stats';
+import { calculateLatestStats } from '../../core/tripCalculator';
 
 export const AddToFolderModal: React.FC = () => {
     const { isOpen, trip, folders, user, trips, pins, badgeSettings, segmentGeometries, railwayData, geoData } = useStore(useShallow(state => ({

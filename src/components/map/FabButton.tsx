@@ -22,7 +22,7 @@ export const FabButton: React.FC = () => {
             setPinMode(PinMode.Snap);
             if (editingPin) {
                 const railwayData = useStore.getState().railwayData;
-                import('../../utils/railwayRouting').then(({ findNearestPointOnLine }) => {
+                import('../../core/railwayRouting').then(({ findNearestPointOnLine }) => {
                     const snap = findNearestPointOnLine(railwayData, editingPin.lat, editingPin.lng);
                     setEditingPin({ ...editingPin, ...snap });
                 });

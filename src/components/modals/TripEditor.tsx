@@ -4,7 +4,7 @@ import { useStore, EditorMode } from '../../store';
 import { DropZone } from '../DragContext';
 import { LineSelector } from './LineSelector';
 import { GlobalSearchModal } from './GlobalSearchModal';
-import { isCompanyCompatible, getTransferableLines, findRoute } from '../../utils/railwayRouting'; // Will need to ensure these are typed
+import { isCompanyCompatible, getTransferableLines, findRoute } from '../../core/railwayRouting'; // Will need to ensure these are typed
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 

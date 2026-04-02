@@ -9,83 +9,81 @@ This guide is intended for developers building integrations (such as a QQ Bot us
 To ensure performance and scalability, the RailRound ecosystem is split into two main responsibilities:
 
 ### A. The Cloudflare Workers API (Lightweight)
-Our API endpoints (\`/api/qqbot/*\`) run on Cloudflare Pages Functions. These functions have strict CPU (often 10ms - 50ms) and Memory (128MB) limits.
+Our API endpoints (`/api/qqbot/*`) run on Cloudflare Pages Functions. These functions have strict CPU (often 10ms - 50ms) and Memory (128MB) limits.
 * **What it does:** Authenticates users via Keys/Hashes, reads/writes small JSON payloads to the KV store, and updates basic statistics.
 * **What it DOES NOT do:** It cannot parse 30MB GeoJSON files, calculate A* shortest paths across thousands of stations, or render PNG images via Canvas/WASM.
 
 ### B. The Bot Node.js Environment (Heavyweight)
 Your Bot runs in a persistent Node.js process with ample memory and CPU.
-* **What it does:** Downloads and caches the large static \`railway.json\` files, executes the A* routing algorithm, processes coordinates using \`@turf/turf\`, and generates images (e.g., SVG to PNG using \`resvg-js\`).
+* **What it does:** Downloads and caches the large static `railway.json` files, executes the A* routing algorithm, processes coordinates using `@turf/turf`, and generates images (e.g., SVG to PNG using `resvg-js`).
 * **What it DOES NOT do:** It does not own the user database; it pushes finished, calculated results back to the Cloudflare API.
 
 ---
 
 ## 2. Fetching the Foundation Data
 
-Since the API does not provide geographic paths directly, your Bot must download the latest static datasets from the RailRound public directory.
+We have refactored the data ingestion pipeline into a pure, environment-agnostic module. You can use our official `BotDataBuilder` to automatically pull the current `changelog.json`, parse `company.json`, download all required `GeoJSON` chunks, and stitch them into memory-ready objects—without writing any custom network or parsing logic.
 
-You should periodically (e.g., on bot startup or once a day) fetch these files:
+### Using the Builder
 
-* **Railway Data (Stations & Lines metadata):**
-  \`GET https://<your-domain>/data/railway.json\`
+Copy the following files into your Bot project:
+1. `src/core/parser.ts`
+2. `src/core/bot/botDataBuilder.ts`
 
-* **Geo Data (GeoJSON paths for drawing maps):**
-  \`GET https://<your-domain>/data/geoData.json\`
+```typescript
+import { BotDataBuilder } from './core/bot/botDataBuilder';
 
-### Data Caching Strategy (Example)
+async function initBot() {
+    // 1. Point the builder to the live RailRound domain
+    const builder = new BotDataBuilder('https://your-domain.com');
 
-\`\`\`typescript
-import axios from 'axios';
-import fs from 'fs/promises';
+    // 2. Automatically fetch, download, and parse all geospatial and metadata
+    console.log("Syncing database...");
+    const { railwayData, geoData, version } = await builder.build();
 
-const RAILWAY_URL = 'https://your-domain.com/data/railway.json';
+    console.log(`Successfully synced v${version}`);
 
-async function syncRailwayData() {
-    try {
-        const response = await axios.get(RAILWAY_URL);
-        await fs.writeFile('./local_cache/railway.json', JSON.stringify(response.data));
-        console.log("Railway data synced successfully.");
-    } catch (e) {
-        console.error("Failed to sync railway data", e);
-    }
+    // Save these globally in your bot's memory for routing and drawing
+    global.railwayData = railwayData;
+    global.geoData = geoData;
 }
-\`\`\`
+```
+
+*(Note: Ensure your Bot has access to the global `fetch` API available in Node 18+)*
 
 ---
 
 ## 3. Reusing the Core Routing Logic
 
-We have designed our core algorithm files to be **Isomorphic** (framework and environment agnostic). They do not rely on React, Zustand, or Browser APIs (\`window\`, \`localStorage\`).
+We have designed our core algorithm files to be **Isomorphic** (framework and environment agnostic). They do not rely on React, Zustand, or Browser APIs (`window`, `localStorage`).
 
-You can directly copy or import the following files into your Bot project:
-1. \`src/utils/railwayRouting.ts\` (Contains the Priority-First-Search \`findRoute\` algorithm).
-2. \`src/utils/stats.js\` (Contains the Haversine \`calcDist\` formula and GeoJSON slicing logic).
+You can directly copy or import the following files into your Bot project alongside the builder:
+1. `src/core/railwayRouting.ts` (Contains the Priority-First-Search `findRoute` algorithm).
+2. `src/core/tripCalculator.js` (Contains the Haversine `calcDist` formula and GeoJSON path computing tools).
 
 ### Example: Calculating a Route in Node.js
 
-Once you have the \`railway.json\` downloaded, you can load it into memory and pass it to the \`findRoute\` function:
+Once you have the `railwayData` built into memory using `BotDataBuilder`, you can calculate paths immediately:
 
-\`\`\`typescript
-import fs from 'fs';
-import { findRoute } from './railwayRouting'; // Your local copy of our routing file
+```typescript
+import { findRoute } from './core/railwayRouting';
+import { getRouteVisualData } from './core/tripCalculator';
 
-// 1. Load the pre-downloaded data
-const railwayDataRaw = fs.readFileSync('./local_cache/railway.json', 'utf-8');
-const railwayData = JSON.parse(railwayDataRaw);
+// Assuming global.railwayData exists from step 2
 
-// 2. Define Start and End
+// 1. Define Start and End
 const startLine = 'JR East:Yamanote Line';
 const startStId = 'Tokyo'; // Assuming IDs match names in this example
 const endLine = 'JR East:Chuo Line';
 const endStId = 'Shinjuku';
 
-// 3. Execute the algorithm
+// 2. Execute the algorithm
 const routeResult = findRoute(
     startLine,
     startStId,
     endLine,
     endStId,
-    railwayData,
+    global.railwayData,
     6 // Max transfers
 );
 
@@ -95,16 +93,24 @@ if (routeResult.error) {
     console.log("Route calculated in:", routeResult.estimatedTime, "minutes");
     console.log("Segments:", routeResult.segments);
 
+    // 3. (Optional) Get rendering coordinates for drawing a map
+    const { totalDist, visualPaths } = getRouteVisualData(
+        routeResult.segments,
+        {}, // Segment geometries cache (can be empty initially)
+        global.railwayData,
+        global.geoData
+    );
+
     // 4. Send the result to the Cloudflare API
     // POST /api/qqbot/record
-    // { "key": "...", "distance": routeResult.estimatedTime * speed_factor, ... }
+    // { "key": "...", "distance": totalDist, ... }
 }
-\`\`\`
+```
 
 ---
 
 ## 4. Best Practices
 
-1. **Keep Sync Intervals Reasonable:** \`railway.json\` does not change every minute. Fetching it once every 24 hours (or hooking into a webhook from our GitHub repo) is optimal.
-2. **Type Imports:** Notice that \`railwayRouting.ts\` uses \`import type\` for store definitions. You will need to either copy the type definitions from \`src/store/index.ts\` or mock them in your Bot's \`types.d.ts\`.
-3. **PNG Rendering:** Use libraries like \`satori\` or \`@resvg/resvg-js\` in your Node.js bot to turn the JSON/SVG output into flat PNG images for QQ users.
+1. **Keep Sync Intervals Reasonable:** Don't rebuild the data on every request. Building it once on startup and maybe once every 24 hours is optimal.
+2. **Type Imports:** Notice that `railwayRouting.ts` uses `import type` for store definitions. You will need to either copy the type definitions from `src/store/index.ts` or mock them in your Bot's `types.d.ts`.
+3. **PNG Rendering:** Use libraries like `satori` or `@resvg/resvg-js` in your Node.js bot to turn the JSON/SVG output into flat PNG images for QQ users.

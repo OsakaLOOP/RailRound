@@ -1,6 +1,6 @@
 import { useStore } from '../store';
 import { api } from '../services/api';
-import { calculateLatestStats } from '../utils/stats';
+import { calculateLatestStats } from '../core/tripCalculator';
 import { meta } from '../../public/changelog.json';
 
 const CURRENT_VERSION = meta["currentVersion"] || "1.0.0";

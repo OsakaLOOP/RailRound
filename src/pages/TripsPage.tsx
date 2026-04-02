@@ -159,13 +159,8 @@ export const TripsPage: React.FC = () => {
                                         <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className={cls.btnDel}><Trash2 size={14}/></button>
                                     </div>
                                 </div>
-<<<<<<< HEAD
-                                <div className="relative z-10 flex flex-row">
-                                    <div className="flex-1 space-y-2 relative overflow-hidden">
-=======
                                 <div className="flex flex-row">
                                     <div className="flex-1 space-y-2 relative">
->>>>>>> parent of 4585ee0 (fix: mobile viewport height and svg stretching layout)
                                         <div className="relative z-10 flex flex-col text-sm">
                                             <div className="flex items-center gap-2">
                                                 <MapPin size={14} className={`${cls.icon} shrink-0`}/>
@@ -191,13 +186,8 @@ export const TripsPage: React.FC = () => {
                                     <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
                                 </div>
                             </div>
-<<<<<<< HEAD
-                            <div className="relative z-10 flex flex-row">
-                                <div className="flex-1 space-y-2 relative overflow-hidden">
-=======
                             <div className="flex flex-row">
                                 <div className="flex-1 space-y-2 relative">
->>>>>>> parent of 4585ee0 (fix: mobile viewport height and svg stretching layout)
                                     {segments.length > 1 && <div className="absolute left-[5px] top-2 bottom-2 w-0.5 bg-gray-200 z-0"></div>}
                                     {segments.map((seg, idx) => {
                                         const line = railwayData[seg.lineKey];

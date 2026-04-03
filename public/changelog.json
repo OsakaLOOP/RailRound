@@ -1,18 +1,23 @@
 {
   "meta": {
     "lastUpdated": "2026-02-10",
-    "currentVersion": "0.41",
+    "currentVersion": "0.42",
     "appName": "RailLOOP",
     "author": "@OsakaLOOP",
     "minVer": "0.20",
     "forceDataReload": true
   },
   "logs": [
+    {"version": "0.43",
+      "date": "2026-04-15",
+      "type": "feat",
+      "content": ""
+    },
     {
       "version": "0.42",
       "date": "2026-04-03",
       "type": "feat",
-      "content": "切斯特初步可用化. 持续优化地图预加载. 新增了地图初始位置设定. "
+      "content": "切斯特初步可用化. 持续优化地图预加载. 新增了地图初始位置设定. 移动端交互逻辑持续修正中."
     },
     {
       "version": "0.41",

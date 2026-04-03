@@ -66,7 +66,7 @@ const Chest = ({ onDropItem } = {}) => {
             const dx = clientX - dragStartPos.current.x;
             const dy = clientY - dragStartPos.current.y;
 
-            if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+            if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
                 hasMoved.current = true;
             }
 

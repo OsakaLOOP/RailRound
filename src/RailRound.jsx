@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import  buildKMLString  from './buildKml';
@@ -29,6 +30,7 @@ import manifest from '../public/geojson_manifest.json';
 import { meta } from '../public/changelog.json';
 import { useStore } from './store';
 import toast from 'react-hot-toast';
+import { ESLint } from 'eslint';
 
 const CURRENT_VERSION = meta["currentVersion"];
 const LAST_MODIFIED = manifest.lastModified

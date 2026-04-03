@@ -422,13 +422,15 @@ export const FloatingActionButtons: React.FC<{
         };
     }, [alwaysVisible, isTutorialActive, isHovering]);
 
-    const scrollToTop = () => {
+    const scrollToTop = (e: React.MouseEvent<HTMLButtonElement>) => {
         document.getElementById('trips-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' });
+        e.currentTarget.blur();
     };
 
-    const scrollToBottom = () => {
+    const scrollToBottom = (e: React.MouseEvent<HTMLButtonElement>) => {
         const container = document.getElementById('trips-scroll-container');
         if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+        e.currentTarget.blur();
     };
 
     return (
@@ -436,12 +438,12 @@ export const FloatingActionButtons: React.FC<{
             {/* Scroll Buttons */}
             <div className={`flex flex-col gap-2 mr-2 transition-opacity duration-300 pointer-events-auto ${showScrollBtns ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 {scrollPos !== 'top' && (
-                    <button onClick={scrollToTop} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors">
+                    <button onClick={scrollToTop} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors active:scale-95 touch-manipulation">
                         <ArrowUp size={20} />
                     </button>
                 )}
                 {scrollPos !== 'bottom' && (
-                    <button onClick={scrollToBottom} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors">
+                    <button onClick={scrollToBottom} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors active:scale-95 touch-manipulation">
                         <ArrowDown size={20} />
                     </button>
                 )}

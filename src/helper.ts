@@ -1,4 +1,4 @@
-export const calcDist = (lat1, lon1, lat2, lon2) => {
+export const calcDist = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
   const R = 6371; 
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -8,14 +8,14 @@ export const calcDist = (lat1, lon1, lat2, lon2) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-export const isCompanyCompatible = (meta1, meta2) => {
+export const isCompanyCompatible = (meta1: any, meta2: any): boolean => {
   if (!meta1 || !meta2) return false;
   if (meta1.company === meta2.company && meta1.company !== "上传数据" && meta1.company !== "未知") return true;
   if (meta1.type === 'JR' && meta2.type === 'JR') return true;
   return false;
 };
 
-export const projectedPoint = (px, py, ax, ay, bx, by) => {
+export const projectedPoint = (px: number, py: number, ax: number, ay: number, bx: number, by: number): { x: number, y: number, t: number } => {
   const dx = bx - ax; const dy = by - ay;
   if (dx === 0 && dy === 0) return { x: ax, y: ay, t: 0 };
   let t = ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy);
@@ -23,7 +23,7 @@ export const projectedPoint = (px, py, ax, ay, bx, by) => {
   return { x: ax + t * dx, y: ay + t * dy, t: t };
 };
 
-export const stitchRoutes = (turf, multiCoords, startPt) => {
+export const stitchRoutes = (turf: any, multiCoords: any[], startPt: any): number[][] => {
   let pool = multiCoords.map((coords, i) => {
     if (!coords || coords.length < 2) return null;
     return {
@@ -165,7 +165,7 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng, tu
     }
 };
 
-export const NearestPoint = (railwayData, targetLat, targetLng) => {
+export const NearestPoint = (railwayData: any, targetLat: number, targetLng: number): { lat: number, lng: number, lineKey: string, percentage?: number } => {
   let minDistSq = Infinity;
   let bestPoint = { lat: targetLat, lng: targetLng, lineKey: '', percentage: 0 };
   Object.entries(railwayData).forEach(([lineKey, line]) => {
@@ -182,17 +182,26 @@ export const NearestPoint = (railwayData, targetLat, targetLng) => {
   return minDistSq > 0.01 ? { lat: targetLat, lng: targetLng, lineKey: '' } : bestPoint;
 };
 
+interface HeapNode {
+    key: string;
+    lineKey: string;
+    stId: string;
+    g: number;
+    f: number;
+}
+
 export class MinHeap {
+    heap: HeapNode[];
     constructor() { this.heap = []; }
-    push(node) {
+    push(node: HeapNode) {
         this.heap.push(node);
         this.bubbleUp(this.heap.length - 1);
     }
-    pop() {
+    pop(): HeapNode | null {
         if (this.heap.length === 0) return null;
         const top = this.heap[0];
         const bottom = this.heap.pop();
-        if (this.heap.length > 0) {
+        if (bottom && this.heap.length > 0) {
             this.heap[0] = bottom;
             this.sinkDown(0);
         }
@@ -200,7 +209,7 @@ export class MinHeap {
     }
     size() { return this.heap.length; }
     
-    bubbleUp(idx) {
+    bubbleUp(idx: number) {
         while (idx > 0) {
             const parentIdx = Math.floor((idx - 1) / 2);
             if (this.heap[parentIdx].f <= this.heap[idx].f) break;
@@ -208,12 +217,12 @@ export class MinHeap {
             idx = parentIdx;
         }
     }
-    sinkDown(idx) {
+    sinkDown(idx: number) {
         const length = this.heap.length;
         while (true) {
             let leftIdx = 2 * idx + 1;
             let rightIdx = 2 * idx + 2;
-            let swap = null;
+            let swap: number | null = null;
             if (leftIdx < length && this.heap[leftIdx].f < this.heap[idx].f) swap = leftIdx;
             if (rightIdx < length && this.heap[rightIdx].f < (swap === null ? this.heap[idx].f : this.heap[leftIdx].f)) swap = rightIdx;
             if (swap === null) break;
@@ -224,7 +233,7 @@ export class MinHeap {
 }
 
 
-export const findRoute = (startLineKey, startStId, endLineKey, endStId, railwayData, stationNameIndex) => {
+export const findRoute = (startLineKey: string, startStId: string, endLineKey: string, endStId: string, railwayData: any, stationNameIndex: any): any => {
 
     if (!startLineKey || !endLineKey || !railwayData) return { error: "数据未就绪或参数错误" };
     if (!stationNameIndex) return { error: "站点索引未构建" };
@@ -348,7 +357,7 @@ export const findRoute = (startLineKey, startStId, endLineKey, endStId, railwayD
 };
 
 // 路径重构
-export const reconstructPath = (cameFrom, currentKey, railwayData) => {
+export const reconstructPath = (cameFrom: Map<string, string>, currentKey: string, railwayData: any): any => {
     const rawPath = [currentKey];
     while (cameFrom.has(currentKey)) {
         currentKey = cameFrom.get(currentKey);

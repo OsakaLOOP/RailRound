@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Clock, GitCommit, Loader2, AlertCircle, MapPin } from 'lucide-react';
 
-const VersionBadge = ({ version: currentVersion }) => {
+const VersionBadge = ({ version: currentVersion }: any) => {
     const [isHovered, setIsHovered] = useState(false);
     const [showDot, setShowDot] = useState(false);
     const [show, setShow] = useState(false);

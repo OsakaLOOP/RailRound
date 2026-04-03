@@ -5,7 +5,7 @@ import { api } from '../services/api';
 
 
 // Custom Markdown Renderer
-const renderMarkdown = (text) => {
+const renderMarkdown = (text: string | null) => {
   if (!text) return null;
 
   const lines = text.split('\n');
@@ -193,7 +193,7 @@ const renderMarkdown = (text) => {
   return elements;
 };
 
-export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
+export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }: any) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

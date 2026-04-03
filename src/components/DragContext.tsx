@@ -5,7 +5,7 @@ import railBg from './../assets/rail_bg.png'
 // --- Global Drag Context ---
 const DragContext = createContext(null);
 
-export const DragProvider = ({ children }) => {
+export const DragProvider = ({ children }: any) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragItem, setDragItem] = useState(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });

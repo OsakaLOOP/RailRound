@@ -4,7 +4,7 @@ export const api = {
   // Export API_BASE for direct usage if needed
   API_BASE,
 
-  async register(username, password) {
+  async register(username: string, password?: string) {
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -15,7 +15,7 @@ export const api = {
     return data;
   },
 
-  async login(username, password) {
+  async login(username: string, password?: string) {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -26,7 +26,7 @@ export const api = {
     return data;
   },
 
-  async getData(token) {
+  async getData(token: string) {
     const res = await fetch(`${API_BASE}/user/data`, {
       method: 'GET',
       headers: {
@@ -39,7 +39,7 @@ export const api = {
     return data;
   },
 
-  async saveData(token, trips, pins, latest_5, version = null, folders = null, badge_settings = null) {
+  async saveData(token: string, trips: any[], pins: any[], latest_5: any[], version: string | null = null, folders: any | null = null, badge_settings: any | null = null) {
     const res = await fetch(`${API_BASE}/user/data`, {
       method: 'POST',
       headers: {
@@ -53,7 +53,7 @@ export const api = {
     return data;
   },
 
-  async completeGithubRegistration(username, password, reg_token) {
+  async completeGithubRegistration(username: string, password: string | undefined, reg_token: string) {
     const res = await fetch(`${API_BASE}/auth/complete_github_register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -64,7 +64,7 @@ export const api = {
     return data;
   },
 
-  initiateOAuth(provider, sessionToken = null) {
+  initiateOAuth(provider: string, sessionToken: string | null = null) {
     let url = `${API_BASE}/auth/oauth?provider=${provider}`;
     if (sessionToken) {
         url += `&session_token=${encodeURIComponent(sessionToken)}`;
@@ -72,7 +72,7 @@ export const api = {
     window.location.href = url;
   },
 
-  async getOrCreateCardKey(token) {
+  async getOrCreateCardKey(token: string) {
     const res = await fetch(`${API_BASE}/user/key`, {
         method: 'POST',
         headers: {

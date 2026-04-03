@@ -21,7 +21,7 @@ const McSlotSvg = () => (
     </svg>
 );
 
-const Chest = ({ onDropItem } = {}) => {
+const Chest = ({ onDropItem }: any = {}) => {
     const { isDragging: isGlobalDragging } = useDrag();
     const [isOpen, setIsOpen] = useState(false);
     const [items, setItems] = useState([]);
@@ -464,7 +464,7 @@ const Chest = ({ onDropItem } = {}) => {
     );
 };
 
-const ChestItem = ({ item, onRemove, onDragSuccess, pos}) => {
+const ChestItem = ({ item, onRemove, onDragSuccess, pos}: any) => {
     const { startDrag, isDragging, dragItem } = useDrag();
     const isHidden = isDragging && dragItem?.chestInstanceId === item.chestInstanceId;
 

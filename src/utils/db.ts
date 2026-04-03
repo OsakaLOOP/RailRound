@@ -4,16 +4,27 @@ const DB_VERSION = 1;
 const STORE_FILES = 'files';
 const STORE_SEGMENTS = 'segments';
 
-export const db = {
+interface DB {
+  dbPromise: Promise<IDBDatabase> | null;
+  open(): Promise<IDBDatabase>;
+  get(storeName: string, key: string): Promise<any>;
+  set(storeName: string, key: string, value: any): Promise<void>;
+  delete(storeName: string, key: string): Promise<void>;
+  clear(storeName: string): Promise<void>;
+  STORE_FILES: string;
+  STORE_SEGMENTS: string;
+}
+
+export const db: DB = {
   dbPromise: null,
 
-  open() {
+  open(): Promise<IDBDatabase> {
     if (this.dbPromise) return this.dbPromise;
 
     this.dbPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-      request.onupgradeneeded = (event) => {
+      request.onupgradeneeded = (event: any) => {
         const db = event.target.result;
         if (!db.objectStoreNames.contains(STORE_FILES)) {
           db.createObjectStore(STORE_FILES); // key: fileName
@@ -23,11 +34,11 @@ export const db = {
         }
       };
 
-      request.onsuccess = (event) => {
+      request.onsuccess = (event: any) => {
         resolve(event.target.result);
       };
 
-      request.onerror = (event) => {
+      request.onerror = (event: any) => {
         console.error('IndexedDB error:', event.target.error);
         reject(event.target.error);
       };
@@ -35,7 +46,7 @@ export const db = {
     return this.dbPromise;
   },
 
-  async get(storeName, key) {
+  async get(storeName: string, key: string): Promise<any> {
     const db = await this.open();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(storeName, 'readonly');
@@ -46,7 +57,7 @@ export const db = {
     });
   },
 
-  async set(storeName, key, value) {
+  async set(storeName: string, key: string, value: any): Promise<void> {
     const db = await this.open();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(storeName, 'readwrite');
@@ -57,7 +68,7 @@ export const db = {
     });
   },
 
-  async delete(storeName, key) {
+  async delete(storeName: string, key: string): Promise<void> {
     const db = await this.open();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(storeName, 'readwrite');
@@ -68,7 +79,7 @@ export const db = {
     });
   },
 
-  async clear(storeName) {
+  async clear(storeName: string): Promise<void> {
     const db = await this.open();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(storeName, 'readwrite');

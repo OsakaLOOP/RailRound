@@ -409,10 +409,24 @@
         }
 
         function getBlockEndpoints(b) {
-            if (b.type === 'merged' && b.merged.length) return { start: window.state.segmentDict[b.merged[0]].coords[0], end: window.state.segmentDict[b.merged[b.merged.length-1]].coords.slice(-1)[0] };
+            let upLeft = null, upRight = null, downLeft = null, downRight = null;
+            if (b.type === 'merged' && b.merged.length) {
+                upLeft = window.state.segmentDict[b.merged[0]].coords[0];
+                upRight = window.state.segmentDict[b.merged[b.merged.length-1]].coords.slice(-1)[0];
+                downLeft = upLeft;
+                downRight = upRight;
+                return { upLeft, upRight, downLeft, downRight };
+            }
             if (b.type === 'split') {
-                if (b.up.length) return { start: window.state.segmentDict[b.up[0]].coords[0], end: window.state.segmentDict[b.up[b.up.length-1]].coords.slice(-1)[0] };
-                if (b.down.length) return { start: window.state.segmentDict[b.down[b.down.length-1]].coords.slice(-1)[0], end: window.state.segmentDict[b.down[0]].coords[0] };
+                if (b.up.length) {
+                    upLeft = window.state.segmentDict[b.up[0]].coords[0];
+                    upRight = window.state.segmentDict[b.up[b.up.length-1]].coords.slice(-1)[0];
+                }
+                if (b.down.length) {
+                    downLeft = window.state.segmentDict[b.down[b.down.length-1]].coords.slice(-1)[0];
+                    downRight = window.state.segmentDict[b.down[0]].coords[0];
+                }
+                if (upLeft || downLeft) return { upLeft, upRight, downLeft, downRight };
             }
             return null;
         }
@@ -505,13 +519,50 @@
             window.state.blocks.forEach((b, idx) => {
                 const endpoints = getBlockEndpoints(b);
                 if (prevEnd && endpoints) {
-                    const d = getDistance(prevEnd, endpoints.start);
-                    if (d > MERGE_TOLERANCE) {
-                        blocksHtml += `<div class="text-center -my-2 relative z-20"><span class="bg-red-500 text-white px-3 py-0.5 rounded-full text-[10px] font-bold shadow-md tracking-tighter">间距: ${(d/1000).toFixed(2)}km</span></div>`;
-                        if (redrawMap) window.gapLayers.push(L.polyline([[prevEnd[1], prevEnd[0]], [endpoints.start[1], endpoints.start[0]]], {color:'#ef4444', weight:3, dashArray:'5,5'}).addTo(window.map));
+                    // Check up connection
+                    const prevUpEnd = prevEnd.upRight;
+                    const curUpStart = endpoints.upLeft;
+                    let dUp = 0;
+                    let hasUpGap = false;
+                    if (prevUpEnd && curUpStart) {
+                        dUp = getDistance(prevUpEnd, curUpStart);
+                        if (dUp > MERGE_TOLERANCE) {
+                            hasUpGap = true;
+                            if (redrawMap) window.gapLayers.push(L.polyline([[prevUpEnd[1], prevUpEnd[0]], [curUpStart[1], curUpStart[0]]], {color:'#ef4444', weight:3, dashArray:'5,5'}).addTo(window.map));
+                        }
+                    }
+
+                    // Check down connection
+                    const prevDownEnd = prevEnd.downRight;
+                    const curDownStart = endpoints.downLeft;
+                    let dDown = 0;
+                    let hasDownGap = false;
+                    if (prevDownEnd && curDownStart) {
+                        dDown = getDistance(prevDownEnd, curDownStart);
+                        if (dDown > MERGE_TOLERANCE) {
+                            hasDownGap = true;
+                            if (redrawMap) window.gapLayers.push(L.polyline([[prevDownEnd[1], prevDownEnd[0]], [curDownStart[1], curDownStart[0]]], {color:'#ef4444', weight:3, dashArray:'5,5'}).addTo(window.map));
+                        }
+                    }
+
+                    if (hasUpGap || hasDownGap) {
+                        let gapText = '';
+                        if (hasUpGap && hasDownGap) {
+                            // If both gaps exist, display them. If they are very similar, maybe display once, but better to display both for clarity or merged if identical.
+                            if (Math.abs(dUp - dDown) < 1) {
+                                gapText = `上下行间距: ${(dUp/1000).toFixed(2)}km`;
+                            } else {
+                                gapText = `上行: ${(dUp/1000).toFixed(2)}km | 下行: ${(dDown/1000).toFixed(2)}km`;
+                            }
+                        } else if (hasUpGap) {
+                            gapText = `上行间距: ${(dUp/1000).toFixed(2)}km`;
+                        } else if (hasDownGap) {
+                            gapText = `下行间距: ${(dDown/1000).toFixed(2)}km`;
+                        }
+                        blocksHtml += `<div class="text-center -my-2 relative z-20"><span class="bg-red-500 text-white px-3 py-0.5 rounded-full text-[10px] font-bold shadow-md tracking-tighter">${gapText}</span></div>`;
                     }
                 }
-                if(endpoints) prevEnd = endpoints.end;
+                if(endpoints) prevEnd = endpoints;
 
                 const trackHtml = b.type === 'merged' ? 
                     `<div class="drop-zone p-2 space-y-1 bg-purple-50/30" data-type="merged" data-block="${b.id}" ondragover="handleDragOver(event)" ondrop="handleDrop(event)">${renderSegmentList(b.merged, 'merged')}</div>` :

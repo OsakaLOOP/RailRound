@@ -37,7 +37,9 @@ export const searchGlobal = (keyword: string, railwayData: RailwayMap): GlobalSe
 
     const seenCompanies = new Set<string>();
 
-    Object.entries(railwayData).forEach(([lineKey, line]) => {
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        const line = railwayData[lineKey];
         const company = line.meta?.company || "未知";
         const lineName = lineKey.includes(':') ? lineKey.split(':').slice(1).join(':') : lineKey;
 
@@ -51,7 +53,7 @@ export const searchGlobal = (keyword: string, railwayData: RailwayMap): GlobalSe
                 result.companies.push(company);
             }
             // Skip checking Line and Stations because the entire Company matched
-            return;
+            continue;
         }
 
         // Ensure seen companies are still tracked to avoid duplicates if they match later
@@ -63,7 +65,7 @@ export const searchGlobal = (keyword: string, railwayData: RailwayMap): GlobalSe
         if (lineName.toLowerCase().includes(normalizedKeyword) || lineKey.toLowerCase().includes(normalizedKeyword)) {
             result.lines.push(lineKey);
             // Skip checking Stations because the entire Line matched
-            return;
+            continue;
         }
 
         // 3. Check Stations ONLY if neither Company nor Line matched
@@ -79,7 +81,7 @@ export const searchGlobal = (keyword: string, railwayData: RailwayMap): GlobalSe
                 }
             });
         }
-    });
+    }
 
     return result;
 };
@@ -95,11 +97,13 @@ export const searchGlobal = (keyword: string, railwayData: RailwayMap): GlobalSe
  */
 export const getLinesByCompany = (exactCompany: string, railwayData: RailwayMap): string[] => {
     const lines: string[] = [];
-    Object.entries(railwayData).forEach(([lineKey, line]) => {
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        const line = railwayData[lineKey];
         if (line.meta?.company === exactCompany) {
             lines.push(lineKey);
         }
-    });
+    }
     return lines;
 };
 

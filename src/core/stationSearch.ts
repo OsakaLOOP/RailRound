@@ -30,7 +30,9 @@ export const searchStations = (
     // Optimize: prevent returning thousands of single-letter matches
     if (normalizedQuery.length < 2) return [];
 
-    for (const [lineKey, line] of Object.entries(railwayData)) {
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        const line = railwayData[lineKey];
         if (!line.stations || !Array.isArray(line.stations)) continue;
 
         const company = line.meta?.company || "未知";

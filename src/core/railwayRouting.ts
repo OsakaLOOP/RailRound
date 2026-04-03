@@ -18,7 +18,9 @@ export const buildStationIndex = (railwayData: RailwayMap) => {
     }
 
     const index = new Map<string, {lineKey: string, stationIndex: number}[]>();
-    for (const [lineKey, line] of Object.entries(railwayData)) {
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        const line = railwayData[lineKey];
         line.stations.forEach((st, idx) => {
             if (!index.has(st.name_ja)) {
                 index.set(st.name_ja, []);
@@ -48,16 +50,17 @@ export const getTransferableLines = (station: Station | undefined, currentLineKe
         });
     }
 
-    Object.keys(railwayData).forEach(lineKey => {
-        if (lineKey === currentLineKey) return;
-        if (validLines.has(lineKey)) return;
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        if (lineKey === currentLineKey) continue;
+        if (validLines.has(lineKey)) continue;
         const nextMeta = railwayData[lineKey].meta;
         const sameNameStation = railwayData[lineKey].stations.find(s => s.name_ja === station.name_ja);
         if (sameNameStation) {
             const dist = calcDist(station.lat, station.lng, sameNameStation.lat, sameNameStation.lng);
             if (dist < 2.0) validLines.add(lineKey);
         }
-    });
+    }
     return Array.from(validLines);
 };
 
@@ -343,9 +346,11 @@ export const findNearestPointOnLine = (railwayData: RailwayMap, targetLat: numbe
     let minDistSq = Infinity;
     let bestPoint = { lat: targetLat, lng: targetLng, lineKey: '', percentage: 0 };
 
-    Object.entries(railwayData).forEach(([lineKey, line]) => {
+    for (const lineKey in railwayData) {
+      if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+      const line = railwayData[lineKey];
       const stations = line.stations;
-      if (!stations || stations.length < 2) return;
+      if (!stations || stations.length < 2) continue;
 
       for (let i = 0; i < stations.length - 1; i++) {
         const A = stations[i];
@@ -364,7 +369,7 @@ export const findNearestPointOnLine = (railwayData: RailwayMap, targetLat: numbe
           };
         }
       }
-    });
+    }
 
     // 阈值检查 (约 10km)
     if (minDistSq > 0.01) {

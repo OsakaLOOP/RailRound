@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useDrag } from './DragContext';
 import { X } from 'lucide-react';
+import railBg from './../assets/rail_bg.png'
 
 const McSlotSvg = ({ className = "" }) => (
     <svg
@@ -147,7 +148,7 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                                     <div className="absolute inset-0 z-10 p-1 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-white/10 transition-colors">
                                         <div className="relative w-full h-full flex items-center justify-center">
                                             {/* Rail (as requested, floating on rail) */}
-                                            <img src="/src/assets/rail_bg.png" className="absolute inset-0 w-full h-full object-contain pixelated opacity-80" alt="" />
+                                            <img src={railBg} className="absolute inset-0 w-full h-full object-contain pixelated opacity-80" alt="" />
 
                                             {/* Icon */}
                                             {(line.icon || line.logo) && (

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { isMobile } from 'react-device-detect';
-
+import railBg from './../assets/rail_bg.png'
 // --- Global Drag Context ---
 const DragContext = createContext(null);
 
@@ -127,7 +127,7 @@ const DragOverlay = ({ item, pos }) => {
             className="animate-pop-in filter drop-shadow-xl"
         >
             <div className="relative w-full h-full">
-                <img src="/src/assets/rail_bg.png" alt="" className="w-full h-full object-contain pixelated" />
+                <img src={railBg} alt="" className="w-full h-full object-contain pixelated" />
                 {item.logo && (
                     <img
                         src={item.logo}

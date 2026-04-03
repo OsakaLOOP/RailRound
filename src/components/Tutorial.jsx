@@ -202,10 +202,10 @@ const Tutorial = ({
         const citySelectorDone = localStorage.getItem('rail_city_selector_done');
 
         if (skipped === 'true' || user) {
-            if (!citySelectorDone && !user) {
-                setStep(-3); // Show City Selector if skipped but not done
+            if (!citySelectorDone) {
+                setStep(-3); // Show City Selector if skipped/logged in but not done
             } else {
-                setStep(-2); // Skipped
+                setStep(-2); // Completely skipped
             }
             return;
         }
@@ -220,7 +220,10 @@ const Tutorial = ({
 
     // Step Transition Logic & Rect Calculation
     useEffect(() => {
-        if (step < 0 || step >= STEPS.length) return;
+        if (step < 0 || step >= STEPS.length) {
+            setRect(null);
+            return;
+        }
 
         const currentStep = STEPS[step];
 
@@ -401,7 +404,7 @@ const Tutorial = ({
         return <DefaultCitySelector isOpen={true} onComplete={handleCitySelectorComplete} />;
     }
 
-    if (!isVisible || step < 0) return null;
+    if (!isVisible || step < 0 || step >= STEPS.length) return null;
 
     const currentStep = STEPS[step];
 

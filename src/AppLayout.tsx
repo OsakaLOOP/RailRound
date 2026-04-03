@@ -1040,6 +1040,18 @@ export const AppLayout: React.FC = () => {
                 <FolderManagerModal />
                 <AddToFolderModal />
 
+                <Tutorial
+                    activeTab={activeTab}
+                    setActiveTab={(t: any) => useStore.getState().setActiveTab(t)}
+                    isTripEditing={useStore.getState().isTripEditorOpen}
+                    setIsTripEditing={(b: boolean) => setModalState({ isTripEditorOpen: b })}
+                    isLoginOpen={isLoginOpen}
+                    setIsLoginOpen={(b: boolean) => setModalState({ isLoginOpen: b })}
+                    user={user}
+                    pinMode={useStore.getState().pinMode}
+                    editorMode={useStore.getState().editorMode}
+                />
+
                 {stationMenu && (
                     <StationMenu
                         position={stationMenu}

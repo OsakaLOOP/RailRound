@@ -319,6 +319,7 @@ const Chest = ({ onDropItem } = {}) => {
                                         item={item}
                                         onRemove={() => removeStack(getStackId(item))}
                                         onDragSuccess={() => commitDragRemove(item)}
+                                        className="w-12 h-12"
                                     />
                                 ))}
                             </div>
@@ -390,8 +391,8 @@ const Chest = ({ onDropItem } = {}) => {
 
                             {/* Bottom Button */}
                             <button
-                                className={`absolute bottom-2 right-2 z-30 w-28 h-12 rounded-lg bg-blue-600/90 text-blue-50 border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-300
-                                    ${(ticketStart && ticketEnd) ? 'border-blue-700 opacity-100 shadow-md hover:bg-blue-600 hover:scale-105' : 'border-dashed border-blue-400 bg-transparent opacity-50 cursor-not-allowed text-blue-600'}
+                                className={`absolute bottom-2 right-2 z-30 w-28 h-12 rounded-lg text-blue-500 border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-300
+                                    ${(ticketStart && ticketEnd) ? 'border-blue-700 opacity-100 shadow-md hover:scale-105' : 'border-dashed border-blue-400 bg-transparent opacity-50 cursor-not-allowed text-blue-50'}
                                     ${isStamping ? 'stamp-animation' : ''}
                                 `}
                                 style={{
@@ -401,7 +402,7 @@ const Chest = ({ onDropItem } = {}) => {
                                 onClick={triggerAutoRoute}
                             >
                                 <span className="text-[10px] tracking-[0.2em] font-bold leading-none mb-1">乗車記念</span>
-                                <div className="w-20 h-px bg-current opacity-50 mb-1"></div>
+                                <div className="w-20 h-px bg-current mb-1"></div>
                                 <span className="text-[12px] tracking-[0.3em] font-bold leading-none">使用済</span>
                             </button>
                         </div>
@@ -428,7 +429,7 @@ const Chest = ({ onDropItem } = {}) => {
     );
 };
 
-const ChestItem = ({ item, onRemove, onDragSuccess }) => {
+const ChestItem = ({ item, onRemove, onDragSuccess}) => {
     const { startDrag, isDragging, dragItem } = useDrag();
     const isHidden = isDragging && dragItem?.chestInstanceId === item.chestInstanceId;
 
@@ -446,7 +447,7 @@ const ChestItem = ({ item, onRemove, onDragSuccess }) => {
 
     return (
         <div
-            className="w-full h-full relative group"
+            className="relative group w-12 h-12"
             onMouseDown={handleDragStart}
             onTouchStart={handleDragStart}
         >

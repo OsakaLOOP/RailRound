@@ -136,7 +136,7 @@ export const StatsPage: React.FC = () => {
                             {userProfile?.bindings?.github ? (
                                 <span className="flex items-center gap-1 text-emerald-600"><Github size={12}/> GitHub 已绑定 ({userProfile.bindings.github.login})</span>
                             ) : (
-                                <button onClick={() => window.open('/api/oauth/github', '_self')} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white rounded text-xs font-bold hover:bg-black transition-colors"><Github size={12}/> 绑定 GitHub</button>
+                                <button onClick={() => window.open('/api/oauth?provider=github', '_self')} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white rounded text-xs font-bold hover:bg-black transition-colors"><Github size={12}/> 绑定 GitHub</button>
                             )}
                         </div>
                     </div>

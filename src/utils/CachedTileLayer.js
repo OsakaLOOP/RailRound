@@ -5,8 +5,33 @@ export const CachedTileLayer = L.TileLayer.extend({
   initialize: function (url, options) {
     L.TileLayer.prototype.initialize.call(this, url, options);
     this._preloadingUrls = new Set();
+    this._memoryCache = new Map(); // Simple LRU in-memory cache
+    this._maxMemoryCacheSize = 150; // Max tiles to keep in memory
     this.on('tileunload', this._onTileRemove, this);
     this.on('load', this._onTilesLoad, this);
+  },
+
+  _cacheInMemory: function(url, blob, objectUrl = null) {
+      if (this._memoryCache.has(url)) {
+          // Refresh position (LRU)
+          const existing = this._memoryCache.get(url);
+          this._memoryCache.delete(url);
+          this._memoryCache.set(url, existing);
+          return existing.objectUrl;
+      } else {
+          if (this._memoryCache.size >= this._maxMemoryCacheSize) {
+              // Evict oldest
+              const firstKey = this._memoryCache.keys().next().value;
+              const evicted = this._memoryCache.get(firstKey);
+              this._memoryCache.delete(firstKey);
+              if (evicted && evicted.objectUrl) {
+                  URL.revokeObjectURL(evicted.objectUrl);
+              }
+          }
+          const finalObjectUrl = objectUrl || URL.createObjectURL(blob);
+          this._memoryCache.set(url, { blob, objectUrl: finalObjectUrl });
+          return finalObjectUrl;
+      }
   },
 
   onAdd: function(map) {
@@ -20,6 +45,12 @@ export const CachedTileLayer = L.TileLayer.extend({
     map.off('movestart zoomstart', this._abortPrefetch, this);
     map.off('moveend', this._onTilesLoad, this);
     this._abortPrefetch();
+    if (this._memoryCache) {
+        for (const item of this._memoryCache.values()) {
+            if (item.objectUrl) URL.revokeObjectURL(item.objectUrl);
+        }
+        this._memoryCache.clear();
+    }
     L.TileLayer.prototype.onRemove.call(this, map);
   },
 
@@ -40,7 +71,8 @@ export const CachedTileLayer = L.TileLayer.extend({
           e.tile._abortController.abort();
           e.tile._abortController = null;
       }
-      if (e.tile._objectUrl) {
+      // Only revoke if it's not managed by the memory cache
+      if (e.tile._objectUrl && e.tile._originalUrl && (!this._memoryCache || !this._memoryCache.has(e.tile._originalUrl))) {
         URL.revokeObjectURL(e.tile._objectUrl);
         e.tile._objectUrl = null;
       }
@@ -62,10 +94,29 @@ export const CachedTileLayer = L.TileLayer.extend({
     tile.alt = '';
     const url = this.getTileUrl(coords);
 
+    tile._originalUrl = url;
+
+    // 1. Fast Path: In-Memory Cache (Synchronous rendering)
+    if (this._memoryCache && this._memoryCache.has(url)) {
+        const cachedItem = this._memoryCache.get(url);
+        tile._objectUrl = cachedItem.objectUrl;
+        tile.src = cachedItem.objectUrl;
+        // Move to end (LRU)
+        this._memoryCache.delete(url);
+        this._memoryCache.set(url, cachedItem);
+        return tile;
+    }
+
+    // 2. Slow Path: IndexedDB / Network
     tileCache.get(url).then(blob => {
       if (tile._unloaded) return;
       if (blob) {
-        const objectUrl = URL.createObjectURL(blob);
+        let objectUrl;
+        if (this._cacheInMemory) {
+            objectUrl = this._cacheInMemory(url, blob);
+        } else {
+            objectUrl = URL.createObjectURL(blob);
+        }
         tile._objectUrl = objectUrl;
         tile.src = objectUrl;
       } else {
@@ -100,9 +151,14 @@ export const CachedTileLayer = L.TileLayer.extend({
       })
       .then(blob => {
         if (tileElement && tileElement._unloaded) return;
+        let objectUrl;
+        if (this._cacheInMemory) {
+            objectUrl = this._cacheInMemory(url, blob);
+        } else {
+            objectUrl = URL.createObjectURL(blob);
+        }
         tileCache.set(url, blob).catch(e => console.error("Failed to save tile to cache", e));
         if (tileElement && !tileElement._unloaded) {
-          const objectUrl = URL.createObjectURL(blob);
           tileElement._objectUrl = objectUrl;
           tileElement.src = objectUrl;
         }
@@ -192,6 +248,11 @@ export const CachedTileLayer = L.TileLayer.extend({
         const url = this.getTileUrl(wrappedCoords);
 
         if (!this._preloadingUrls.has(url)) {
+            if (this._memoryCache && this._memoryCache.has(url)) {
+                // Already in fast memory cache, skip IndexedDB check entirely
+                return;
+            }
+
             this._preloadingUrls.add(url);
             tileCache.get(url).then(blob => {
               // Check if visible tiles started loading again while we were querying IDB
@@ -217,6 +278,7 @@ export const CachedTileLayer = L.TileLayer.extend({
                       throw new Error("Bad response");
                   })
                   .then(fetchedBlob => {
+                      if (this._cacheInMemory) this._cacheInMemory(url, fetchedBlob);
                       tileCache.set(url, fetchedBlob).catch(()=> {});
                   })
                   .catch(() => {})
@@ -227,6 +289,7 @@ export const CachedTileLayer = L.TileLayer.extend({
                        }
                   });
               } else {
+                 if (this._cacheInMemory) this._cacheInMemory(url, blob);
                  this._preloadingUrls.delete(url);
               }
             }).catch(() => {

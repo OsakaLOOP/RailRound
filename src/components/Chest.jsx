@@ -98,56 +98,6 @@ const Chest = ({ onDropItem } = {}) => {
         };
     }, []);
 
-    const shouldBeOpen = (isOpen || isHovering) && !justDropped;
-
-    useEffect(() => {
-        const saved = localStorage.getItem('rail_chest_items');
-        if (saved) {
-            try {
-                const parsedItems = JSON.parse(saved).map(item => ({
-                    ...item,
-                    count: item.count || 1
-                }));
-                setItems(parsedItems);
-            } catch (e) {
-                console.error("Failed to parse chest items", e);
-            }
-        }
-        setPos({ x: window.innerWidth - 80, y: window.innerHeight - 160 });
-    }, []);
-
-    useEffect(() => {
-        if (!isOpen) {
-            // Restore slots to chest when closing
-            if (ticketStart) {
-                handleDrop(ticketStart, true);
-                setTicketStart(null);
-            }
-            if (ticketEnd) {
-                handleDrop(ticketEnd, true);
-                setTicketEnd(null);
-            }
-        }
-    }, [isOpen]);
-
-    useEffect(() => {
-        if (shouldBeOpen) {
-            if (animState === 'closed') {
-                setAnimState('opening');
-                setAnimationKey(prev => prev + 1);
-                if (timerRef.current) clearTimeout(timerRef.current);
-                timerRef.current = setTimeout(() => {
-                    setAnimState('open');
-                }, 2000);
-            }
-        } else {
-            if (animState !== 'closed') {
-                setAnimState('closed');
-                if (timerRef.current) clearTimeout(timerRef.current);
-            }
-        }
-    }, [shouldBeOpen, animState]);
-
     const saveItems = (newItems) => {
         setItems(newItems);
         localStorage.setItem('rail_chest_items', JSON.stringify(newItems));
@@ -214,6 +164,57 @@ const Chest = ({ onDropItem } = {}) => {
             return newItems;
         });
     }
+
+
+    const shouldBeOpen = (isOpen || isHovering) && !justDropped;
+
+    useEffect(() => {
+        const saved = localStorage.getItem('rail_chest_items');
+        if (saved) {
+            try {
+                const parsedItems = JSON.parse(saved).map(item => ({
+                    ...item,
+                    count: item.count || 1
+                }));
+                setItems(parsedItems);
+            } catch (e) {
+                console.error("Failed to parse chest items", e);
+            }
+        }
+        setPos({ x: window.innerWidth - 80, y: window.innerHeight - 160 });
+    }, []);
+
+    useEffect(() => {
+        if (!isOpen) {
+            // Restore slots to chest when closing
+            if (ticketStart) {
+                handleDrop(ticketStart, true);
+                setTicketStart(null);
+            }
+            if (ticketEnd) {
+                handleDrop(ticketEnd, true);
+                setTicketEnd(null);
+            }
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (shouldBeOpen) {
+            if (animState === 'closed') {
+                setAnimState('opening');
+                setAnimationKey(prev => prev + 1);
+                if (timerRef.current) clearTimeout(timerRef.current);
+                timerRef.current = setTimeout(() => {
+                    setAnimState('open');
+                }, 2000);
+            }
+        } else {
+            if (animState !== 'closed') {
+                setAnimState('closed');
+                if (timerRef.current) clearTimeout(timerRef.current);
+            }
+        }
+    }, [shouldBeOpen, animState]);
 
     const triggerAutoRoute = () => {
         if (!ticketStart || !ticketEnd) return;

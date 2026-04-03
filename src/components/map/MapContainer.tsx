@@ -134,7 +134,33 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
     const initMap = () => {
         if (!mapRef.current || mapInstance.current ) return;
-        const map = L.map(mapRef.current, { zoomControl: true, preferCanvas: true }).setView([35.68, 139.76], 10);
+
+        let startLat = 35.6812;
+        let startLng = 139.7671;
+
+        const mapCenterSettings = useStore.getState().badgeSettings?.defaultMapCenter;
+
+        if (mapCenterSettings) {
+            if (mapCenterSettings.mode === 'fixed') {
+                startLat = mapCenterSettings.lat;
+                startLng = mapCenterSettings.lng;
+            } else if (mapCenterSettings.mode === 'latest') {
+                const _trips = useStore.getState().trips;
+                if (_trips && _trips.length > 0 && _trips[0].segments && _trips[0].segments.length > 0) {
+                    const lastSegment = _trips[0].segments[_trips[0].segments.length - 1];
+                    const geo = useStore.getState().geoData;
+                    if (geo && geo.features) {
+                        const targetFeature = geo.features.find((f: any) => f.properties.name === lastSegment.destination && f.properties.line === lastSegment.line);
+                        if (targetFeature && targetFeature.geometry && targetFeature.geometry.coordinates) {
+                            startLat = targetFeature.geometry.coordinates[1];
+                            startLng = targetFeature.geometry.coordinates[0];
+                        }
+                    }
+                }
+            }
+        }
+
+        const map = L.map(mapRef.current, { zoomControl: true, preferCanvas: true }).setView([startLat, startLng], 10);
         const light = cachedTileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { attribution: '© CARTO', subdomains: ['a','b','c','d'], maxZoom: 20 });
         const dark = cachedTileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', subdomains: ['a','b','c','d'], maxZoom: 20 });
         const rail = cachedTileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 20, opacity: 0, attribution: '© OpenRailwayMap' });

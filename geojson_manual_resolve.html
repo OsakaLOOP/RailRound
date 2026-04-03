@@ -405,7 +405,7 @@
             });
         };
 
-        // 内部整理：自动接龙线段
+        // 内部整理：自动接龙线段（不判断全局方向，仅做内部连续性连接，流向以第一条线段为准）
         window.resolveSegmentList = (list) => {
             if (list.length <= 1) return;
 
@@ -415,8 +415,13 @@
                 let tailCoords = window.state.segmentDict[tailId].coords;
                 let tailEnd = tailCoords[tailCoords.length - 1];
 
+                let headId = sorted[0];
+                let headCoords = window.state.segmentDict[headId].coords;
+                let headStart = headCoords[0];
+
                 let foundIndex = -1;
                 let needReverse = false;
+                let addToFront = false; // 是否应该接到车头前
 
                 for (let i = 0; i < list.length; i++) {
                     let candId = list[i];
@@ -424,12 +429,24 @@
                     let candStart = candCoords[0];
                     let candEnd = candCoords[candCoords.length - 1];
 
+                    // 检查接车尾
                     if (getDistance(tailEnd, candStart) <= MERGE_TOLERANCE) {
                         foundIndex = i;
                         break;
                     } else if (getDistance(tailEnd, candEnd) <= MERGE_TOLERANCE) {
                         foundIndex = i;
                         needReverse = true;
+                        break;
+                    }
+                    // 检查接车头
+                    else if (getDistance(headStart, candEnd) <= MERGE_TOLERANCE) {
+                        foundIndex = i;
+                        addToFront = true;
+                        break;
+                    } else if (getDistance(headStart, candStart) <= MERGE_TOLERANCE) {
+                        foundIndex = i;
+                        needReverse = true;
+                        addToFront = true;
                         break;
                     }
                 }
@@ -439,9 +456,13 @@
                     if (needReverse) {
                         window.state.segmentDict[nextId].coords.reverse();
                     }
-                    sorted.push(nextId);
+                    if (addToFront) {
+                        sorted.unshift(nextId);
+                    } else {
+                        sorted.push(nextId);
+                    }
                 } else {
-                    // 如果断头了，先把剩下的第一个强行塞进来继续排
+                    // 如果断头了，先把剩下的第一个强行塞进来继续排（按车尾方向塞入）
                     sorted.push(list.shift());
                 }
             }
@@ -491,22 +512,29 @@
             updateUI(); triggerPersist();
         };
 
-        // 全局整理：先整理内部，再接龙所有 Blocks，并自动翻转反向的 Block
+        // 全局整理：先整理内部，再接龙所有 Blocks，独立调整上下行方向以匹配标准流向
         window.resolveGlobal = () => {
             if (window.state.blocks.length <= 1) {
                 if (window.state.blocks.length === 1) window.resolveInternal(window.state.blocks[0].id);
                 return;
             }
 
-            // 1. 先进行内部整理
+            // 1. 先进行初步的内部连续性整理（无论方向对错，先连起来）
             window.state.blocks.forEach(b => {
                 if (b.type === 'merged') window.resolveSegmentList(b.merged);
                 else { window.resolveSegmentList(b.up); window.resolveSegmentList(b.down); }
             });
 
-            // 2. Blocks 接龙排序
+            // 2. Blocks 独立轨道匹配与接龙排序 (Track-by-Track Matching)
+            // 标准流向定义：
+            // A -> B (整体推进方向)
+            // up: 从 A 到 B (起点在 A)
+            // down: 从 B 到 A (起点在 B，终点在 A)
             let list = [...window.state.blocks];
             let sorted = [list.shift()];
+
+            // 辅助函数：根据端点判断是否匹配
+            const isMatch = (p1, p2) => p1 && p2 && getDistance(p1, p2) <= MERGE_TOLERANCE;
 
             while (list.length > 0) {
                 let tailBlock = sorted[sorted.length - 1];
@@ -517,37 +545,89 @@
                 }
 
                 let foundIndex = -1;
-                let needFlip = false;
+                // 分别记录候选区块中 up/down/merged 轨道的反转需求，不再进行整体 Block Flip
+                let flipUp = false;
+                let flipDown = false;
+                let flipMerged = false;
+
+                // 我们正在寻找能接在 Tail 之后的候选区块 Candidate
+                // Tail 提供：upEnd (即 upRight) 和 downStart (即 downRight) 作为挂接点
+                let tailUpEnd = tailEndpoints.upRight;
+                let tailDownStart = tailEndpoints.downRight;
+                // 合并轨道兼容两端：可作为 upEnd 或 downStart
+                if (tailBlock.type === 'merged') {
+                    tailUpEnd = tailEndpoints.upRight;
+                    tailDownStart = tailEndpoints.upRight;
+                }
 
                 for (let i = 0; i < list.length; i++) {
                     let candBlock = list[i];
                     let candEndpoints = getBlockEndpoints(candBlock);
                     if (!candEndpoints) continue;
 
-                    // 检查顺向连接（tailRight 连 candLeft）
-                    let upMatch = (tailEndpoints.upRight && candEndpoints.upLeft) ? getDistance(tailEndpoints.upRight, candEndpoints.upLeft) <= MERGE_TOLERANCE : false;
-                    let downMatch = (tailEndpoints.downRight && candEndpoints.downLeft) ? getDistance(tailEndpoints.downRight, candEndpoints.downLeft) <= MERGE_TOLERANCE : false;
+                    let matchFound = false;
 
-                    if (upMatch || downMatch || (tailEndpoints.upRight && candEndpoints.downLeft && getDistance(tailEndpoints.upRight, candEndpoints.downLeft) <= MERGE_TOLERANCE)) {
-                         foundIndex = i;
-                         break;
+                    if (candBlock.type === 'merged') {
+                        let candStart = candEndpoints.upLeft;
+                        let candEnd = candEndpoints.upRight;
+
+                        // 检查是否能接在 Tail 后面
+                        if (isMatch(tailUpEnd, candStart) || isMatch(tailDownStart, candStart)) {
+                            matchFound = true;
+                        } else if (isMatch(tailUpEnd, candEnd) || isMatch(tailDownStart, candEnd)) {
+                            matchFound = true;
+                            flipMerged = true;
+                        }
+                    } else if (candBlock.type === 'split') {
+                        let candUpStart = candEndpoints.upLeft;
+                        let candUpEnd = candEndpoints.upRight;
+
+                        // 注意：down 的流向应该是从 right 到 left。
+                        // 所以 candDownStart 是几何上的 right，candDownEnd 是几何上的 left。
+                        // 这里我们独立拿着 tailUpEnd 去碰 cand 的 up，拿着 tailDownStart 去碰 cand 的 down
+                        let candDownStart = candEndpoints.downRight; // 几何终点（靠近 B）
+                        let candDownEnd = candEndpoints.downLeft;   // 几何起点（靠近 A）
+
+                        let upMatched = false;
+                        let downMatched = false;
+
+                        // 独立判断 up 连接
+                        if (isMatch(tailUpEnd, candUpStart)) {
+                            upMatched = true;
+                        } else if (isMatch(tailUpEnd, candUpEnd)) {
+                            upMatched = true;
+                            flipUp = true;
+                        }
+
+                        // 独立判断 down 连接
+                        // Tail 的 downStart (它在 B 端) 应该连接 Candidate 的 downEnd (即靠近 A 端的起点)
+                        if (isMatch(tailDownStart, candDownEnd)) {
+                            downMatched = true;
+                        } else if (isMatch(tailDownStart, candDownStart)) {
+                            downMatched = true;
+                            flipDown = true;
+                        }
+
+                        if (upMatched || downMatched) {
+                            matchFound = true;
+                            // 如果只有单边匹配上了，另一边我们通过它自己的默认方向判定，
+                            // 不过既然我们正在从左往右理，我们姑且认为没匹配上的边如果不反转也能顺下去（由于刚才没有整体Flip了，所以这里单独留白即可）。
+                        }
                     }
 
-                    // 检查逆向连接（tailRight 连 candRight）意味着 candBlock 需要被整个翻转
-                    let upRevMatch = (tailEndpoints.upRight && candEndpoints.upRight) ? getDistance(tailEndpoints.upRight, candEndpoints.upRight) <= MERGE_TOLERANCE : false;
-                    let downRevMatch = (tailEndpoints.downRight && candEndpoints.downRight) ? getDistance(tailEndpoints.downRight, candEndpoints.downRight) <= MERGE_TOLERANCE : false;
-
-                    if (upRevMatch || downRevMatch || (tailEndpoints.upRight && candEndpoints.downRight && getDistance(tailEndpoints.upRight, candEndpoints.downRight) <= MERGE_TOLERANCE)) {
-                         foundIndex = i;
-                         needFlip = true;
-                         break;
+                    if (matchFound) {
+                        foundIndex = i;
+                        break;
                     }
                 }
 
                 if (foundIndex > -1) {
                     let nextBlock = list.splice(foundIndex, 1)[0];
-                    if (needFlip) {
-                        window.flipBlockData(nextBlock.id);
+                    if (nextBlock.type === 'merged' && flipMerged) {
+                        window.reverseSegmentList(nextBlock.merged);
+                    } else if (nextBlock.type === 'split') {
+                        if (flipUp) window.reverseSegmentList(nextBlock.up);
+                        if (flipDown) window.reverseSegmentList(nextBlock.down);
                     }
                     sorted.push(nextBlock);
                 } else {
@@ -587,8 +667,15 @@
                     upRight = window.state.segmentDict[b.up[b.up.length-1]].coords.slice(-1)[0];
                 }
                 if (b.down.length) {
-                    downLeft = window.state.segmentDict[b.down[b.down.length-1]].coords.slice(-1)[0];
+                    // Note: 'downLeft' and 'downRight' are defined relative to the 'up' direction's progression.
+                    // This means `downLeft` is physically on the same side as `upLeft` in space.
+                    // However, because the train flows from `downRight` to `downLeft`,
+                    // the first segment in the 'down' array should be placed such that `[0]` represents `downRight`.
+                    // To accurately extract 'downLeft' and 'downRight', we just take the pure geometric ends of the current list.
+                    // It is the caller's responsibility to orient it correctly.
+                    // So we assign `downLeft` = end, `downRight` = start. If it's correctly sorted, `downRight` flows to `downLeft`.
                     downRight = window.state.segmentDict[b.down[0]].coords[0];
+                    downLeft = window.state.segmentDict[b.down[b.down.length-1]].coords.slice(-1)[0];
                 }
                 if (upLeft || downLeft) return { upLeft, upRight, downLeft, downRight };
             }

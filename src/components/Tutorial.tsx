@@ -145,7 +145,7 @@ const Tutorial = ({
     user,
     pinMode,
     editorMode
-}) => {
+}: any) => {
     const [step, setStep] = useState(-1); // -1: Loading/Check, 0+: Steps, -2: Skipped, -3: City Selector
     const [rect, setRect] = useState(null);
     const [isVisible, setIsVisible] = useState(false);

@@ -3,7 +3,7 @@ import { useDrag } from './DragContext';
 import { X } from 'lucide-react';
 import railBg from './../assets/rail_bg.png'
 
-const McSlotSvg = ({ className = "" }) => (
+const McSlotSvg = ({ className = "" }: any) => (
     <svg
         viewBox="0 0 50 50"
         preserveAspectRatio="none"
@@ -19,7 +19,7 @@ const McSlotSvg = ({ className = "" }) => (
     </svg>
 );
 
-const StationMenu = ({ position, stationData, railwayData, onClose }) => {
+const StationMenu = ({ position, stationData, railwayData, onClose }: any) => {
     const { startDrag, isDragging, dragItem } = useDrag();
     const menuRef = useRef(null);
 

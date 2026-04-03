@@ -273,8 +273,33 @@ export const FloatingActionButtons: React.FC<{
 
     const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scrollBtnsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastScrollYRef = useRef(0);
     const lastScrollTimeRef = useRef(Date.now());
+
+    const handleMouseEnter = () => {
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+        setIsHovering(true);
+    };
+
+    const handleMouseLeave = () => {
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = setTimeout(() => {
+            setIsHovering(false);
+        }, 150);
+    };
+
+    const handleTouchStart = () => {
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+        setIsHovering(true);
+    };
+
+    const handleTouchEnd = () => {
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = setTimeout(() => {
+            setIsHovering(false);
+        }, 2000);
+    };
 
     useEffect(() => {
         const handleTutorialStep = (e: Event) => {
@@ -433,32 +458,47 @@ export const FloatingActionButtons: React.FC<{
         e.currentTarget.blur();
     };
 
+    const showMainButtons = isVisible || alwaysVisible || isTutorialActive || isHovering;
+
     return (
         <div className="absolute bottom-4 left-4 right-4 z-50 flex flex-col gap-2 items-end pointer-events-none">
-            {/* Scroll Buttons */}
-            <div className={`flex flex-col gap-2 mr-2 transition-opacity duration-300 pointer-events-auto ${showScrollBtns ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                {scrollPos !== 'top' && (
-                    <button onClick={scrollToTop} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors active:scale-95 touch-manipulation">
-                        <ArrowUp size={20} />
-                    </button>
-                )}
-                {scrollPos !== 'bottom' && (
-                    <button onClick={scrollToBottom} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors active:scale-95 touch-manipulation">
-                        <ArrowDown size={20} />
-                    </button>
-                )}
-            </div>
-
+            {/* Shared Hover Area for Scroll & Main Buttons */}
             <div
-                className={`w-full transition-opacity duration-500 ease-in-out pointer-events-auto ${isVisible || alwaysVisible || isTutorialActive || isHovering ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                onMouseEnter={() => setIsHovering(true)}
-                onMouseLeave={() => setIsHovering(false)}
-                onTouchStart={() => setIsHovering(true)}
-                onTouchEnd={() => {
-                    setTimeout(() => setIsHovering(false), 2000);
-                }}
+                className="flex flex-col items-end gap-2 w-full pointer-events-none"
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
             >
-            <DropZone onDrop={(item: any) => {
+                {/* Scroll & Small Add Buttons */}
+                <div className={`flex flex-col gap-2 mr-2 transition-opacity duration-300 pointer-events-auto ${showScrollBtns ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                    {scrollPos !== 'top' && (
+                        <button onClick={scrollToTop} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors active:scale-95 touch-manipulation">
+                            <ArrowUp size={20} />
+                        </button>
+                    )}
+                    {scrollPos !== 'bottom' && (
+                        <button onClick={scrollToBottom} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors active:scale-95 touch-manipulation">
+                            <ArrowDown size={20} />
+                        </button>
+                    )}
+
+                    {/* Small '+' Button (Fades out / Collapses when Main Buttons show) */}
+                    <div
+                        className={`overflow-hidden transition-all duration-300 ease-in-out ${showMainButtons ? 'h-0 opacity-0 scale-95 mb-0' : 'h-[38px] opacity-100 scale-100'}`}
+                    >
+                        <button
+                            className="bg-transparent backdrop-blur-sm p-2 rounded-full shadow-sm border-2 border-dashed border-emerald-400 text-emerald-500 transition-all touch-manipulation flex items-center justify-center w-[38px] h-[38px]"
+                        >
+                            <Plus size={20} />
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    className={`w-full transition-opacity duration-500 ease-in-out pointer-events-auto ${showMainButtons ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                >
+                <DropZone onDrop={(item: any) => {
                 if (item.type === 'station') {
                     const newSegments = [{ id: Date.now().toString(), lineKey: item.lineKey, fromId: item.id, toId: '' }];
                     startEditingTrip({ date: new Date().toISOString().split('T')[0], memo: '', segments: newSegments, cost: 0 });
@@ -474,6 +514,7 @@ export const FloatingActionButtons: React.FC<{
                     <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportSuica} />
                 </div>
             </DropZone>
+                </div>
             </div>
         </div>
     );

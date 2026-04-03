@@ -186,6 +186,11 @@ export interface UserProfile {
 
 export interface BadgeSettings {
   enabled: boolean;
+  defaultMapCenter?: {
+    mode: 'fixed' | 'latest';
+    lat: number;
+    lng: number;
+  };
 }
 
 export interface StationMenuData {
@@ -311,7 +316,7 @@ export const useStore = create<GlobalStore>()(
       trips: [],
       pins: [],
       folders: [],
-      badgeSettings: { enabled: true },
+      badgeSettings: { enabled: true, defaultMapCenter: { mode: 'fixed', lat: 35.6812, lng: 139.7671 } },
 
       login: (token, username) => set({ isLoggedIn: true, user: { token, username } }),
       logout: () => set({ isLoggedIn: false, user: null, userProfile: null }),

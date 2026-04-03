@@ -10,12 +10,25 @@ export const DragProvider = ({ children }) => {
   const [dragItem, setDragItem] = useState(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
   const [dropZone, setDropZone] = useState(null);
+  const dragStartPos = useRef({ x: 0, y: 0 });
+  const dragThresholdMet = useRef(false);
 
   // Global Mouse/Touch Handlers
   useEffect(() => {
-    if (!isDragging) return;
+    if (!dragItem) return;
 
     const handleMove = (x, y) => {
+      if (!dragThresholdMet.current) {
+         const dx = x - dragStartPos.current.x;
+         const dy = y - dragStartPos.current.y;
+         if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+             dragThresholdMet.current = true;
+             setIsDragging(true);
+         } else {
+             return; // Ignore small movements
+         }
+      }
+
       setCursorPos({ x, y });
 
       const target = document.elementFromPoint(x, y);
@@ -35,10 +48,21 @@ export const DragProvider = ({ children }) => {
 
     const onMouseMove = (e) => handleMove(e.clientX, e.clientY);
     const onTouchMove = (e) => {
+        if (dragThresholdMet.current) {
+            e.preventDefault(); // Prevent scrolling while actively dragging an item
+        }
         handleMove(e.touches[0].clientX, e.touches[0].clientY);
     };
 
     const onEnd = () => {
+      if (!dragThresholdMet.current) {
+          // It was a click, not a drag.
+          setIsDragging(false);
+          setDragItem(null);
+          setDropZone(null);
+          return;
+      }
+
       let droppedOnValidZone = false;
       if (dropZone) {
         dropZone.onDrop(dragItem);
@@ -72,7 +96,14 @@ export const DragProvider = ({ children }) => {
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     setDragItem(item);
     setCursorPos({ x: clientX, y: clientY });
-    setIsDragging(true);
+    dragStartPos.current = { x: clientX, y: clientY };
+    dragThresholdMet.current = false;
+
+    // For mouse events we can just start immediately, for touch we wait for threshold
+    if (!e.touches) {
+       dragThresholdMet.current = true;
+       setIsDragging(true);
+    }
   };
 
   return (

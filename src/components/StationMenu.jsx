@@ -80,7 +80,7 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
     return (
         <div
             ref={menuRef}
-            className="fixed z-[1000] animate-pop-in"
+            className="fixed z-[1000] animate-pop-in select-none"
             style={{
                 left: position.x,
                 top: position.y,
@@ -114,7 +114,7 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                         return (
                             <div
                                 key={line.lineKey}
-                                className="shrink-0 w-12 h-12 relative group"
+                                className="shrink-0 w-12 h-12 relative group touch-none select-none"
                                 onMouseDown={(e) => {
                                     startDrag({
                                         type: 'station',
@@ -127,6 +127,7 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                                     }, e);
                                 }}
                                 onTouchStart={(e) => {
+                                    e.stopPropagation();
                                     startDrag({
                                         type: 'station',
                                         id: line.stationId,

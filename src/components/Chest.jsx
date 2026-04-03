@@ -66,7 +66,7 @@ const Chest = ({ onDropItem } = {}) => {
             const dx = clientX - dragStartPos.current.x;
             const dy = clientY - dragStartPos.current.y;
 
-            if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+            if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
                 hasMoved.current = true;
             }
 
@@ -291,7 +291,7 @@ const Chest = ({ onDropItem } = {}) => {
     return (
         <>
             <div
-                className="fixed z-[500]"
+                className="fixed z-[500] select-none touch-none"
                 style={{ left: pos.x, top: pos.y, userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none' }}
             >
                 <DropZone
@@ -469,6 +469,7 @@ const ChestItem = ({ item, onRemove, onDragSuccess, pos}) => {
     const isHidden = isDragging && dragItem?.chestInstanceId === item.chestInstanceId;
 
     const handleDragStart = (e) => {
+        e.stopPropagation();
         startDrag({
             ...item,
             chestInstanceId: item.chestInstanceId || Date.now(),

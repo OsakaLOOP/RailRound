@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Github, Folder, TrendingUp, Move, MapPin, Map } from 'lucide-react';
+import { Github, Folder, TrendingUp, Move, MapPin, Map as MapIcon } from 'lucide-react';
 import { useStore } from '../store';
 import { calcDist } from '../core/tripCalculator';
 import * as turf from '@turf/turf';
@@ -152,7 +152,7 @@ export const StatsPage: React.FC = () => {
                 <div className="border-t border-gray-100 pt-4 z-10">
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2 text-gray-700 font-bold text-sm">
-                            <Map size={16} /> 地图初始位置
+                            <MapIcon size={16} /> 地图初始位置
                         </div>
                         <div className="flex items-center bg-gray-100 rounded-lg p-1">
                             <button

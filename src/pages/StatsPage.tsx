@@ -258,9 +258,9 @@ export const StatsPage: React.FC = () => {
                 </span>
                 <div className="flex-grow border-t-2 border-dashed border-gray-300/70"></div>
              </div>
-             Lisenced under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-500 hover:underline transition-all">CC BY-SA 4.0</a>
+             Licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-500 hover:underline transition-all">CC BY-SA 4.0</a>
              <br/>
-             Copyleft <span aria-label="Copyleft icon" style={{display: 'inline-block', transform: 'rotateY(180deg)'}}>&copy;</span> 2025-2026 @OsakaLOOP
+             Copyleft <span aria-label="Copyleft icon" style={{display: 'inline-block', transform: 'rotateY(180deg)'}}>&copy;</span> 2026-2027 @OsakaLOOP
              <br/>
              <div><span style={{ display: "inline" }}>更多详情, 参见</span><button style={{ display: "inline" }} onClick={() => setModalState({ isLoginOpen: true })} className="text-xs text-blue-400 hover:text-blue-500 hover:underline transition-all items-center gap-1">用户指南</button></div>
         </div>

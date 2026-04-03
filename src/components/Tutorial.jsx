@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronRight, CheckCircle2, ArrowRight } from 'lucide-react';
+import { DefaultCitySelector } from './modals/DefaultCitySelector';
 
 const STEPS = [
     {
@@ -145,7 +146,7 @@ const Tutorial = ({
     pinMode,
     editorMode
 }) => {
-    const [step, setStep] = useState(-1); // -1: Loading/Check, 0+: Steps
+    const [step, setStep] = useState(-1); // -1: Loading/Check, 0+: Steps, -2: Skipped, -3: City Selector
     const [rect, setRect] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
     const [tooltipStyle, setTooltipStyle] = useState({});
@@ -159,8 +160,8 @@ const Tutorial = ({
             setIsLoginOpen(true);
             setTimeout(() => setStep(s => s + 1), 200);
         } else if (step >= STEPS.length - 1) {
-            // End
-            setStep(-2);
+            // End -> Show City Selector
+            setStep(-3);
             setIsVisible(false);
         } else {
             setStep(s => s + 1);
@@ -171,7 +172,8 @@ const Tutorial = ({
         if (dontShowAgain) {
             localStorage.setItem('rail_tutorial_skipped', 'true');
         }
-        setStep(-2);
+        // Skip -> Show City Selector
+        setStep(-3);
         setIsVisible(false);
     }, [setStep, setIsVisible]);
 
@@ -197,14 +199,24 @@ const Tutorial = ({
     // Initialization check
     useEffect(() => {
         const skipped = localStorage.getItem('rail_tutorial_skipped');
+        const citySelectorDone = localStorage.getItem('rail_city_selector_done');
 
         if (skipped === 'true' || user) {
-            setStep(-2); // Skipped
+            if (!citySelectorDone && !user) {
+                setStep(-3); // Show City Selector if skipped but not done
+            } else {
+                setStep(-2); // Skipped
+            }
             return;
         }
         setStep(0);
         setIsVisible(true);
     }, [user]);
+
+    const handleCitySelectorComplete = useCallback(() => {
+        localStorage.setItem('rail_city_selector_done', 'true');
+        setStep(-2); // Final skip
+    }, [setStep]);
 
     // Step Transition Logic & Rect Calculation
     useEffect(() => {
@@ -384,6 +396,10 @@ const Tutorial = ({
         observer.observe(tooltipRef.current);
         return () => observer.disconnect();
     }, [rect, step]);
+
+    if (step === -3) {
+        return <DefaultCitySelector isOpen={true} onComplete={handleCitySelectorComplete} />;
+    }
 
     if (!isVisible || step < 0) return null;
 

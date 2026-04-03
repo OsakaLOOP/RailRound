@@ -1,13 +1,33 @@
-import React, { useMemo } from 'react';
-import { Github, Folder, TrendingUp, Move } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Github, Folder, TrendingUp, Move, MapPin, Map } from 'lucide-react';
 import { useStore } from '../store';
 import { calcDist } from '../core/tripCalculator';
 import * as turf from '@turf/turf';
 import { useShallow } from 'zustand/react/shallow';
+import { useUserData } from '../hooks/useUserData';
+
+const CITIES = {
+    China: [
+        { name: '北京', lat: 39.9042, lng: 116.4074 },
+        { name: '上海', lat: 31.2304, lng: 121.4737 },
+        { name: '广州', lat: 23.1291, lng: 113.2644 },
+        { name: '深圳', lat: 22.5431, lng: 114.0579 },
+        { name: '南京', lat: 32.0603, lng: 118.7969 },
+        { name: '杭州', lat: 30.2741, lng: 120.1551 },
+    ],
+    Japan: [
+        { name: '東京', lat: 35.6812, lng: 139.7671 },
+        { name: '大阪', lat: 34.6937, lng: 135.5023 },
+        { name: '京都', lat: 35.0116, lng: 135.7681 },
+        { name: '札幌', lat: 43.0618, lng: 141.3545 },
+        { name: '福岡', lat: 33.5902, lng: 130.4017 },
+        { name: '名古屋', lat: 35.1815, lng: 136.9066 },
+    ]
+};
 
 export const StatsPage: React.FC = () => {
     const {
-        trips, railwayData, geoData, user, userProfile, segmentGeometries, companyDB
+        trips, railwayData, geoData, user, userProfile, segmentGeometries, companyDB, badgeSettings, setBadgeSettings, pins, folders
     } = useStore(useShallow(state => ({
         trips: state.trips,
         railwayData: state.railwayData,
@@ -15,9 +35,14 @@ export const StatsPage: React.FC = () => {
         user: state.user,
         userProfile: state.userProfile,
         segmentGeometries: state.segmentGeometries,
-        companyDB: state.companyDB
+        companyDB: state.companyDB,
+        badgeSettings: state.badgeSettings,
+        setBadgeSettings: state.setBadgeSettings,
+        pins: state.pins,
+        folders: state.folders
     })));
     const setModalState = useStore(state => state.setModalState);
+    const { saveData } = useUserData();
 
     const { totalTrips, uniqueLines, totalDist, totalCost, rankedSegments } = useMemo(() => {
         const _totalTrips = trips.length;
@@ -96,8 +121,9 @@ export const StatsPage: React.FC = () => {
     return (
       <div id="stats-view-content" className="flex-1 overflow-y-auto p-4 space-y-4">
         {user && (
-            <div className="bg-white p-4 rounded-xl shadow-sm border relative">
-                <div className="flex items-center gap-4">
+            <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col gap-4 relative overflow-hidden">
+                <div className="flex items-center justify-between z-10">
+                    <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-xl font-bold text-gray-500 overflow-hidden">
                         {userProfile?.bindings?.github?.avatar_url ? (
                             <img src={userProfile.bindings.github.avatar_url} alt="Avatar" className="w-full h-full object-cover"/>
@@ -114,13 +140,67 @@ export const StatsPage: React.FC = () => {
                                 <button onClick={() => window.open('/api/oauth/github', '_self')} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white rounded text-xs font-bold hover:bg-black transition-colors"><Github size={12}/> 绑定 GitHub</button>
                             )}
                         </div>
+                        </div>
                     </div>
+                    {userProfile?.bindings?.github && (
+                       <button onClick={() => setModalState({ cardModalUser: user })} className="text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                           <Github size={14}/> 装饰代码
+                       </button>
+                    )}
                 </div>
-                {userProfile?.bindings?.github && (
-                   <button onClick={() => setModalState({ cardModalUser: user })} className="absolute right-4 top-4 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                       <Github size={14}/> 装饰代码
-                   </button>
-                )}
+
+                <div className="border-t border-gray-100 pt-4 z-10">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 text-gray-700 font-bold text-sm">
+                            <Map size={16} /> 地图初始位置
+                        </div>
+                        <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                            <button
+                                onClick={() => {
+                                    const newSettings = { ...badgeSettings, defaultMapCenter: { mode: 'fixed' as const, lat: badgeSettings.defaultMapCenter?.lat || 35.6812, lng: badgeSettings.defaultMapCenter?.lng || 139.7671 } };
+                                    setBadgeSettings(newSettings);
+                                    saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
+                                }}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${(!badgeSettings.defaultMapCenter || badgeSettings.defaultMapCenter.mode === 'fixed') ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                固定兴趣
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const newSettings = { ...badgeSettings, defaultMapCenter: { mode: 'latest' as const, lat: badgeSettings.defaultMapCenter?.lat || 35.6812, lng: badgeSettings.defaultMapCenter?.lng || 139.7671 } };
+                                    setBadgeSettings(newSettings);
+                                    saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
+                                }}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${badgeSettings.defaultMapCenter?.mode === 'latest' ? 'bg-white shadow text-amber-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                跟随最新
+                            </button>
+                        </div>
+                    </div>
+                    {(!badgeSettings.defaultMapCenter || badgeSettings.defaultMapCenter.mode === 'fixed') && (
+                        <div className="flex items-center gap-2">
+                            <MapPin size={14} className="text-gray-400" />
+                            <select
+                                className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full p-2 outline-none"
+                                value={`${badgeSettings.defaultMapCenter?.lat || 35.6812},${badgeSettings.defaultMapCenter?.lng || 139.7671}`}
+                                onChange={(e) => {
+                                    const [lat, lng] = e.target.value.split(',').map(Number);
+                                    const newSettings = { ...badgeSettings, defaultMapCenter: { mode: 'fixed' as const, lat, lng } };
+                                    setBadgeSettings(newSettings);
+                                    saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
+                                }}
+                            >
+                                {Object.entries(CITIES).map(([country, cities]) => (
+                                    <optgroup key={country} label={country === 'China' ? '中国' : '日本'}>
+                                        {cities.map(city => (
+                                            <option key={city.name} value={`${city.lat},${city.lng}`}>{city.name}</option>
+                                        ))}
+                                    </optgroup>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
             </div>
         )}
 

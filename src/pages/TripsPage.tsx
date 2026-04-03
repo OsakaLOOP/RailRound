@@ -362,11 +362,11 @@ export const FloatingActionButtons: React.FC<{
                     startEditingTrip({ date: new Date().toISOString().split('T')[0], memo: '', segments: newSegments, cost: 0 });
                 }
             }}>
-                <div className="flex gap-2 bg-white/90 backdrop-blur-sm p-2 rounded-2xl shadow-lg border border-gray-100">
-                    <button id="btn-add-trip" onClick={() => startEditingTrip()} className="flex-1 py-3 border-2 border-dashed border-gray-300 text-gray-500 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
+                <div className="flex gap-2 p-2 rounded-2xl">
+                    <button id="btn-add-trip" onClick={() => startEditingTrip()} className="flex-1 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
                         <Plus className="group-hover:rotate-90 transition-transform duration-300" size={18} /> 记录新行程
                     </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="flex-none px-4 py-3 border-2 border-dashed border-gray-300 text-gray-500 rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2" title="导入 Suica CSV">
+                    <button onClick={() => fileInputRef.current?.click()} className="flex-none px-4 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2" title="导入 Suica CSV">
                         <Upload size={18} />
                     </button>
                     <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportSuica} />

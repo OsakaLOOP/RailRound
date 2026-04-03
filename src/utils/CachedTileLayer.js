@@ -159,65 +159,81 @@ export const CachedTileLayer = L.TileLayer.extend({
       L.point(tileBounds.max.x + width, tileBounds.max.y + height)
     );
 
+    // Calculate center of current visible tiles
+    const centerI = (tileBounds.min.x + tileBounds.max.x) / 2;
+    const centerJ = (tileBounds.min.y + tileBounds.max.y) / 2;
+
+    const tilesToLoad = [];
+
     for (let j = prefetchBounds.min.y; j <= prefetchBounds.max.y; j++) {
       for (let i = prefetchBounds.min.x; i <= prefetchBounds.max.x; i++) {
-        const coords = new L.Point(i, j);
-        coords.z = zoom;
-
         // Skip tiles within the currently visible bounds (already loaded)
         if (i >= tileBounds.min.x && i <= tileBounds.max.x &&
             j >= tileBounds.min.y && j <= tileBounds.max.y) {
             continue;
         }
 
+        const coords = new L.Point(i, j);
+        coords.z = zoom;
+
         if (this._isValidTile(coords)) {
-            const wrappedCoords = this._wrapCoords(coords);
-            const url = this.getTileUrl(wrappedCoords);
-            if (!this._preloadingUrls.has(url)) {
-                this._preloadingUrls.add(url);
-                tileCache.get(url).then(blob => {
-                  // Check if visible tiles started loading again while we were querying IDB
-                  if (this.isLoading && this.isLoading()) {
-                      this._preloadingUrls.delete(url);
-                      return;
-                  }
-
-                  // Ensure we haven't aborted via _abortPrefetch
-                  if (!this._preloadingUrls.has(url)) {
-                      return;
-                  }
-
-                  if (!blob) {
-                    const controller = new AbortController();
-                    if (this._prefetchControllers) {
-                        this._prefetchControllers.set(url, controller);
-                    }
-
-                    fetch(url, { signal: controller.signal })
-                      .then(response => {
-                          if (response.ok) return response.blob();
-                          throw new Error("Bad response");
-                      })
-                      .then(fetchedBlob => {
-                          tileCache.set(url, fetchedBlob).catch(()=> {});
-                      })
-                      .catch(() => {})
-                      .finally(() => {
-                           this._preloadingUrls.delete(url);
-                           if (this._prefetchControllers) {
-                               this._prefetchControllers.delete(url);
-                           }
-                      });
-                  } else {
-                     this._preloadingUrls.delete(url);
-                  }
-                }).catch(() => {
-                    this._preloadingUrls.delete(url);
-                });
-            }
+            // Calculate squared distance from center to prioritize inner tiles first
+            const distSq = Math.pow(i - centerI, 2) + Math.pow(j - centerJ, 2);
+            tilesToLoad.push({ coords, distSq });
         }
       }
     }
+
+    // Sort tiles: closest to center first
+    tilesToLoad.sort((a, b) => a.distSq - b.distSq);
+
+    tilesToLoad.forEach(({ coords }) => {
+        const wrappedCoords = this._wrapCoords(coords);
+        const url = this.getTileUrl(wrappedCoords);
+
+        if (!this._preloadingUrls.has(url)) {
+            this._preloadingUrls.add(url);
+            tileCache.get(url).then(blob => {
+              // Check if visible tiles started loading again while we were querying IDB
+              if (this.isLoading && this.isLoading()) {
+                  this._preloadingUrls.delete(url);
+                  return;
+              }
+
+              // Ensure we haven't aborted via _abortPrefetch
+              if (!this._preloadingUrls.has(url)) {
+                  return;
+              }
+
+              if (!blob) {
+                const controller = new AbortController();
+                if (this._prefetchControllers) {
+                    this._prefetchControllers.set(url, controller);
+                }
+
+                fetch(url, { signal: controller.signal })
+                  .then(response => {
+                      if (response.ok) return response.blob();
+                      throw new Error("Bad response");
+                  })
+                  .then(fetchedBlob => {
+                      tileCache.set(url, fetchedBlob).catch(()=> {});
+                  })
+                  .catch(() => {})
+                  .finally(() => {
+                       this._preloadingUrls.delete(url);
+                       if (this._prefetchControllers) {
+                           this._prefetchControllers.delete(url);
+                       }
+                  });
+              } else {
+                 this._preloadingUrls.delete(url);
+              }
+            }).catch(() => {
+                this._preloadingUrls.delete(url);
+            });
+        }
+    });
   }
 });
 

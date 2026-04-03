@@ -121,9 +121,8 @@ export const StatsPage: React.FC = () => {
     return (
       <div id="stats-view-content" className="flex-1 overflow-y-auto p-4 space-y-4">
         {user && (
-            <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col gap-4 relative overflow-hidden">
-                <div className="flex items-center justify-between z-10">
-                    <div className="flex items-center gap-4">
+            <div className="bg-white p-4 rounded-xl shadow-sm border relative">
+                <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-xl font-bold text-gray-500 overflow-hidden">
                         {userProfile?.bindings?.github?.avatar_url ? (
                             <img src={userProfile.bindings.github.avatar_url} alt="Avatar" className="w-full h-full object-cover"/>
@@ -140,17 +139,40 @@ export const StatsPage: React.FC = () => {
                                 <button onClick={() => window.open('/api/oauth/github', '_self')} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white rounded text-xs font-bold hover:bg-black transition-colors"><Github size={12}/> 绑定 GitHub</button>
                             )}
                         </div>
-                        </div>
                     </div>
-                    {userProfile?.bindings?.github && (
-                       <button onClick={() => setModalState({ cardModalUser: user })} className="text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                           <Github size={14}/> 装饰代码
-                       </button>
-                    )}
                 </div>
+                {userProfile?.bindings?.github && (
+                   <button onClick={() => setModalState({ cardModalUser: user })} className="absolute right-4 top-4 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                       <Github size={14}/> 装饰代码
+                   </button>
+                )}
+            </div>
+        )}
 
-                <div className="border-t border-gray-100 pt-4 z-10">
-                    <div className="flex items-center justify-between mb-3">
+        <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-102 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">记录数</div><div className="text-3xl font-bold text-gray-800">{totalTrips}</div></div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-102 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">制霸路线</div><div className="text-3xl font-bold text-indigo-600">{uniqueLines}</div></div>
+        </div>
+
+        <div className="space-y-4">
+            <button onClick={() => setModalState({ folderManagerOpen: true })} className="w-full bg-white p-4 rounded-xl shadow-sm border flex items-center justify-between group hover:bg-gray-50 transition-colors">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center text-yellow-600">
+                        <Folder size={20}/>
+                    </div>
+                    <div className="text-left">
+                        <div className="font-bold text-gray-800">Star Folders</div>
+                        <div className="text-xs text-gray-400">Manage trip collections & badges</div>
+                    </div>
+                </div>
+                <Move size={16} className="text-gray-300 group-hover:text-gray-500"/>
+            </button>
+
+            {/* Personal Settings */}
+            <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col gap-4">
+                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">个人偏好设置</div>
+                <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-gray-700 font-bold text-sm">
                             <MapIcon size={16} /> 地图初始位置
                         </div>
@@ -159,7 +181,7 @@ export const StatsPage: React.FC = () => {
                                 onClick={() => {
                                     const newSettings = { ...badgeSettings, defaultMapCenter: { mode: 'fixed' as const, lat: badgeSettings.defaultMapCenter?.lat || 35.6812, lng: badgeSettings.defaultMapCenter?.lng || 139.7671 } };
                                     setBadgeSettings(newSettings);
-                                    saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
+                                    if (user) saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
                                 }}
                                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${(!badgeSettings.defaultMapCenter || badgeSettings.defaultMapCenter.mode === 'fixed') ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
                             >
@@ -169,7 +191,7 @@ export const StatsPage: React.FC = () => {
                                 onClick={() => {
                                     const newSettings = { ...badgeSettings, defaultMapCenter: { mode: 'latest' as const, lat: badgeSettings.defaultMapCenter?.lat || 35.6812, lng: badgeSettings.defaultMapCenter?.lng || 139.7671 } };
                                     setBadgeSettings(newSettings);
-                                    saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
+                                    if (user) saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
                                 }}
                                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${badgeSettings.defaultMapCenter?.mode === 'latest' ? 'bg-white shadow text-amber-600' : 'text-gray-500 hover:text-gray-700'}`}
                             >
@@ -178,16 +200,16 @@ export const StatsPage: React.FC = () => {
                         </div>
                     </div>
                     {(!badgeSettings.defaultMapCenter || badgeSettings.defaultMapCenter.mode === 'fixed') && (
-                        <div className="flex items-center gap-2">
-                            <MapPin size={14} className="text-gray-400" />
+                        <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                            <MapPin size={14} className="text-emerald-500 shrink-0 ml-1" />
                             <select
-                                className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full p-2 outline-none"
+                                className="bg-transparent text-gray-700 text-sm font-bold w-full outline-none cursor-pointer"
                                 value={`${badgeSettings.defaultMapCenter?.lat || 35.6812},${badgeSettings.defaultMapCenter?.lng || 139.7671}`}
                                 onChange={(e) => {
                                     const [lat, lng] = e.target.value.split(',').map(Number);
                                     const newSettings = { ...badgeSettings, defaultMapCenter: { mode: 'fixed' as const, lat, lng } };
                                     setBadgeSettings(newSettings);
-                                    saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
+                                    if (user) saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
                                 }}
                             >
                                 {Object.entries(CITIES).map(([country, cities]) => (
@@ -202,27 +224,7 @@ export const StatsPage: React.FC = () => {
                     )}
                 </div>
             </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-102 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">记录数</div><div className="text-3xl font-bold text-gray-800">{totalTrips}</div></div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-102 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">制霸路线</div><div className="text-3xl font-bold text-indigo-600">{uniqueLines}</div></div>
         </div>
-
-        {user && (
-            <button onClick={() => setModalState({ folderManagerOpen: true })} className="w-full bg-white p-4 rounded-xl shadow-sm border flex items-center justify-between group hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center text-yellow-600">
-                        <Folder size={20}/>
-                    </div>
-                    <div className="text-left">
-                        <div className="font-bold text-gray-800">Star Folders</div>
-                        <div className="text-xs text-gray-400">Manage trip collections & badges</div>
-                    </div>
-                </div>
-                <Move size={16} className="text-gray-300 group-hover:text-gray-500"/>
-            </button>
-        )}
 
         <div className="bg-gradient-to-br from-emerald-600 to-teal-700 hover:from-teal-600 hover:to-emerald-800 p-6 rounded-xl shadow-lg text-white transition-all duration-500 hover:-translate-y-1 hover:shadow-xl cursor-default group">
             <div className="flex items-center justify-between mb-2"><h3 className="font-bold flex items-center gap-2"><TrendingUp size={18} className="group-hover:-translate-y-1 group-hover:scale-110 transition-transform duration-300"/> 里程统计</h3><span className="text-xs bg-white/20 px-2 py-1 rounded">总距离</span></div>
@@ -256,6 +258,10 @@ export const StatsPage: React.FC = () => {
                 </span>
                 <div className="flex-grow border-t-2 border-dashed border-gray-300/70"></div>
              </div>
+             Lisenced under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-500 hover:underline transition-all">CC BY-SA 4.0</a>
+             <br/>
+             Copyleft <span aria-label="Copyleft icon" style={{display: 'inline-block', transform: 'rotateY(180deg)'}}>&copy;</span> 2025-2026 @OsakaLOOP
+             <br/>
              <div><span style={{ display: "inline" }}>更多详情, 参见</span><button style={{ display: "inline" }} onClick={() => setModalState({ isLoginOpen: true })} className="text-xs text-blue-400 hover:text-blue-500 hover:underline transition-all items-center gap-1">用户指南</button></div>
         </div>
       </div>

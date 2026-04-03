@@ -469,6 +469,7 @@ const ChestItem = ({ item, onRemove, onDragSuccess, pos}) => {
     const isHidden = isDragging && dragItem?.chestInstanceId === item.chestInstanceId;
 
     const handleDragStart = (e) => {
+        e.stopPropagation();
         startDrag({
             ...item,
             chestInstanceId: item.chestInstanceId || Date.now(),

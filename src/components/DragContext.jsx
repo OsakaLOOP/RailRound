@@ -48,6 +48,9 @@ export const DragProvider = ({ children }) => {
 
     const onMouseMove = (e) => handleMove(e.clientX, e.clientY);
     const onTouchMove = (e) => {
+        if (dragThresholdMet.current) {
+            e.preventDefault(); // Prevent scrolling while actively dragging an item
+        }
         handleMove(e.touches[0].clientX, e.touches[0].clientY);
     };
 

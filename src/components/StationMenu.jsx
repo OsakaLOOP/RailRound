@@ -127,6 +127,7 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                                     }, e);
                                 }}
                                 onTouchStart={(e) => {
+                                    e.stopPropagation();
                                     startDrag({
                                         type: 'station',
                                         id: line.stationId,

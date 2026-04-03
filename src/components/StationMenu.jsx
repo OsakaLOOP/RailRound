@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useDrag } from './DragContext';
 import { X } from 'lucide-react';
 
@@ -20,6 +20,35 @@ const McSlotSvg = ({ className = "" }) => (
 
 const StationMenu = ({ position, stationData, railwayData, onClose }) => {
     const { startDrag, isDragging, dragItem } = useDrag();
+    const menuRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                onClose();
+            }
+        };
+
+        const handleEscape = (event) => {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        };
+
+        // Delay the attachment slightly to prevent immediate close on the same click that opened it
+        const timeoutId = setTimeout(() => {
+            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('touchstart', handleClickOutside);
+            document.addEventListener('keydown', handleEscape);
+        }, 10);
+
+        return () => {
+            clearTimeout(timeoutId);
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [onClose]);
 
     if (!position || !stationData) return null;
 
@@ -49,6 +78,7 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
 
     return (
         <div
+            ref={menuRef}
             className="fixed z-[1000] animate-pop-in"
             style={{
                 left: position.x,

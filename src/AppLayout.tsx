@@ -79,6 +79,13 @@ export const AppLayout: React.FC = () => {
         }
     }, []);
 
+    // --- Close StationMenu on Tab Change ---
+    useEffect(() => {
+        if (activeTab !== 'map' && stationMenu) {
+            setStationMenu(null);
+        }
+    }, [activeTab]);
+
     // --- Standalone April Fool's Fake Loading Effect ---
     useEffect(() => {
         const storeState = useStore.getState();

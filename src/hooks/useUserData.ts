@@ -31,8 +31,8 @@ export const useUserData = () => {
             let newFolders = cloudData.folders || [];
             let newBadgeSettings = cloudData.badge_settings || { enabled: true };
 
-            if (isInteractive && (state.trips.length > 0 || state.pins.length > 0)) {
-                if (window.confirm("检测到本地有数据，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)")) {
+            if (isInteractive && (state.trips.length > 0 || state.pins.length > 0 || state.folders.length > 0 || state.badgeSettings?.defaultMapCenter)) {
+                if (window.confirm("检测到本地有数据或个人配置，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)")) {
                     const tripMap = new Map();
                     newTrips.forEach((t: any) => tripMap.set(t.id, t));
                     state.trips.forEach((t: any) => tripMap.set(t.id, t));
@@ -43,9 +43,28 @@ export const useUserData = () => {
                     state.pins.forEach((p: any) => pinMap.set(p.id, p));
                     newPins = Array.from(pinMap.values());
 
+                    const folderMap = new Map();
+                    newFolders.forEach((f: any) => folderMap.set(f.id, f));
+                    state.folders.forEach((f: any) => folderMap.set(f.id, f));
+                    newFolders = Array.from(folderMap.values());
+
+                    // Merge badge settings: Cloud > Local > Default
+                    newBadgeSettings = {
+                        ...state.badgeSettings,
+                        ...cloudData.badge_settings,
+                        defaultMapCenter: cloudData.badge_settings?.defaultMapCenter || state.badgeSettings?.defaultMapCenter,
+                        enabled: cloudData.badge_settings?.enabled !== undefined ? cloudData.badge_settings.enabled : state.badgeSettings?.enabled ?? true
+                    };
+
                     if (token) {
                         saveData(token, newTrips, newPins, newFolders, newBadgeSettings).catch(e => console.error("Auto sync failed after merge", e));
                     }
+                }
+            } else if (!isInteractive) {
+                // Background sync merge fallback for missing remote settings
+                if (!cloudData.badge_settings?.defaultMapCenter && state.badgeSettings?.defaultMapCenter) {
+                     newBadgeSettings.defaultMapCenter = state.badgeSettings.defaultMapCenter;
+                     saveData(token, newTrips, newPins, newFolders, newBadgeSettings).catch(e => console.error("Auto sync settings failed", e));
                 }
             }
 

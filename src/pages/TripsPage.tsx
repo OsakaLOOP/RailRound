@@ -3,7 +3,7 @@ import { Train, Edit2, Trash2, Star, Plus, MapPin, Upload } from 'lucide-react';
 import { useStore } from '../store';
 import { DropZone } from '../components/DragContext';
 import { getRouteVisualData } from '../core/tripCalculator';
-import { isMobile } from 'react-device-detect';
+import { useIsMobile } from '../hooks/useMobile';
 import { useShallow } from 'zustand/react/shallow';
 
 const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
@@ -32,6 +32,8 @@ const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
         () => getRouteVisualData(segments, segmentGeometries, railwayData, geoData),
         [segments, segmentGeometries, railwayData, geoData]
     );
+
+    const isMobile = useIsMobile();
 
     if (visualPaths.length === 0) return <div className="w-28 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">无预览</div>;
 
@@ -451,8 +453,13 @@ export const FloatingActionButtons: React.FC<{
 
             <div
                 className={`w-full transition-opacity duration-500 ease-in-out pointer-events-auto ${isVisible || alwaysVisible || isTutorialActive || isHovering ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                onMouseEnter={() => setIsHovering(true)}
-                onMouseLeave={() => setIsHovering(false)}
+                onMouseEnter={() => {
+                    // Only apply hover interactions on non-mobile to prevent sticky hover states
+                    if (window.innerWidth > 768) setIsHovering(true);
+                }}
+                onMouseLeave={() => {
+                    if (window.innerWidth > 768) setIsHovering(false);
+                }}
                 onTouchStart={() => setIsHovering(true)}
                 onTouchEnd={() => {
                     setTimeout(() => setIsHovering(false), 2000);

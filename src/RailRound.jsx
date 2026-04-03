@@ -5,7 +5,7 @@ import  buildKMLString  from './buildKml';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as turf from '@turf/turf';
-import { isMobile } from 'react-device-detect';
+import { useIsMobile } from './hooks/useMobile';
 
 // Quick import-time log to ensure the module loads when Vite imports it.
 try { console.log('[icon] module loaded'); } catch  {}
@@ -937,6 +937,8 @@ const RouteSlice = ({ segments, segmentGeometries, railwayData, geoData }) => {
       () => getRouteVisualData(segments, segmentGeometries, railwayData, geoData),
       [segments, segmentGeometries, railwayData, geoData]
   );
+
+  const isMobile = useIsMobile();
 
   if (visualPaths.length === 0) return <div className="w-28 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">无预览</div>;
 

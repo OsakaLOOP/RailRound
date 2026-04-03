@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import { GlobalProvider } from './GlobalProvider';
 import { AppLayout } from './AppLayout'; // Ensure it points to AppLayout
-import { isMobile } from 'react-device-detect';
+import { IS_MOBILE } from './hooks/useMobile';
 
 // Suppress console logs in production
 if (import.meta.env.PROD) {
@@ -11,7 +11,7 @@ if (import.meta.env.PROD) {
 }
 
 // Add touch-action for mobile interaction stability
-if (isMobile) {
+if (IS_MOBILE) {
     document.documentElement.style.touchAction = 'manipulation';
     document.body.style.touchAction = 'manipulation';
 }

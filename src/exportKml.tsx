@@ -4,14 +4,20 @@ import { sliceGeoJsonPath } from './utils/geoUtils';
 import { useStore } from './store';
 import toast from 'react-hot-toast';
 
-const handleExportKML = async () => {
+export const handleExportKML = async (
+    isExportingKML: boolean,
+    setIsExportingKML: React.Dispatch<React.SetStateAction<boolean>>,
+    trips: any[],
+    geoData: any,
+    railwayData: any
+) => {
     if (isExportingKML) return;
     setIsExportingKML(true);
     
     // 异步执行 KML 生成，防止阻塞主线程
     setTimeout(async () => {
         try {
-            if (trips.length === 0 || !geoData || !window.turf) {
+            if (trips.length === 0 || !geoData || !(window as any).turf) {
                 alert("无行程数据或地图数据未加载。");
                 setIsExportingKML(false);
                 return;

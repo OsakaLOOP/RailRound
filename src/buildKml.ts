@@ -1,4 +1,9 @@
-const buildKMLString = (paths) => {
+interface KMLPath {
+    name: string;
+    coordinates: string;
+}
+
+const buildKMLString = (paths: KMLPath[]): string => {
     let placemarks = '';
 
     paths.forEach(p => {

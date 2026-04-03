@@ -50,9 +50,11 @@ const Chest = ({ onDropItem } = {}) => {
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         dragStartPos.current = { x: clientX, y: clientY };
         initialPos.current = { ...pos };
-        e.stopPropagation();
 
-        if (!e.touches) {
+        // Stop propagation only if touch event on mobile to prevent scrolling
+        if (e.touches) {
+            e.stopPropagation();
+        } else {
              e.preventDefault();
         }
     };
@@ -302,7 +304,10 @@ const Chest = ({ onDropItem } = {}) => {
                     <div
                         className={`w-16 h-16 transition-transform duration-200 cursor-grab active:cursor-grabbing ${isGlobalDragging ? 'scale-110' : ''}`}
                         onMouseDown={handlePointerDown}
-                        onTouchStart={handlePointerDown}
+                        onTouchStart={(e) => {
+                            // On mobile, touch events shouldn't conflict with map pan
+                            handlePointerDown(e);
+                        }}
                         onMouseEnter={() => { if(isGlobalDragging) setIsHovering(true); }}
                         onMouseLeave={() => { setIsHovering(false); setJustDropped(false); }}
                     >
@@ -486,7 +491,10 @@ const ChestItem = ({ item, onRemove, onDragSuccess, pos}) => {
         <div
             className={pos==='left'?"relative group w-12 h-12":"relative group w-full h-full"}
             onMouseDown={handleDragStart}
-            onTouchStart={handleDragStart}
+            onTouchStart={(e) => {
+                // Prevent mobile scroll when dragging items
+                handleDragStart(e);
+            }}
         >
             <McSlotSvg />
 

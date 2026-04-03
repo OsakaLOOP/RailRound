@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useDrag } from './DragContext';
 import { X } from 'lucide-react';
+import { IS_MOBILE } from '../hooks/useMobile';
 import railBg from './../assets/rail_bg.png'
 
 const McSlotSvg = ({ className = "" }) => (
@@ -89,7 +90,9 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onDoubleClick={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
+            onTouchStart={(e) => {
+                if (IS_MOBILE) e.stopPropagation();
+            }}
             onScroll={(e) => e.stopPropagation()}
             onWheel={(e) => e.stopPropagation()}
         >
@@ -127,7 +130,7 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                                     }, e);
                                 }}
                                 onTouchStart={(e) => {
-                                    e.stopPropagation();
+                                    if (IS_MOBILE) e.stopPropagation();
                                     startDrag({
                                         type: 'station',
                                         id: line.stationId,

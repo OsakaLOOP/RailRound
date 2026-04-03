@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { isMobile } from 'react-device-detect';
 import railBg from './../assets/rail_bg.png'
 // --- Global Drag Context ---
 const DragContext = createContext(null);
@@ -48,7 +47,7 @@ export const DragProvider = ({ children }) => {
 
     const onMouseMove = (e) => handleMove(e.clientX, e.clientY);
     const onTouchMove = (e) => {
-        if (dragThresholdMet.current) {
+        if (dragThresholdMet.current && e.cancelable) {
             e.preventDefault(); // Prevent scrolling while actively dragging an item
         }
         handleMove(e.touches[0].clientX, e.touches[0].clientY);

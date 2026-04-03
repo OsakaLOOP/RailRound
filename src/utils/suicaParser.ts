@@ -71,7 +71,9 @@ export interface ParsedDetails {
 
 const findStation = (stationName: string, lineName: string, companyName: string, railwayData: RailwayMap) => {
     // 1. Try exact match on line and station
-    for (const [lineKey, line] of Object.entries(railwayData)) {
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        const line = railwayData[lineKey];
         if (line.meta.company === companyName || companyName.includes(line.meta.company) || line.meta.company.includes(companyName)) {
              if (lineKey.includes(lineName) || lineName.includes(lineKey)) {
                  const station = line.stations.find(s => s.name_ja === stationName || s.name_ja.includes(stationName) || stationName.includes(s.name_ja));
@@ -83,7 +85,9 @@ const findStation = (stationName: string, lineName: string, companyName: string,
     }
 
     // 2. Try match on station and company (ignoring line)
-    for (const [lineKey, line] of Object.entries(railwayData)) {
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        const line = railwayData[lineKey];
         if (line.meta.company === companyName || companyName.includes(line.meta.company) || line.meta.company.includes(companyName)) {
              const station = line.stations.find(s => s.name_ja === stationName || s.name_ja.includes(stationName) || stationName.includes(s.name_ja));
              if (station) {
@@ -93,7 +97,9 @@ const findStation = (stationName: string, lineName: string, companyName: string,
     }
 
     // 3. Try match just on station name across all
-    for (const [lineKey, line] of Object.entries(railwayData)) {
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        const line = railwayData[lineKey];
         const station = line.stations.find(s => s.name_ja === stationName || s.name_ja.includes(stationName) || stationName.includes(s.name_ja));
         if (station) {
             return { lineKey, stationId: station.id };

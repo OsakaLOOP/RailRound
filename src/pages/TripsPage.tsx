@@ -257,6 +257,8 @@ export const TripsPage: React.FC = () => {
     );
 };
 
+import { ArrowUp, ArrowDown } from 'lucide-react';
+
 export const FloatingActionButtons: React.FC<{
     fileInputRef: React.RefObject<HTMLInputElement>,
     handleImportSuica: (event: React.ChangeEvent<HTMLInputElement>) => void,
@@ -264,12 +266,32 @@ export const FloatingActionButtons: React.FC<{
     alwaysVisible?: boolean
 }> = ({ fileInputRef, handleImportSuica, startEditingTrip, alwaysVisible = false }) => {
     const [isVisible, setIsVisible] = useState(true);
+    const [isTutorialActive, setIsTutorialActive] = useState(false);
+    const [scrollPos, setScrollPos] = useState<'top' | 'middle' | 'bottom'>('top');
+    const [showScrollBtns, setShowScrollBtns] = useState(false);
+    const [isHovering, setIsHovering] = useState(false);
+
     const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const scrollBtnsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastScrollYRef = useRef(0);
     const lastScrollTimeRef = useRef(Date.now());
 
     useEffect(() => {
-        if (alwaysVisible) {
+        const handleTutorialStep = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            if (customEvent.detail.id === 'add-trip') {
+                setIsTutorialActive(true);
+                setIsVisible(true);
+            } else {
+                setIsTutorialActive(false);
+            }
+        };
+        document.addEventListener('tutorial:step-changed', handleTutorialStep);
+        return () => document.removeEventListener('tutorial:step-changed', handleTutorialStep);
+    }, []);
+
+    useEffect(() => {
+        if (alwaysVisible || isTutorialActive || isHovering) {
             setIsVisible(true);
             if (scrollTimeoutRef.current) {
                 clearTimeout(scrollTimeoutRef.current);
@@ -298,13 +320,54 @@ export const FloatingActionButtons: React.FC<{
                     }
 
                     scrollTimeoutRef.current = setTimeout(() => {
-                        setIsVisible(false);
-                    }, 2000); // Hide after 2 seconds of inactivity
+                        if (!isHovering && !isTutorialActive && !alwaysVisible) {
+                            setIsVisible(false);
+                        }
+                    }, 2000);
                 }
             }
 
             lastScrollYRef.current = currentScrollY;
             lastScrollTimeRef.current = currentTime;
+
+            // Scroll buttons logic
+            setShowScrollBtns(false);
+            if (scrollBtnsTimeoutRef.current) clearTimeout(scrollBtnsTimeoutRef.current);
+            scrollBtnsTimeoutRef.current = setTimeout(() => {
+                setShowScrollBtns(true);
+            }, 500);
+
+            // Position detection
+            if (currentScrollY === 0) {
+                setScrollPos('top');
+            } else if (currentScrollY + target.clientHeight >= target.scrollHeight - 10) {
+                setScrollPos('bottom');
+                // Trigger visibility when reaching bottom
+                setIsVisible(true);
+                if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+                scrollTimeoutRef.current = setTimeout(() => {
+                    if (!isHovering && !isTutorialActive && !alwaysVisible) {
+                        setIsVisible(false);
+                    }
+                }, 2000);
+            } else {
+                setScrollPos('middle');
+            }
+        };
+
+        const handleWheelOrTouch = () => {
+            const container = document.getElementById('trips-scroll-container');
+            if (!container) return;
+            const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
+            if (isAtBottom) {
+                setIsVisible(true);
+                if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+                scrollTimeoutRef.current = setTimeout(() => {
+                    if (!isHovering && !isTutorialActive && !alwaysVisible) {
+                        setIsVisible(false);
+                    }
+                }, 2000);
+            }
         };
 
         const container = document.getElementById('trips-scroll-container');
@@ -327,15 +390,21 @@ export const FloatingActionButtons: React.FC<{
 
         if (container) {
             container.addEventListener('scroll', handleScroll);
+            container.addEventListener('wheel', handleWheelOrTouch);
+            container.addEventListener('touchmove', handleWheelOrTouch);
             // Run initial check
             setTimeout(checkScrollable, 100);
             window.addEventListener('resize', checkScrollable);
+
+            // Initial position check
+            if (container.scrollTop === 0) setScrollPos('top');
+            setShowScrollBtns(true);
         }
 
         // Initial fade out timer (only if not empty and scrollable)
-        if (!alwaysVisible) {
+        if (!alwaysVisible && !isTutorialActive) {
             scrollTimeoutRef.current = setTimeout(() => {
-                if (container && container.scrollHeight > container.clientHeight) {
+                if (container && container.scrollHeight > container.clientHeight && !isHovering) {
                     setIsVisible(false);
                 }
             }, 3000);
@@ -344,18 +413,45 @@ export const FloatingActionButtons: React.FC<{
         return () => {
             if (container) {
                 container.removeEventListener('scroll', handleScroll);
+                container.removeEventListener('wheel', handleWheelOrTouch);
+                container.removeEventListener('touchmove', handleWheelOrTouch);
             }
             window.removeEventListener('resize', checkScrollable);
-            if (scrollTimeoutRef.current) {
-                clearTimeout(scrollTimeoutRef.current);
-            }
+            if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+            if (scrollBtnsTimeoutRef.current) clearTimeout(scrollBtnsTimeoutRef.current);
         };
-    }, [alwaysVisible]);
+    }, [alwaysVisible, isTutorialActive, isHovering]);
+
+    const scrollToTop = () => {
+        document.getElementById('trips-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const scrollToBottom = () => {
+        const container = document.getElementById('trips-scroll-container');
+        if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    };
 
     return (
         <div
-            className={`absolute bottom-4 left-4 right-4 z-50 transition-opacity duration-500 ease-in-out ${isVisible || alwaysVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+            className={`absolute bottom-4 left-4 right-4 z-50 flex flex-col gap-2 items-end transition-opacity duration-500 ease-in-out ${isVisible || alwaysVisible || isTutorialActive || isHovering ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
         >
+            {/* Scroll Buttons */}
+            <div className={`flex flex-col gap-2 mr-2 transition-opacity duration-300 ${showScrollBtns ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                {scrollPos !== 'top' && (
+                    <button onClick={scrollToTop} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors">
+                        <ArrowUp size={20} />
+                    </button>
+                )}
+                {scrollPos !== 'bottom' && (
+                    <button onClick={scrollToBottom} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors">
+                        <ArrowDown size={20} />
+                    </button>
+                )}
+            </div>
+
+            <div className="w-full">
             <DropZone onDrop={(item: any) => {
                 if (item.type === 'station') {
                     const newSegments = [{ id: Date.now().toString(), lineKey: item.lineKey, fromId: item.id, toId: '' }];
@@ -372,6 +468,7 @@ export const FloatingActionButtons: React.FC<{
                     <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportSuica} />
                 </div>
             </DropZone>
+            </div>
         </div>
     );
 };

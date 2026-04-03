@@ -25,7 +25,7 @@ const STEPS = [
         id: 'add-trip',
         target: '#btn-add-trip',
         title: "初次记录",
-        content: "点击打开新旅程编辑菜单",
+        content: "点击下方悬浮的“新旅程”按钮打开编辑菜单",
         position: 'top',
         action: 'wait-interaction', 
         check: ({ isTripEditing }) => isTripEditing
@@ -222,10 +222,12 @@ const Tutorial = ({
     useEffect(() => {
         if (step < 0 || step >= STEPS.length) {
             setRect(null);
+            document.dispatchEvent(new CustomEvent('tutorial:step-changed', { detail: { id: null } }));
             return;
         }
 
         const currentStep = STEPS[step];
+        document.dispatchEvent(new CustomEvent('tutorial:step-changed', { detail: { id: currentStep.id } }));
 
         // 1. Target Resolution
         const updateRect = () => {

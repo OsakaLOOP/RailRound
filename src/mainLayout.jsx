@@ -4,6 +4,7 @@ import { Layers, Map as MapIcon, PieChart, Train, LogOut, User, Download, Upload
 import MapComponent from './components/MapComponent';
 import Chest from './components/Chest';
 import Tutorial from './components/Tutorial';
+import DefaultLocationPrompt from './components/DefaultLocationPrompt';
 import { useAuth, useUserData, useGeo, useVersion } from './globalContext';
 import { VersionBadge } from './components/VersionBadge';
 import buildKMLString from './buildKml';
@@ -27,6 +28,24 @@ export default function MainLayout() {
   const showMap = isMapMode;
 
   const [isExportingKML, setIsExportingKML] = useState(false);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+
+  useEffect(() => {
+      // We will check periodically if the tutorial is done but pref is not set
+      let isPrompted = false;
+      const checkPrompt = () => {
+          if (isPrompted) return;
+          const tutorialDone = localStorage.getItem('rail_tutorial_skipped') === 'true';
+          const prefSet = localStorage.getItem('rail_default_location_pref') !== null;
+          if (tutorialDone && !prefSet) {
+              setShowLocationPrompt(true);
+              isPrompted = true;
+          }
+      };
+      checkPrompt();
+      const intervalId = setInterval(checkPrompt, 1000);
+      return () => clearInterval(intervalId);
+  }, []);
 
   // --- File Logic ---
   const handleExportKML = async () => {
@@ -300,6 +319,15 @@ export default function MainLayout() {
        </div>
 
        <Tutorial />
+       {showLocationPrompt && (
+           <DefaultLocationPrompt onClose={() => {
+               // If closed without setting, we set a dummy so it doesn't pop up forever
+               if (!localStorage.getItem('rail_default_location_pref')) {
+                    localStorage.setItem('rail_default_location_pref', JSON.stringify({ mode: 'fixed', center: [35.68, 139.76], label: '东京(默认)' }));
+               }
+               setShowLocationPrompt(false);
+           }} />
+       )}
 
        {/* Navigation Bar (z-30) */}
        <nav className="absolute bottom-0 left-0 right-0 bg-white border-t p-2 flex justify-around shrink-0 pb-safe z-30 pointer-events-auto">

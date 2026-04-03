@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoJSON 拓扑编辑器 - 轨道逻辑增强版</title>
+    <title>GeoJSON 拓扑编辑器 - 框选功能增强版</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -38,6 +38,7 @@
             100% { box-shadow: 0 0 5px rgba(245, 158, 11, 0.4); }
         }
 
+        /* 框选时的鼠标样式 */
         .cursor-crosshair { cursor: crosshair !important; }
     </style>
 </head>
@@ -48,8 +49,10 @@
         <p class="text-gray-600 font-medium">正在同步工作区...</p>
     </div>
 
+    <!-- 左侧：地图 -->
     <div id="map" class="w-[55%] h-full z-0 relative shadow-inner"></div>
 
+    <!-- 右侧：控制面板 -->
     <div class="w-[45%] h-full flex flex-col bg-gray-100 border-l border-gray-200 z-10 shadow-lg relative">
         
         <!-- 点选模式悬浮条 -->
@@ -70,13 +73,13 @@
             </div>
         </div>
 
-        <!-- 头部 -->
+        <!-- 头部与主控制 -->
         <div class="p-3 border-b border-gray-200 bg-white flex-shrink-0 shadow-sm z-20">
             <div class="flex justify-between items-center mb-2">
                 <h1 class="text-lg font-bold flex items-center gap-2">
-                    <i class="fa-solid fa-route text-blue-500"></i> 拓扑编辑器 v6
+                    <i class="fa-solid fa-route text-blue-500"></i> 拓扑编辑器 v5
                 </h1>
-                <div id="sync-status" class="text-[10px] text-gray-400"><i class="fa-solid fa-database"></i> 存储就绪</div>
+                <div id="sync-status" class="text-[10px] text-gray-400"><i class="fa-solid fa-database"></i> 离线存储就绪</div>
             </div>
             <textarea id="geojson-input" rows="2" class="w-full p-2 text-xs border rounded focus:ring-1 focus:ring-blue-500 font-mono mb-2" placeholder="粘贴 GeoJSON 数据..."></textarea>
             
@@ -92,37 +95,47 @@
             </div>
         </div>
 
-        <!-- 暂存条 -->
+        <!-- 暂存区工具条 -->
         <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex justify-between items-center text-xs">
             <div class="flex items-center gap-2 text-orange-600 font-bold">
-                <i class="fa-solid fa-boxes-packing"></i> 暂存: <span id="stash-count">0</span>
+                <i class="fa-solid fa-boxes-packing"></i> 暂存区: <span id="stash-count">0</span> 项
             </div>
             <button onclick="handleLoadStash()" class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1">
-                <i class="fa-solid fa-rotate-right"></i> 加载暂存
+                <i class="fa-solid fa-rotate-right"></i> 加载全部暂存
             </button>
         </div>
 
-        <!-- 列表 -->
+        <!-- 滚动列表 -->
         <div class="flex-1 overflow-y-auto p-3 space-y-4" id="main-scroll-area">
+            
+            <!-- 待分配池 -->
             <div id="unassigned-container" class="bg-white rounded border border-gray-300 shadow-sm overflow-hidden">
                 <div class="bg-gray-100 px-3 py-2 border-b flex justify-between items-center">
-                    <span class="font-bold text-gray-600">待处理池 (<span id="unassigned-count">0</span>)</span>
-                    <button onclick="enterSelectionMode()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-full font-bold shadow-md transition transform hover:scale-105">
+                    <span class="font-bold text-gray-600"><i class="fa-solid fa-layer-group text-gray-400"></i> 待处理池 (<span id="unassigned-count">0</span>)</span>
+                    <button onclick="enterSelectionMode()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-full font-bold shadow-md transition transform hover:scale-105 active:scale-95">
                         <i class="fa-solid fa-plus-circle"></i> 点选新建区段
                     </button>
                 </div>
                 <div class="drop-zone p-2 grid grid-cols-2 gap-2 bg-gray-50 min-h-[60px]" data-type="unassigned" id="unassigned-list" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+                    <!-- 未分配列表 -->
                 </div>
             </div>
+
+            <!-- 区段列表 -->
             <div id="blocks-container" class="space-y-4"></div>
+            
+            <div class="h-20 text-center text-gray-300 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-lg">
+                <i class="fa-solid fa-ellipsis text-2xl mb-1"></i>
+                <span>请创建区段进行组织</span>
+            </div>
         </div>
     </div>
 
     <script>
         /**
-         * --- 1. 存储与基础 ---
+         * --- 0. 基础工具与存储 ---
          */
-        const DB_NAME = 'GeoTopoEditorDB_V6'; 
+        const DB_NAME = 'GeoTopoEditorDB_V5'; 
         const STORE_NAME = 'workspace';
         let db;
 
@@ -142,13 +155,16 @@
             });
         }
 
+        /**
+         * --- 1. 全局状态 ---
+         */
         window.state = {
             segmentDict: {},  
             unassigned: [],   
             blocks: [],       
             stashed: { segments: [], blocks: [] },
             selectionMode: false,
-            boxSelectActive: false,
+            boxSelectActive: false, // 框选工具是否激活
             selectedIds: []   
         };
 
@@ -181,7 +197,7 @@
         }
 
         /**
-         * --- 2. 地图与框选 ---
+         * --- 2. 地图初始化与框选插件逻辑 ---
          */
         let boxSelectRect = null;
         let boxStartLatLng = null;
@@ -190,11 +206,14 @@
             window.map = L.map('map').setView([35.68, 139.76], 13);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSMC' }).addTo(window.map);
 
+            // 框选模式事件绑定
             window.map.on('mousedown', (e) => {
                 if (!window.state.boxSelectActive) return;
                 L.DomEvent.stopPropagation(e);
                 boxStartLatLng = e.latlng;
-                boxSelectRect = L.rectangle([boxStartLatLng, boxStartLatLng], { color: '#f59e0b', weight: 2, fillOpacity: 0.2, dashArray: '5, 5', interactive: false }).addTo(window.map);
+                boxSelectRect = L.rectangle([boxStartLatLng, boxStartLatLng], {
+                    color: '#f59e0b', weight: 2, fillOpacity: 0.2, dashArray: '5, 5', interactive: false
+                }).addTo(window.map);
             });
 
             window.map.on('mousemove', (e) => {
@@ -205,56 +224,177 @@
             window.map.on('mouseup', (e) => {
                 if (!boxSelectRect) return;
                 const bounds = boxSelectRect.getBounds();
+                
+                // 执行空间查询：找出落在框内的线段
                 let newlySelected = 0;
                 for (let id in window.state.segmentDict) {
                     const seg = window.state.segmentDict[id];
+                    // 只要有一个点在框内即视为选中
                     const isInside = seg.coords.some(c => bounds.contains([c[1], c[0]]));
                     if (isInside && !window.state.selectedIds.includes(id)) {
                         window.state.selectedIds.push(id);
                         newlySelected++;
                     }
                 }
+                
                 window.map.removeLayer(boxSelectRect);
                 boxSelectRect = null;
-                if (newlySelected > 0) { document.getElementById('selection-count').innerText = window.state.selectedIds.length; updateUI(true); }
+                
+                if (newlySelected > 0) {
+                    document.getElementById('selection-count').innerText = window.state.selectedIds.length;
+                    updateUI(true);
+                }
             });
         }
 
         /**
-         * --- 3. 逻辑控制 ---
+         * --- 3. 点选模式逻辑 (含框选开关) ---
          */
-        window.enterSelectionMode = () => { window.state.selectionMode = true; window.state.selectedIds = []; document.getElementById('selection-toolbar').classList.remove('hidden'); updateUI(true); };
-        window.exitSelectionMode = () => { if (window.state.boxSelectActive) toggleBoxSelect(); window.state.selectionMode = false; document.getElementById('selection-toolbar').classList.add('hidden'); updateUI(true); };
+        window.enterSelectionMode = () => {
+            window.state.selectionMode = true;
+            window.state.selectedIds = [];
+            document.getElementById('selection-toolbar').classList.remove('hidden');
+            document.getElementById('selection-count').innerText = '0';
+            updateUI(true); 
+        };
+
         window.toggleBoxSelect = () => {
             window.state.boxSelectActive = !window.state.boxSelectActive;
             const btn = document.getElementById('box-select-btn');
-            if (window.state.boxSelectActive) { window.map.dragging.disable(); btn.classList.add('bg-white', 'text-amber-600'); }
-            else { window.map.dragging.enable(); btn.classList.remove('bg-white', 'text-amber-600'); }
+            const mapDiv = document.getElementById('map');
+            
+            if (window.state.boxSelectActive) {
+                window.map.dragging.disable();
+                window.map.scrollWheelZoom.disable();
+                btn.classList.add('bg-white', 'text-amber-600');
+                btn.classList.remove('bg-amber-600', 'text-white');
+                mapDiv.classList.add('cursor-crosshair');
+                showToast("框选模式已开启，请在地图上拖拽选择线段");
+            } else {
+                window.map.dragging.enable();
+                window.map.scrollWheelZoom.enable();
+                btn.classList.remove('bg-white', 'text-amber-600');
+                btn.classList.add('bg-amber-600', 'text-white');
+                mapDiv.classList.remove('cursor-crosshair');
+            }
+        };
+
+        window.exitSelectionMode = () => {
+            if (window.state.boxSelectActive) toggleBoxSelect(); // 强制关闭框选
+            window.state.selectionMode = false;
+            window.state.selectedIds = [];
+            document.getElementById('selection-toolbar').classList.add('hidden');
+            updateUI(true);
+        };
+
+        window.toggleSelection = (id) => {
+            const idx = window.state.selectedIds.indexOf(id);
+            if (idx > -1) window.state.selectedIds.splice(idx, 1);
+            else window.state.selectedIds.push(id);
+            document.getElementById('selection-count').innerText = window.state.selectedIds.length;
+            updateUI(true); 
         };
 
         window.confirmBlockSelection = () => {
-            if (window.state.selectedIds.length === 0) return;
-            const newBlock = { id: 'blk_' + Math.random().toString(36).substr(2, 9), type: 'merged', merged: [...window.state.selectedIds], up: [], down: [] };
+            if (window.state.selectedIds.length === 0) return showToast("未选择任何线段", true);
+            
+            const newBlockId = 'blk_' + Math.random().toString(36).substr(2, 9);
+            const newBlock = { id: newBlockId, type: 'merged', merged: [...window.state.selectedIds], up: [], down: [] };
+            
             window.state.selectedIds.forEach(id => {
-                const uIdx = window.state.unassigned.indexOf(id);
-                if (uIdx > -1) window.state.unassigned.splice(uIdx, 1);
-                window.state.blocks.forEach(b => { ['merged','up','down'].forEach(t => { const p = b[t].indexOf(id); if(p > -1) b[t].splice(p, 1); }); });
+                if (window.state.unassigned.includes(id)) {
+                    window.state.unassigned.splice(window.state.unassigned.indexOf(id), 1);
+                } else {
+                    window.state.blocks.forEach(b => {
+                        ['merged', 'up', 'down'].forEach(t => {
+                            const p = b[t].indexOf(id);
+                            if (p > -1) b[t].splice(p, 1);
+                        });
+                    });
+                }
             });
+
             window.state.blocks.push(newBlock);
-            exitSelectionMode(); triggerPersist();
+            showToast(`成功创建区段，包含 ${window.state.selectedIds.length} 条线段`);
+            exitSelectionMode();
+            triggerPersist();
         };
 
-        window.handleStashBlock = (id) => { const idx = window.state.blocks.findIndex(b=>b.id===id); if(idx>-1) { window.state.stashed.blocks.push(window.state.blocks.splice(idx,1)[0]); updateUI(); triggerPersist(); } };
-        window.handleStashUnassigned = (id) => { const idx = window.state.unassigned.indexOf(id); if(idx>-1) { window.state.stashed.segments.push(window.state.unassigned.splice(idx,1)[0]); updateUI(); triggerPersist(); } };
+        /**
+         * --- 4. 暂存区 (Stash) 核心逻辑 ---
+         */
+        window.handleStashBlock = (id) => {
+            const idx = window.state.blocks.findIndex(b => b.id === id);
+            if (idx > -1) {
+                const block = window.state.blocks.splice(idx, 1)[0];
+                window.state.stashed.blocks.push(block);
+                showToast("已搁置");
+                updateUI();
+                triggerPersist();
+            }
+        };
+
+        window.handleStashUnassigned = (id) => {
+            const idx = window.state.unassigned.indexOf(id);
+            if (idx > -1) {
+                const segId = window.state.unassigned.splice(idx, 1)[0];
+                window.state.stashed.segments.push(segId);
+                showToast("已搁置线段");
+                updateUI();
+                triggerPersist();
+            }
+        };
+
         window.handleLoadStash = () => {
             const s = window.state.stashed;
-            window.state.unassigned.push(...s.segments); window.state.blocks.push(...s.blocks);
+            const total = s.segments.length + s.blocks.length;
+            if (total === 0) return showToast("暂存区为空", true);
+            window.state.unassigned.push(...s.segments);
+            window.state.blocks.push(...s.blocks);
             window.state.stashed = { segments: [], blocks: [] };
+            showToast(`已恢复 ${total} 个暂存项`);
+            updateUI();
+            fitMapToBounds();
+            triggerPersist();
+        };
+
+        /**
+         * --- 5. 基础解析与导出 ---
+         */
+        function handleLoadAction() {
+            const input = document.getElementById('geojson-input').value.trim();
+            if (!input) return;
+            let rawData; try { rawData = JSON.parse(input); } catch(e) { return showToast("JSON无效", true); }
+
+            let coordsArray = [];
+            function extract(obj) {
+                if (!obj) return;
+                if (obj.type === 'FeatureCollection') obj.features.forEach(extract);
+                else if (obj.type === 'Feature') extract(obj.geometry);
+                else if (obj.type === 'MultiLineString') coordsArray.push(...obj.coordinates);
+                else if (obj.type === 'LineString') coordsArray.push(obj.coordinates);
+            }
+            extract(rawData);
+            
+            coordsArray.forEach(coords => {
+                let id = 'seg_' + Math.random().toString(36).substr(2, 9);
+                window.state.segmentDict[id] = { id, coords, length: calculateLength(coords) };
+                window.state.unassigned.push(id);
+            });
+
+            document.getElementById('geojson-input').value = '';
+            updateUI(); fitMapToBounds(); triggerPersist();
+        }
+
+        window.handleClearAll = () => {
+            if(!confirm("确定清空活跃工作区？")) return;
+            window.state.unassigned = [];
+            window.state.blocks = [];
             updateUI(); triggerPersist();
         };
 
         /**
-         * --- 4. 拓扑与计算核心 (修复开口线路逻辑) ---
+         * --- 6. 辅助算法 ---
          */
         function getDistance(p1, p2) {
             const rad = Math.PI / 180;
@@ -262,56 +402,94 @@
             return R_EARTH * 2 * Math.asin(Math.sqrt(a));
         }
 
-        // 提取区段中特定路径的真实端点
-        function getTrackEndpoints(b, trackType) {
-            let list = [];
-            if (b.type === 'merged') list = b.merged;
-            else if (trackType === 'up') list = b.up;
-            else if (trackType === 'down') list = b.down;
+        function calculateLength(coords) {
+            let l = 0;
+            for(let i=0; i<coords.length-1; i++) l += getDistance(coords[i], coords[i+1]);
+            return l;
+        }
 
-            if (list.length === 0) return null;
-
-            const first = window.state.segmentDict[list[0]].coords;
-            const last = window.state.segmentDict[list[list.length-1]].coords;
-
-            // 特别注意：如果请求的是下行逻辑端点，逻辑起点是物理末尾，逻辑终点是物理开头
-            if (trackType === 'down' || (b.type === 'merged' && trackType === 'down_logic')) {
-                return { start: last[last.length - 1], end: first[0] };
+        function getBlockEndpoints(b) {
+            if (b.type === 'merged' && b.merged.length) return { start: window.state.segmentDict[b.merged[0]].coords[0], end: window.state.segmentDict[b.merged[b.merged.length-1]].coords.slice(-1)[0] };
+            if (b.type === 'split') {
+                if (b.up.length) return { start: window.state.segmentDict[b.up[0]].coords[0], end: window.state.segmentDict[b.up[b.up.length-1]].coords.slice(-1)[0] };
+                if (b.down.length) return { start: window.state.segmentDict[b.down[b.down.length-1]].coords.slice(-1)[0], end: window.state.segmentDict[b.down[0]].coords[0] };
             }
-            return { start: first[0], end: last[last.length - 1] };
+            return null;
         }
 
         /**
-         * --- 5. 渲染 ---
+         * --- 7. 拖拽逻辑 ---
+         */
+        window.handleDragStart = (e, id) => {
+            if (window.state.selectionMode) { e.preventDefault(); return; }
+            window.draggedId = id;
+            e.target.classList.add('dragging');
+        };
+
+        window.handleDragOver = (e) => { e.preventDefault(); e.target.closest('.drop-zone')?.classList.add('drop-zone-active'); };
+        window.handleDragLeave = (e) => e.target.closest('.drop-zone')?.classList.remove('drop-zone-active');
+
+        window.handleDrop = (e) => {
+            e.preventDefault();
+            const dz = e.target.closest('.drop-zone');
+            if (!dz || !window.draggedId) return;
+            dz.classList.remove('drop-zone-active');
+
+            const targetType = dz.dataset.type;
+            const targetBlk = dz.dataset.block;
+            
+            Object.values(window.state.blocks).forEach(b => { ['merged', 'up', 'down'].forEach(t => {
+                const idx = b[t].indexOf(window.draggedId);
+                if(idx > -1) b[t].splice(idx, 1);
+            })});
+            const uIdx = window.state.unassigned.indexOf(window.draggedId);
+            if(uIdx > -1) window.state.unassigned.splice(uIdx, 1);
+
+            let list = targetType === 'unassigned' ? window.state.unassigned : window.state.blocks.find(b=>b.id===targetBlk)[targetType];
+            const targetSeg = e.target.closest('.segment-item')?.dataset.id;
+            if (targetSeg) list.splice(list.indexOf(targetSeg), 0, window.draggedId);
+            else list.push(window.draggedId);
+
+            updateUI(); triggerPersist();
+        };
+
+        /**
+         * --- 8. 渲染核心 ---
          */
         function renderSegmentList(ids, context) {
             let html = '';
             ids.forEach((id) => {
                 const seg = window.state.segmentDict[id];
-                const isSel = window.state.selectedIds.includes(id);
+                const isSelected = window.state.selectedIds.includes(id);
+                
                 html += `
-                <div class="segment-item bg-white border border-gray-200 p-2 rounded shadow-sm flex items-center justify-between ${isSel ? 'is-selected' : ''}" 
+                <div class="segment-item bg-white border border-gray-200 p-2 rounded shadow-sm flex items-center justify-between ${isSelected ? 'is-selected' : ''}" 
                      data-id="${id}" draggable="${!window.state.selectionMode}" ondragstart="handleDragStart(event, '${id}')" 
-                     onmouseenter="setHover('${id}')" onmouseleave="setHover(null)" onclick="handleItemClick('${id}')">
-                    <div class="overflow-hidden pr-2 pointer-events-none text-left">
-                        <div class="font-mono text-[9px] text-gray-400 uppercase">#${id.slice(-4)}</div>
+                     onmouseenter="setHover('${id}')" onmouseleave="setHover(null)"
+                     onclick="handleItemClick('${id}')">
+                    <div class="overflow-hidden pr-2">
+                        <div class="font-mono text-[10px] text-gray-400">#${id.slice(-4)}</div>
                         <div class="font-bold text-gray-700">${(seg.length/1000).toFixed(2)} km</div>
                     </div>
                     <div class="flex gap-1" onclick="event.stopPropagation()">
-                         <button onclick="window.state.segmentDict['${id}'].coords.reverse(); updateUI(); triggerPersist();" class="text-gray-300 hover:text-purple-500 p-1"><i class="fa-solid fa-sync text-[10px]"></i></button>
-                         ${context === 'unassigned' ? `<button onclick="handleStashUnassigned('${id}')" class="text-gray-300 hover:text-orange-500 p-1"><i class="fa-solid fa-boxes-packing text-[10px]"></i></button>` : ''}
+                         <button onclick="window.state.segmentDict['${id}'].coords.reverse(); updateUI(); triggerPersist();" class="text-gray-300 hover:text-purple-500 p-1" title="翻转"><i class="fa-solid fa-sync text-[10px]"></i></button>
+                         ${context === 'unassigned' ? `<button onclick="handleStashUnassigned('${id}')" class="text-gray-300 hover:text-orange-500 p-1" title="搁置"><i class="fa-solid fa-boxes-packing text-[10px]"></i></button>` : ''}
                     </div>
                 </div>`;
             });
             return html;
         }
 
+        window.handleItemClick = (id) => {
+            if (window.state.selectionMode) window.toggleSelection(id);
+            else focusSegment(id);
+        };
+
         function updateUI(redrawMap = true) {
             document.getElementById('unassigned-count').innerText = window.state.unassigned.length;
             document.getElementById('stash-count').innerText = window.state.stashed.segments.length + window.state.stashed.blocks.length;
             
             if (redrawMap) {
-                // 显式清理地图上所有已追踪的业务图层
                 Object.values(window.mapLayers).forEach(o => window.map.removeLayer(o.layer));
                 Object.values(window.decoratorLayers).forEach(l => window.map.removeLayer(l));
                 window.gapLayers.forEach(l => window.map.removeLayer(l));
@@ -322,47 +500,18 @@
 
             const container = document.getElementById('blocks-container');
             let blocksHtml = '';
-
-            // 用于跨区段追踪路径连续性的游标
-            let lastUpEnd = null;
-            let lastDownStart = null;
+            let prevEnd = null;
 
             window.state.blocks.forEach((b, idx) => {
-                const upEnds = getTrackEndpoints(b, 'up');
-                const downEnds = getTrackEndpoints(b, 'down');
-                const mergedEnds = getTrackEndpoints(b, 'merged');
-
-                // 确定该区块在两个方向上的实际端点（如果某个方向是开口线路，则为null）
-                const currentUp = upEnds || mergedEnds;
-                const currentDown = downEnds || (mergedEnds ? { start: mergedEnds.end, end: mergedEnds.start } : null);
-
-                let gapWarningHtml = '';
-
-                // 1. 检查上行衔接 (上一区块物理末 -> 当前区块物理头)
-                if (lastUpEnd && currentUp) {
-                    const d = getDistance(lastUpEnd, currentUp.start);
+                const endpoints = getBlockEndpoints(b);
+                if (prevEnd && endpoints) {
+                    const d = getDistance(prevEnd, endpoints.start);
                     if (d > MERGE_TOLERANCE) {
-                        gapWarningHtml += `<div class="bg-blue-600 text-white px-2 py-0.5 rounded shadow text-[9px] font-bold">上行断裂: ${(d/1000).toFixed(2)}km</div>`;
-                        if (redrawMap) window.gapLayers.push(L.polyline([[lastUpEnd[1], lastUpEnd[0]], [currentUp.start[1], currentUp.start[0]]], {color:'#2563eb', weight:3, dashArray:'5,5'}).addTo(window.map));
+                        blocksHtml += `<div class="text-center -my-2 relative z-20"><span class="bg-red-500 text-white px-3 py-0.5 rounded-full text-[10px] font-bold shadow-md tracking-tighter">间距: ${(d/1000).toFixed(2)}km</span></div>`;
+                        if (redrawMap) window.gapLayers.push(L.polyline([[prevEnd[1], prevEnd[0]], [endpoints.start[1], endpoints.start[0]]], {color:'#ef4444', weight:3, dashArray:'5,5'}).addTo(window.map));
                     }
                 }
-                
-                // 2. 检查下行衔接 (当前区块回程出口 -> 上一区块回程入口)
-                if (lastDownStart && currentDown) {
-                    const d = getDistance(currentDown.start, lastDownStart);
-                    if (d > MERGE_TOLERANCE) {
-                        gapWarningHtml += `<div class="bg-green-600 text-white px-2 py-0.5 rounded shadow text-[9px] font-bold">下行断裂: ${(d/1000).toFixed(2)}km</div>`;
-                        if (redrawMap) window.gapLayers.push(L.polyline([[currentDown.start[1], currentDown.start[0]], [lastDownStart[1], lastDownStart[0]]], {color:'#16a34a', weight:3, dashArray:'5,5'}).addTo(window.map));
-                    }
-                }
-
-                if (gapWarningHtml) {
-                    blocksHtml += `<div class="flex flex-col items-center gap-1 -my-2 relative z-20">${gapWarningHtml}</div>`;
-                }
-
-                // 更新游标，只有当本区块存在该方向轨道时才更新位置
-                if (currentUp) lastUpEnd = currentUp.end;
-                if (currentDown) lastDownStart = currentDown.end;
+                if(endpoints) prevEnd = endpoints.end;
 
                 const trackHtml = b.type === 'merged' ? 
                     `<div class="drop-zone p-2 space-y-1 bg-purple-50/30" data-type="merged" data-block="${b.id}" ondragover="handleDragOver(event)" ondrop="handleDrop(event)">${renderSegmentList(b.merged, 'merged')}</div>` :
@@ -374,13 +523,13 @@
                 blocksHtml += `
                 <div class="bg-white rounded border border-gray-300 shadow-sm overflow-hidden">
                     <div class="bg-gray-100 px-3 py-2 flex justify-between items-center">
-                        <span class="font-bold">区段 ${idx+1}</span>
-                        <div class="flex gap-1">
-                            <button onclick="moveBlock(${idx}, -1)" class="p-1 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-chevron-up text-xs"></i></button>
-                            <button onclick="moveBlock(${idx}, 1)" class="p-1 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-chevron-down text-xs"></i></button>
-                            <button onclick="toggleBlockType('${b.id}')" class="text-[10px] bg-white border border-gray-300 px-2 py-0.5 rounded text-blue-600">${b.type==='merged'?'双轨拆分':'合并并线'}</button>
-                            <button onclick="handleStashBlock('${b.id}')" class="p-1 text-orange-400 hover:text-orange-600"><i class="fa-solid fa-boxes-packing text-xs"></i></button>
-                            <button onclick="deleteBlock('${b.id}')" class="p-1 text-gray-300 hover:text-red-500"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                        <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-layer-group text-blue-400"></i> ${idx+1}</span>
+                        <div class="flex gap-2">
+                            <button onclick="moveBlock(${idx}, -1)" class="text-gray-400 hover:text-gray-600 px-1"><i class="fa-solid fa-chevron-up"></i></button>
+                            <button onclick="moveBlock(${idx}, 1)" class="text-gray-400 hover:text-gray-600 px-1"><i class="fa-solid fa-chevron-down"></i></button>
+                            <button onclick="toggleBlockType('${b.id}')" class="text-[10px] bg-white border border-gray-300 px-2 py-0.5 rounded shadow-sm text-blue-600">${b.type==='merged'?'拆分轨道':'合并轨道'}</button>
+                            <button onclick="handleStashBlock('${b.id}')" class="text-gray-400 hover:text-orange-500 px-1"><i class="fa-solid fa-boxes-packing"></i></button>
+                            <button onclick="deleteBlock('${b.id}')" class="text-gray-300 hover:text-red-500 px-1"><i class="fa-solid fa-trash-can"></i></button>
                         </div>
                     </div>
                     ${trackHtml}
@@ -397,25 +546,13 @@
             }
         }
 
-        /**
-         * --- 6. 其他辅助函数 ---
-         */
         function drawOnMap(id, type) {
             const seg = window.state.segmentDict[id];
-            if(!seg) return;
-            const isSel = window.state.selectedIds.includes(id);
-            const color = isSel ? COLORS.selecting : COLORS[type];
+            const isSelected = window.state.selectedIds.includes(id);
+            const color = isSelected ? COLORS.selecting : COLORS[type];
             const latlngs = seg.coords.map(c => [c[1], c[0]]);
-            const line = L.polyline(latlngs, { color, weight: isSel ? 6 : 4, opacity: 0.8 }).addTo(window.map);
-            
-            // 关键：保存装饰器引用到全局字典，确保清理时彻底
-            window.decoratorLayers[id] = L.polylineDecorator(line, { 
-                patterns: [{ 
-                    offset: '50%', repeat: 0, 
-                    symbol: L.Symbol.arrowHead({pixelSize: 10, pathOptions: {fillOpacity: 1, weight: 0, color: '#1f2937'}}) 
-                }] 
-            }).addTo(window.map);
-
+            const line = L.polyline(latlngs, { color, weight: isSelected ? 6 : 4, opacity: 0.8 }).addTo(window.map);
+            window.decoratorLayers[id] = L.polylineDecorator(line, { patterns: [{ offset: '50%', repeat: 0, symbol: L.Symbol.arrowHead({pixelSize: 10, pathOptions: {fillOpacity: 1, weight: 0, color: '#1f2937'}}) }] }).addTo(window.map);
             line.on('click', (e) => { L.DomEvent.stopPropagation(e); handleItemClick(id); });
             line.on('mouseover', () => setHover(id));
             line.on('mouseout', () => setHover(null));
@@ -423,68 +560,54 @@
         }
 
         window.setHover = (id) => {
-            document.querySelectorAll('.segment-item').forEach(el => el.classList.toggle('hovered', el.dataset.id === id));
+            document.querySelectorAll('.segment-item').forEach(el => {
+                if (el.dataset.id === id) el.classList.add('hovered');
+                else el.classList.remove('hovered');
+            });
             for (let k in window.mapLayers) {
                 const isSel = window.state.selectedIds.includes(k);
                 const obj = window.mapLayers[k];
-                if (k === id) {
-                    obj.layer.setStyle({ color: COLORS.hover, weight: 8 }).bringToFront();
-                    if(window.decoratorLayers[k]) window.decoratorLayers[k].bringToFront();
-                } else {
-                    obj.layer.setStyle({ color: isSel ? COLORS.selecting : obj.baseColor, weight: isSel ? 6 : 4 });
-                }
+                if (k === id) obj.layer.setStyle({ color: COLORS.hover, weight: 8 }).bringToFront();
+                else obj.layer.setStyle({ color: isSel ? COLORS.selecting : obj.baseColor, weight: isSel ? 6 : 4 });
             }
         };
 
-        window.handleItemClick = (id) => { if (window.state.selectionMode) window.toggleSelection(id); else focusSegment(id); };
-        function focusSegment(id) { const l = window.mapLayers[id]?.layer; if (l) window.map.fitBounds(l.getBounds(), { padding: [100, 100], maxZoom: 16 }); }
-        
-        window.handleLoadAction = () => {
-            const input = document.getElementById('geojson-input').value.trim();
-            if (!input) return;
-            let rawData; try { rawData = JSON.parse(input); } catch(e) { return showToast("JSON无效", true); }
-            let coordsArray = [];
-            function extract(obj) {
-                if (!obj) return;
-                if (obj.type === 'FeatureCollection') obj.features.forEach(extract);
-                else if (obj.type === 'Feature') extract(obj.geometry);
-                else if (obj.type === 'MultiLineString') coordsArray.push(...obj.coordinates);
-                else if (obj.type === 'LineString') coordsArray.push(obj.coordinates);
-            }
-            extract(rawData);
-            coordsArray.forEach(coords => {
-                let id = 'seg_' + Math.random().toString(36).substr(2, 9);
-                window.state.segmentDict[id] = { id, coords, length: calculateLength(coords) };
-                window.state.unassigned.push(id);
-            });
-            document.getElementById('geojson-input').value = ''; updateUI(); fitMapToBounds(); triggerPersist();
+        window.focusSegment = (id) => {
+            const l = window.mapLayers[id]?.layer;
+            if (l) window.map.fitBounds(l.getBounds(), { padding: [100, 100], maxZoom: 16 });
         };
 
-        window.handleClearAll = () => { if(confirm("确定清空当前活跃工作区？")) { window.state.unassigned = []; window.state.blocks = []; updateUI(); triggerPersist(); } };
+        /**
+         * --- 9. 区段操作 ---
+         */
         window.toggleBlockType = (id) => {
             const b = window.state.blocks.find(x => x.id === id);
             if (b.type === 'merged') { b.type = 'split'; b.up = [...b.merged]; b.merged = []; }
             else { b.type = 'merged'; b.merged = [...b.up, ...b.down]; b.up = []; b.down = []; }
             updateUI(); triggerPersist();
         };
-        window.deleteBlock = (id) => { const idx = window.state.blocks.findIndex(b=>b.id===id); if(idx > -1) { const b = window.state.blocks.splice(idx, 1)[0]; window.state.unassigned.push(...b.merged, ...b.up, ...b.down); updateUI(); triggerPersist(); } };
-        window.moveBlock = (idx, step) => { const target = idx + step; if (target >= 0 && target < window.state.blocks.length) { [window.state.blocks[idx], window.state.blocks[target]] = [window.state.blocks[target], window.state.blocks[idx]]; updateUI(); triggerPersist(); } };
-        
-        function handleDragStart(e, id) { if (window.state.selectionMode) { e.preventDefault(); return; } window.draggedId = id; e.target.classList.add('dragging'); }
-        function handleDragOver(e) { e.preventDefault(); e.target.closest('.drop-zone')?.classList.add('drop-zone-active'); }
-        function handleDragLeave(e) { e.target.closest('.drop-zone')?.classList.remove('drop-zone-active'); }
-        function handleDrop(e) {
-            e.preventDefault(); const dz = e.target.closest('.drop-zone'); if (!dz || !window.draggedId) return; dz.classList.remove('drop-zone-active');
-            const targetType = dz.dataset.type, targetBlk = dz.dataset.block;
-            Object.values(window.state.blocks).forEach(b => { ['merged', 'up', 'down'].forEach(t => { const idx = b[t].indexOf(window.draggedId); if(idx > -1) b[t].splice(idx, 1); })});
-            const uIdx = window.state.unassigned.indexOf(window.draggedId); if(uIdx > -1) window.state.unassigned.splice(uIdx, 1);
-            let list = targetType === 'unassigned' ? window.state.unassigned : window.state.blocks.find(b=>b.id===targetBlk)[targetType];
-            const targetSeg = e.target.closest('.segment-item')?.dataset.id;
-            if (targetSeg) list.splice(list.indexOf(targetSeg), 0, window.draggedId); else list.push(window.draggedId);
-            updateUI(); triggerPersist();
-        }
 
-        function fitMapToBounds() { const all = []; Object.values(window.state.segmentDict).forEach(s => s.coords.forEach(c => all.push([c[1], c[0]]))); if (all.length) window.map.fitBounds(L.latLngBounds(all), { padding: [40, 40] }); }
+        window.deleteBlock = (id) => {
+            const idx = window.state.blocks.findIndex(b=>b.id===id);
+            if(idx > -1) {
+                const b = window.state.blocks.splice(idx, 1)[0];
+                window.state.unassigned.push(...b.merged, ...b.up, ...b.down);
+                updateUI(); triggerPersist();
+            }
+        };
+
+        window.moveBlock = (idx, step) => {
+            const target = idx + step;
+            if (target < 0 || target >= window.state.blocks.length) return;
+            [window.state.blocks[idx], window.state.blocks[target]] = [window.state.blocks[target], window.state.blocks[idx]];
+            updateUI(); triggerPersist();
+        };
+
+        function fitMapToBounds() {
+            const all = [];
+            Object.values(window.state.segmentDict).forEach(s => s.coords.forEach(c => all.push([c[1], c[0]])));
+            if (all.length) window.map.fitBounds(L.latLngBounds(all), { padding: [40, 40] });
+        }
 
         window.exportData = (type) => {
             let out = [];
@@ -499,10 +622,13 @@
                     else b.down.forEach(id => out.push(window.state.segmentDict[id].coords));
                 });
             }
-            if(out.length === 0) return showToast("无可导出内容", true);
+            if(out.length === 0) return showToast("工作区无可导出内容", true);
             const blob = new Blob([JSON.stringify({ type: "Feature", geometry: { type: "MultiLineString", coordinates: out } }, null, 2)], {type: "application/json"});
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `topo_${type==='1'?'up':'down'}_${Date.now()}.geojson`; a.click();
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = `topo_${type==='1'?'upbound':'downbound'}_${Date.now()}.geojson`; a.click();
+            showToast("文件已下载");
         };
+
     </script>
 </body>
 </html>

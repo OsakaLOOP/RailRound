@@ -168,7 +168,9 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng, tu
 export const NearestPoint = (railwayData, targetLat, targetLng) => {
   let minDistSq = Infinity;
   let bestPoint = { lat: targetLat, lng: targetLng, lineKey: '', percentage: 0 };
-  Object.entries(railwayData).forEach(([lineKey, line]) => {
+  for (const lineKey in railwayData) {
+    if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+    const line = railwayData[lineKey];
     for (let i = 0; i < line.stations.length - 1; i++) {
       const A = line.stations[i]; const B = line.stations[i+1];
       const proj = getProjectedPointOnSegment(targetLng, targetLat, A.lng, A.lat, B.lng, B.lat);
@@ -178,7 +180,7 @@ export const NearestPoint = (railwayData, targetLat, targetLng) => {
         bestPoint = { lat: proj.y, lng: proj.x, lineKey, percentage: 0 };
       }
     }
-  });
+  }
   return minDistSq > 0.01 ? { lat: targetLat, lng: targetLng, lineKey: '' } : bestPoint;
 };
 

@@ -18,6 +18,9 @@
         ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
         .segment-item { transition: all 0.2s ease; border-left: 4px solid transparent; cursor: pointer; }
         .segment-item.hovered { border-left-color: #3b82f6; background-color: #eff6ff; }
         .segment-item.is-selected { border-left-color: #f59e0b; background-color: #fffbeb; box-shadow: 0 0 0 2px #f59e0b inset; }
@@ -77,10 +80,15 @@
         <div class="p-3 border-b border-gray-200 bg-white flex-shrink-0 shadow-sm z-20">
             <div class="flex justify-between items-center mb-2">
                 <h1 class="text-lg font-bold flex items-center gap-2">
-                    <i class="fa-solid fa-route text-blue-500"></i> 拓扑编辑器 v5
+                    <i class="fa-solid fa-route text-blue-500"></i> 拓扑编辑器 v6
                 </h1>
                 <div id="sync-status" class="text-[10px] text-gray-400"><i class="fa-solid fa-database"></i> 离线存储就绪</div>
             </div>
+
+            <!-- 线路 Tabs -->
+            <div class="flex items-center gap-2 mb-3 overflow-x-auto pb-1 no-scrollbar" id="line-tabs-container">
+            </div>
+
             <textarea id="geojson-input" rows="2" class="w-full p-2 text-xs border rounded focus:ring-1 focus:ring-blue-500 font-mono mb-2" placeholder="粘贴 GeoJSON 数据..."></textarea>
             
             <div class="flex justify-between items-center">
@@ -160,14 +168,24 @@
          * --- 1. 全局状态 ---
          */
         window.state = {
-            segmentDict: {},  
-            unassigned: [],   
-            blocks: [],       
-            stashed: { segments: [], blocks: [] },
+            lines: {
+                'default': {
+                    name: '默认线路',
+                    segmentDict: {},
+                    unassigned: [],
+                    blocks: [],
+                    stashed: { segments: [], blocks: [] }
+                }
+            },
+            currentLineId: 'default',
             selectionMode: false,
-            boxSelectActive: false, // 框选工具是否激活
+            boxSelectActive: false,
             selectedIds: []   
         };
+
+        function getCurrentLine() {
+            return window.state.lines[window.state.currentLineId];
+        }
 
         window.mapLayers = {};      
         window.decoratorLayers = {}; 
@@ -183,12 +201,42 @@
             const saved = await new Promise(r => {
                 const req = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get('current');
                 req.onsuccess = () => r(req.result);
+                req.onerror = () => r(null);
             });
             if (saved) { 
-                window.state = saved; 
-                if(!window.state.stashed) window.state.stashed = { segments: [], blocks: [] };
+                // 迁移旧数据
+                if (!saved.lines) {
+                    const oldLine = {
+                        name: '默认线路',
+                        segmentDict: saved.segmentDict || {},
+                        unassigned: saved.unassigned || [],
+                        blocks: saved.blocks || [],
+                        stashed: saved.stashed || { segments: [], blocks: [] }
+                    };
+                    window.state = {
+                        lines: { 'default': oldLine },
+                        currentLineId: 'default',
+                        selectionMode: false,
+                        boxSelectActive: false,
+                        selectedIds: []
+                    };
+                } else {
+                    window.state = saved;
+                }
+
+                // 确保所有线路都有必要字段
+                for (let id in window.state.lines) {
+                    let line = window.state.lines[id];
+                    if (!line.stashed) line.stashed = { segments: [], blocks: [] };
+                    if (!line.segmentDict) line.segmentDict = {};
+                    if (!line.unassigned) line.unassigned = [];
+                    if (!line.blocks) line.blocks = [];
+                }
+
                 updateUI(); 
                 fitMapToBounds(); 
+            } else {
+                updateUI();
             }
             document.getElementById('loading-overlay').style.display = 'none';
         };
@@ -226,10 +274,11 @@
                 if (!boxSelectRect) return;
                 const bounds = boxSelectRect.getBounds();
                 
+                const line = getCurrentLine();
                 // 执行空间查询：找出落在框内的线段
                 let newlySelected = 0;
-                for (let id in window.state.segmentDict) {
-                    const seg = window.state.segmentDict[id];
+                for (let id in line.segmentDict) {
+                    const seg = line.segmentDict[id];
                     // 只要有一个点在框内即视为选中
                     const isInside = seg.coords.some(c => bounds.contains([c[1], c[0]]));
                     if (isInside && !window.state.selectedIds.includes(id)) {
@@ -299,14 +348,15 @@
         window.confirmBlockSelection = () => {
             if (window.state.selectedIds.length === 0) return showToast("未选择任何线段", true);
             
+            const line = getCurrentLine();
             const newBlockId = 'blk_' + Math.random().toString(36).substr(2, 9);
             const newBlock = { id: newBlockId, type: 'merged', merged: [...window.state.selectedIds], up: [], down: [] };
             
             window.state.selectedIds.forEach(id => {
-                if (window.state.unassigned.includes(id)) {
-                    window.state.unassigned.splice(window.state.unassigned.indexOf(id), 1);
+                if (line.unassigned.includes(id)) {
+                    line.unassigned.splice(line.unassigned.indexOf(id), 1);
                 } else {
-                    window.state.blocks.forEach(b => {
+                    line.blocks.forEach(b => {
                         ['merged', 'up', 'down'].forEach(t => {
                             const p = b[t].indexOf(id);
                             if (p > -1) b[t].splice(p, 1);
@@ -315,7 +365,7 @@
                 }
             });
 
-            window.state.blocks.push(newBlock);
+            line.blocks.push(newBlock);
             showToast(`成功创建区段，包含 ${window.state.selectedIds.length} 条线段`);
             exitSelectionMode();
             triggerPersist();
@@ -325,10 +375,11 @@
          * --- 4. 暂存区 (Stash) 核心逻辑 ---
          */
         window.handleStashBlock = (id) => {
-            const idx = window.state.blocks.findIndex(b => b.id === id);
+            const line = getCurrentLine();
+            const idx = line.blocks.findIndex(b => b.id === id);
             if (idx > -1) {
-                const block = window.state.blocks.splice(idx, 1)[0];
-                window.state.stashed.blocks.push(block);
+                const block = line.blocks.splice(idx, 1)[0];
+                line.stashed.blocks.push(block);
                 showToast("已搁置");
                 updateUI();
                 triggerPersist();
@@ -336,10 +387,11 @@
         };
 
         window.handleStashUnassigned = (id) => {
-            const idx = window.state.unassigned.indexOf(id);
+            const line = getCurrentLine();
+            const idx = line.unassigned.indexOf(id);
             if (idx > -1) {
-                const segId = window.state.unassigned.splice(idx, 1)[0];
-                window.state.stashed.segments.push(segId);
+                const segId = line.unassigned.splice(idx, 1)[0];
+                line.stashed.segments.push(segId);
                 showToast("已搁置线段");
                 updateUI();
                 triggerPersist();
@@ -347,12 +399,13 @@
         };
 
         window.handleLoadStash = () => {
-            const s = window.state.stashed;
+            const line = getCurrentLine();
+            const s = line.stashed;
             const total = s.segments.length + s.blocks.length;
             if (total === 0) return showToast("暂存区为空", true);
-            window.state.unassigned.push(...s.segments);
-            window.state.blocks.push(...s.blocks);
-            window.state.stashed = { segments: [], blocks: [] };
+            line.unassigned.push(...s.segments);
+            line.blocks.push(...s.blocks);
+            line.stashed = { segments: [], blocks: [] };
             showToast(`已恢复 ${total} 个暂存项`);
             updateUI();
             fitMapToBounds();
@@ -367,6 +420,7 @@
             if (!input) return;
             let rawData; try { rawData = JSON.parse(input); } catch(e) { return showToast("JSON无效", true); }
 
+            const line = getCurrentLine();
             let coordsArray = [];
             function extract(obj) {
                 if (!obj) return;
@@ -379,8 +433,8 @@
             
             coordsArray.forEach(coords => {
                 let id = 'seg_' + Math.random().toString(36).substr(2, 9);
-                window.state.segmentDict[id] = { id, coords, length: calculateLength(coords) };
-                window.state.unassigned.push(id);
+                line.segmentDict[id] = { id, coords, length: calculateLength(coords) };
+                line.unassigned.push(id);
             });
 
             document.getElementById('geojson-input').value = '';
@@ -389,8 +443,11 @@
 
         window.handleClearAll = () => {
             if(!confirm("确定清空活跃工作区？")) return;
-            window.state.unassigned = [];
-            window.state.blocks = [];
+            const line = getCurrentLine();
+            line.unassigned = [];
+            line.blocks = [];
+            line.segmentDict = {};
+            line.stashed = { segments: [], blocks: [] };
             updateUI(); triggerPersist();
         };
 
@@ -399,24 +456,26 @@
          */
         // 翻转线段列表（顺序及内部坐标）
         window.reverseSegmentList = (list) => {
+            const line = getCurrentLine();
             list.reverse();
             list.forEach(id => {
-                window.state.segmentDict[id].coords.reverse();
+                line.segmentDict[id].coords.reverse();
             });
         };
 
         // 内部整理：自动接龙线段（不判断全局方向，仅做内部连续性连接，流向以第一条线段为准）
         window.resolveSegmentList = (list) => {
             if (list.length <= 1) return;
+            const line = getCurrentLine();
 
             let sorted = [list.shift()];
             while (list.length > 0) {
                 let tailId = sorted[sorted.length - 1];
-                let tailCoords = window.state.segmentDict[tailId].coords;
+                let tailCoords = line.segmentDict[tailId].coords;
                 let tailEnd = tailCoords[tailCoords.length - 1];
 
                 let headId = sorted[0];
-                let headCoords = window.state.segmentDict[headId].coords;
+                let headCoords = line.segmentDict[headId].coords;
                 let headStart = headCoords[0];
 
                 let foundIndex = -1;
@@ -425,7 +484,7 @@
 
                 for (let i = 0; i < list.length; i++) {
                     let candId = list[i];
-                    let candCoords = window.state.segmentDict[candId].coords;
+                    let candCoords = line.segmentDict[candId].coords;
                     let candStart = candCoords[0];
                     let candEnd = candCoords[candCoords.length - 1];
 
@@ -454,7 +513,7 @@
                 if (foundIndex > -1) {
                     let nextId = list.splice(foundIndex, 1)[0];
                     if (needReverse) {
-                        window.state.segmentDict[nextId].coords.reverse();
+                        line.segmentDict[nextId].coords.reverse();
                     }
                     if (addToFront) {
                         sorted.unshift(nextId);
@@ -473,7 +532,8 @@
 
         // 翻转整个 Block
         window.flipBlockData = (id) => {
-            const b = window.state.blocks.find(x => x.id === id);
+            const line = getCurrentLine();
+            const b = line.blocks.find(x => x.id === id);
             if (!b) return;
             if (b.type === 'merged') {
                 window.reverseSegmentList(b.merged);
@@ -493,7 +553,8 @@
 
         // 整理内部
         window.resolveInternal = (id) => {
-            const b = window.state.blocks.find(x => x.id === id);
+            const line = getCurrentLine();
+            const b = line.blocks.find(x => x.id === id);
             if (!b) return;
             if (b.type === 'merged') {
                 window.resolveSegmentList(b.merged);
@@ -506,7 +567,8 @@
 
         // 翻转单独列表 UI 回调
         window.handleReverseList = (blockId, listType) => {
-            const b = window.state.blocks.find(x => x.id === blockId);
+            const line = getCurrentLine();
+            const b = line.blocks.find(x => x.id === blockId);
             if (!b || !b[listType]) return;
             window.reverseSegmentList(b[listType]);
             updateUI(); triggerPersist();
@@ -514,13 +576,14 @@
 
         // 全局整理：先整理内部，再接龙所有 Blocks，独立调整上下行方向以匹配标准流向
         window.resolveGlobal = () => {
-            if (window.state.blocks.length <= 1) {
-                if (window.state.blocks.length === 1) window.resolveInternal(window.state.blocks[0].id);
+            const line = getCurrentLine();
+            if (line.blocks.length <= 1) {
+                if (line.blocks.length === 1) window.resolveInternal(line.blocks[0].id);
                 return;
             }
 
             // 1. 先进行初步的内部连续性整理（无论方向对错，先连起来）
-            window.state.blocks.forEach(b => {
+            line.blocks.forEach(b => {
                 if (b.type === 'merged') window.resolveSegmentList(b.merged);
                 else { window.resolveSegmentList(b.up); window.resolveSegmentList(b.down); }
             });
@@ -530,7 +593,7 @@
             // A -> B (整体推进方向)
             // up: 从 A 到 B (起点在 A)
             // down: 从 B 到 A (起点在 B，终点在 A)
-            let list = [...window.state.blocks];
+            let list = [...line.blocks];
             let sorted = [list.shift()];
 
             // 辅助函数：根据端点判断是否匹配
@@ -635,7 +698,7 @@
                 }
             }
 
-            window.state.blocks = sorted;
+            line.blocks = sorted;
             updateUI(); triggerPersist();
             showToast("全局整理完毕");
         };
@@ -653,29 +716,23 @@
         }
 
         function getBlockEndpoints(b) {
+            const line = getCurrentLine();
             let upLeft = null, upRight = null, downLeft = null, downRight = null;
             if (b.type === 'merged' && b.merged.length) {
-                upLeft = window.state.segmentDict[b.merged[0]].coords[0];
-                upRight = window.state.segmentDict[b.merged[b.merged.length-1]].coords.slice(-1)[0];
+                upLeft = line.segmentDict[b.merged[0]].coords[0];
+                upRight = line.segmentDict[b.merged[b.merged.length-1]].coords.slice(-1)[0];
                 downLeft = upLeft;
                 downRight = upRight;
                 return { upLeft, upRight, downLeft, downRight };
             }
             if (b.type === 'split') {
                 if (b.up.length) {
-                    upLeft = window.state.segmentDict[b.up[0]].coords[0];
-                    upRight = window.state.segmentDict[b.up[b.up.length-1]].coords.slice(-1)[0];
+                    upLeft = line.segmentDict[b.up[0]].coords[0];
+                    upRight = line.segmentDict[b.up[b.up.length-1]].coords.slice(-1)[0];
                 }
                 if (b.down.length) {
-                    // Note: 'downLeft' and 'downRight' are defined relative to the 'up' direction's progression.
-                    // This means `downLeft` is physically on the same side as `upLeft` in space.
-                    // However, because the train flows from `downRight` to `downLeft`,
-                    // the first segment in the 'down' array should be placed such that `[0]` represents `downRight`.
-                    // To accurately extract 'downLeft' and 'downRight', we just take the pure geometric ends of the current list.
-                    // It is the caller's responsibility to orient it correctly.
-                    // So we assign `downLeft` = end, `downRight` = start. If it's correctly sorted, `downRight` flows to `downLeft`.
-                    downRight = window.state.segmentDict[b.down[0]].coords[0];
-                    downLeft = window.state.segmentDict[b.down[b.down.length-1]].coords.slice(-1)[0];
+                    downRight = line.segmentDict[b.down[0]].coords[0];
+                    downLeft = line.segmentDict[b.down[b.down.length-1]].coords.slice(-1)[0];
                 }
                 if (upLeft || downLeft) return { upLeft, upRight, downLeft, downRight };
             }
@@ -701,18 +758,20 @@
             dz.classList.remove('drop-zone-active');
 
             const targetType = dz.dataset.type;
-            const targetBlk = dz.dataset.block;
+            const targetBlkId = dz.dataset.block;
             
-            Object.values(window.state.blocks).forEach(b => { ['merged', 'up', 'down'].forEach(t => {
+            const line = getCurrentLine();
+
+            line.blocks.forEach(b => { ['merged', 'up', 'down'].forEach(t => {
                 const idx = b[t].indexOf(window.draggedId);
                 if(idx > -1) b[t].splice(idx, 1);
             })});
-            const uIdx = window.state.unassigned.indexOf(window.draggedId);
-            if(uIdx > -1) window.state.unassigned.splice(uIdx, 1);
+            const uIdx = line.unassigned.indexOf(window.draggedId);
+            if(uIdx > -1) line.unassigned.splice(uIdx, 1);
 
-            let list = targetType === 'unassigned' ? window.state.unassigned : window.state.blocks.find(b=>b.id===targetBlk)[targetType];
-            const targetSeg = e.target.closest('.segment-item')?.dataset.id;
-            if (targetSeg) list.splice(list.indexOf(targetSeg), 0, window.draggedId);
+            let list = targetType === 'unassigned' ? line.unassigned : line.blocks.find(b=>b.id===targetBlkId)[targetType];
+            const targetSegId = e.target.closest('.segment-item')?.dataset.id;
+            if (targetSegId) list.splice(list.indexOf(targetSegId), 0, window.draggedId);
             else list.push(window.draggedId);
 
             updateUI(); triggerPersist();
@@ -722,9 +781,10 @@
          * --- 8. 渲染核心 ---
          */
         function renderSegmentList(ids, context) {
+            const line = getCurrentLine();
             let html = '';
             ids.forEach((id) => {
-                const seg = window.state.segmentDict[id];
+                const seg = line.segmentDict[id];
                 const isSelected = window.state.selectedIds.includes(id);
                 
                 html += `
@@ -737,7 +797,7 @@
                         <div class="font-bold text-gray-700">${(seg.length/1000).toFixed(2)} km</div>
                     </div>
                     <div class="flex gap-1" onclick="event.stopPropagation()">
-                         <button onclick="window.state.segmentDict['${id}'].coords.reverse(); updateUI(); triggerPersist();" class="text-gray-300 hover:text-purple-500 p-1" title="翻转"><i class="fa-solid fa-sync text-[10px]"></i></button>
+                         <button onclick="getCurrentLine().segmentDict['${id}'].coords.reverse(); updateUI(); triggerPersist();" class="text-gray-300 hover:text-purple-500 p-1" title="翻转"><i class="fa-solid fa-sync text-[10px]"></i></button>
                          ${context === 'unassigned' ? `<button onclick="handleStashUnassigned('${id}')" class="text-gray-300 hover:text-orange-500 p-1" title="搁置"><i class="fa-solid fa-boxes-packing text-[10px]"></i></button>` : ''}
                     </div>
                 </div>`;
@@ -751,9 +811,12 @@
         };
 
         function updateUI(redrawMap = true) {
-            document.getElementById('unassigned-count').innerText = window.state.unassigned.length;
-            document.getElementById('stash-count').innerText = window.state.stashed.segments.length + window.state.stashed.blocks.length;
+            const line = getCurrentLine();
+            document.getElementById('unassigned-count').innerText = line.unassigned.length;
+            document.getElementById('stash-count').innerText = line.stashed.segments.length + line.stashed.blocks.length;
             
+            renderLineTabs();
+
             if (redrawMap) {
                 Object.values(window.mapLayers).forEach(o => window.map.removeLayer(o.layer));
                 Object.values(window.decoratorLayers).forEach(l => window.map.removeLayer(l));
@@ -761,13 +824,13 @@
                 window.mapLayers = {}; window.decoratorLayers = {}; window.gapLayers = [];
             }
 
-            document.getElementById('unassigned-list').innerHTML = renderSegmentList(window.state.unassigned, 'unassigned');
+            document.getElementById('unassigned-list').innerHTML = renderSegmentList(line.unassigned, 'unassigned');
 
             const container = document.getElementById('blocks-container');
             let blocksHtml = '';
             let prevEnd = null;
 
-            window.state.blocks.forEach((b, idx) => {
+            line.blocks.forEach((b, idx) => {
                 const endpoints = getBlockEndpoints(b);
                 if (prevEnd && endpoints) {
                     // Check up connection
@@ -831,14 +894,29 @@
                         </div>
                     </div>`;
 
+                let lineOptionsHtml = '';
+                for (const lId in window.state.lines) {
+                    if (lId === window.state.currentLineId) continue;
+                    lineOptionsHtml += `<li><button onclick="copyBlockToLine('${b.id}', '${lId}')" class="block w-full text-left px-4 py-2 hover:bg-gray-100">${window.state.lines[lId].name}</button></li>`;
+                }
+
                 blocksHtml += `
-                <div class="bg-white rounded border border-gray-300 shadow-sm overflow-hidden">
+                <div class="bg-white rounded border border-gray-300 shadow-sm overflow-hidden block-node" data-id="${b.id}">
                     <div class="bg-gray-100 px-3 py-2 flex justify-between items-center">
                         <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-layer-group text-blue-400"></i> ${idx+1}</span>
                         <div class="flex gap-2">
                             <button onclick="moveBlock(${idx}, -1)" class="text-gray-400 hover:text-gray-600 px-1"><i class="fa-solid fa-chevron-up"></i></button>
                             <button onclick="moveBlock(${idx}, 1)" class="text-gray-400 hover:text-gray-600 px-1"><i class="fa-solid fa-chevron-down"></i></button>
-                            <button onclick="toggleBlockType('${b.id}')" class="text-[10px] bg-white border border-gray-300 px-2 py-0.5 rounded shadow-sm text-blue-600">${b.type==='merged'?'拆分轨道':'合并轨道'}</button>
+
+                            <div class="relative group">
+                                <button class="text-gray-400 hover:text-blue-500 px-1"><i class="fa-solid fa-copy"></i></button>
+                                <ul class="absolute right-0 mt-0 w-32 bg-white border border-gray-200 rounded shadow-lg hidden group-hover:block z-50">
+                                    <li class="px-4 py-1 text-[10px] text-gray-400 border-b">复制到线路</li>
+                                    ${lineOptionsHtml || '<li class="px-4 py-2 text-gray-400">无其他线路</li>'}
+                                </ul>
+                            </div>
+
+                            <button onclick="toggleBlockType('${b.id}')" class="text-[10px] bg-white border border-gray-300 px-2 py-0.5 rounded shadow-sm text-blue-600">${b.type==='merged'?'拆分':'合并'}</button>
                             <button onclick="resolveInternal('${b.id}')" class="text-gray-400 hover:text-blue-500 px-1" title="整理内部"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
                             <button onclick="flipBlock('${b.id}')" class="text-gray-400 hover:text-purple-500 px-1" title="翻转区段"><i class="fa-solid fa-sync"></i></button>
                             <button onclick="handleStashBlock('${b.id}')" class="text-gray-400 hover:text-orange-500 px-1"><i class="fa-solid fa-boxes-packing"></i></button>
@@ -851,8 +929,8 @@
             container.innerHTML = blocksHtml;
 
             if(redrawMap) {
-                window.state.unassigned.forEach(id => drawOnMap(id, 'unassigned'));
-                window.state.blocks.forEach(b => {
+                line.unassigned.forEach(id => drawOnMap(id, 'unassigned'));
+                line.blocks.forEach(b => {
                     if(b.type === 'merged') b.merged.forEach(id => drawOnMap(id, 'merged'));
                     else { b.up.forEach(id => drawOnMap(id, 'up')); b.down.forEach(id => drawOnMap(id, 'down')); }
                 });
@@ -860,16 +938,17 @@
         }
 
         function drawOnMap(id, type) {
-            const seg = window.state.segmentDict[id];
+            const lineData = getCurrentLine();
+            const seg = lineData.segmentDict[id];
             const isSelected = window.state.selectedIds.includes(id);
             const color = isSelected ? COLORS.selecting : COLORS[type];
             const latlngs = seg.coords.map(c => [c[1], c[0]]);
-            const line = L.polyline(latlngs, { color, weight: isSelected ? 6 : 4, opacity: 0.8 }).addTo(window.map);
-            window.decoratorLayers[id] = L.polylineDecorator(line, { patterns: [{ offset: '50%', repeat: 0, symbol: L.Symbol.arrowHead({pixelSize: 10, pathOptions: {fillOpacity: 1, weight: 0, color: '#1f2937'}}) }] }).addTo(window.map);
-            line.on('click', (e) => { L.DomEvent.stopPropagation(e); handleItemClick(id); });
-            line.on('mouseover', () => setHover(id));
-            line.on('mouseout', () => setHover(null));
-            window.mapLayers[id] = { layer: line, baseColor: COLORS[type] };
+            const polyline = L.polyline(latlngs, { color, weight: isSelected ? 6 : 4, opacity: 0.8 }).addTo(window.map);
+            window.decoratorLayers[id] = L.polylineDecorator(polyline, { patterns: [{ offset: '50%', repeat: 0, symbol: L.Symbol.arrowHead({pixelSize: 10, pathOptions: {fillOpacity: 1, weight: 0, color: '#1f2937'}}) }] }).addTo(window.map);
+            polyline.on('click', (e) => { L.DomEvent.stopPropagation(e); handleItemClick(id); });
+            polyline.on('mouseover', () => setHover(id));
+            polyline.on('mouseout', () => setHover(null));
+            window.mapLayers[id] = { layer: polyline, baseColor: COLORS[type] };
         }
 
         window.setHover = (id) => {
@@ -891,54 +970,167 @@
         };
 
         /**
-         * --- 9. 区段操作 ---
+         * --- 9. 线路管理与 Tab ---
+         */
+        function renderLineTabs() {
+            const container = document.getElementById('line-tabs-container');
+            let html = '';
+            for (const id in window.state.lines) {
+                const line = window.state.lines[id];
+                const isActive = id === window.state.currentLineId;
+                html += `
+                    <div class="flex-shrink-0 flex items-center group">
+                        <button onclick="switchLine('${id}')" class="px-3 py-1 rounded-l-md font-bold transition-all ${isActive ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}">
+                            ${line.name}
+                        </button>
+                        <button onclick="renameLine('${id}')" class="px-1.5 py-1 bg-gray-100 text-gray-400 hover:text-blue-500 transition-colors ${isActive ? 'border-y border-blue-600 !bg-blue-600 !text-blue-200' : ''}">
+                            <i class="fa-solid fa-pen text-[10px]"></i>
+                        </button>
+                        <button onclick="deleteLine('${id}')" class="px-2 py-1 rounded-r-md bg-gray-100 text-gray-400 hover:text-red-500 transition-colors ${isActive ? 'border-y border-r border-blue-600 !bg-blue-600 !text-blue-200' : ''}">
+                            <i class="fa-solid fa-times text-[10px]"></i>
+                        </button>
+                    </div>
+                `;
+            }
+            html += `
+                <button onclick="addNewLine()" class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 text-gray-400 hover:bg-blue-50 hover:text-blue-500 transition-all flex items-center justify-center">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            `;
+            container.innerHTML = html;
+        }
+
+        window.switchLine = (id) => {
+            if (window.state.currentLineId === id) return;
+            exitSelectionMode();
+            window.state.currentLineId = id;
+            updateUI();
+            triggerPersist();
+            fitMapToBounds();
+        };
+
+        window.addNewLine = () => {
+            const name = prompt("请输入新线路名称:", "新线路 " + (Object.keys(window.state.lines).length + 1));
+            if (!name) return;
+            const id = 'line_' + Math.random().toString(36).substr(2, 9);
+            window.state.lines[id] = {
+                name,
+                segmentDict: {},
+                unassigned: [],
+                blocks: [],
+                stashed: { segments: [], blocks: [] }
+            };
+            switchLine(id);
+        };
+
+        window.renameLine = (id) => {
+            const name = prompt("重命名线路:", window.state.lines[id].name);
+            if (!name) return;
+            window.state.lines[id].name = name;
+            renderLineTabs();
+            triggerPersist();
+        };
+
+        window.deleteLine = (id) => {
+            if (Object.keys(window.state.lines).length <= 1) return showToast("至少保留一条线路", true);
+            if (!confirm(`确定删除线路 "${window.state.lines[id].name}" 及其所有数据吗？`)) return;
+
+            delete window.state.lines[id];
+            if (window.state.currentLineId === id) {
+                window.state.currentLineId = Object.keys(window.state.lines)[0];
+            }
+            updateUI();
+            triggerPersist();
+        };
+
+        window.copyBlockToLine = (blockId, targetLineId) => {
+            const currentLine = getCurrentLine();
+            const targetLine = window.state.lines[targetLineId];
+            const block = currentLine.blocks.find(b => b.id === blockId);
+            if (!block || !targetLine) return;
+
+            // 深度克隆 Block 及其引用的所有 Segments
+            const newBlock = JSON.parse(JSON.stringify(block));
+            newBlock.id = 'blk_' + Math.random().toString(36).substr(2, 9);
+
+            const processList = (list) => {
+                const newList = [];
+                list.forEach(segId => {
+                    const originalSeg = currentLine.segmentDict[segId];
+                    const newSegId = 'seg_' + Math.random().toString(36).substr(2, 9);
+                    targetLine.segmentDict[newSegId] = JSON.parse(JSON.stringify(originalSeg));
+                    targetLine.segmentDict[newSegId].id = newSegId;
+                    newList.push(newSegId);
+                });
+                return newList;
+            };
+
+            if (newBlock.type === 'merged') {
+                newBlock.merged = processList(newBlock.merged);
+            } else {
+                newBlock.up = processList(newBlock.up);
+                newBlock.down = processList(newBlock.down);
+            }
+
+            targetLine.blocks.push(newBlock);
+            showToast(`已复制到 ${targetLine.name}`);
+            triggerPersist();
+        };
+
+        /**
+         * --- 11. 区段操作 ---
          */
         window.toggleBlockType = (id) => {
-            const b = window.state.blocks.find(x => x.id === id);
+            const line = getCurrentLine();
+            const b = line.blocks.find(x => x.id === id);
             if (b.type === 'merged') { b.type = 'split'; b.up = [...b.merged]; b.merged = []; }
             else { b.type = 'merged'; b.merged = [...b.up, ...b.down]; b.up = []; b.down = []; }
             updateUI(); triggerPersist();
         };
 
         window.deleteBlock = (id) => {
-            const idx = window.state.blocks.findIndex(b=>b.id===id);
+            const line = getCurrentLine();
+            const idx = line.blocks.findIndex(b=>b.id===id);
             if(idx > -1) {
-                const b = window.state.blocks.splice(idx, 1)[0];
-                window.state.unassigned.push(...b.merged, ...b.up, ...b.down);
+                const b = line.blocks.splice(idx, 1)[0];
+                line.unassigned.push(...b.merged, ...b.up, ...b.down);
                 updateUI(); triggerPersist();
             }
         };
 
         window.moveBlock = (idx, step) => {
+            const line = getCurrentLine();
             const target = idx + step;
-            if (target < 0 || target >= window.state.blocks.length) return;
-            [window.state.blocks[idx], window.state.blocks[target]] = [window.state.blocks[target], window.state.blocks[idx]];
+            if (target < 0 || target >= line.blocks.length) return;
+            [line.blocks[idx], line.blocks[target]] = [line.blocks[target], line.blocks[idx]];
             updateUI(); triggerPersist();
         };
 
         function fitMapToBounds() {
+            const line = getCurrentLine();
             const all = [];
-            Object.values(window.state.segmentDict).forEach(s => s.coords.forEach(c => all.push([c[1], c[0]])));
+            Object.values(line.segmentDict).forEach(s => s.coords.forEach(c => all.push([c[1], c[0]])));
             if (all.length) window.map.fitBounds(L.latLngBounds(all), { padding: [40, 40] });
         }
 
         window.exportData = (type) => {
+            const line = getCurrentLine();
             let out = [];
             if (type === '1') {
-                window.state.blocks.forEach(b => {
+                line.blocks.forEach(b => {
                     const list = b.type === 'merged' ? b.merged : b.up;
-                    list.forEach(id => out.push(window.state.segmentDict[id].coords));
+                    list.forEach(id => out.push(line.segmentDict[id].coords));
                 });
             } else {
-                [...window.state.blocks].reverse().forEach(b => {
-                    if (b.type === 'merged') [...b.merged].reverse().forEach(id => out.push([...window.state.segmentDict[id].coords].reverse()));
-                    else b.down.forEach(id => out.push(window.state.segmentDict[id].coords));
+                [...line.blocks].reverse().forEach(b => {
+                    if (b.type === 'merged') [...b.merged].reverse().forEach(id => out.push([...line.segmentDict[id].coords].reverse()));
+                    else b.down.forEach(id => out.push(line.segmentDict[id].coords));
                 });
             }
             if(out.length === 0) return showToast("工作区无可导出内容", true);
             const blob = new Blob([JSON.stringify({ type: "Feature", geometry: { type: "MultiLineString", coordinates: out } }, null, 2)], {type: "application/json"});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `topo_${type==='1'?'upbound':'downbound'}_${Date.now()}.geojson`; a.click();
+            a.download = `topo_${line.name}_${type==='1'?'upbound':'downbound'}_${Date.now()}.geojson`; a.click();
             showToast("文件已下载");
         };
 

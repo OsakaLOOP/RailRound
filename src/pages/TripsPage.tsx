@@ -85,6 +85,22 @@ export const TripsPage: React.FC = () => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Build a fast station lookup map to optimize rendering performance, avoiding O(M*N) complexity
+    const stationLookup = useMemo(() => {
+        const map = new Map<string, any>();
+        for (const lineKey in railwayData) {
+            if (Object.prototype.hasOwnProperty.call(railwayData, lineKey)) {
+                const line = railwayData[lineKey];
+                if (line && line.stations) {
+                    for (const st of line.stations) {
+                        map.set(st.id, st);
+                    }
+                }
+            }
+        }
+        return map;
+    }, [railwayData]);
+
     const handleImportSuica = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -157,14 +173,10 @@ export const TripsPage: React.FC = () => {
                     const isWalk = t.isWalk;
 
                     if (isWalk) {
-                        let startName = t.fromId || '';
-                        let endName = t.toId || '';
-                        Object.values(railwayData).forEach(line => {
-                            const s = line.stations.find(st => st.id === t.fromId);
-                            if (s) startName = s.name_ja;
-                            const e = line.stations.find(st => st.id === t.toId);
-                            if (e) endName = e.name_ja;
-                        });
+                        const startStation = stationLookup.get(t.fromId);
+                        const endStation = stationLookup.get(t.toId);
+                        const startName = startStation ? startStation.name_ja : (t.fromId || '');
+                        const endName = endStation ? endStation.name_ja : (t.toId || '');
 
                         const isTree = t.walkType === 'tree';
                         const cls = {

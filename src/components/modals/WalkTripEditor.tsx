@@ -38,6 +38,22 @@ export const WalkTripEditor: React.FC = () => {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [isOpen, closeEditor, form]);
 
+    // Build a fast station lookup map to optimize performance
+    const stationLookup = React.useMemo(() => {
+        const map = new Map<string, any>();
+        for (const lineKey in railwayData) {
+            if (Object.prototype.hasOwnProperty.call(railwayData, lineKey)) {
+                const line = railwayData[lineKey];
+                if (line && line.stations) {
+                    for (const st of line.stations) {
+                        map.set(st.id, st);
+                    }
+                }
+            }
+        }
+        return map;
+    }, [railwayData]);
+
     if (!isOpen) return null;
 
     const generateBezierPath = (startLngLat: [number, number], endLngLat: [number, number]): [number, number][] => {
@@ -79,12 +95,12 @@ export const WalkTripEditor: React.FC = () => {
             // Find coordinates for the Bezier curve
             let startCoords = null;
             let endCoords = null;
-            Object.values(railwayData).forEach(line => {
-                const s = line.stations.find(st => st.id === form.fromId);
-                if (s) startCoords = [s.lng, s.lat];
-                const e = line.stations.find(st => st.id === form.toId);
-                if (e) endCoords = [e.lng, e.lat];
-            });
+
+            const startStation = stationLookup.get(form.fromId);
+            if (startStation) startCoords = [startStation.lng, startStation.lat];
+
+            const endStation = stationLookup.get(form.toId);
+            if (endStation) endCoords = [endStation.lng, endStation.lat];
 
             if (startCoords && endCoords) {
                 walkPath = generateBezierPath(startCoords as [number, number], endCoords as [number, number]);
@@ -125,14 +141,10 @@ export const WalkTripEditor: React.FC = () => {
     };
 
     // Resolving station names for read-only display
-    let startName = "未知起点";
-    let endName = "未知终点";
-    Object.values(railwayData).forEach(line => {
-        const s = line.stations.find(st => st.id === form.fromId);
-        if (s) startName = s.name_ja;
-        const e = line.stations.find(st => st.id === form.toId);
-        if (e) endName = e.name_ja;
-    });
+    const startStation = stationLookup.get(form.fromId);
+    const endStation = stationLookup.get(form.toId);
+    const startName = startStation ? startStation.name_ja : "未知起点";
+    const endName = endStation ? endStation.name_ja : "未知终点";
 
     const isTree = form.walkType === 'tree';
 

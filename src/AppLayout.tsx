@@ -29,6 +29,7 @@ import { api } from './services/api';
 import { useShallow } from 'zustand/react/shallow';
 import { Toaster, toast } from 'react-hot-toast';
 import DistanceWorker from './workers/distance.worker.js?worker';
+import { useMeta } from './contexts';
 
 const CURRENT_VERSION = meta["currentVersion"];
 
@@ -64,6 +65,7 @@ export const AppLayout: React.FC = () => {
     const { loadUserData, saveData } = useUserData();
     const [stationMenu, setStationMenu] = useState<any>(null);
     const [isExportingKML, setIsExportingKML] = useState(false);
+    const { devMode } = useMeta() as any;
     const isDraggingRef = useRef(false);
     const workerRef = useRef<Worker | null>(null);
     const distanceWorkerRef = useRef<Worker | null>(null);
@@ -376,22 +378,26 @@ export const AppLayout: React.FC = () => {
                 // Attempt to read fully precompiled geoData & railwayData structures directly (FAST PATH)
                 let precompiledGeoData: any = null;
                 let precompiledRailwayData: any = null;
-                try {
-                    const txGeo = dbInstance.transaction(db.STORE_FILES, 'readonly');
-                    const storeGeo = txGeo.objectStore(db.STORE_FILES);
+                if (!devMode) {
+                    try {
+                        const txGeo = dbInstance.transaction(db.STORE_FILES, 'readonly');
+                        const storeGeo = txGeo.objectStore(db.STORE_FILES);
 
-                    const reqGeo = storeGeo.get('__precompiled_geodata');
-                    precompiledGeoData = await new Promise((resolve) => {
-                        reqGeo.onsuccess = () => resolve(reqGeo.result || null);
-                        reqGeo.onerror = () => resolve(null);
-                    });
+                        const reqGeo = storeGeo.get('__precompiled_geodata');
+                        precompiledGeoData = await new Promise((resolve) => {
+                            reqGeo.onsuccess = () => resolve(reqGeo.result || null);
+                            reqGeo.onerror = () => resolve(null);
+                        });
 
-                    const reqRail = storeGeo.get('__precompiled_railwaydata');
-                    precompiledRailwayData = await new Promise((resolve) => {
-                        reqRail.onsuccess = () => resolve(reqRail.result || null);
-                        reqRail.onerror = () => resolve(null);
-                    });
-                } catch(e) {}
+                        const reqRail = storeGeo.get('__precompiled_railwaydata');
+                        precompiledRailwayData = await new Promise((resolve) => {
+                            reqRail.onsuccess = () => resolve(reqRail.result || null);
+                            reqRail.onerror = () => resolve(null);
+                        });
+                    } catch(e) {}
+                } else {
+                    console.log('[Autoload] Dev mode enabled: skipping __precompiled_geodata cache.');
+                }
 
                 // Exclude caches from cachedFiles list used for manifest comparison
                 realFiles = cachedFiles.filter(f => f.fileName && !f.fileName.startsWith('__precompiled_') && !f.fileName.startsWith('zustand_'));
@@ -501,15 +507,31 @@ export const AppLayout: React.FC = () => {
             const manifestRes = await fetch(`/geojson_manifest.json?v=${Date.now()}`).catch(() => null);
             if (manifestRes && manifestRes.ok) {
                 const manifest = await manifestRes.json();
-                const geojsonFiles = manifest.files || [];
+                let missingFiles: { fileName: string; hash?: string }[] = [];
 
-                const cachedFileNames = new Set(realFiles.map(f => f.fileName));
-                const missingFiles = geojsonFiles.filter((f: string) => !cachedFileNames.has(f.replace(/\.(geojson|json)$/i, '')));
+                if (Array.isArray(manifest.files)) {
+                    // Legacy array format: fallback to checking existence only
+                    const cachedFileNames = new Set(realFiles.map(f => f.fileName));
+                    missingFiles = manifest.files
+                        .filter((f: string) => !cachedFileNames.has(f.replace(/\.(geojson|json)$/i, '')))
+                        .map((f: string) => ({ fileName: f }));
+                } else if (manifest.files && typeof manifest.files === 'object') {
+                    // New hash-based format: { "JR-East.geojson": "hash123", ... }
+                    const cachedFilesMap = new Map(realFiles.map(f => [f.fileName, f.hash]));
+                    missingFiles = Object.entries(manifest.files)
+                        .filter(([fileName, hash]) => {
+                            const localFileName = fileName.replace(/\.(geojson|json)$/i, '');
+                            const localHash = cachedFilesMap.get(localFileName);
+                            return localHash !== hash; // Also covers missing files (localHash is undefined)
+                        })
+                        .map(([fileName, hash]) => ({ fileName, hash: hash as string }));
+                }
 
                 if (missingFiles.length > 0) {
                     let downloadedCount = 0;
                     const totalToDownload = missingFiles.length;
-                    const downloadTasks = missingFiles.map(async (fileName: string) => {
+                    const downloadTasks = missingFiles.map(async (fileInfo: { fileName: string, hash?: string }) => {
+                        const { fileName, hash } = fileInfo;
                         try {
                             const res = await fetch(`/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}?v=${Date.now()}`);
                             downloadedCount++;
@@ -531,7 +553,7 @@ export const AppLayout: React.FC = () => {
                             const json = await res.json();
                             const rawCompanyName = fileName.replace(/\.(geojson|json)$/i, '');
                             const matchedCompany = findBestCompanyKey(rawCompanyName, companyIndex);
-                            const dataItem = { json, company: matchedCompany, fileName: rawCompanyName };
+                            const dataItem = { json, company: matchedCompany, fileName: rawCompanyName, hash };
                             db.set(db.STORE_FILES, rawCompanyName, dataItem).catch(e => console.warn('Cache write failed', e));
                             return dataItem;
                         } catch (e: any) { return null; }

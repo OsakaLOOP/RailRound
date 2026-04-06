@@ -8,6 +8,7 @@ export const MetaContext = createContext({
     thememode: 'light',
     area: 'JP',
     locale: 'zh-CN',
+    devMode: false,
 });
 export const useMeta = () => useContext(MetaContext);
 

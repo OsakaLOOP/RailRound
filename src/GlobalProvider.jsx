@@ -53,9 +53,23 @@ export const GlobalProvider = ({ children }) => {
         return () => clearInterval(timer);
     }, []);
 
+    const [devMode, setDevMode] = useState(false);
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('dev') === '1' || urlParams.get('dev') === 'true') {
+            setDevMode(true);
+        }
+    }, []);
+
+    const metaContextValue = {
+        ...meta,
+        devMode
+    };
+
     return (
         <VersionContext value={versionInfo}>
-            <MetaContext value={meta}>
+            <MetaContext value={metaContextValue}>
                 {children}
             </MetaContext>
         </VersionContext>

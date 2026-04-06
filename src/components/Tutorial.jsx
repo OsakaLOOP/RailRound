@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from
 import { createPortal } from 'react-dom';
 import { X, ChevronRight, CheckCircle2, ArrowRight } from 'lucide-react';
 import { DefaultCitySelector } from './modals/DefaultCitySelector';
+import { useMeta } from '../contexts';
 
 const STEPS = [
     {
@@ -146,6 +147,7 @@ const Tutorial = ({
     pinMode,
     editorMode
 }) => {
+    const { devMode } = useMeta();
     const [step, setStep] = useState(-1); // -1: Loading/Check, 0+: Steps, -2: Skipped, -3: City Selector
     const [rect, setRect] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
@@ -201,8 +203,8 @@ const Tutorial = ({
         const skipped = localStorage.getItem('rail_tutorial_skipped');
         const citySelectorDone = localStorage.getItem('rail_city_selector_done');
 
-        if (skipped === 'true' || user) {
-            if (!citySelectorDone) {
+        if (devMode || skipped === 'true' || user) {
+            if (!citySelectorDone && !devMode) {
                 setStep(-3); // Show City Selector if skipped/logged in but not done
             } else {
                 setStep(-2); // Completely skipped
@@ -211,7 +213,7 @@ const Tutorial = ({
         }
         setStep(0);
         setIsVisible(true);
-    }, [user]);
+    }, [user, devMode]);
 
     const handleCitySelectorComplete = useCallback(() => {
         localStorage.setItem('rail_city_selector_done', 'true');

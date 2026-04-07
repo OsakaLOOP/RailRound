@@ -29,58 +29,188 @@ const CITIES = {
     ]
 };
 
-// Intricate SVG for Fixed Interest (Local Discovery) - Emerald/Teal theme
+// Intricate SVG for Fixed Interest (Local Discovery / Commute / Monorail emerging from buildings)
+// Emerald/Teal theme
 const FixedInterestSVG = () => (
-    <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-md">
+    <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-lg overflow-hidden rounded-full">
         <defs>
-            <linearGradient id="gradFixed" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#10b981" />
-                <stop offset="100%" stopColor="#0f766e" />
+            <linearGradient id="gradFixedBg" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#022c22" />
+                <stop offset="60%" stopColor="#0f766e" />
+                <stop offset="100%" stopColor="#ccfbf1" />
             </linearGradient>
-            <filter id="glowFixed">
-                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <linearGradient id="gradRail" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="50%" stopColor="#6ee7b7" />
+                <stop offset="100%" stopColor="#10b981" />
+            </linearGradient>
+            <linearGradient id="gradBuilding" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#064e3b" />
+                <stop offset="100%" stopColor="#042f2e" />
+            </linearGradient>
+            <filter id="glowWindow">
+                <feGaussianBlur stdDeviation="2" result="blur" />
                 <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                </feMerge>
+            </filter>
+            <filter id="headlightGlow">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
                 </feMerge>
             </filter>
         </defs>
-        <circle cx="100" cy="100" r="80" fill="url(#gradFixed)" opacity="0.1" />
-        <path d="M100 30 C140 30 170 60 170 100 C170 140 140 170 100 170 C60 170 30 140 30 100 C30 60 60 30 100 30 Z" fill="none" stroke="url(#gradFixed)" strokeWidth="4" strokeDasharray="10 10" className="animate-spin-slow" style={{ transformOrigin: 'center' }} />
-        {/* Map Pin / Compass motif */}
-        <path d="M100 50 L120 90 L100 150 L80 90 Z" fill="url(#gradFixed)" filter="url(#glowFixed)" />
-        <circle cx="100" cy="100" r="10" fill="white" />
-        <circle cx="100" cy="100" r="2" fill="#0f766e" />
-        <path d="M50 100 A 50 50 0 0 1 150 100" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.6"/>
+
+        <circle cx="100" cy="100" r="100" fill="url(#gradFixedBg)" />
+
+        {/* Far Background Skyline */}
+        <path d="M 0 150 L 20 100 L 40 100 L 40 120 L 70 80 L 100 80 L 100 130 L 140 60 L 170 60 L 170 150 L 200 110 L 200 200 L 0 200 Z" fill="#115e59" opacity="0.5" />
+
+        {/* Midground Silhouette Buildings */}
+        <path d="M 20 200 L 20 90 L 60 90 L 60 200 Z M 130 200 L 130 70 L 180 70 L 180 200 Z" fill="url(#gradBuilding)" />
+
+        {/* Windows - Left Building */}
+        <rect x="30" y="100" width="8" height="15" fill="#6ee7b7" filter="url(#glowWindow)" opacity="0.8" />
+        <rect x="42" y="100" width="8" height="15" fill="#34d399" opacity="0.3" />
+        <rect x="30" y="130" width="8" height="15" fill="#a7f3d0" filter="url(#glowWindow)" />
+        <rect x="42" y="160" width="8" height="15" fill="#34d399" filter="url(#glowWindow)" opacity="0.6" />
+
+        {/* Windows - Right Building */}
+        <rect x="140" y="80" width="12" height="12" fill="#6ee7b7" filter="url(#glowWindow)" opacity="0.9" />
+        <rect x="160" y="80" width="12" height="12" fill="#34d399" opacity="0.2" />
+        <rect x="140" y="110" width="12" height="12" fill="#34d399" opacity="0.4" />
+        <rect x="160" y="110" width="12" height="12" fill="#a7f3d0" filter="url(#glowWindow)" />
+        <rect x="140" y="140" width="12" height="12" fill="#6ee7b7" filter="url(#glowWindow)" opacity="0.7" />
+
+        {/* Rail Infrastructure - Monorail Track */}
+        {/* Shadow under track */}
+        <path d="M 60 130 Q 100 130 130 155 L 130 165 Q 100 140 60 140 Z" fill="#022c22" opacity="0.6" />
+        {/* Track Surface */}
+        <path d="M 60 120 Q 100 120 130 145 L 130 155 Q 100 130 60 130 Z" fill="#0f766e" />
+        {/* Track Rail Highlights */}
+        <path d="M 60 122 Q 100 122 130 147" fill="none" stroke="#5eead4" strokeWidth="1.5" />
+        <path d="M 60 128 Q 100 128 130 153" fill="none" stroke="#5eead4" strokeWidth="1.5" />
+
+        {/* The Train / Light Rail sliding out */}
+        <g transform="translate(-10, 0)" className="animate-pulse">
+            {/* Train Body */}
+            <path d="M 70 100 Q 100 100 115 115 L 115 135 Q 100 120 70 120 Z" fill="url(#gradRail)" />
+            {/* Window Strip */}
+            <path d="M 75 105 Q 100 105 110 115 L 110 122 Q 100 112 75 112 Z" fill="#022c22" />
+            {/* Lit Passenger Windows inside strip */}
+            <path d="M 80 106 Q 90 106 95 111 L 95 118 Q 90 113 80 113 Z" fill="#ccfbf1" filter="url(#glowWindow)" opacity="0.9" />
+            <path d="M 100 108 Q 105 108 108 112 L 108 119 Q 105 115 100 115 Z" fill="#ccfbf1" filter="url(#glowWindow)" opacity="0.7" />
+
+            {/* Front Driver Window */}
+            <path d="M 111 118 L 113 121 L 111 125 L 108 122 Z" fill="#ccfbf1" />
+
+            {/* Glowing Headlights */}
+            <circle cx="113" cy="128" r="2.5" fill="#fff" filter="url(#headlightGlow)" />
+            <circle cx="113" cy="128" r="1" fill="#fff" />
+            {/* Headlight beam */}
+            <path d="M 113 128 L 140 145 L 130 155 Z" fill="#a7f3d0" filter="url(#headlightGlow)" opacity="0.3" />
+        </g>
     </svg>
 );
 
-// Intricate SVG for Follow Latest (Exploration/Journey) - Amber/Orange theme
+// Intricate SVG for Follow Latest (Exploration/Journey / Realistic Compass & Detailed Road)
+// Amber/Orange theme
 const FollowLatestSVG = () => (
-    <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-md">
+    <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-lg rounded-full overflow-hidden">
         <defs>
-            <linearGradient id="gradLatest" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#f59e0b" />
-                <stop offset="100%" stopColor="#b45309" />
+            <linearGradient id="gradLatestBg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#fffbeb" />
+                <stop offset="100%" stopColor="#fef3c7" />
             </linearGradient>
-            <filter id="glowLatest">
-                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <linearGradient id="gradCompassRing" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#d97706" />
+                <stop offset="100%" stopColor="#92400e" />
+            </linearGradient>
+            <linearGradient id="gradCompassInner" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#fcd34d" />
+                <stop offset="100%" stopColor="#f59e0b" />
+            </linearGradient>
+            <linearGradient id="gradRoad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#451a03" />
+                <stop offset="100%" stopColor="#78350f" />
+            </linearGradient>
+            <filter id="shadowCompass">
+                <feDropShadow dx="2" dy="4" stdDeviation="4" floodOpacity="0.3" />
+            </filter>
+            <filter id="glowPin">
+                <feGaussianBlur stdDeviation="3" result="blur" />
                 <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
                 </feMerge>
             </filter>
         </defs>
-        <circle cx="100" cy="100" r="80" fill="url(#gradLatest)" opacity="0.1" />
-        {/* Winding tracks/paths */}
-        <path d="M40 160 Q 80 160 100 100 T 160 40" fill="none" stroke="url(#gradLatest)" strokeWidth="8" strokeLinecap="round" filter="url(#glowLatest)" />
-        <path d="M40 160 Q 80 160 100 100 T 160 40" fill="none" stroke="white" strokeWidth="2" strokeDasharray="5 10" className="animate-pulse" />
-        {/* Stars/Nodes */}
-        <circle cx="40" cy="160" r="6" fill="#f59e0b" />
-        <circle cx="100" cy="100" r="8" fill="white" stroke="#f59e0b" strokeWidth="3" />
-        <circle cx="160" cy="40" r="10" fill="url(#gradLatest)" />
-        <path d="M150 40 L170 40 M160 30 L160 50" stroke="white" strokeWidth="2" />
-        <path d="M50 50 A 60 60 0 0 1 150 150" fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 8" opacity="0.5" className="animate-spin-slow" style={{ transformOrigin: 'center' }}/>
+
+        {/* Soft Background */}
+        <circle cx="100" cy="100" r="100" fill="url(#gradLatestBg)" />
+
+        {/* Grid lines / Map texture */}
+        <path d="M 0 50 L 200 50 M 0 100 L 200 100 M 0 150 L 200 150 M 50 0 L 50 200 M 100 0 L 100 200 M 150 0 L 150 200" stroke="#fde68a" strokeWidth="1" opacity="0.6" />
+
+        {/* --- The Compass (Skeuomorphic) --- */}
+        <g transform="translate(100, 100) scale(0.65)" filter="url(#shadowCompass)">
+            {/* Outer metallic ring */}
+            <circle cx="0" cy="0" r="80" fill="url(#gradCompassRing)" />
+            <circle cx="0" cy="0" r="72" fill="#fff" />
+            <circle cx="0" cy="0" r="68" fill="url(#gradCompassInner)" opacity="0.1" />
+
+            {/* Compass markings/ticks */}
+            <g stroke="#92400e" strokeWidth="2">
+                <line x1="0" y1="-68" x2="0" y2="-60" />
+                <line x1="0" y1="68" x2="0" y2="60" />
+                <line x1="-68" y1="0" x2="-60" y2="0" />
+                <line x1="68" y1="0" x2="60" y2="0" />
+            </g>
+            <g stroke="#b45309" strokeWidth="1" transform="rotate(45)">
+                <line x1="0" y1="-68" x2="0" y2="-62" />
+                <line x1="0" y1="68" x2="0" y2="62" />
+                <line x1="-68" y1="0" x2="-62" y2="0" />
+                <line x1="68" y1="0" x2="62" y2="0" />
+            </g>
+
+            {/* Compass Rose Stars */}
+            <path d="M 0 -55 L 12 -12 L 55 0 L 12 12 L 0 55 L -12 12 L -55 0 L -12 -12 Z" fill="#fcd34d" opacity="0.4" />
+
+            {/* Animated Needle */}
+            <g className="animate-spin-slow" style={{ transformOrigin: 'center' }}>
+                <path d="M -8 0 L 0 -50 L 8 0 Z" fill="#dc2626" /> {/* North pointing red */}
+                <path d="M -8 0 L 0 50 L 8 0 Z" fill="#e5e7eb" /> {/* South pointing white/gray */}
+                <circle cx="0" cy="0" r="6" fill="#92400e" />
+                <circle cx="0" cy="0" r="3" fill="#fcd34d" />
+            </g>
+        </g>
+
+        {/* --- Winding Journey Path (Replacing dashed line) --- */}
+        {/* Solid thick base for road */}
+        <path d="M 30 180 C 60 140, 20 90, 80 50 C 130 10, 160 50, 150 90 C 140 130, 180 120, 180 150" fill="none" stroke="url(#gradRoad)" strokeWidth="10" strokeLinecap="round" filter="url(#shadowCompass)" />
+        {/* Road center line marker (solid highlight) */}
+        <path d="M 30 180 C 60 140, 20 90, 80 50 C 130 10, 160 50, 150 90 C 140 130, 180 120, 180 150" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+
+        {/* --- Roadside Decorations --- */}
+        {/* Pine Trees */}
+        <g fill="#047857">
+            <path d="M 25 130 L 35 110 L 45 130 Z M 33 130 L 37 130 L 37 135 L 33 135 Z" />
+            <path d="M 45 60 L 52 45 L 59 60 Z M 50 60 L 54 60 L 54 65 L 50 65 Z" transform="scale(0.8) translate(15, 10)" />
+            <path d="M 155 120 L 165 95 L 175 120 Z M 162 120 L 168 120 L 168 126 L 162 126 Z" />
+        </g>
+
+        {/* Rocks / Scenery */}
+        <path d="M 85 140 Q 90 135 95 140 Q 92 145 85 140 Z" fill="#9ca3af" />
+        <path d="M 130 50 Q 135 45 140 50 L 135 52 Z" fill="#6b7280" />
+
+        {/* --- Map Pin (Current location/Latest) --- */}
+        <g transform="translate(180, 150) scale(1.2)" className="animate-bounce">
+            <path d="M 0 -20 C 8 -20, 12 -12, 12 -6 C 12 4, 0 12, 0 12 C 0 12, -12 4, -12 -6 C -12 -12, -8 -20, 0 -20 Z" fill="#dc2626" filter="url(#glowPin)" />
+            <circle cx="0" cy="-9" r="4" fill="#fff" />
+        </g>
     </svg>
 );
 

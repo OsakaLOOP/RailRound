@@ -1,0 +1,53 @@
+{
+  "tutorial": {
+    "skip": "Don't show again",
+    "skipBtn": "Skip Tutorial",
+    "nextBtn": "Next",
+    "finishBtn": "Finish",
+    "waitAction": "Please follow the instructions",
+    "welcome": {
+      "title": "Welcome to RailLOOP",
+      "content": "RailLOOP is a personal railway diary designed to help you track and manage your railway journeys, visually presenting your travel footprints."
+    },
+    "tabRecords": {
+      "title": "Trip Records",
+      "content": "This tab is your journey control center. You can view, add, and manage all railway trip records here, or add them to your collections."
+    }
+  },
+  "loginModal": {
+    "login": "Login to RailLOOP",
+    "register": "Register New Account",
+    "welcomeBack": "Welcome back, railfan",
+    "startJourney": "Start your railway mastery journey",
+    "username": "Username",
+    "password": "Password",
+    "loginBtn": "Login",
+    "registerBtn": "Register Now",
+    "loading": "Please wait...",
+    "thirdParty": "Third-party Login",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "toRegister": "Create a new account",
+    "toLogin": "Go to Login",
+    "guideTitle": "User Guide / Agreement",
+    "disclaimer": "By using the service after registration/login, you agree to the above agreement. Otherwise, your data will only be processed locally (frontend)."
+  },
+  "statsPage": {
+    "bindGithub": "Bind GitHub",
+    "githubBound": "GitHub Bound",
+    "badgeCode": "Badge Code",
+    "totalTrips": "Total Trips",
+    "uniqueLines": "Lines Mastered",
+    "starFolders": "Star Folders",
+    "starFoldersDesc": "Manage trip collections & badges",
+    "personalSettings": "Personal Settings",
+    "language": "UI Language",
+    "mapCenter": "Default Map Center",
+    "fixedInterest": "Fixed Interest",
+    "followLatest": "Follow Latest",
+    "totalDist": "Total Distance",
+    "totalCost": "Total Cost",
+    "topLines": "Top Ridden Lines",
+    "footerStats": "Loaded {{companies}} companies, {{lines}} lines, {{stations}} stations."
+  }
+}

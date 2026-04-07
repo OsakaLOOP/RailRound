@@ -28,6 +28,7 @@ dist-ssr
 !tsconfig.json
 !public/changelog.json
 !public/company_data.json
+!public/locales/**/*.json
 *.geojson
 
 # Tencent Cloud EdgeOne

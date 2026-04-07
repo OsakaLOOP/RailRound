@@ -85,26 +85,53 @@ const FollowLatestSVG = () => (
 );
 
 
-// Language SVG - Blue theme
+// Language SVG - Blue/Indigo theme
 const LanguageSVG = () => (
-    <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-md">
+    <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-lg">
         <defs>
             <linearGradient id="gradLang" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#3b82f6" />
-                <stop offset="100%" stopColor="#1d4ed8" />
+                <stop offset="100%" stopColor="#4338ca" />
+            </linearGradient>
+            <linearGradient id="gradLangLight" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#93c5fd" />
+                <stop offset="100%" stopColor="#60a5fa" />
             </linearGradient>
             <filter id="glowLang">
-                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
                 <feMerge>
                     <feMergeNode in="coloredBlur"/>
                     <feMergeNode in="SourceGraphic"/>
                 </feMerge>
             </filter>
         </defs>
-        <circle cx="100" cy="100" r="80" fill="url(#gradLang)" opacity="0.1" />
-        <path d="M40 100 A 60 60 0 0 1 160 100 A 60 60 0 0 1 40 100" fill="none" stroke="url(#gradLang)" strokeWidth="4" strokeDasharray="10 10" className="animate-spin-slow" style={{ transformOrigin: 'center' }} />
-        <path d="M70 70 L130 130 M130 70 L70 130" stroke="url(#gradLang)" strokeWidth="4" filter="url(#glowLang)" />
-        <text x="100" y="115" fontSize="40" fill="url(#gradLang)" textAnchor="middle" fontWeight="bold">A/文</text>
+        {/* Background ambient ring */}
+        <circle cx="100" cy="100" r="85" fill="none" stroke="url(#gradLangLight)" strokeWidth="2" opacity="0.4" strokeDasharray="4 8" className="animate-spin-slow" style={{ transformOrigin: 'center' }} />
+
+        {/* Outer orbital path */}
+        <circle cx="100" cy="100" r="65" fill="url(#gradLang)" opacity="0.05" />
+        <path d="M35 100 A 65 65 0 0 1 165 100 A 65 65 0 0 1 35 100" fill="none" stroke="url(#gradLang)" strokeWidth="6" opacity="0.3" />
+
+        {/* Animated connection line simulating communication */}
+        <path d="M 60 120 Q 100 160 140 80" fill="none" stroke="url(#gradLangLight)" strokeWidth="3" filter="url(#glowLang)" strokeDasharray="100" strokeDashoffset="0">
+            <animate attributeName="stroke-dashoffset" values="100;0;100" dur="4s" repeatCount="indefinite" />
+        </path>
+
+        {/* Left Speech Bubble - Translation/Dialogue */}
+        <g transform="translate(45, 60)">
+            <path d="M0 20 C0 8.954 8.954 0 20 0 L40 0 C51.046 0 60 8.954 60 20 C60 31.046 51.046 40 40 40 L15 40 L0 50 Z" fill="url(#gradLang)" filter="url(#glowLang)" opacity="0.9" />
+            <text x="30" y="26" fontSize="20" fill="white" textAnchor="middle" fontWeight="800">あ</text>
+        </g>
+
+        {/* Right Speech Bubble - Translation/Dialogue */}
+        <g transform="translate(105, 95)">
+            <path d="M0 20 C0 8.954 8.954 0 20 0 L40 0 C51.046 0 60 8.954 60 20 C60 31.046 51.046 40 40 40 L50 50 L45 40 C54.341 38.384 60 30.046 60 20 Z" fill="url(#gradLangLight)" opacity="0.95" />
+            <text x="30" y="27" fontSize="22" fill="#1e3a8a" textAnchor="middle" fontWeight="bold">A</text>
+        </g>
+
+        {/* Communication Nodes */}
+        <circle cx="60" cy="115" r="4" fill="#3b82f6" />
+        <circle cx="140" cy="85" r="6" fill="#4338ca" />
     </svg>
 );
 
@@ -164,10 +191,9 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
 
     return (
         <div className="fixed inset-0 z-[6000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-scale-up">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-scale-up relative">
 
-                {step === 1 && (
-                    <>
+                <div className={`absolute inset-0 flex flex-col transition-transform duration-500 ease-in-out ${step === 1 ? 'translate-x-0' : '-translate-x-full'} ${step === 1 ? 'opacity-100 relative' : 'opacity-0 absolute pointer-events-none'}`}>
                         <div className="p-8 pb-4 text-center">
                             <h2 className="text-3xl font-bold text-gray-800 mb-2">Language / 语言</h2>
                             <p className="text-gray-500">Choose your preferred language / 选择你的偏好语言</p>
@@ -193,11 +219,9 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
                                 Next <ChevronRight size={16} />
                             </button>
                         </div>
-                    </>
-                )}
+                </div>
 
-                {step === 2 && (
-                    <>
+                <div className={`absolute inset-0 flex flex-col transition-transform duration-500 ease-in-out ${step === 2 ? 'translate-x-0' : 'translate-x-full'} ${step === 2 ? 'opacity-100 relative' : 'opacity-0 absolute pointer-events-none'}`}>
                         <div className="p-8 pb-4 text-center">
                             <h2 className="text-3xl font-bold text-gray-800 mb-2">你的探索起点</h2>
                             <p className="text-gray-500">每次打开地图时，你希望从哪里开始你的旅程？</p>
@@ -293,8 +317,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
                                 )}
                             </div>
                         </div>
-                    </>
-                )}
+                </div>
 
             </div>
         </div>

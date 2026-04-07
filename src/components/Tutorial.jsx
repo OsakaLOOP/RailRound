@@ -1,23 +1,24 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronRight, CheckCircle2, ArrowRight } from 'lucide-react';
-import { DefaultCitySelector } from './modals/DefaultCitySelector';
+import { InitialSetupModal } from './modals/InitialSetupModal';
 import { useMeta } from '../contexts';
+import { useTranslation } from 'react-i18next';
 
-const STEPS = [
+const getSteps = (t) => [
     {
         id: 'welcome',
         target: '#header-title', // Center modal
-        title: "欢迎来到 RailLOOP",
-        content: "RailLOOP 是一个个人向旅铁手账, 旨在帮助你追踪和管理你的铁路旅程, 直观可感地展示旅行足迹.",
+        title: t('tutorial.welcome.title', '欢迎来到 RailLOOP'),
+        content: t('tutorial.welcome.content', 'RailLOOP 是一个个人向旅铁手账, 旨在帮助你追踪和管理你的铁路旅程, 直观可感地展示旅行足迹.'),
         position: 'center',
         action: 'next'
     },
     {
         id: 'tab-records',
         target: '#tab-btn-records',
-        title: "行程记录",
-        content: "这个标签页是你的旅程控制中心. 你可以在这里查看、添加和管理所有的铁路旅行记录, 或者添加到收藏",
+        title: t('tutorial.tabRecords.title', '行程记录'),
+        content: t('tutorial.tabRecords.content', '这个标签页是你的旅程控制中心. 你可以在这里查看、添加和管理所有的铁路旅行记录, 或者添加到收藏'),
         position: 'top',
         action: 'switch-tab',
         tab: 'records'
@@ -148,6 +149,8 @@ const Tutorial = ({
     editorMode
 }) => {
     const { devMode } = useMeta();
+    const { t, i18n } = useTranslation();
+    const STEPS = getSteps(t);
     const [step, setStep] = useState(-1); // -1: Loading/Check, 0+: Steps, -2: Skipped, -3: City Selector
     const [rect, setRect] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
@@ -201,24 +204,38 @@ const Tutorial = ({
     // Initialization check
     useEffect(() => {
         const skipped = localStorage.getItem('rail_tutorial_skipped');
-        const citySelectorDone = localStorage.getItem('rail_city_selector_done');
+        const setupDone = localStorage.getItem('rail_setup_done');
 
         if (devMode || skipped === 'true' || user) {
-            if (!citySelectorDone && !devMode) {
-                setStep(-3); // Show City Selector if skipped/logged in but not done
+            if (!setupDone && !devMode) {
+                setStep(-3); // Show Initial Setup Modal if skipped/logged in but not done
             } else {
                 setStep(-2); // Completely skipped
             }
             return;
         }
+
+        // For new users who haven't skipped/logged in AND haven't done setup:
+        if (!setupDone && !devMode) {
+            setStep(-3);
+            return;
+        }
+
         setStep(0);
         setIsVisible(true);
-    }, [user, devMode]);
+    }, [user, devMode, i18n.language]);
 
     const handleCitySelectorComplete = useCallback(() => {
-        localStorage.setItem('rail_city_selector_done', 'true');
-        setStep(-2); // Final skip
-    }, [setStep]);
+        localStorage.setItem('rail_setup_done', 'true');
+
+        const skipped = localStorage.getItem('rail_tutorial_skipped');
+        if (skipped === 'true' || user) {
+             setStep(-2); // Final skip if they are logged in or skipped previously
+        } else {
+             setStep(0); // Proceed to tutorial
+             setIsVisible(true);
+        }
+    }, [setStep, user]);
 
     // Step Transition Logic & Rect Calculation
     useEffect(() => {
@@ -405,7 +422,7 @@ const Tutorial = ({
     }, [rect, step]);
 
     if (step === -3) {
-        return <DefaultCitySelector isOpen={true} onComplete={handleCitySelectorComplete} />;
+        return <InitialSetupModal isOpen={true} onComplete={handleCitySelectorComplete} />;
     }
 
     if (!isVisible || step < 0 || step >= STEPS.length) return null;
@@ -457,11 +474,11 @@ const Tutorial = ({
                             {step === 0 && (
                                 <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer hover:text-gray-700">
                                     <input type="checkbox" onChange={(e) => { if(e.target.checked) handleSkip(true); }} className="rounded border-gray-300"/>
-                                    不再显示
+                                    {t('tutorial.skip', '不再显示')}
                                 </label>
                             )}
                             {step > 0 && (
-                                <button onClick={() => handleSkip(true)} className="text-xs text-gray-400 hover:text-gray-600 underline">跳过教程</button>
+                                <button onClick={() => handleSkip(true)} className="text-xs text-gray-400 hover:text-gray-600 underline">{t('tutorial.skipBtn', '跳过教程')}</button>
                             )}
                          </div>
 
@@ -470,12 +487,12 @@ const Tutorial = ({
                                 onClick={handleNext}
                                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-200 transition-all transform active:scale-95"
                              >
-                                {step === STEPS.length - 1 ? '结束' : '继续'} <ArrowRight size={16}/>
+                                {step === STEPS.length - 1 ? t('tutorial.finishBtn', '结束') : t('tutorial.nextBtn', '继续')} <ArrowRight size={16}/>
                              </button>
                         )}
                         {(currentStep.action === 'wait-interaction' || currentStep.action === 'wait-click-tab') && (
                             <div className="text-xs font-bold text-emerald-600 animate-pulse flex items-center gap-1">
-                                <ChevronRight size={14}/> 请按照指示操作
+                                <ChevronRight size={14}/> {t('tutorial.waitAction', '请按照指示操作')}
                             </div>
                         )}
                     </div>

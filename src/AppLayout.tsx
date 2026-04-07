@@ -25,12 +25,15 @@ import { isCompanyCompatible, getTransferableLines, computeLoopVia } from './cor
 import { calculateLatestStats } from './core/tripCalculator';
 import { parseGeoJsonBatch } from './core/parser';
 import GeoWorker from './workers/geo.worker.js?worker';
-import { meta } from '../public/changelog.json';
+// Use dynamic fetch or absolute URL instead of import from public, or ignore since this was an existing error
+import changelog from '../public/changelog.json';
+const { meta } = changelog;
 import { api } from './services/api';
 import { useShallow } from 'zustand/react/shallow';
 import { Toaster, toast } from 'react-hot-toast';
 import DistanceWorker from './workers/distance.worker.js?worker';
 import { useMeta } from './contexts';
+import { useTranslation } from 'react-i18next';
 
 const CURRENT_VERSION = meta["currentVersion"];
 
@@ -66,6 +69,13 @@ export const AppLayout: React.FC = () => {
     const { loadUserData, saveData } = useUserData();
     const [stationMenu, setStationMenu] = useState<any>(null);
     const [isExportingKML, setIsExportingKML] = useState(false);
+    const { i18n } = useTranslation();
+
+    useEffect(() => {
+        if (badgeSettings.language && badgeSettings.language !== i18n.language) {
+            i18n.changeLanguage(badgeSettings.language);
+        }
+    }, [badgeSettings.language, i18n]);
     const { devMode } = useMeta() as any;
     const isDraggingRef = useRef(false);
     const workerRef = useRef<Worker | null>(null);

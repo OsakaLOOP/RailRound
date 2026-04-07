@@ -1,0 +1,53 @@
+{
+  "tutorial": {
+    "skip": "不再顯示",
+    "skipBtn": "跳過教學",
+    "nextBtn": "繼續",
+    "finishBtn": "結束",
+    "waitAction": "請按照指示操作",
+    "welcome": {
+      "title": "歡迎來到 RailLOOP",
+      "content": "RailLOOP 是一個個人向旅鐵手帳，旨在幫助你追蹤和管理你的鐵路旅程，直觀可感地展示旅行足跡。"
+    },
+    "tabRecords": {
+      "title": "行程記錄",
+      "content": "這個分頁是你的旅程控制中心。你可以在這裡查看、添加和管理所有的鐵路旅行記錄，或者添加到收藏"
+    }
+  },
+  "loginModal": {
+    "login": "登入 RailLOOP",
+    "register": "註冊新帳號",
+    "welcomeBack": "歡迎回來，鐵道迷",
+    "startJourney": "開啟你的鐵道制霸之旅",
+    "username": "使用者名稱",
+    "password": "密碼",
+    "loginBtn": "登入",
+    "registerBtn": "立即註冊",
+    "loading": "請稍候...",
+    "thirdParty": "第三方登入",
+    "noAccount": "還沒有帳號？",
+    "hasAccount": "已有帳號？",
+    "toRegister": "建立新帳號",
+    "toLogin": "去登入",
+    "guideTitle": "用戶指南 / 協議",
+    "disclaimer": "註冊/登入後使用即代表您同意上述協議內容，否則您的數據將僅在本地(前端)處理。"
+  },
+  "statsPage": {
+    "bindGithub": "綁定 GitHub",
+    "githubBound": "GitHub 已綁定",
+    "badgeCode": "裝飾代碼",
+    "totalTrips": "記錄數",
+    "uniqueLines": "制霸路線",
+    "starFolders": "Star Folders",
+    "starFoldersDesc": "Manage trip collections & badges",
+    "personalSettings": "個人偏好設定",
+    "language": "UI 語言 / Language",
+    "mapCenter": "地圖初始位置",
+    "fixedInterest": "固定興趣",
+    "followLatest": "跟隨最新",
+    "totalDist": "總距離",
+    "totalCost": "總開銷",
+    "topLines": "常乘路線排行",
+    "footerStats": "加載了 {{companies}} 家公司，{{lines}} 條路線，{{stations}} 個站點。"
+  }
+}

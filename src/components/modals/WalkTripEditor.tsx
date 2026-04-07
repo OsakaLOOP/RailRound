@@ -79,12 +79,33 @@ export const WalkTripEditor: React.FC = () => {
             // Find coordinates for the Bezier curve
             let startCoords = null;
             let endCoords = null;
-            Object.values(railwayData).forEach(line => {
-                const s = line.stations.find(st => st.id === form.fromId);
-                if (s) startCoords = [s.lng, s.lat];
-                const e = line.stations.find(st => st.id === form.toId);
-                if (e) endCoords = [e.lng, e.lat];
-            });
+            let foundStart = false;
+            let foundEnd = false;
+
+            // ⚡ Bolt Optimization: Replace Object.values().forEach with a single-pass
+            // for...in loop and early break to prevent large temporary array allocations
+            for (const lineKey in railwayData) {
+                if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+                const line = railwayData[lineKey];
+
+                if (!foundStart) {
+                    const s = line.stations.find(st => st.id === form.fromId);
+                    if (s) {
+                        startCoords = [s.lng, s.lat];
+                        foundStart = true;
+                    }
+                }
+
+                if (!foundEnd) {
+                    const e = line.stations.find(st => st.id === form.toId);
+                    if (e) {
+                        endCoords = [e.lng, e.lat];
+                        foundEnd = true;
+                    }
+                }
+
+                if (foundStart && foundEnd) break;
+            }
 
             if (startCoords && endCoords) {
                 walkPath = generateBezierPath(startCoords as [number, number], endCoords as [number, number]);
@@ -127,12 +148,33 @@ export const WalkTripEditor: React.FC = () => {
     // Resolving station names for read-only display
     let startName = "未知起点";
     let endName = "未知终点";
-    Object.values(railwayData).forEach(line => {
-        const s = line.stations.find(st => st.id === form.fromId);
-        if (s) startName = s.name_ja;
-        const e = line.stations.find(st => st.id === form.toId);
-        if (e) endName = e.name_ja;
-    });
+    let foundStartName = false;
+    let foundEndName = false;
+
+    // ⚡ Bolt Optimization: Replace Object.values().forEach with a single-pass
+    // for...in loop and early break to prevent large temporary array allocations
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        const line = railwayData[lineKey];
+
+        if (!foundStartName) {
+            const s = line.stations.find(st => st.id === form.fromId);
+            if (s) {
+                startName = s.name_ja;
+                foundStartName = true;
+            }
+        }
+
+        if (!foundEndName) {
+            const e = line.stations.find(st => st.id === form.toId);
+            if (e) {
+                endName = e.name_ja;
+                foundEndName = true;
+            }
+        }
+
+        if (foundStartName && foundEndName) break;
+    }
 
     const isTree = form.walkType === 'tree';
 

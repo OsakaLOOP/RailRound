@@ -77,6 +77,21 @@ export const TripsPage: React.FC = () => {
         folders: state.folders,
         badgeSettings: state.badgeSettings
     })));
+
+    // ⚡ Bolt Optimization: Build a single O(N) map of station IDs to names
+    // instead of repeatedly looping through all railway lines for every walk trip.
+    // This reduces the complexity from O(Trips * Lines * Stations) to O(1) per lookup.
+    const stationNameMap = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const lineKey in railwayData) {
+            if (Object.prototype.hasOwnProperty.call(railwayData, lineKey)) {
+                railwayData[lineKey].stations.forEach(st => {
+                    map.set(st.id, st.name_ja);
+                });
+            }
+        }
+        return map;
+    }, [railwayData]);
     const setModalState = useStore(state => state.setModalState);
     const startEditingTrip = useStore(state => state.startEditingTrip);
     const removeTrip = useStore(state => state.removeTrip);
@@ -157,14 +172,9 @@ export const TripsPage: React.FC = () => {
                     const isWalk = t.isWalk;
 
                     if (isWalk) {
-                        let startName = t.fromId || '';
-                        let endName = t.toId || '';
-                        Object.values(railwayData).forEach(line => {
-                            const s = line.stations.find(st => st.id === t.fromId);
-                            if (s) startName = s.name_ja;
-                            const e = line.stations.find(st => st.id === t.toId);
-                            if (e) endName = e.name_ja;
-                        });
+                        // ⚡ Bolt Optimization: O(1) hash map lookup replacing nested loops
+                        const startName = stationNameMap.get(t.fromId) || t.fromId || '';
+                        const endName = stationNameMap.get(t.toId) || t.toId || '';
 
                         const isTree = t.walkType === 'tree';
                         const cls = {

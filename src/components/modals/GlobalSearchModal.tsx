@@ -36,7 +36,12 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
         const matchedLines: any[] = [];
         const matchedStations: any[] = [];
 
-        Object.entries(railwayData).forEach(([lineKey, lineData]) => {
+        // ⚡ Bolt Optimization: Prevent creating a large array via Object.entries()
+        // on every keystroke by using a manual single-pass for...in loop.
+        for (const lineKey in railwayData) {
+            if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+            const lineData = railwayData[lineKey];
+
             const displayName = lineKey.includes(':') ? lineKey.split(':').slice(1).join(':') : lineKey;
 
             // Check line match
@@ -64,7 +69,7 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
                     });
                 }
             });
-        });
+        }
 
         // (the code up there already populated `matchedLines` and `matchedStations` so no need to do performSearch here)
         return {

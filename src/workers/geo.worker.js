@@ -363,7 +363,7 @@ const getLandmarkVia = (line, fromId, toId, direction) => {
     let checkedCount = 0;
     let currIdx = fromIdx;
 
-    while (checkedCount < n && results.length < 3) {
+    while (checkedCount < n && results.length < 2) {
         // 按方向移动索引
         if (direction === 'up') {
             currIdx = (currIdx + 1) % n;
@@ -371,13 +371,16 @@ const getLandmarkVia = (line, fromId, toId, direction) => {
             currIdx = (currIdx - 1 + n) % n;
         }
 
-        // 如果到达终点，自然结束
-        if (currIdx === toIdx) break;
+        // 仅当非环线到达终点时才断开，环线为了收集 2 个 landmark 可以继续往后找
+        if (!isLoop && currIdx === toIdx) break;
+
         // 如果绕回起点
         if (currIdx === fromIdx) break;
 
         if (stations[currIdx].landmark) {
-            results.push(stations[currIdx].name_ja);
+            if (!results.includes(stations[currIdx].name_ja)) {
+                results.push(stations[currIdx].name_ja);
+            }
         }
 
         checkedCount++;

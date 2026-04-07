@@ -375,20 +375,23 @@ export const getLandmarks = (line: any, fromId: string, toId: string, loopVia?: 
     let checkedCount = 0;
     let currIdx = fi;
 
-    while (checkedCount < n && results.length < 3) {
+    while (checkedCount < n && results.length < 2) {
         if (direction === 'up') {
             currIdx = (currIdx + 1) % n;
         } else {
             currIdx = (currIdx - 1 + n) % n;
         }
 
-        // 如果到达终点，自然结束
-        if (currIdx === ti) break;
+        // 仅当非环线到达终点时才断开，环线为了收集 2 个 landmark 可以继续往后找
+        if (!line.meta?.isLoop && currIdx === ti) break;
+
         // 如果绕回起点（不应该发生，但作为安全兜底），结束
         if (currIdx === fi) break;
 
         if (stations[currIdx].landmark) {
-            results.push(stations[currIdx].name_ja);
+            if (!results.includes(stations[currIdx].name_ja)) {
+                results.push(stations[currIdx].name_ja);
+            }
         }
 
         checkedCount++;

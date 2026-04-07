@@ -1,4 +1,5 @@
 import * as turf from '@turf/turf';
+import { computeLoopVia } from './railwayRouting';
 
 // 辅助：计算两点间直线距离 (Haversine Formula)
 export const calcDist = (lat1, lon1, lat2, lon2) => {
@@ -163,11 +164,23 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
 
     // Helper to get or calc geometry on-the-fly
     const getGeometry = (seg) => {
-        const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+        if (!seg.lineKey || !seg.fromId || !seg.toId) return null;
+        
+        const isLoop = !!(railwayData[seg.lineKey]?.meta?.isLoop);
+        let realVia = seg.loopVia;
+        if (isLoop && realVia === 'auto') {
+            realVia = computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId);
+        }
+
+        const key = (isLoop && realVia)
+            ? `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realVia}`
+            : `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+
         let geom = segmentGeometries ? segmentGeometries.get(key) : null;
+        if (geom) return geom;
 
         // Fallback: If not in cache but we have geoData, try to slice it now
-        if ((!geom || !geom.coords) && geoData && railwayData) {
+        if (geoData && railwayData) {
             const line = railwayData[seg.lineKey];
             if (line) {
                 const s1 = line.stations.find(st => st.id === seg.fromId);
@@ -176,16 +189,19 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
                     const parts = seg.lineKey.split(':');
                     const company = parts[0];
                     const lineName = parts.slice(1).join(':');
+                    // Find feature respecting direction for loops
                     const feature = geoData.features.find(f =>
                         f.properties.type === 'line' &&
                         f.properties.name === lineName &&
-                        f.properties.company === company
+                        f.properties.company === company &&
+                        (!isLoop || f.properties.direction === realVia)
                     );
                     if (feature) {
                         const coords = sliceGeoJsonPath(feature, s1.lat, s1.lng, s2.lat, s2.lng);
                         if (coords) {
                             const isMulti = Array.isArray(coords[0]) && Array.isArray(coords[0][0]);
-                            geom = { coords, isMulti };
+                            const color = feature.properties.stroke || '#94a3b8';
+                            geom = { coords, isMulti, color };
                         }
                     }
                 }

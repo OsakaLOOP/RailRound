@@ -1,4 +1,5 @@
-import type { RailwayMap, CompanyMeta, Station } from '../store';
+import type { RailwayMap, CompanyMeta, Station, RailwayLineMeta } from '../store';
+
 
 /**
  * A standalone, environment-agnostic pure function to parse GeoJSON features
@@ -10,7 +11,8 @@ import type { RailwayMap, CompanyMeta, Station } from '../store';
  */
 export const parseGeoJsonBatch = (items: { json: any; company?: string }[], companyData: any = {}) => {
     const newFeatures: any[] = [];
-    const railwayUpdates: Record<string, { meta: CompanyMeta, stations: Station[] }> = {};
+    const railwayUpdates: Record<string, { meta: RailwayLineMeta, stations: Station[] }> = {};
+
 
     items.forEach(({ json, company: defaultCompany }) => {
         if (!json || !json.features || !Array.isArray(json.features)) return;
@@ -40,17 +42,25 @@ export const parseGeoJsonBatch = (items: { json: any; company?: string }[], comp
                             type: info.type || "未知",
                             company: comp,
                             logo: info.logo,
-                            icon
+                            icon,
+                            // 任何同名 line feature 只要带 isLoop 即为环线
+                            isLoop: props.isLoop === true || props.isLoop === 'true'
                         },
                         stations: []
                     };
-                } else if (props.icon && !railwayUpdates[lineKey].meta.icon) {
-                    railwayUpdates[lineKey].meta.icon = props.icon;
+                } else {
+                    if (props.icon && !railwayUpdates[lineKey].meta.icon) {
+                        railwayUpdates[lineKey].meta.icon = props.icon;
+                    }
+                    if (props.isLoop === true || props.isLoop === 'true') {
+                        railwayUpdates[lineKey].meta.isLoop = true;
+                    }
                 }
                 return lineKey;
             };
 
             if (p.type === 'line' && p.name) {
+                // direction 子 feature（up/down）仍然注册 lineKey，供 geoData 查询使用
                 ensureLineInTemp(p.name, p);
             } else if (p.type === 'station' && p.line && p.name && f.geometry?.coordinates) {
                 const lineKey = ensureLineInTemp(p.line, p);
@@ -64,12 +74,23 @@ export const parseGeoJsonBatch = (items: { json: any; company?: string }[], comp
                         name_ja: p.name,
                         lat: f.geometry.coordinates[1],
                         lng: f.geometry.coordinates[0],
-                        transfers: p.transfers || []
+                        transfers: p.transfers || [],
+                        landmark: p.landmark === true || p.landmark === 'true'
                     });
                 }
             }
         });
     });
+
+    // 环线站序规范化: index 0 不变, 其余反转 (GeoJSON 原始顺序为外回り, 转为内回り使 index 递增 = up)
+    for (const lineKey in railwayUpdates) {
+        const entry = railwayUpdates[lineKey];
+        if (entry.meta.isLoop && entry.stations.length > 2) {
+            const [first, ...rest] = entry.stations;
+            rest.reverse();
+            entry.stations = [first, ...rest];
+        }
+    }
 
     return {
         newFeatures,

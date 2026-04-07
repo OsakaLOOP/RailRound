@@ -21,6 +21,7 @@ import { useStore } from './store';
 import { useUserData } from './hooks/useUserData';
 import { db } from './utils/db';
 import buildKMLString from './buildKml';
+import { isCompanyCompatible, getTransferableLines, computeLoopVia } from './core/railwayRouting';
 import { calculateLatestStats } from './core/tripCalculator';
 import { parseGeoJsonBatch } from './core/parser';
 import GeoWorker from './workers/geo.worker.js?worker';
@@ -672,10 +673,34 @@ export const AppLayout: React.FC = () => {
                 const toIdx = line.stations.findIndex(s => s.id === seg.toId);
 
                 if (fromIdx !== -1 && toIdx !== -1) {
-                    const start = Math.min(fromIdx, toIdx);
-                    const end = Math.max(fromIdx, toIdx);
-                    for (let i = start; i <= end; i++) {
-                        visited.add(line.stations[i].id);
+                    const isLoop = !!line.meta?.isLoop;
+                    let realVia = seg.loopVia;
+                    if (isLoop && (!realVia || realVia === 'auto')) {
+                        realVia = computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId);
+                    }
+
+                    if (isLoop && (realVia === 'up' || realVia === 'down')) {
+                        let currIdx = fromIdx;
+                        const n = line.stations.length;
+                        visited.add(line.stations[currIdx].id);
+                        
+                        let safeCounter = 0;
+                        while (currIdx !== toIdx && safeCounter <= n) {
+                            if (realVia === 'up') {
+                                currIdx = (currIdx + 1) % n;
+                            } else {
+                                currIdx = (currIdx - 1 + n) % n;
+                            }
+                            visited.add(line.stations[currIdx].id);
+                            safeCounter++;
+                        }
+                    } else {
+                        // Linear line or unhandled loop edge cases
+                        const start = Math.min(fromIdx, toIdx);
+                        const end = Math.max(fromIdx, toIdx);
+                        for (let i = start; i <= end; i++) {
+                            visited.add(line.stations[i].id);
+                        }
                     }
                 }
             });
@@ -688,7 +713,14 @@ export const AppLayout: React.FC = () => {
                     const segs = trip.segments || [];
                     for (let i = 0; i < segs.length; i++) {
                         const seg = segs[i];
-                        const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+                        const isLoop = !!(railwayData[seg.lineKey]?.meta?.isLoop);
+                        let realVia = seg.loopVia;
+                        if (isLoop && realVia === 'auto') {
+                            realVia = computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId);
+                        }
+                        const key = (isLoop && realVia)
+                            ? `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realVia}`
+                            : `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
                         const cached = cache.get(key);
                         const line = railwayData[seg.lineKey];
                         const s1 = line?.stations.find((s: any) => s.id === seg.fromId);
@@ -728,7 +760,15 @@ export const AppLayout: React.FC = () => {
             // 2. 筛选缺失的数据发送给 Worker
             const needed = allSegments.filter(seg => {
                 if (!seg.lineKey || !seg.fromId || !seg.toId) return false;
-                return !segmentGeometries.has(`${seg.lineKey}_${seg.fromId}_${seg.toId}`);
+                const isLoop = !!(railwayData[seg.lineKey]?.meta?.isLoop);
+                let realVia = seg.loopVia;
+                if (isLoop && realVia === 'auto') {
+                    realVia = computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId);
+                }
+                const key = (isLoop && realVia)
+                    ? `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realVia}`
+                    : `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+                return !segmentGeometries.has(key);
             });
 
             if (needed.length === 0) return;
@@ -740,7 +780,14 @@ export const AppLayout: React.FC = () => {
 
                 // 先尝试从 IndexedDB 加载
                 for (const seg of needed) {
-                    const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+                    const isLoop = !!(railwayData[seg.lineKey]?.meta?.isLoop);
+                    let realVia = seg.loopVia;
+                    if (isLoop && realVia === 'auto') {
+                        realVia = computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId);
+                    }
+                    const key = (isLoop && realVia)
+                        ? `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realVia}`
+                        : `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
                     let data = await db.get(db.STORE_SEGMENTS, key).catch(() => null);
 
                 // 如果缓存是 fallback，但此时可能 geoData 已经加载好了，
@@ -766,7 +813,17 @@ export const AppLayout: React.FC = () => {
                                 updated = true;
                             } else {
                             // 对于确实无法匹配的数据，生成一个基于车站经纬度的 fallback，而不是 [0,0]
-                            const seg = toCalculateInWorker.find(s => `${s.lineKey}_${s.fromId}_${s.toId}` === key);
+                            const seg = toCalculateInWorker.find((s: any) => {
+                                const isLoop = !!(railwayData[s.lineKey]?.meta?.isLoop);
+                                let realVia = s.loopVia;
+                                if (isLoop && realVia === 'auto') {
+                                    realVia = computeLoopVia(railwayData, s.lineKey, s.fromId, s.toId);
+                                }
+                                const k = (isLoop && realVia)
+                                    ? `${s.lineKey}_${s.fromId}_${s.toId}_${realVia}`
+                                    : `${s.lineKey}_${s.fromId}_${s.toId}`;
+                                return k === key;
+                            });
                             let fallbackCoords = [[0, 0], [0, 0]];
                             if (seg && railwayData[seg.lineKey]) {
                                 const line = railwayData[seg.lineKey];
@@ -799,7 +856,7 @@ export const AppLayout: React.FC = () => {
             };
 
             fetchMissing();
-        }, 300); // 300ms 延时/防抖
+        }, 100); // 100ms 延时/防抖
 
         return () => clearTimeout(timerId);
     }, [trips, geoData, railwayData, segmentGeometries]);
@@ -1043,8 +1100,8 @@ export const AppLayout: React.FC = () => {
                 <Tutorial
                     activeTab={activeTab}
                     setActiveTab={(t: any) => useStore.getState().setActiveTab(t)}
-                    isTripEditing={useStore.getState().isTripEditorOpen}
-                    setIsTripEditing={(b: boolean) => setModalState({ isTripEditorOpen: b })}
+                    isTripEditing={useStore.getState().isTripEditing}
+                    setIsTripEditing={(b: boolean) => b ? useStore.getState().startEditingTrip() : useStore.getState().closeTripEditor()}
                     isLoginOpen={isLoginOpen}
                     setIsLoginOpen={(b: boolean) => setModalState({ isLoginOpen: b })}
                     user={user}

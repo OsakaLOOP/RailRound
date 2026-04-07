@@ -75,7 +75,7 @@ export const stitchRoutes = (turf, multiCoords, startPt) => {
       if (d_Head_Start < minDist) { minDist = d_Head_Start; bestMatchIdx = i; matchType = 'head-start'; }
     }
 
-    if (bestMatchIdx !== -1) {
+    if (bestMatchIdx !== -1 && minDist < 1.0) { // Limit stitch distance to 1km to prevent massive straight line jumps
       const seg = pool[bestMatchIdx];
       if (matchType === 'tail-start') {
         pathSegments.push(seg);
@@ -108,8 +108,27 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng, tu
 
     try {
       let line = feature;
-      const startPt = turf.point([startLng, startLat]);
-      const endPt = turf.point([endLng, endLat]);
+      let startPt = turf.point([startLng, startLat]);
+      let endPt = turf.point([endLng, endLat]);
+
+      // 安全前置吸附 (Safe Global Snap): 防止 turf 对部分 MultiLineString 吸附异常或引发下游错误
+      if (feature.geometry.type === 'MultiLineString') {
+          const safeSnap = (pt) => {
+              let minDist = Infinity;
+              let bestPt = pt;
+              feature.geometry.coordinates.forEach(coords => {
+                  try {
+                      const tempLine = turf.lineString(coords);
+                      const snapped = turf.nearestPointOnLine(tempLine, pt);
+                      const d = turf.distance(pt, snapped);
+                      if (d < minDist) { minDist = d; bestPt = snapped; }
+                  } catch(e) {}
+              });
+              return bestPt;
+          };
+          startPt = safeSnap(startPt);
+          endPt = safeSnap(endPt);
+      }
 
       // If MultiLineString, attempt to stitch segments into a sensible continuous path
       if (feature.geometry.type === 'MultiLineString') {
@@ -123,7 +142,7 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng, tu
          }
       }
 
-      // 1. 吸附 (Snap)
+      // 1. 在连续化后的纯净 LineString 上做最终吸附与索引定标
       const snappedStart = turf.nearestPointOnLine(line, startPt);
       const snappedEnd = turf.nearestPointOnLine(line, endPt);
 

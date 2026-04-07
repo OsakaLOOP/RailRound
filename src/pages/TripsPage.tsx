@@ -3,6 +3,7 @@ import { Train, Edit2, Trash2, Star, Plus, MapPin, Upload } from 'lucide-react';
 import { useStore } from '../store';
 import { DropZone } from '../components/DragContext';
 import { getRouteVisualData } from '../core/tripCalculator';
+import { computeLoopVia, getLandmarks } from '../core/railwayRouting';
 import { isMobile } from 'react-device-detect';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -60,7 +61,8 @@ const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
         return seg.id === nextSeg.id &&
                seg.lineKey === nextSeg.lineKey &&
                seg.fromId === nextSeg.fromId &&
-               seg.toId === nextSeg.toId;
+               seg.toId === nextSeg.toId &&
+               seg.loopVia === nextSeg.loopVia;
     });
 });
 
@@ -69,9 +71,10 @@ import { processSuicaCSV } from '../utils/suicaParser';
 import toast from 'react-hot-toast';
 
 export const TripsPage: React.FC = () => {
-    const { trips, railwayData, user, pins, folders, badgeSettings } = useStore(useShallow(state => ({
+    const { trips, railwayData, segmentGeometries, user, pins, folders, badgeSettings } = useStore(useShallow(state => ({
         trips: state.trips,
         railwayData: state.railwayData,
+        segmentGeometries: state.segmentGeometries,
         user: state.user,
         pins: state.pins,
         folders: state.folders,
@@ -235,6 +238,23 @@ export const TripsPage: React.FC = () => {
                                                     <span className="font-bold text-emerald-700 text-xs">{seg.lineKey}</span>
                                                 </div>
                                                 <div className="pl-5 font-medium text-gray-700">{getSt(seg.fromId)} <span className="text-gray-300 mx-1">→</span> {getSt(seg.toId)}</div>
+                                                {(() => {
+                                                    const isLoop = !!(line?.meta?.isLoop);
+                                                    if (!isLoop) return null;
+                                                    let realVia = seg.loopVia || 'auto';
+                                                    if (realVia === 'auto') {
+                                                        realVia = computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId);
+                                                    }
+                                                    const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realVia}`;
+                                                    const cachedLm = segmentGeometries.get(key)?.landmarks;
+                                                    
+                                                    // 回退方案：实时计算地标
+                                                    const lm = cachedLm || getLandmarks(line, seg.fromId, seg.toId, seg.loopVia);
+                                                    
+                                                    return lm?.length > 0 ? (
+                                                        <div className="pl-5 text-[11px] text-gray-400">经由 {lm.join('、')}</div>
+                                                    ) : null;
+                                                })()}
                                             </div>
                                         );
                                     })}

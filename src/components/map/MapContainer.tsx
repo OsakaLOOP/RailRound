@@ -133,7 +133,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
     }, [setEditingPin]);
 
     const initMap = () => {
-        if (!mapRef.current || mapInstance.current ) return;
+        if (!mapRef.current || mapInstance.current) return;
 
         let startLat = 35.6812;
         let startLng = 139.7671;
@@ -161,8 +161,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
         }
 
         const map = L.map(mapRef.current, { zoomControl: true, preferCanvas: true }).setView([startLat, startLng], 10);
-        const light = cachedTileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { attribution: '© CARTO', subdomains: ['a','b','c','d'], maxZoom: 20 });
-        const dark = cachedTileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', subdomains: ['a','b','c','d'], maxZoom: 20 });
+        const light = cachedTileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { attribution: '© CARTO', subdomains: ['a', 'b', 'c', 'd'], maxZoom: 20 });
+        const dark = cachedTileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', subdomains: ['a', 'b', 'c', 'd'], maxZoom: 20 });
         const rail = cachedTileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 20, opacity: 0, attribution: '© OpenRailwayMap' });
         railLayerRef.current = rail;
 
@@ -227,16 +227,16 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
 
         const updateLayerVisibility = () => {
             const z = map.getZoom();
-            if (railLayerRef.current) railLayerRef.current.setOpacity(z >= 15 ? 0.7 : (z>=12 ? 0.4 : 0));
+            if (railLayerRef.current) railLayerRef.current.setOpacity(z >= 15 ? 0.7 : (z >= 12 ? 0.4 : 0));
             const showBaseLines = z >= 10 && z < 12;
             if (baseLinesLayer.current) {
                 if (showBaseLines) {
-                     if (!map.hasLayer(baseLinesLayer.current)) {
-                         map.addLayer(baseLinesLayer.current);
-                         baseLinesLayer.current.invoke('bringToBack');
-                     }
+                    if (!map.hasLayer(baseLinesLayer.current)) {
+                        map.addLayer(baseLinesLayer.current);
+                        baseLinesLayer.current.invoke('bringToBack');
+                    }
                 } else {
-                     if (map.hasLayer(baseLinesLayer.current)) map.removeLayer(baseLinesLayer.current);
+                    if (map.hasLayer(baseLinesLayer.current)) map.removeLayer(baseLinesLayer.current);
                 }
             }
 
@@ -340,7 +340,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                                     0% { stroke-width: 6; opacity: 1; transform: translate(0px, 0px) scale(1); }
                                     25% { stroke-width: 15; transform: translate(${rx}px, ${ry}px) scale(1.5) skew(${rx}deg); }
                                     50% { stroke-width: 4; transform: translate(${-rx}px, ${-ry}px) scale(0.5) skew(${-rx}deg); opacity: 0.8; }
-                                    75% { stroke-width: 10; transform: translate(${rx/2}px, ${ry/2}px) scale(1.2); opacity: 0.5; }
+                                    75% { stroke-width: 10; transform: translate(${rx / 2}px, ${ry / 2}px) scale(1.2); opacity: 0.5; }
                                     100% { stroke-width: 2; transform: translate(0px, 0px) scale(0); opacity: 0; }
                                 }
                                 .${animName}-class {
@@ -557,8 +557,8 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     });
 
                     const rand = Math.random();
-                    if (isAprilFool && rand < 1/3) {
-                        const type = rand < 1/6 ? 'ufo' : 'tree';
+                    if (isAprilFool && rand < 1 / 3) {
+                        const type = rand < 1 / 6 ? 'ufo' : 'tree';
                         // Open the TripEditor normally, but force it into an immediate Easter Egg searching state
                         setAutoRouteEasterEggType(type);
                         setIsRouteSearching(true);
@@ -630,18 +630,18 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 [],
                 (f) => f.properties.id || `${f.properties.company}:${f.properties.line}:${f.properties.name}`,
                 (f) => L.circleMarker([0, 0]),
-                () => {}
+                () => { }
             );
             return;
         }
 
         // Calculate dynamic zoom scale
-        let scale = Math.pow(2, currentZoom - 10);
+        let scale = Math.pow(2, currentZoom - 12);
         scale = Math.min(scale, 1.5);
 
         const baseUnvisitedRadius = 4 * scale;
-        const baseVisitedRadius = 5 * Math.max(0.4, scale);
-        const baseVisitedWeight = 2 * Math.max(0.4, scale);
+        const baseVisitedRadius = 5 * Math.max(0.2, scale);
+        const baseVisitedWeight = 2 * Math.max(0.3, scale);
 
         // Calculate 3x3 viewport bounds
         const bounds = map.getBounds();
@@ -745,7 +745,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                             className: 'rubber-band-line'
                         }).addTo(rubberBandLayerRef.current!);
 
-                        const snapCircleCenter = L.circleMarker([0,0], {
+                        const snapCircleCenter = L.circleMarker([0, 0], {
                             radius: 8,
                             color: '#fff',
                             weight: 3,
@@ -959,7 +959,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                     pl.setStyle({ color: item.color, weight: zoomWeight, dashArray: targetDash, opacity: targetOpacity });
                 }
 
-                if(pl.getPopup()?.getContent() !== item.popup) {
+                if (pl.getPopup()?.getContent() !== item.popup) {
                     pl.bindPopup(item.popup);
                 }
             }
@@ -977,7 +977,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
             (pin) => pin.id,
             (pin) => {
                 const isEditing = editingPin?.id === pin.id;
-                const icon = L.divIcon({ className: 'pin-marker-icon', html: `<div class="pin-content ${isEditing ? 'dragging' : ''}" style="background:${pin.color}; border-color:${isEditing?'#ffff00':'white'}; transform:${isEditing?'scale(1.2) rotate(45deg)':''}"> ${pin.type==='photo'?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'} </div>`, iconSize: [32, 32], iconAnchor: [16, 32] });
+                const icon = L.divIcon({ className: 'pin-marker-icon', html: `<div class="pin-content ${isEditing ? 'dragging' : ''}" style="background:${pin.color}; border-color:${isEditing ? '#ffff00' : 'white'}; transform:${isEditing ? 'scale(1.2) rotate(45deg)' : ''}"> ${pin.type === 'photo' ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'} </div>`, iconSize: [32, 32], iconAnchor: [16, 32] });
 
                 const marker = L.marker([pin.lat, pin.lng], { icon, draggable: true, zIndexOffset: isEditing ? 1000 : 0 });
                 marker.on('dragstart', () => {
@@ -1017,7 +1017,7 @@ export const MapContainer: React.FC<Props> = ({ setStationMenu, isDraggingRef })
                 }
 
                 if (marker._cachedIsEditing !== isEditing || marker._cachedColor !== pin.color) {
-                    const icon = L.divIcon({ className: 'pin-marker-icon', html: `<div class="pin-content ${isEditing ? 'dragging' : ''}" style="background:${pin.color}; border-color:${isEditing?'#ffff00':'white'}; transform:${isEditing?'scale(1.2) rotate(45deg)':''}"> ${pin.type==='photo'?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'} </div>`, iconSize: [32, 32], iconAnchor: [16, 32] });
+                    const icon = L.divIcon({ className: 'pin-marker-icon', html: `<div class="pin-content ${isEditing ? 'dragging' : ''}" style="background:${pin.color}; border-color:${isEditing ? '#ffff00' : 'white'}; transform:${isEditing ? 'scale(1.2) rotate(45deg)' : ''}"> ${pin.type === 'photo' ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'} </div>`, iconSize: [32, 32], iconAnchor: [16, 32] });
                     marker.setIcon(icon);
                     marker.setZIndexOffset(isEditing ? 1000 : 0);
 

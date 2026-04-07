@@ -85,11 +85,13 @@ export interface Station {
   lng: number;
   transfers: LineKey[];
   distToNext?: number;
+  landmark?: boolean; // 环线地标站
 }
 
 export interface RailwayLineMeta extends CompanyMeta {
   company: string;
   icon?: URLString | null;
+  isLoop?: boolean; // 环状线路标记
 }
 
 export interface RailwayLine {
@@ -136,7 +138,11 @@ export interface TripSegment {
     lineKey: LineKey;
     fromId: StationId;
     toId: StationId;
+    direction?: 'up' | 'down';
+    loopVia?: 'up' | 'down' | 'auto';
+    isAlt?: boolean;
 }
+
 
 export interface Trip {
   id: ID;

@@ -1,4 +1,4 @@
-import type { RailwayMap, CompanyMeta, Station } from '../store';
+import type { RailwayMap, CompanyMeta, Station, LineKey, StationId } from '../store';
 import { calcDist } from '../core/tripCalculator'; // Ensure calcDist is exported from here or a common math utility
 
 // 预构建的换乘站索引缓存
@@ -285,18 +285,27 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
     let currentSegmentStartIdx = path[0].stationIndex;
     let lastIdx = path[0].stationIndex;
 
+    const buildSeg = (lineKey: string, startIdx: number, endIdx: number) => {
+        const lineObj = railwayData[lineKey];
+        const seg: any = {
+            id: Date.now() + segments.length,
+            lineKey,
+            fromId: lineObj.stations[startIdx].id,
+            toId:   lineObj.stations[endIdx].id
+        };
+        // 环线：嵌入方向
+        if (lineObj.meta?.isLoop) {
+            seg.loopVia = startIdx <= endIdx ? 'up' : 'down';
+        }
+        return seg;
+    };
+
     for (let i = 1; i < path.length; i++) {
         const node = path[i];
         if (node.lineKey !== currentSegmentLine) {
             // Line changed, flush previous segment if it moved
             if (currentSegmentStartIdx !== lastIdx) {
-                const lineObj = railwayData[currentSegmentLine];
-                segments.push({
-                    id: Date.now() + segments.length,
-                    lineKey: currentSegmentLine,
-                    fromId: lineObj.stations[currentSegmentStartIdx].id,
-                    toId: lineObj.stations[lastIdx].id
-                });
+                segments.push(buildSeg(currentSegmentLine, currentSegmentStartIdx, lastIdx));
             }
             // Start new segment
             currentSegmentLine = node.lineKey;
@@ -309,19 +318,88 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
 
     // Flush the last segment
     if (currentSegmentStartIdx !== lastIdx) {
-        const lineObj = railwayData[currentSegmentLine];
-        segments.push({
-            id: Date.now() + segments.length,
-            lineKey: currentSegmentLine,
-            fromId: lineObj.stations[currentSegmentStartIdx].id,
-            toId: lineObj.stations[lastIdx].id
-        });
+        segments.push(buildSeg(currentSegmentLine, currentSegmentStartIdx, lastIdx));
     }
 
     return {
         segments,
         estimatedTime: Math.round(bestEndNode.timeMins)
     };
+};
+
+export const computeLoopVia = (railwayData: RailwayMap, lineKey: LineKey, fromId: StationId, toId: StationId): 'up' | 'down' => {
+    const line = railwayData[lineKey];
+    const stations = line?.stations || [];
+    const fi = stations.findIndex(s => s.id === fromId);
+    const ti = stations.findIndex(s => s.id === toId);
+    if (fi === -1 || ti === -1) return 'up';
+
+    if (line?.meta?.isLoop) {
+        const len = stations.length;
+        const distUp = (ti - fi + len) % len;
+        const distDown = (fi - ti + len) % len;
+        return distUp <= distDown ? 'up' : 'down';
+    }
+    return fi <= ti ? 'up' : 'down';
+};
+
+/**
+ * 获取起终点之间的地标站 (最多3个)
+ * @param line 线路对象
+ * @param fromId 起点站ID
+ * @param toId 终点站ID
+ * @param loopVia 方向 ('up' | 'down' | 'auto')
+ */
+export const getLandmarks = (line: any, fromId: string, toId: string, loopVia?: 'up' | 'down' | 'auto') => {
+    if (!line) return [];
+    const stations = line.stations;
+    const n = stations.length;
+    const fi = stations.findIndex((s: any) => s.id === fromId);
+    const ti = stations.findIndex((s: any) => s.id === toId);
+
+    if (fi === -1 || ti === -1 || fi === ti) return [];
+
+    let direction: 'up' | 'down' = 'up';
+    if (line.meta?.isLoop) {
+        if (loopVia === 'up' || loopVia === 'down') direction = loopVia;
+        else {
+            const distUp = (ti - fi + n) % n;
+            const distDown = (fi - ti + n) % n;
+            direction = distUp <= distDown ? 'up' : 'down';
+        }
+    } else {
+        direction = fi <= ti ? 'up' : 'down';
+    }
+
+    const results = [];
+    let checkedCount = 0;
+    let currIdx = fi;
+
+    while (checkedCount < n && results.length < 3) {
+        if (direction === 'up') {
+            currIdx = (currIdx + 1) % n;
+        } else {
+            currIdx = (currIdx - 1 + n) % n;
+        }
+
+        // 如果到达终点，自然结束
+        if (currIdx === ti) break;
+        // 如果绕回起点（不应该发生，但作为安全兜底），结束
+        if (currIdx === fi) break;
+
+        if (stations[currIdx].landmark) {
+            results.push(stations[currIdx].name_ja);
+        }
+
+        checkedCount++;
+        
+        // 非环线如果越界则停止
+        if (!line.meta?.isLoop) {
+            if (currIdx === 0 || currIdx === n - 1) break;
+        }
+    }
+
+    return results;
 };
 
 // --- Geo Math for Snapping ---

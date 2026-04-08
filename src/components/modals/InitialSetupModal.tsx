@@ -276,7 +276,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
     })));
 
     const { saveData } = useUserData();
-    const { t } = useTranslation();
+    const { t: translate } = useTranslation();
 
     // step 1: language, step 2: city
     const [step, setStep] = useState<1 | 2>(1);
@@ -325,8 +325,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
 
                 <div className={`absolute inset-0 flex flex-col transition-transform duration-500 ease-in-out ${step === 1 ? 'translate-x-0' : '-translate-x-full'} ${step === 1 ? 'opacity-100 relative' : 'opacity-0 absolute pointer-events-none'}`}>
                         <div className="p-8 pb-4 text-center">
-                            <h2 className="text-3xl font-bold text-gray-800 mb-2">{t('setup.langTitle', 'Language / 语言')}</h2>
-                            <p className="text-gray-500">{t('setup.langDesc', 'Choose your preferred language / 选择你的偏好语言')}</p>
+                            <h2 className="text-3xl font-bold text-gray-800 mb-2">{translate('setup.langTitle', 'Language / 语言')}</h2>
+                            <p className="text-gray-500">{translate('setup.langDesc', 'Choose your preferred language / 选择你的偏好语言')}</p>
                         </div>
                         <div className="flex-1 overflow-y-auto p-8 pt-4 flex flex-col items-center">
                              <div className="w-40 h-40 mb-8">
@@ -353,8 +353,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
 
                 <div className={`absolute inset-0 flex flex-col transition-transform duration-500 ease-in-out ${step === 2 ? 'translate-x-0' : 'translate-x-full'} ${step === 2 ? 'opacity-100 relative' : 'opacity-0 absolute pointer-events-none'}`}>
                         <div className="p-8 pb-4 text-center">
-                            <h2 className="text-3xl font-bold text-gray-800 mb-2">{t('setup.startTitle', '你的探索起点')}</h2>
-                            <p className="text-gray-500">{t('setup.startDesc', '每次打开地图时，你希望从哪里开始你的旅程？')}</p>
+                            <h2 className="text-3xl font-bold text-gray-800 mb-2">{translate('setup.startTitle', '你的探索起点')}</h2>
+                            <p className="text-gray-500">{translate('setup.startDesc', '每次打开地图时，你希望从哪里开始你的旅程？')}</p>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-8 pt-4">
@@ -367,8 +367,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
                                         <div className="w-40 h-40 mb-4 group-hover:scale-105 transition-transform duration-500">
                                             <FixedInterestSVG />
                                         </div>
-                                        <h3 className="text-xl font-bold text-gray-800 mb-2">{t('setup.fixedInterest', '固定兴趣')}</h3>
-                                        <p className="text-sm text-gray-500 text-center">{t('setup.fixedInterestDesc', '选择一个心仪的城市<br/>作为每次探索的默认大本营')}</p>
+                                        <h3 className="text-xl font-bold text-gray-800 mb-2">{translate('setup.fixedInterest', '固定兴趣')}</h3>
+                                        <p className="text-sm text-gray-500 text-center">{translate('setup.fixedInterestDesc', '选择一个心仪的城市<br/>作为每次探索的默认大本营')}</p>
                                     </button>
 
                                     <button
@@ -381,26 +381,26 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
                                         <div className="w-40 h-40 mb-4 group-hover:scale-105 transition-transform duration-500">
                                             <FollowLatestSVG />
                                         </div>
-                                        <h3 className="text-xl font-bold text-gray-800 mb-2">{t('setup.followLatest', '跟随最新')}</h3>
-                                        <p className="text-sm text-gray-500 text-center">{t('setup.followLatestDesc', '总是从上一次旅行的终点<br/>继续你的未竟之旅')}</p>
+                                        <h3 className="text-xl font-bold text-gray-800 mb-2">{translate('setup.followLatest', '跟随最新')}</h3>
+                                        <p className="text-sm text-gray-500 text-center">{translate('setup.followLatestDesc', '总是从上一次旅行的终点<br/>继续你的未竟之旅')}</p>
                                     </button>
                                 </div>
                             ) : (
                                 <div className="animate-fade-in">
                                     <div className="flex items-center gap-2 mb-6 text-sm text-gray-500 cursor-pointer w-fit hover:text-gray-800 transition-colors" onClick={() => {setMode(null); setSelectedCountry(null);}}>
-                                        <ChevronRight className="rotate-180" size={16} /> {t('setup.backToMode', '返回选择模式')}
+                                        <ChevronRight className="rotate-180" size={16} /> {translate('setup.backToMode', '返回选择模式')}
                                     </div>
 
                                     {!selectedCountry ? (
                                         <div className="space-y-4">
-                                            <h3 className="text-lg font-bold text-gray-800 mb-4">{t('setup.chooseCountry', '选择国家或地区')}</h3>
+                                            <h3 className="text-lg font-bold text-gray-800 mb-4">{translate('setup.chooseCountry', '选择国家或地区')}</h3>
                                             {(Object.keys(CITIES) as Array<keyof typeof CITIES>).map(country => (
                                                 <button
                                                     key={country}
                                                     onClick={() => setSelectedCountry(country)}
                                                     className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 rounded-xl transition-colors group"
                                                 >
-                                                    <span className="font-bold text-gray-700 group-hover:text-emerald-700">{country === 'China' ? t('setup.china', '中国') : t('setup.japan', '日本')}</span>
+                                                    <span className="font-bold text-gray-700 group-hover:text-emerald-700">{country === 'China' ? translate('setup.china', '中国') : translate('setup.japan', '日本')}</span>
                                                     <ChevronRight className="text-gray-400 group-hover:text-emerald-500" />
                                                 </button>
                                             ))}
@@ -408,9 +408,9 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
                                     ) : (
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-2 mb-4 text-sm text-gray-500 cursor-pointer w-fit hover:text-gray-800 transition-colors" onClick={() => setSelectedCountry(null)}>
-                                                <ChevronRight className="rotate-180" size={16} /> {t('setup.backToCountry', '返回选择国家')}
+                                                <ChevronRight className="rotate-180" size={16} /> {translate('setup.backToCountry', '返回选择国家')}
                                             </div>
-                                            <h3 className="text-lg font-bold text-gray-800 mb-4">{t('setup.chooseBase', '选择你的默认大本营')}</h3>
+                                            <h3 className="text-lg font-bold text-gray-800 mb-4">{translate('setup.chooseBase', '选择你的默认大本营')}</h3>
                                             <div className="grid grid-cols-2 gap-3">
                                                 {CITIES[selectedCountry].map(city => (
                                                     <button
@@ -442,7 +442,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
                                 </button>
                                 {(mode === 'fixed' && selectedCity) && (
                                     <button onClick={() => handleSave()} className="px-6 py-2.5 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 transition-all">
-                                        {t('setup.confirm', '确定设置')}
+                                        {translate('setup.confirm', '确定设置')}
                                     </button>
                                 )}
                             </div>

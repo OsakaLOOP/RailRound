@@ -44,7 +44,7 @@ export const StatsPage: React.FC = () => {
     })));
     const setModalState = useStore(state => state.setModalState);
     const { saveData } = useUserData();
-    const { t } = useTranslation();
+    const { t: translate } = useTranslation();
 
     const { totalTrips, uniqueLines, totalDist, totalCost, rankedSegments } = useMemo(() => {
         const _totalTrips = trips.length;
@@ -136,24 +136,24 @@ export const StatsPage: React.FC = () => {
                         <div className="font-bold text-lg">{user.username}</div>
                         <div className="text-xs text-gray-400 flex items-center gap-1">
                             {userProfile?.bindings?.github ? (
-                                <span className="flex items-center gap-1 text-emerald-600"><Github size={12}/> {t('statsPage.githubBound', 'GitHub 已绑定')} ({userProfile.bindings.github.login})</span>
+                                <span className="flex items-center gap-1 text-emerald-600"><Github size={12}/> {translate('statsPage.githubBound', 'GitHub 已绑定')} ({userProfile.bindings.github.login})</span>
                             ) : (
-                                <button onClick={() => window.open('/api/oauth?provider=github', '_self')} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white rounded text-xs font-bold hover:bg-black transition-colors"><Github size={12}/> {t('statsPage.bindGithub', '绑定 GitHub')}</button>
+                                <button onClick={() => window.open('/api/oauth?provider=github', '_self')} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white rounded text-xs font-bold hover:bg-black transition-colors"><Github size={12}/> {translate('statsPage.bindGithub', '绑定 GitHub')}</button>
                             )}
                         </div>
                     </div>
                 </div>
                 {userProfile?.bindings?.github && (
                    <button onClick={() => setModalState({ cardModalUser: user })} className="absolute right-4 top-4 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                       <Github size={14}/> {t('statsPage.badgeCode', '装饰代码')}
+                       <Github size={14}/> {translate('statsPage.badgeCode', '装饰代码')}
                    </button>
                 )}
             </div>
         )}
 
         <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-102 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">{t('statsPage.totalTrips', '记录数')}</div><div className="text-3xl font-bold text-gray-800">{totalTrips}</div></div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-102 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">{t('statsPage.uniqueLines', '制霸路线')}</div><div className="text-3xl font-bold text-indigo-600">{uniqueLines}</div></div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-102 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">{translate('statsPage.totalTrips', '记录数')}</div><div className="text-3xl font-bold text-gray-800">{totalTrips}</div></div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-102 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">{translate('statsPage.uniqueLines', '制霸路线')}</div><div className="text-3xl font-bold text-indigo-600">{uniqueLines}</div></div>
         </div>
 
         <div className="space-y-4">
@@ -163,8 +163,8 @@ export const StatsPage: React.FC = () => {
                         <Folder size={20}/>
                     </div>
                     <div className="text-left">
-                        <div className="font-bold text-gray-800">{t('statsPage.starFolders', 'Star Folders')}</div>
-                        <div className="text-xs text-gray-400">{t('statsPage.starFoldersDesc', 'Manage trip collections & badges')}</div>
+                        <div className="font-bold text-gray-800">{translate('statsPage.starFolders', 'Star Folders')}</div>
+                        <div className="text-xs text-gray-400">{translate('statsPage.starFoldersDesc', 'Manage trip collections & badges')}</div>
                     </div>
                 </div>
                 <Move size={16} className="text-gray-300 group-hover:text-gray-500"/>
@@ -172,11 +172,11 @@ export const StatsPage: React.FC = () => {
 
             {/* Personal Settings */}
             <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col gap-4">
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('statsPage.personalSettings', '个人偏好设置')}</div>
+                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{translate('statsPage.personalSettings', '个人偏好设置')}</div>
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-gray-700 font-bold text-sm">
-                            <Globe size={16} /> {t('statsPage.language', 'UI 语言 / Language')}
+                            <Globe size={16} /> {translate('statsPage.language', 'UI 语言 / Language')}
                         </div>
                         <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200">
                             <select
@@ -198,7 +198,7 @@ export const StatsPage: React.FC = () => {
 
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-gray-700 font-bold text-sm">
-                            <MapIcon size={16} /> {t('statsPage.mapCenter', '地图初始位置')}
+                            <MapIcon size={16} /> {translate('statsPage.mapCenter', '地图初始位置')}
                         </div>
                         <div className="flex items-center bg-gray-100 rounded-lg p-1">
                             <button
@@ -209,7 +209,7 @@ export const StatsPage: React.FC = () => {
                                 }}
                                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${(!badgeSettings.defaultMapCenter || badgeSettings.defaultMapCenter.mode === 'fixed') ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
                             >
-                                {t('statsPage.fixedInterest', '固定兴趣')}
+                                {translate('statsPage.fixedInterest', '固定兴趣')}
                             </button>
                             <button
                                 onClick={() => {
@@ -219,7 +219,7 @@ export const StatsPage: React.FC = () => {
                                 }}
                                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${badgeSettings.defaultMapCenter?.mode === 'latest' ? 'bg-white shadow text-amber-600' : 'text-gray-500 hover:text-gray-700'}`}
                             >
-                                {t('statsPage.followLatest', '跟随最新')}
+                                {translate('statsPage.followLatest', '跟随最新')}
                             </button>
                         </div>
                     </div>
@@ -237,7 +237,7 @@ export const StatsPage: React.FC = () => {
                                 }}
                             >
                                 {Object.entries(CITIES).map(([country, cities]) => (
-                                    <optgroup key={country} label={country === 'China' ? t('setup.china', '中国') : t('setup.japan', '日本')}>
+                                    <optgroup key={country} label={country === 'China' ? translate('setup.china', '中国') : translate('setup.japan', '日本')}>
                                         {cities.map(city => (
                                             <option key={city.name} value={`${city.lat},${city.lng}`}>{city.name}</option>
                                         ))}
@@ -251,11 +251,11 @@ export const StatsPage: React.FC = () => {
         </div>
 
         <div className="bg-gradient-to-br from-emerald-600 to-teal-700 hover:from-teal-600 hover:to-emerald-800 p-6 rounded-xl shadow-lg text-white transition-all duration-500 hover:-translate-y-1 hover:shadow-xl cursor-default group">
-            <div className="flex items-center justify-between mb-2"><h3 className="font-bold flex items-center gap-2"><TrendingUp size={18} className="group-hover:-translate-y-1 group-hover:scale-110 transition-transform duration-300"/> {t('statsPage.totalDist', '总距离')}</h3><span className="text-xs bg-white/20 px-2 py-1 rounded">{t('statsPage.totalDist', '总距离')}</span></div>
+            <div className="flex items-center justify-between mb-2"><h3 className="font-bold flex items-center gap-2"><TrendingUp size={18} className="group-hover:-translate-y-1 group-hover:scale-110 transition-transform duration-300"/> {translate('statsPage.totalDist', '总距离')}</h3><span className="text-xs bg-white/20 px-2 py-1 rounded">{translate('statsPage.totalDist', '总距离')}</span></div>
             <div className="text-4xl font-bold mb-2">{Math.round(totalDist)} <span className="text-lg font-normal opacity-80">km</span></div>
-            <div className="border-t border-white/20 pt-2 flex items-center gap-2 text-sm opacity-90"><span className="font-bold">¥</span> {t('statsPage.totalCost', '总开销')}: {totalCost.toLocaleString()}</div>
+            <div className="border-t border-white/20 pt-2 flex items-center gap-2 text-sm opacity-90"><span className="font-bold">¥</span> {translate('statsPage.totalCost', '总开销')}: {totalCost.toLocaleString()}</div>
         </div>
-        <div className="bg-white rounded-xl border overflow-hidden"><div className="p-3 border-b bg-slate-50 font-bold text-sm text-slate-600">{t('statsPage.topLines', '常乘路线排行')}</div>
+        <div className="bg-white rounded-xl border overflow-hidden"><div className="p-3 border-b bg-slate-50 font-bold text-sm text-slate-600">{translate('statsPage.topLines', '常乘路线排行')}</div>
           {rankedSegments.map(([line, count]: [string, any], idx) => {
               const icon = railwayData[line]?.meta?.icon;
               return (
@@ -272,7 +272,7 @@ export const StatsPage: React.FC = () => {
         </div>
 
         <div className="text-center text-xs text-gray-400 mt-8 pb-4">
-             {t('statsPage.footerStats', '加载了 {{companies}} 家公司，{{lines}} 条线路，{{stations}} 个站点。', {
+             {translate('statsPage.footerStats', '加载了 {{companies}} 家公司，{{lines}} 条线路，{{stations}} 个站点。', {
                  companies: Object.keys(companyDB).length,
                  lines: Object.keys(railwayData).length,
                  stations: uniqueStationsCount
@@ -288,7 +288,7 @@ export const StatsPage: React.FC = () => {
              <br/>
              Copyleft <span aria-label="Copyleft icon" style={{display: 'inline-block', transform: 'rotateY(180deg)'}}>&copy;</span> 2026-2027 @OsakaLOOP
              <br/>
-             <div><span style={{ display: "inline" }}>{t('statsPage.moreDetails', '更多详情, 参见')}</span><button style={{ display: "inline" }} onClick={() => setModalState({ isLoginOpen: true })} className="text-xs text-blue-400 hover:text-blue-500 hover:underline transition-all items-center gap-1">{t('statsPage.userGuide', '用户指南')}</button></div>
+             <div><span style={{ display: "inline" }}>{translate('statsPage.moreDetails', '更多详情, 参见')}</span><button style={{ display: "inline" }} onClick={() => setModalState({ isLoginOpen: true })} className="text-xs text-blue-400 hover:text-blue-500 hover:underline transition-all items-center gap-1">{translate('statsPage.userGuide', '用户指南')}</button></div>
         </div>
       </div>
     );

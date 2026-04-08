@@ -207,7 +207,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
   const setBadgeSettings = useStore(state => state.setBadgeSettings);
   const lang = badgeSettings.language || 'zh-CN';
 
-  const { t } = useTranslation();
+  const { t: translate } = useTranslation();
 
   useEffect(() => {
     if (isOpen) {
@@ -268,10 +268,10 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
             <div className="mb-8">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2 mb-2">
                     {isRegistering ? <UserPlus className="text-emerald-600"/> : <LogIn className="text-blue-600"/>}
-                    {isRegistering ? t('loginModal.register', '注册新账号') : t('loginModal.login', '登录 RailLOOP')}
+                    {isRegistering ? translate('loginModal.register', '注册新账号') : translate('loginModal.login', '登录 RailLOOP')}
                 </h2>
                 <p className="text-sm text-gray-500">
-                    {isRegistering ? t('loginModal.startJourney', '开启你的铁道制霸之旅') : t('loginModal.welcomeBack', '欢迎回来，铁道迷')}
+                    {isRegistering ? translate('loginModal.startJourney', '开启你的铁道制霸之旅') : translate('loginModal.welcomeBack', '欢迎回来，铁道迷')}
                 </p>
             </div>
 
@@ -283,7 +283,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{t('loginModal.username', '用户名')}</label>
+                <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{translate('loginModal.username', '用户名')}</label>
                 <input
                 type="text"
                 required
@@ -293,7 +293,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
                 />
             </div>
             <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{t('loginModal.password', '密码')}</label>
+                <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{translate('loginModal.password', '密码')}</label>
                 <input
                 type="password"
                 required
@@ -311,7 +311,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
                 ${loading ? 'opacity-70 cursor-wait' : ''}
                 `}
             >
-                {loading ? t('loginModal.loading', '请稍候...') : (isRegistering ? t('loginModal.registerBtn', '立即注册') : t('loginModal.loginBtn', '登录'))}
+                {loading ? translate('loginModal.loading', '请稍候...') : (isRegistering ? translate('loginModal.registerBtn', '立即注册') : translate('loginModal.loginBtn', '登录'))}
             </button>
             </form>
 
@@ -321,7 +321,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
                     <div className="w-full border-t border-gray-200"></div>
                     </div>
                     <div className="relative flex justify-center text-xs uppercase tracking-wider font-bold">
-                    <span className="px-2 bg-white text-gray-400">{t('loginModal.thirdParty', '第三方登录')}</span>
+                    <span className="px-2 bg-white text-gray-400">{translate('loginModal.thirdParty', '第三方登录')}</span>
                     </div>
                 </div>
 
@@ -342,12 +342,12 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
             </div>
 
             <div className="mt-6 text-center text-sm">
-            <span className="text-gray-400">{isRegistering ? t('loginModal.hasAccount', '已有账号?') : t('loginModal.noAccount', '还没有账号?')}</span>
+            <span className="text-gray-400">{isRegistering ? translate('loginModal.hasAccount', '已有账号?') : translate('loginModal.noAccount', '还没有账号?')}</span>
             <button
                 onClick={() => setIsRegistering(!isRegistering)}
                 className="ml-2 font-bold text-blue-600 hover:underline"
             >
-                {isRegistering ? t('loginModal.toLogin', '去登录') : t('loginModal.toRegister', '创建新账号')}
+                {isRegistering ? translate('loginModal.toLogin', '去登录') : translate('loginModal.toRegister', '创建新账号')}
             </button>
             </div>
         </div>}
@@ -357,7 +357,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
             <button onClick={onClose} className="absolute top-4 right-4 z-10 hidden md:block"><X className="text-gray-400 hover:text-gray-600"/></button>
 
             <div className="flex items-center justify-between p-4 border-b bg-white/50 backdrop-blur shrink-0">
-                <div className="font-bold text-gray-500 text-sm">{t('loginModal.guideTitle', '用户指南 / 协议')}</div>
+                <div className="font-bold text-gray-500 text-sm">{translate('loginModal.guideTitle', '用户指南 / 协议')}</div>
                 <div className="flex bg-gray-200 p-1 rounded-lg mr-8">
                     {['zh-CN', 'en', 'ja-JP', 'zh-TW'].map(l => (
                         <button
@@ -376,7 +376,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
             </div>
 
             <div className="p-4 border-t bg-white/50 backdrop-blur text-center text-xs text-gray-400 shrink-0">
-                {t('loginModal.disclaimer', '注册/登录后使用即代表您同意上述协议内容, 否则您的数据将仅在本地(前端)处理.')}
+                {translate('loginModal.disclaimer', '注册/登录后使用即代表您同意上述协议内容, 否则您的数据将仅在本地(前端)处理.')}
             </div>
         </div>
 

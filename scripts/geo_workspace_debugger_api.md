@@ -26,3 +26,6 @@ python d:\PROJ\GIT\PyDesign\RailRound\scripts\geo_workspace_debugger.py workspac
 * `--delete-block <BLOCK_IDX>`: 【修改态】移除指定序号（0-N）的区块，并将修改后的结构原地覆盖写入原 JSON 文件。
 * `--swap-blocks <IDX1> <IDX2>`: 【修改态】交换两个序号区块的前后位置（例如针对拼接错位），自动保存。
 * `--delete-seg <SEG_ID>`: 【修改态】在所有线路轨道结构中检索指定的线段 ID（支持只输入末端显示的最后 8 位字符作模糊匹配），剔除该断代碎片并自动保存。
+
+**环境限制**
+* 本pc为win11, 日本地区编码, 需要手动指定utf-8.

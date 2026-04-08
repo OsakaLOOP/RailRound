@@ -34,7 +34,7 @@ const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
         [segments, segmentGeometries, railwayData, geoData]
     );
 
-    if (visualPaths.length === 0) return <div className="w-28 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">无预览</div>;
+    if (visualPaths.length === 0) return <div className="w-28 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">{t('tripsPage.noPreview', '无预览')}</div>;
 
     const maxWidth = Math.max(0, containerWidth - 300);
     const shouldRotate = isMobile && widthPx > maxWidth && maxWidth > 0;
@@ -105,10 +105,11 @@ export const TripsPage: React.FC = () => {
 
                     if (newTrips.length > 0) {
                         toast.dismiss(toastId);
-                        const skipMsg = skippedCount > 0 ? `\n(已跳过 ${skippedCount} 条重复记录)` : '';
-                        if (window.confirm(`成功解析 ${newTrips.length} 条新行程。是否导入？${skipMsg}\n(按 F12 打开控制台查看详细匹配日志)`)) {
+                        const skipMsg = skippedCount > 0 ? t('tripsPage.skipMsg', '\n(已跳过 {{count}} 条重复记录)', { count: skippedCount }) : '';
+                        if (window.confirm(t('tripsPage.parseSuccess', '成功解析 {{count}} 条新行程。是否导入？{{skipMsg}}\n(按 F12 打开控制台查看详细匹配日志)', { count: newTrips.length, skipMsg: skipMsg }))) {
                             newTrips.forEach(trip => addTrip(trip));
-                            toast.success(`导入了 ${newTrips.length} 条行程！${skippedCount > 0 ? ` (跳过 ${skippedCount} 重复)` : ''}`);
+                            const skipMsgShort = skippedCount > 0 ? t('tripsPage.skipMsgShort', ' (跳过 {{count}} 重复)', { count: skippedCount }) : '';
+                            toast.success(t('tripsPage.importSuccess', '导入了 {{count}} 条行程！{{skipMsg}}', { count: newTrips.length, skipMsg: skipMsgShort }));
                             if (user) {
                                 const updatedTrips = [...newTrips, ...trips].sort((a,b) => b.date.localeCompare(a.date));
                                 saveData(user.token, updatedTrips, pins, folders, badgeSettings).catch((err: any) => toast.error('云端同步失败'));
@@ -116,19 +117,19 @@ export const TripsPage: React.FC = () => {
                         }
                     } else {
                         if (skippedCount > 0) {
-                            toast.success(`解析完成，但所有记录（${skippedCount}条）已存在，无需重复导入。`, { id: toastId });
+                            toast.success(t('tripsPage.allExist', '解析完成，但所有记录（{{count}}条）已存在，无需重复导入。', { count: skippedCount }), { id: toastId });
                         } else {
-                            toast.error('未找到可导入的行程，或者解析失败。', { id: toastId });
+                            toast.error(t('tripsPage.noImport', '未找到可导入的行程，或者解析失败。'), { id: toastId });
                         }
                     }
                 } catch (error) {
                     console.error("Error parsing Suica CSV:", error);
-                    toast.error('读取或解析文件出错。', { id: toastId });
+                    toast.error(t('tripsPage.readError', '读取或解析文件出错。'), { id: toastId });
                 }
             }
         };
         reader.onerror = () => {
-            toast.error('读取文件失败', { id: toastId });
+            toast.error(t('tripsPage.readError', '读取文件失败'), { id: toastId });
         }
         reader.readAsText(file);
         // Reset the input value so the same file can be selected again
@@ -136,7 +137,7 @@ export const TripsPage: React.FC = () => {
     };
 
     const handleDeleteTrip = (id: string | number) => {
-        if (confirm('确认删除?')) {
+        if (confirm(t('tripsPage.deleteConfirm', '确认删除?'))) {
             removeTrip(id);
             if (user) {
                 const newTrips = trips.filter(t => t.id !== id);
@@ -151,8 +152,8 @@ export const TripsPage: React.FC = () => {
             {trips.length === 0 ? (
                 <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
                     <Train size={48} className="opacity-20 mb-4"/>
-                    <p>暂无行程记录</p>
-                    <p className="text-xs mt-2">点击下方按钮添加你的第一次乗り鉄<br/>注意: 自定义线路可以导入 company_data 和 geojson</p>
+                    <p>{t('tripsPage.noTrips', '暂无行程记录')}</p>
+                    <p className="text-xs mt-2">{t('tripsPage.addFirstTrip', '点击下方按钮添加你的第一次乗り鉄')}<br/>{t('tripsPage.addFirstTripNote', '注意: 自定义线路可以导入 company_data 和 geojson')}</p>
                 </div>
             ) : (
                 trips.map(t => {
@@ -183,7 +184,7 @@ export const TripsPage: React.FC = () => {
                             stations: isTree ? 'text-green-900' : 'text-purple-900',
                             arrow: isTree ? 'text-green-300' : 'text-purple-300',
                             memo: isTree ? 'text-green-600' : 'text-purple-600',
-                            label: isTree ? '步行' : '搭便车'
+                            label: isTree ? t('tripsPage.walk', '步行') : t('tripsPage.hitchhike', '搭便车')
                         };
 
                         return (
@@ -191,7 +192,7 @@ export const TripsPage: React.FC = () => {
                                 <div className={`flex justify-between mb-2 pb-2 border-b ${cls.border}`}>
                                     <span className={`text-xs font-bold ${cls.date}`}>{t.date}</span>
                                     <div className="flex items-center gap-2">
-                                        <span className={`text-xs font-mono ${cls.tagText} ${cls.tagBg} px-1.5 py-0.5 rounded`}>步行</span>
+                                        <span className={`text-xs font-mono ${cls.tagText} ${cls.tagBg} px-1.5 py-0.5 rounded`}>{t('tripsPage.walk', '步行')}</span>
                                         <button onClick={(e) => { e.stopPropagation(); useStore.getState().startEditingWalkTrip(t); }} className={cls.btnEdit}><Edit2 size={14}/></button>
                                         <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className={cls.btnDel}><Trash2 size={14}/></button>
                                     </div>
@@ -252,7 +253,7 @@ export const TripsPage: React.FC = () => {
                                                     const lm = cachedLm || getLandmarks(line, seg.fromId, seg.toId, seg.loopVia);
                                                     
                                                     return lm?.length > 0 ? (
-                                                        <div className="pl-5 text-[11px] text-gray-400">经由 {lm.join('、')}</div>
+                                                        <div className="pl-5 text-[11px] text-gray-400">{t('tripsPage.via', '经由 ')}{lm.join('、')}</div>
                                                     ) : null;
                                                 })()}
                                             </div>
@@ -486,9 +487,9 @@ export const FloatingActionButtons: React.FC<{
             }}>
                 <div className="flex gap-2 p-2 rounded-2xl">
                     <button id="btn-add-trip" onClick={() => startEditingTrip()} className="flex-1 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
-                        <Plus className="group-hover:rotate-90 transition-transform duration-300" size={18} /> 记录新行程
+                        <Plus className="group-hover:rotate-90 transition-transform duration-300" size={18} /> {t('tripsPage.recordNewTrip', '记录新行程')}
                     </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="flex-none px-4 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2" title="导入 Suica CSV">
+                    <button onClick={() => fileInputRef.current?.click()} className="flex-none px-4 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2" title={t('tripsPage.importSuica', '导入 Suica CSV')}>
                         <Upload size={18} />
                     </button>
                     <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportSuica} />

@@ -15,6 +15,7 @@ export const FolderManagerModal: React.FC = () => {
     })));
     const setModalState = useStore(state => state.setModalState);
     const setFolders = useStore(state => state.setFolders);
+    const { t } = useTranslation();
     const [newFolderName, setNewFolderName] = useState("");
     const { saveData } = useUserData();
 
@@ -34,7 +35,7 @@ export const FolderManagerModal: React.FC = () => {
     const saveUserFolders = (newFolders: any[]) => {
         setFolders(newFolders);
         if (user) {
-            saveData(user.token, trips, pins, newFolders, badgeSettings).catch((e: any) => alert("保存失败: " + e.message));
+            saveData(user.token, trips, pins, newFolders, badgeSettings).catch((e: any) => alert(t('folder.saveFail', "保存失败: ") + e.message));
         }
     };
 
@@ -77,14 +78,14 @@ export const FolderManagerModal: React.FC = () => {
         <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2"><Folder size={24}/> 收藏夹</h3>
+                    <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2"><Folder size={24}/> {t('folder.title', '收藏夹')}</h3>
                     <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
                 </div>
 
                 <form onSubmit={(e) => { e.preventDefault(); handleCreate(); }} className="flex gap-2 mb-4">
                     <input
                         className="flex-1 p-2 border rounded-lg text-sm"
-                        placeholder="名称..."
+                        placeholder={t('folder.placeholder', "名称...")}
                         value={newFolderName}
                         onChange={e => setNewFolderName(e.target.value)}
                     />

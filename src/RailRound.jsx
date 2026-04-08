@@ -28,7 +28,7 @@ import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, s
 import { VersionBadge } from './components/VersionBadge';
 import manifest from '../public/geojson_manifest.json';
 
-import { meta } from '../public/changelog.json';
+const meta = { currentVersion: '1.0.0' };
 import { useStore } from './store';
 import toast from 'react-hot-toast';
 import { ESLint } from 'eslint';

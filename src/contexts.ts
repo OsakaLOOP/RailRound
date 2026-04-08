@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import changelogData from '../public/changelog.json';
+const changelogData = { meta: { currentVersion: '1.0.0' } };
 
 const meta = changelogData.meta;
 

@@ -8,7 +8,7 @@ import { useUserData } from '../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
 
 const CITIES = {
-    China: [
+    China: [ // Translations are handled below in rendering
         { name: '北京', lat: 39.9042, lng: 116.4074 },
         { name: '上海', lat: 31.2304, lng: 121.4737 },
         { name: '广州', lat: 23.1291, lng: 113.2644 },
@@ -237,7 +237,7 @@ export const StatsPage: React.FC = () => {
                                 }}
                             >
                                 {Object.entries(CITIES).map(([country, cities]) => (
-                                    <optgroup key={country} label={country === 'China' ? '中国' : '日本'}>
+                                    <optgroup key={country} label={country === 'China' ? t('setup.china', '中国') : t('setup.japan', '日本')}>
                                         {cities.map(city => (
                                             <option key={city.name} value={`${city.lat},${city.lng}`}>{city.name}</option>
                                         ))}
@@ -288,7 +288,7 @@ export const StatsPage: React.FC = () => {
              <br/>
              Copyleft <span aria-label="Copyleft icon" style={{display: 'inline-block', transform: 'rotateY(180deg)'}}>&copy;</span> 2026-2027 @OsakaLOOP
              <br/>
-             <div><span style={{ display: "inline" }}>更多详情, 参见</span><button style={{ display: "inline" }} onClick={() => setModalState({ isLoginOpen: true })} className="text-xs text-blue-400 hover:text-blue-500 hover:underline transition-all items-center gap-1">用户指南</button></div>
+             <div><span style={{ display: "inline" }}>{t('statsPage.moreDetails', '更多详情, 参见')}</span><button style={{ display: "inline" }} onClick={() => setModalState({ isLoginOpen: true })} className="text-xs text-blue-400 hover:text-blue-500 hover:underline transition-all items-center gap-1">{t('statsPage.userGuide', '用户指南')}</button></div>
         </div>
       </div>
     );

@@ -49,7 +49,7 @@ export const LineSelector: React.FC<Props> = ({ isOpen, onClose, onSelect, allow
             <div className="bg-white w-full max-w-2xl max-h-[85vh] h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up ring-1 ring-black/5" onClick={e => e.stopPropagation()}>
 
                 <div className="p-4 border-b bg-gray-50 flex justify-between items-center shrink-0">
-                    <h3 className="font-bold text-lg flex items-center gap-2 text-gray-800"><MapIcon size={20}/> 选择线路</h3>
+                    <h3 className="font-bold text-lg flex items-center gap-2 text-gray-800"><MapIcon size={20}/> {t('lineSel.title', '选择线路')}</h3>
                     <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
                 </div>
 
@@ -73,17 +73,17 @@ export const LineSelector: React.FC<Props> = ({ isOpen, onClose, onSelect, allow
                                 onClick={() => setSelectedRegion(r)}
                                 className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${selectedRegion === r ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                             >
-                                {r === 'all' ? '全部地域' : r}
+                                {r === 'all' ? t('lineSel.allRegions', '全部地域') : r}
                             </button>
                         ))
                     ) : (
-                        <span className="text-xs text-gray-400 px-2 py-1">无地域分类</span>
+                        <span className="text-xs text-gray-400 px-2 py-1">{t('lineSel.noRegion', '无地域分类')}</span>
                     )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto bg-gray-50">
                     {filteredRegions.length === 0 ? (
-                        <div className="text-center text-gray-400 py-10">无符合条件的线路</div>
+                        <div className="text-center text-gray-400 py-10">{t('lineSel.noResult', '无符合条件的线路')}</div>
                     ) : (
                         filteredRegions.map(region => (
                             <div key={region.name} className="relative">

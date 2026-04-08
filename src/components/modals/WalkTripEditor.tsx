@@ -67,7 +67,7 @@ export const WalkTripEditor: React.FC = () => {
     const onSave = async () => {
         if (!form.date) return;
         if (!form.fromId || !form.toId) {
-            alert('缺少起止点');
+            alert(t('walk.noStartEnd', '缺少起止点'));
             return;
         }
 
@@ -109,24 +109,24 @@ export const WalkTripEditor: React.FC = () => {
 
         setTrips(finalTrips);
         if (user) {
-            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => alert('云端保存失败: ' + e.message));
+            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => alert(t('walk.saveFail', '云端保存失败: ') + e.message));
         }
         closeEditor();
     };
 
     const onDelete = async () => {
-        if (!window.confirm("确定要删除这条步行记录吗？")) return;
+        if (!window.confirm(t('walk.delConfirm', "确定要删除这条步行记录吗？"))) return;
         const nextTrips = trips.filter(t => t.id !== form.id);
         setTrips(nextTrips);
         if (user) {
-            saveData(user.token, nextTrips, pins, folders, badgeSettings).catch((e: any) => alert('云端删除失败: ' + e.message));
+            saveData(user.token, nextTrips, pins, folders, badgeSettings).catch((e: any) => alert(t('walk.delFail', '云端删除失败: ') + e.message));
         }
         closeEditor();
     };
 
     // Resolving station names for read-only display
-    let startName = "未知起点";
-    let endName = "未知终点";
+    let startName = t('walk.unknownStart', "未知起点");
+    let endName = t('walk.unknownEnd', "未知终点");
     Object.values(railwayData).forEach(line => {
         const s = line.stations.find(st => st.id === form.fromId);
         if (s) startName = s.name_ja;
@@ -155,7 +155,7 @@ export const WalkTripEditor: React.FC = () => {
               <div className="flex justify-between items-center">
                  <h3 className={`font-bold text-lg flex items-center gap-2 ${colors.textHeader}`}>
                     <Edit2 size={18} />
-                    {isEditing ? '编辑步行路线' : '新建步行路线'}
+                    {isEditing ? t('walk.editTitle', '编辑步行路线') : t('walk.newTitle', '新建步行路线')}
                  </h3>
                  <button onClick={closeEditor}><X className="text-gray-400 hover:text-gray-600"/></button>
               </div>
@@ -165,31 +165,31 @@ export const WalkTripEditor: React.FC = () => {
                 {/* Read-Only Origin/Dest display */}
                 <div className={`${colors.bgBox} p-4 rounded-lg flex flex-col gap-2`}>
                     <div className={`flex justify-between items-center text-sm font-semibold ${colors.textBoxTitle}`}>
-                        <span>起点</span>
+                        <span>{t('walk.start', '起点')}</span>
                         <span className={colors.textBoxValue}>{startName}</span>
                     </div>
                     <div className={`border-b ${colors.borderBox} border-dashed my-1`}></div>
                     <div className={`flex justify-between items-center text-sm font-semibold ${colors.textBoxTitle}`}>
-                        <span>终点</span>
+                        <span>{t('walk.end', '终点')}</span>
                         <span className={colors.textBoxValue}>{endName}</span>
                     </div>
                     <p className={`text-xs ${colors.textWarning} mt-2 text-center flex items-center justify-center gap-1`}>
-                        <AlertTriangle size={12}/> 步行起止点和类型无法更改
+                        <AlertTriangle size={12}/> {t('walk.noChangeWarning', '步行起止点和类型无法更改')}
                     </p>
                 </div>
 
                 <div className="space-y-4 pt-4 border-t">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">日期</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('walk.date', '日期')}</label>
                         <input type="date" value={form.date || ''} onChange={(e) => setForm({ date: e.target.value })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} outline-none`} />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
-                        <textarea placeholder="例如：逛街、散步..." value={form.memo || ''} onChange={(e) => setForm({ memo: e.target.value })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} outline-none min-h-[80px]`} />
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('walk.memo', '备注')}</label>
+                        <textarea placeholder={t('walk.memoPlaceholder', "例如：逛街、散步...")} value={form.memo || ''} onChange={(e) => setForm({ memo: e.target.value })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} outline-none min-h-[80px]`} />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">花费 (可选)</label>
-                        <input type="number" placeholder="花费 (円)" value={form.cost || ''} onChange={(e) => setForm({ cost: parseInt(e.target.value) || 0 })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} outline-none`} />
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('walk.cost', '花费 (可选)')}</label>
+                        <input type="number" placeholder={t('walk.costPlaceholder', "花费 (円)")} value={form.cost || ''} onChange={(e) => setForm({ cost: parseInt(e.target.value) || 0 })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} outline-none`} />
                     </div>
                 </div>
             </div>
@@ -197,11 +197,11 @@ export const WalkTripEditor: React.FC = () => {
             <div className="p-4 border-t bg-gray-50 flex justify-between gap-3">
                {isEditing && (
                  <button onClick={onDelete} className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors">
-                     <Trash2 size={16} /> 删除
+                     <Trash2 size={16} /> {t('walk.delete', '删除')}
                  </button>
                )}
                <button onClick={onSave} className={`flex-1 text-white py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition shadow-sm ${colors.bgSaveBtn}`}>
-                   <Save size={16} /> 保存行程
+                   <Save size={16} /> {t('walk.save', '保存行程')}
                </button>
             </div>
           </div>

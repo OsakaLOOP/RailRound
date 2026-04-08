@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useEffectEvent } from "react";
 import { verCalc, isVerSupported, verCmp } from "./utils/verCalc";
-import changelogData from '../public/changelog.json';
+
 import { MetaContext, VersionContext } from "./contexts";
 
 const meta = changelogData.meta;

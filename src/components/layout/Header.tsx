@@ -2,7 +2,7 @@ import React from 'react';
 import { Train, LogOut, User, Download, Upload, Building2, FilePlus } from 'lucide-react';
 import { useStore } from '../../store';
 import { VersionBadge } from '../VersionBadge';
-import { meta } from '../../../public/changelog.json';
+const meta = { currentVersion: '1.0.0' };
 import { useShallow } from 'zustand/react/shallow';
 
 const CURRENT_VERSION = meta["currentVersion"];

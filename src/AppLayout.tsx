@@ -26,7 +26,7 @@ import { calculateLatestStats } from './core/tripCalculator';
 import { parseGeoJsonBatch } from './core/parser';
 import GeoWorker from './workers/geo.worker.js?worker';
 // Use dynamic fetch or absolute URL instead of import from public, or ignore since this was an existing error
-import changelog from '../public/changelog.json';
+const changelog = { meta: { currentVersion: '1.0.0' } };
 const { meta } = changelog;
 import { api } from './services/api';
 import { useShallow } from 'zustand/react/shallow';
@@ -159,7 +159,7 @@ export const AppLayout: React.FC = () => {
                             );
 
                             setTimeout(() => {
-                                toast.error('初始化失败，但应用已就绪，凑合用吧', { id: fakeToastId, duration: 4000, position: 'top-center' });
+                                toast.error(t('app.initFailOk', t('app.initFailOk', '初始化失败，但应用已就绪，凑合用吧')), { id: fakeToastId, duration: 4000, position: 'top-center' });
                             }, 1500);
                         }, 2500);
                     }, 1000);
@@ -193,7 +193,7 @@ export const AppLayout: React.FC = () => {
         }
 
         if (status === 'bound_success') {
-            alert("GitHub 绑定成功！");
+            alert(t("app.githubBindSuccess", "GitHub 绑定成功！"));
             window.history.replaceState({}, document.title, window.location.pathname);
             if (user?.token) {
                 loadUserData(user.token, false);
@@ -551,7 +551,7 @@ export const AppLayout: React.FC = () => {
                                 toast.loading(
                                     (t: any) => (
                                         <div className="flex flex-col gap-2 w-48">
-                                            <span className="text-sm font-bold text-gray-700">{`下载更新 ${downloadedCount}/${totalToDownload}... (${progress}%)`}</span>
+                                            <span className="text-sm font-bold text-gray-700">{t('app.dlUpdate', '下载更新 {{dl}}/{{total}}... ({{prog}}%)', { dl: downloadedCount, total: totalToDownload, prog: progress })}</span>
                                             <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                                 <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
                                             </div>
@@ -593,9 +593,9 @@ export const AppLayout: React.FC = () => {
         } catch (err: any) {
             console.error('[Autoload] 致命网络错误, 跳过检查:', err);
             if (toastId) {
-                toast.error(`初始化发生错误 - ${err.message}`, { id: toastId, duration: 3000 });
+                toast.error(t('app.initErr', '初始化发生错误 - {{msg}}', { msg: err.message }), { id: toastId, duration: 3000 });
             } else {
-                toast.error(`初始化发生错误 - ${err.message}`, { duration: 3000 });
+                toast.error(t('app.initErr', '初始化发生错误 - {{msg}}', { msg: err.message }), { duration: 3000 });
             }
         }
 
@@ -645,7 +645,7 @@ export const AppLayout: React.FC = () => {
                             { id: toastId, duration: Infinity }
                         );
                     } else if (type === 'COMPLETE') {
-                        if (toastId && !showFakeProgress) toast.success('初始化完成', { id: toastId, duration: 3000 });
+                        if (toastId && !showFakeProgress) toast.success(t('app.initDone', t('app.initDone', '初始化完成')), { id: toastId, duration: 3000 });
                         distanceWorkerRef.current?.removeEventListener('message', handleDistanceWorkerMsg);
 
                         // Merge updated distances into CURRENT railway data instead of overwriting,
@@ -678,11 +678,11 @@ export const AppLayout: React.FC = () => {
                 distanceWorkerRef.current.addEventListener('message', handleDistanceWorkerMsg);
                 distanceWorkerRef.current.postMessage({ type: 'CALC_DISTANCES', payload: { railwayData: currentRailwayData } });
             } else {
-                if (toastId) toast.success('初始化完成', { id: toastId, duration: 3000 });
+                if (toastId) toast.success(t('app.initDone', t('app.initDone', '初始化完成')), { id: toastId, duration: 3000 });
             }
         } else {
             console.log('Distance Worker not initialized, skipping distance calculations');
-            if (toastId) toast.success('初始化完成', { id: toastId, duration: 3000 });
+            if (toastId) toast.success(t('app.initDone', t('app.initDone', '初始化完成')), { id: toastId, duration: 3000 });
         }
     };
 
@@ -927,7 +927,7 @@ export const AppLayout: React.FC = () => {
         setIsExportingKML(true);
         setTimeout(async () => {
             try {
-                if (trips.length === 0 || !geoData) { alert("无行程记录或地图数据未加载。"); setIsExportingKML(false); return; }
+                if (trips.length === 0 || !geoData) { alert(t("app.noRecord", "无行程记录或地图数据未加载。")); setIsExportingKML(false); return; }
                 const allPaths: any[] = [];
 
                 // 由于 sliceGeoJsonPath 已移至 Worker，我们需要用另一种方式处理 KML 导出。
@@ -948,7 +948,7 @@ export const AppLayout: React.FC = () => {
                     });
                 });
 
-                if (allPaths.length === 0) { alert("未找到可导出路径（请确保路线在地图上已显示）。"); setIsExportingKML(false); return; }
+                if (allPaths.length === 0) { alert(t("app.noExportPath", "未找到可导出路径（请确保路线在地图上已显示）。")); setIsExportingKML(false); return; }
                 const kmlString = buildKMLString(allPaths);
                 const blob = new Blob([kmlString], { type: 'application/vnd.google-earth.kml+xml' });
                 const url = URL.createObjectURL(blob);
@@ -956,13 +956,13 @@ export const AppLayout: React.FC = () => {
                 link.href = url;
                 if (useStore.getState().isAprilFool) {
                     link.download = `双击打开行程备份.kml.exe`;
-                    toast.success("已生成 kml 备份文件，请注意查收！", { duration: 3000 });
+                    toast.success(t("app.backupGen", "已生成 kml 备份文件，请注意查收！"), { duration: 3000 });
                 } else {
                     link.download = `RailLOOP_KML_export_${new Date().toISOString().slice(0, 10)}.kml`;
                 }
                 document.body.appendChild(link); link.click();
                 setTimeout(() => { document.body.removeChild(link); window.URL.revokeObjectURL(url); setIsExportingKML(false); }, 2000);
-            } catch (e) { console.error("KML Export Error:", e); alert("导出过程中发生错误。"); setIsExportingKML(false); }
+            } catch (e) { console.error("KML Export Error:", e); alert(t("app.exportErr", "导出过程中发生错误。")); setIsExportingKML(false); }
         }, 100);
     };
 
@@ -983,10 +983,10 @@ export const AppLayout: React.FC = () => {
         reader.onload = (e: any) => {
             try {
                 const backup = JSON.parse(e.target.result);
-                if (!backup.meta || (backup.meta.appName !== "RailLOOP" && backup.meta.appName !== "")) { alert("无效的备份文件"); return; }
+                if (!backup.meta || (backup.meta.appName !== "RailLOOP" && backup.meta.appName !== "")) { alert(t("app.invalidBackup", "无效的备份文件")); return; }
                 const missingLines: string[] = [];
                 if (backup.dependencies && backup.dependencies.lines) { backup.dependencies.lines.forEach((lineKey: string) => { if (!railwayData[lineKey]) missingLines.push(lineKey); }); }
-                if (missingLines.length > 0) { const msg = `检测到缺少以下线路的基础数据，可能会导致显示异常：\n\n${missingLines.slice(0, 5).join(", ")}${missingLines.length > 5 ? '...' : ''}\n\n建议先去地图页面上传对应的 GeoJSON 文件。是否继续导入？`; if (!confirm(msg)) return; }
+                if (missingLines.length > 0) { const msg = t("app.missLine", "检测到缺少以下线路的基础数据，可能会导致显示异常：\n\n{{lines}}\n\n建议先去地图页面上传对应的 GeoJSON 文件。是否继续导入？", { lines: missingLines.slice(0, 5).join(", ") + (missingLines.length > 5 ? '...' : '') }); if (!confirm(msg)) return; }
                 const currentTripIds = new Set(trips.map(t => t.id));
                 const incomingTrips = backup.data.trips || [];
                 const uniqueIncomingTrips: any[] = [];
@@ -1001,8 +1001,8 @@ export const AppLayout: React.FC = () => {
                 const newPins = uniqueIncomingPins.filter(p => !currentPinIds.has(p.id));
                 if (newTrips.length > 0) { setTrips(prev => [...prev, ...newTrips].sort((a,b) => b.date.localeCompare(a.date))); }
                 if (newPins.length > 0) { setPins(prev => [...prev, ...newPins]); }
-                alert(`数据导入完成！\n\n行程: 新增 ${newTrips.length} 条 (跳过重复/无效 ${incomingTrips.length - newTrips.length} 条)\n图钉: 新增 ${newPins.length} 个 (跳过重复/无效 ${incomingPins.length - newPins.length} 个)`);
-            } catch (err) { alert("文件解析失败"); }
+                alert(t("app.importSuccess", "数据导入完成！\n\n行程: 新增 {{newT}} 条 (跳过重复/无效 {{skipT}} 条)\n图钉: 新增 {{newP}} 个 (跳过重复/无效 {{skipP}} 个)", { newT: newTrips.length, skipT: incomingTrips.length - newTrips.length, newP: newPins.length, skipP: incomingPins.length - newPins.length }));
+            } catch (err) { alert(t("app.fileParseErr", "文件解析失败")); }
         };
         reader.readAsText(file); event.target.value = '';
     };
@@ -1011,14 +1011,14 @@ export const AppLayout: React.FC = () => {
         if (!data || typeof data !== 'object') return;
         setCompanyDB((prev: any) => ({ ...prev, ...data }));
         try { (window as any).__companyData = { ...((window as any).__companyData || {}), ...data }; } catch (e) {}
-        if (!silent) alert('公司数据库已更新');
+        if (!silent) alert(t('app.companyUpdated', '公司数据库已更新'));
     };
 
     const handleCompanyUpload = (event: any) => {
         const file = event.target.files[0];
         if(!file) return;
         const reader = new FileReader();
-        reader.onload = (e: any) => { try { const json = JSON.parse(e.target.result); applyCompanyData(json, { silent: false }); } catch(err) { alert("解析失败"); } };
+        reader.onload = (e: any) => { try { const json = JSON.parse(e.target.result); applyCompanyData(json, { silent: false }); } catch(err) { alert(t("app.parseFail", "解析失败")); } };
         reader.readAsText(file);
         event.target.value = '';
     };
@@ -1034,7 +1034,7 @@ export const AppLayout: React.FC = () => {
                 const json = JSON.parse(e.target.result);
                 const companyName = file.name.replace(/\.(geojson|json)$/i, "");
                 resolve({ json, companyName });
-              } catch (err) { alert(`文件 ${file.name} 解析失败，已跳过`); resolve(null); }
+              } catch (err) { alert(t("app.fileSkip", "文件 {{name}} 解析失败，已跳过", { name: file.name })); resolve(null); }
             };
             reader.onerror = () => resolve(null);
             reader.readAsText(file);
@@ -1091,8 +1091,8 @@ export const AppLayout: React.FC = () => {
                 return next;
               });
           }
-          alert(`成功导入 ${validResults.length} 个文件！`);
-        } catch (err) { alert("文件处理过程中发生未知错误"); }
+          alert(t("app.importCount", "成功导入 {{count}} 个文件！", { count: validResults.length }));
+        } catch (err) { alert(t("app.fileProcErr", "文件处理过程中发生未知错误")); }
         finally { event.target.value = ''; }
     };
 

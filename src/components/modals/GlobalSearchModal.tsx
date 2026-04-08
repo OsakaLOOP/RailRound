@@ -10,6 +10,7 @@ interface Props {
 
 export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }) => {
     const railwayData = useStore(state => state.railwayData);
+    const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -87,7 +88,7 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
                     <input
                         ref={inputRef}
                         type="text"
-                        placeholder="搜索线路或车站..."
+                        placeholder={t('search.placeholder', "搜索线路或车站...")}
                         className="flex-1 bg-transparent border-none outline-none text-lg text-gray-800 placeholder:text-gray-400"
                         value={query}
                         onChange={e => setQuery(e.target.value)}
@@ -107,11 +108,11 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
                     {!query.trim() ? (
                         <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
                             <Search size={48} className="text-gray-200" />
-                            <p>输入线路名或车站名进行搜索</p>
+                            <p>{t('search.instruction', '输入线路名或车站名进行搜索')}</p>
                         </div>
                     ) : results.lines.length === 0 && results.stations.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
-                            <p>没有找到相关结果</p>
+                            <p>{t('search.noResult', '没有找到相关结果')}</p>
                         </div>
                     ) : (
                         <div className="p-4 space-y-6">

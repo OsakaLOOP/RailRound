@@ -7,11 +7,11 @@
     "waitAction": "Please follow the instructions",
     "welcome": {
       "title": "Welcome to RailLOOP",
-      "content": "RailLOOP is a personal railway diary designed to help you track and manage your railway journeys, visually presenting your travel footprints."
+      "content": "RailLOOP is a personal railway diary web app designed to help you track and manage your railway journeys, visually presenting and sharing your travel footprints."
     },
     "tabRecords": {
       "title": "Trip Records",
-      "content": "This tab is your journey control center. You can view, add, and manage all railway trip records here, or add them to your collections."
+      "content": "This tab is your journey's command center. You can view, add, and manage all railway trip records here, or add them to your collections."
     }
   },
   "loginModal": {

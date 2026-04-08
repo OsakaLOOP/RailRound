@@ -6,16 +6,16 @@
     "finishBtn": "完了",
     "waitAction": "指示に従ってください",
     "welcome": {
-      "title": "RailLOOPへようこそ",
-      "content": "RailLOOPは、鉄道の旅を追跡・管理し、旅行の足跡を視覚的に表示するための個人的な鉄道手帳です。"
+      "title": "RailLOOP へようこそ",
+      "content": "RailLOOP は、鉄道の旅を追跡・管理し、旅行の足跡を視覚的に表示する、またはバッジなどで飾るための個人的な鉄道手帳ウェブアップリです。"
     },
     "tabRecords": {
       "title": "旅行記録",
-      "content": "このタブは旅のコントロールセンターです。ここで鉄道旅行の記録を表示、追加、管理したり、コレクションに追加したりできます。"
+      "content": "このタブは旅のコマンドセンターです。ここで鉄道旅行の記録を表示、追加、編集、管理したり、コレクションに追加したりできます。"
     }
   },
   "loginModal": {
-    "login": "RailLOOPにログイン",
+    "login": "RailLOOP にログイン",
     "register": "新規アカウント登録",
     "welcomeBack": "おかえりなさい、鉄道ファン",
     "startJourney": "鉄道制覇の旅を始めよう",
@@ -29,8 +29,8 @@
     "hasAccount": "すでにアカウントをお持ちですか？",
     "toRegister": "新しいアカウントを作成",
     "toLogin": "ログイン画面へ",
-    "guideTitle": "ユーザーガイド / 利用規約",
-    "disclaimer": "登録/ログイン後に利用することで、上記の規約に同意したことになります。同意しない場合、データはローカル（フロントエンド）でのみ処理されます。"
+    "guideTitle": "ユーザーガイド・ご利用規約",
+    "disclaimer": "登録・ログイン後に利用することで、上記の規約に同意したことになります。同意しない場合、データはローカル（フロントエンド）でのみ処理されます。"
   },
   "statsPage": {
     "bindGithub": "GitHub連携",
@@ -41,13 +41,13 @@
     "starFolders": "スターフォルダ",
     "starFoldersDesc": "旅行コレクションとバッジを管理",
     "personalSettings": "個人設定",
-    "language": "UI言語",
+    "language": "UI言語 / UI Language",
     "mapCenter": "マップの初期位置",
     "fixedInterest": "お気に入り固定",
     "followLatest": "最新を追跡",
     "totalDist": "総距離",
     "totalCost": "総費用",
     "topLines": "よく乗る路線ランキング",
-    "footerStats": "{{companies}}社の会社、{{lines}}本の路線、{{stations}}個の駅を読み込みました。"
+    "footerStats": "{{companies}}社の運営会社、{{lines}}本の路線、{{stations}}個の停車駅を読み込みました。"
   }
 }

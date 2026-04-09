@@ -5,7 +5,7 @@ import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import './index.css';
 
 import { GlobalProvider } from './globalContext';
-import MainLayout from './MainLayout';
+import mainLayout from './mainLayout';
 import TripsPage from './pages/TripsPage';
 import StatsPage from './pages/StatsPage';
 import LoginPage from './pages/LoginPage';
@@ -17,7 +17,7 @@ import AddToFolderModal from './components/AddToFolderModal';
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <MainLayout />,
+    element: <mainLayout />,
     children: [
       {
         index: true,

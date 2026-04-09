@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, LogIn, UserPlus, Github, Mail } from 'lucide-react';
+import { X, LogIn, UserPlus, Code, Mail } from 'lucide-react';
 import { api } from '../services/api';
 
 
@@ -324,7 +324,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
                     onClick={() => handleOAuth('github')}
                     className="flex items-center justify-center gap-2 p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition font-bold text-gray-700 text-sm"
                     >
-                    <Github size={18}/> GitHub
+                    <Code size={18}/> GitHub
                     </button>
                     <button
                     disabled

@@ -202,10 +202,13 @@ export default function MapComponent() {
 
         // Call Worker
         let active = true;
-        getAllGeometries(trips).then(geoms => {
+        getAllGeometries(trips).then(data => {
             if (!active) return;
             const layer = routeLayer.current;
             layer.clearLayers();
+
+            const geoms = Array.isArray(data) ? data : data.geometries;
+            const stations = data.stations || [];
 
             const zoomWeight = mapZoom < 8 ? 2 : mapZoom < 12 ? 4 : mapZoom < 15 ? 6 : 9;
 
@@ -222,6 +225,23 @@ export default function MapComponent() {
                 } else {
                     L.polyline(g.coords, options).bindPopup(g.popup).addTo(layer);
                 }
+            });
+
+            // Explicitly render visited stations with a uniform small dot
+            // to cover default white markers and visually confirm visits
+            const stationRadius = Math.max(3, zoomWeight / 2);
+            stations.forEach(st => {
+                const options = {
+                    radius: stationRadius,
+                    color: 'white',
+                    weight: 1, // thin white stroke
+                    fillColor: st.color || '#38bdf8',
+                    fillOpacity: 1,
+                    className: 'visited-station-dot',
+                    pane: 'markerPane' // ensuring it renders above polylines
+                };
+                const marker = L.circleMarker([st.lat, st.lng], options).bindTooltip(st.name);
+                marker.addTo(layer);
             });
         });
         return () => { active = false; };

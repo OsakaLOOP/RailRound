@@ -1,10 +1,10 @@
 import React from 'react';
-import { Github, Eye, EyeOff, Loader2, Lock, X } from 'lucide-react';
+import { Code, Eye, EyeOff, Loader2, Lock, X } from 'lucide-react';
 import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, useUserData } from '../globalContext';
 
-export default function GithubCardModal() {
+export default function CodeCardModal() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { folders, badgeSettings, setBadgeSettings, saveData } = useUserData();
@@ -48,7 +48,7 @@ export default function GithubCardModal() {
         <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in pointer-events-auto" onClick={onClose}>
             <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-lg flex items-center gap-2"><Github size={20}/> GitHub Profile Decoration</h3>
+                    <h3 className="font-bold text-lg flex items-center gap-2"><Code size={20}/> GitHub Profile Decoration</h3>
                     <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
                 </div>
 

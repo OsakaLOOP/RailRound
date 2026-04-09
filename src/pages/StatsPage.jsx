@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth, useUserData, useGeo } from '../globalContext';
 import { api } from '../services/api';
-import { Github, Folder, TrendingUp, Move, Eye, EyeOff, Loader2, Lock, X } from 'lucide-react';
+import { Code, Folder, TrendingUp, Move, Eye, EyeOff, Loader2, Lock, X } from 'lucide-react';
 import { useNavigate, Outlet } from 'react-router-dom';
 import { VersionBadge } from '../components/VersionBadge';
 
@@ -76,16 +76,16 @@ export default function StatsPage() {
                         <div className="font-bold text-lg">{user.username}</div>
                         <div className="text-xs text-gray-400 flex items-center gap-1">
                             {userProfile?.bindings?.github ? (
-                                <span className="flex items-center gap-1 text-emerald-600"><Github size={12}/> GitHub 已绑定 ({userProfile.bindings.github.login})</span>
+                                <span className="flex items-center gap-1 text-emerald-600"><Code size={12}/> GitHub 已绑定 ({userProfile.bindings.github.login})</span>
                             ) : (
-                                <button onClick={() => api.initiateOAuth('github', user?.token)} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white rounded text-xs font-bold hover:bg-black transition-colors"><Github size={12}/> 绑定 GitHub</button>
+                                <button onClick={() => api.initiateOAuth('github', user?.token)} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white rounded text-xs font-bold hover:bg-black transition-colors"><Code size={12}/> 绑定 GitHub</button>
                             )}
                         </div>
                     </div>
                 </div>
                 {userProfile?.bindings?.github && (
                    <button onClick={() => navigate('/stats/card')} className="absolute right-4 top-4 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                       <Github size={14}/> 装饰代码
+                       <Code size={14}/> 装饰代码
                    </button>
                 )}
             </div>

@@ -174,12 +174,19 @@ export const LocateButton: React.FC = () => {
       }
   };
 
+  const handlePointerLeave = () => {
+      if (pressTimerRef.current) {
+          clearTimeout(pressTimerRef.current);
+          pressTimerRef.current = null;
+      }
+  };
+
   return (
     <div className="absolute bottom-20 right-4 z-[400] flex flex-col gap-3">
       <button
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
         onContextMenu={(e) => e.preventDefault()}
         disabled={status === "locating"}
         className={`p-3 rounded-full shadow-lg transition-all active:scale-95 flex items-center justify-center w-12 h-12

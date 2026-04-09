@@ -207,16 +207,24 @@ export const MapContainer: React.FC<Props> = ({
       const handleShowNearbyStations = (e: Event) => {
         const customEvent = e as CustomEvent;
         const { stations } = customEvent.detail;
-        if (stations && stations.length > 0) {
-            // For now, let's open the closest one in the station menu
+        if (stations && stations.length > 0 && mapInstance.current) {
+            const map = mapInstance.current;
             const closest = stations[0];
-            const point = mapInstance.current?.latLngToContainerPoint([closest.station.lat, closest.station.lng]);
-            if (point) {
-                 setStationMenu({
+
+            // Wait for flyTo to finish before calculating container point
+            const setMenu = () => {
+                const point = map.latLngToContainerPoint([closest.station.lat, closest.station.lng]);
+                setStationMenu({
                     x: point.x,
                     y: point.y,
                     stationData: closest.station
-                 });
+                });
+            };
+
+            if ((map as any)._isLocateFlying) {
+                map.once("moveend", setMenu);
+            } else {
+                setMenu();
             }
         }
       };

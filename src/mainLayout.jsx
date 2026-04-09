@@ -236,7 +236,7 @@ export default function MainLayout() {
 
   return (
     <DragProvider>
-      <div className="relative w-full h-full min-h-screen overflow-hidden bg-slate-100 flex flex-col">
+      <div className="relative w-full h-full min-h-[100dvh] overflow-hidden bg-slate-100 flex flex-col">
        {/* Header */}
        <header className="bg-slate-900 text-white p-4 shadow-md z-30 flex justify-between shrink-0 pointer-events-auto">
         <div id="header-title" className="flex items-center gap-2">

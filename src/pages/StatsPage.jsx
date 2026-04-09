@@ -61,7 +61,7 @@ export default function StatsPage() {
     const meta = React.useContext(React.createContext(null)); // Mock or use useMeta
 
     return (
-      <div id="stats-view-content" className="flex-1 overflow-y-auto p-4 space-y-4 pb-24 pointer-events-auto bg-slate-100 min-h-full">
+      <div id="stats-view-content" className="flex-1 overflow-y-auto p-4 space-y-4 pb-24 pointer-events-auto bg-slate-100 h-full">
         {user && (
             <div className="bg-white p-4 rounded-xl shadow-sm border relative">
                 <div className="flex items-center gap-4">

@@ -90,7 +90,8 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                                         id: line.stationId,
                                         lineKey: line.lineKey,
                                         name: line.name,
-                                        logo: line.icon || line.logo
+                                        logo: line.icon || line.logo,
+                                        originPos: { x: e.clientX, y: e.clientY }
                                     }, e);
                                 }}
                                 onTouchStart={(e) => {
@@ -99,7 +100,8 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                                         id: line.stationId,
                                         lineKey: line.lineKey,
                                         name: line.name,
-                                        logo: line.icon || line.logo
+                                        logo: line.icon || line.logo,
+                                        originPos: { x: e.touches[0].clientX, y: e.touches[0].clientY }
                                     }, e);
                                 }}
                             >

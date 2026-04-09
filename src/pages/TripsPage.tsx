@@ -86,6 +86,22 @@ export const TripsPage: React.FC = () => {
     const addTrip = useStore(state => state.addTrip);
     const { saveData } = useUserData();
 
+    const stationNameMap = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const lineKey in railwayData) {
+            if (Object.prototype.hasOwnProperty.call(railwayData, lineKey)) {
+                const line = railwayData[lineKey];
+                if (line.stations) {
+                    for (let i = 0; i < line.stations.length; i++) {
+                        const st = line.stations[i];
+                        map.set(st.id, st.name_ja);
+                    }
+                }
+            }
+        }
+        return map;
+    }, [railwayData]);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleImportSuica = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,14 +177,8 @@ export const TripsPage: React.FC = () => {
                     const isWalk = t.isWalk;
 
                     if (isWalk) {
-                        let startName = t.fromId || '';
-                        let endName = t.toId || '';
-                        Object.values(railwayData).forEach(line => {
-                            const s = line.stations.find(st => st.id === t.fromId);
-                            if (s) startName = s.name_ja;
-                            const e = line.stations.find(st => st.id === t.toId);
-                            if (e) endName = e.name_ja;
-                        });
+                        const startName = (t.fromId && stationNameMap.get(t.fromId)) || t.fromId || '';
+                        const endName = (t.toId && stationNameMap.get(t.toId)) || t.toId || '';
 
                         const isTree = t.walkType === 'tree';
                         const cls = {
@@ -230,7 +240,7 @@ export const TripsPage: React.FC = () => {
                                     {segments.map((seg, idx) => {
                                         const line = railwayData[seg.lineKey];
                                         const icon = line?.meta?.icon;
-                                        const getSt = (id: string) => line?.stations.find(s => s.id === id)?.name_ja || id;
+                                        const getSt = (id: string) => (id && stationNameMap.get(id)) || id;
                                         return (
                                             <div key={idx} className="relative z-10 flex flex-col text-sm">
                                                 <div className="flex items-center gap-2">

@@ -1,0 +1,138 @@
+--- src/components/map/LocateButton.tsx
++++ src/components/map/LocateButton.tsx
+@@ -1,7 +1,9 @@
+ import React, { useState, useRef, useEffect, useCallback } from "react";
+ import { Locate, LocateFixed, Loader2 } from "lucide-react";
+ import toast from "react-hot-toast";
++import { useTranslation } from "react-i18next";
++import { useStore } from "../../store";
+
+ type LocateStatus = "idle" | "locating" | "located";
+ const ZOOM_LEVELS = [14, 16, 18];
+
+ export const LocateButton: React.FC = () => {
+   const [status, setStatus] = useState<LocateStatus>("idle");
+   const [zoomIndex, setZoomIndex] = useState(0);
++  const { t } = useTranslation();
+
+   const statusRef = useRef<LocateStatus>("idle");
+   const coordsRef = useRef<{ lat: number; lng: number } | null>(null);
++  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+   // Keep refs in sync for event listeners
+   useEffect(() => {
+@@ -43,7 +46,7 @@
+       setZoomIndex(0);
+
+       if (!navigator.geolocation) {
+-        toast.error("浏览器不支持地理定位");
++        toast.error(t("map.geoNotSupported", "浏览器不支持地理定位"));
+         setStatus("idle");
+         return;
+       }
+@@ -66,11 +69,11 @@
+         (error) => {
+           console.error("Geolocation error:", error);
+-          let errMsg = "定位获取失败";
+-          if (error.code === error.PERMISSION_DENIED) errMsg = "定位权限被拒绝";
++          let errMsg = t("map.geoFail", "定位获取失败");
++          if (error.code === error.PERMISSION_DENIED) errMsg = t("map.geoDenied", "定位权限被拒绝");
+           else if (error.code === error.POSITION_UNAVAILABLE)
+-            errMsg = "无法获取位置信息";
+-          else if (error.code === error.TIMEOUT) errMsg = "定位超时";
++            errMsg = t("map.geoUnavailable", "无法获取位置信息");
++          else if (error.code === error.TIMEOUT) errMsg = t("map.geoTimeout", "定位超时");
+
+           toast.error(errMsg);
+           setStatus("idle");
+@@ -99,10 +102,87 @@
+     }
+   };
+
++  const handleLongPress = () => {
++    if (status === "locating") return;
++
++    // Get the coords either from current ref if we have it, or fetch it right away
++    const executeAction = (lat: number, lng: number) => {
++        setStatus("located");
++        setZoomIndex(2); // Start at z18 since we are jumping to it
++
++        window.dispatchEvent(
++            new CustomEvent("map:fly-to-location", {
++                detail: { lat, lng, zoom: 18 },
++            }),
++        );
++
++        // Show station menus
++        import("../../core/railwayRouting").then(({ findNearbyStations }) => {
++            const railwayData = useStore.getState().railwayData;
++            const nearby = findNearbyStations(railwayData, lat, lng, 5);
++
++            // Use the map dispatch to open station menus, assuming map instance can handle multiple or we use the custom event
++            if (nearby && nearby.length > 0) {
++                // We can just open the closest one for now via setStationMenu, or trigger an event for MapContainer to show them
++                // Or dispatch to AppLayout to open the nearest one
++                window.dispatchEvent(
++                    new CustomEvent("map:show-nearby-stations", {
++                        detail: { stations: nearby }
++                    })
++                );
++            }
++        });
++    };
++
++    if (coordsRef.current && status === "located") {
++        executeAction(coordsRef.current.lat, coordsRef.current.lng);
++    } else {
++        if (!navigator.geolocation) {
++            toast.error(t("map.geoNotSupported", "浏览器不支持地理定位"));
++            return;
++        }
++        setStatus("locating");
++        navigator.geolocation.getCurrentPosition(
++            (position) => {
++                const lat = position.coords.latitude;
++                const lng = position.coords.longitude;
++                coordsRef.current = { lat, lng };
++                executeAction(lat, lng);
++            },
++            (error) => {
++                let errMsg = t("map.geoFail", "定位获取失败");
++                if (error.code === error.PERMISSION_DENIED) errMsg = t("map.geoDenied", "定位权限被拒绝");
++                else if (error.code === error.POSITION_UNAVAILABLE) errMsg = t("map.geoUnavailable", "无法获取位置信息");
++                else if (error.code === error.TIMEOUT) errMsg = t("map.geoTimeout", "定位超时");
++                toast.error(errMsg);
++                setStatus("idle");
++            },
++            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
++        );
++    }
++  };
++
++  const handlePointerDown = () => {
++    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
++    pressTimerRef.current = setTimeout(() => {
++        pressTimerRef.current = null;
++        handleLongPress();
++    }, 600);
++  };
++
++  const handlePointerUp = () => {
++      if (pressTimerRef.current) {
++          clearTimeout(pressTimerRef.current);
++          pressTimerRef.current = null;
++          handleLocate();
++      }
++  };
++
+   return (
+     <div className="absolute bottom-20 right-4 z-[400] flex flex-col gap-3">
+       <button
+-        onClick={handleLocate}
++        onPointerDown={handlePointerDown}
++        onPointerUp={handlePointerUp}
++        onPointerLeave={handlePointerUp}
++        onContextMenu={(e) => e.preventDefault()}
+         disabled={status === "locating"}
+         className={`p-3 rounded-full shadow-lg transition-all active:scale-95 flex items-center justify-center w-12 h-12
+                     ${

@@ -204,11 +204,30 @@ export const MapContainer: React.FC<Props> = ({
       }, 1100);
     };
 
+      const handleShowNearbyStations = (e: Event) => {
+        const customEvent = e as CustomEvent;
+        const { stations } = customEvent.detail;
+        if (stations && stations.length > 0) {
+            // For now, let's open the closest one in the station menu
+            const closest = stations[0];
+            const point = mapInstance.current?.latLngToContainerPoint([closest.station.lat, closest.station.lng]);
+            if (point) {
+                 setStationMenu({
+                    x: point.x,
+                    y: point.y,
+                    stationData: closest.station
+                 });
+            }
+        }
+      };
+
     window.addEventListener("map:create-temp-pin", handleCreateTempPin);
     window.addEventListener("map:fly-to-location", handleFlyToLocation);
+      window.addEventListener("map:show-nearby-stations", handleShowNearbyStations);
     return () => {
       window.removeEventListener("map:create-temp-pin", handleCreateTempPin);
       window.removeEventListener("map:fly-to-location", handleFlyToLocation);
+        window.removeEventListener("map:show-nearby-stations", handleShowNearbyStations);
     };
   }, [setEditingPin]);
 

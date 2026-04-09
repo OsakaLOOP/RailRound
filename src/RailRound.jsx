@@ -17,6 +17,7 @@ import {
     LogOut, User, Github, Star, Folder, Globe, Lock, Eye, EyeOff
 } from 'lucide-react';
 
+import Select from 'react-select';
 import { LoginModal } from './components/LoginModal';
 import { DragProvider, DropZone } from './components/DragContext';
 import Chest from './components/Chest';
@@ -32,6 +33,38 @@ const meta = { currentVersion: '1.0.0' };
 import { useStore } from './store';
 import toast from 'react-hot-toast';
 import { ESLint } from 'eslint';
+
+
+const getSelectStyles = (isSmall = false) => ({
+    control: (base) => ({
+        ...base,
+        minHeight: isSmall ? '28px' : '36px',
+        fontSize: isSmall ? '11px' : '14px',
+        borderRadius: '0.25rem',
+        borderColor: '#e5e7eb',
+        boxShadow: 'none',
+        '&:hover': {
+            borderColor: '#d1d5db'
+        }
+    }),
+    dropdownIndicator: (base) => ({
+        ...base,
+        padding: isSmall ? '2px' : '4px'
+    }),
+    menu: (base) => ({
+        ...base,
+        zIndex: 50,
+        fontSize: isSmall ? '11px' : '14px',
+    }),
+    option: (base) => ({
+        ...base,
+        padding: isSmall ? '4px 8px' : '8px 12px'
+    }),
+    valueContainer: (base) => ({
+        ...base,
+        padding: isSmall ? '0 4px' : '2px 8px'
+    })
+});
 
 const CURRENT_VERSION = meta["currentVersion"];
 const LAST_MODIFIED = manifest.lastModified
@@ -788,7 +821,15 @@ const TripEditor = ({
                                                         });
                                                     }
                                                 }}>
-                                                    <select className="w-full p-2 border rounded text-xs bg-white" value={segment.fromId} onChange={e => updateSegment(idx, 'fromId', e.target.value)}><option value="">乘车...</option>{segment.lineKey && railwayData[segment.lineKey]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                                    <Select
+        className="w-full text-xs"
+        value={segment.fromId ? { value: segment.fromId, label: railwayData[segment.lineKey || '']?.stations.find(s => s.id === segment.fromId)?.name_ja || segment.fromId } : null}
+        onChange={(option) => updateSegment(idx, 'fromId', option?.value || '')}
+        options={segment.lineKey ? railwayData[segment.lineKey]?.stations.map(s => ({ value: s.id, label: s.name_ja })) : []}
+        placeholder="乘车..."
+        isClearable
+        styles={getSelectStyles()}
+    />
                                                 </DropZone>
 
                                                 <button
@@ -834,7 +875,15 @@ const TripEditor = ({
                                                         });
                                                     }
                                                 }}>
-                                                    <select className="w-full p-2 border rounded bg-white text-xs" value={segment.toId} onChange={e => updateSegment(idx, 'toId', e.target.value)}><option value="">下车...</option>{segment.lineKey && railwayData[segment.lineKey]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                                    <Select
+        className="w-full text-xs"
+        value={segment.toId ? { value: segment.toId, label: railwayData[segment.lineKey || '']?.stations.find(s => s.id === segment.toId)?.name_ja || segment.toId } : null}
+        onChange={(option) => updateSegment(idx, 'toId', option?.value || '')}
+        options={segment.lineKey ? railwayData[segment.lineKey]?.stations.map(s => ({ value: s.id, label: s.name_ja })) : []}
+        placeholder="下车..."
+        isClearable
+        styles={getSelectStyles()}
+    />
                                                 </DropZone>
                                             </div>
                                         </div>
@@ -853,7 +902,18 @@ const TripEditor = ({
                                 <label className="block text-xs font-bold text-slate-500 mb-1">出发地</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button onClick={() => openSelector('autoStart')} className="p-2 rounded border text-sm text-left bg-white text-gray-700 truncate flex items-center gap-1">{autoForm.startLine ? <span>{autoForm.startLine}</span> : <span className="text-gray-400">选择线路...</span>}</button>
-                                    <select className="p-2 rounded border text-sm" disabled={!autoForm.startLine} value={autoForm.startStation} onChange={e => setAutoForm({ ...autoForm, startStation: e.target.value })}><option value="">车站...</option>{autoForm.startLine && railwayData[autoForm.startLine].stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                    <div className="flex-1">
+        <Select
+            className="text-sm"
+            isDisabled={!autoForm.startLine}
+            value={autoForm.startStation ? { value: autoForm.startStation, label: railwayData[autoForm.startLine || '']?.stations.find(s => s.id === autoForm.startStation)?.name_ja || autoForm.startStation } : null}
+            onChange={(option) => setAutoForm({ ...autoForm, startStation: option?.value || '' })}
+            options={autoForm.startLine ? railwayData[autoForm.startLine]?.stations.map(s => ({ value: s.id, label: s.name_ja })) : []}
+            placeholder="车站..."
+            isClearable
+            styles={getSelectStyles()}
+        />
+    </div>
                                 </div>
                             </div>
                             <div className="flex justify-center text-blue-300"><ArrowDown size={20} /></div>
@@ -861,7 +921,18 @@ const TripEditor = ({
                                 <label className="block text-xs font-bold text-slate-500 mb-1">目的地</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button onClick={() => openSelector('autoEnd')} className="p-2 rounded border text-sm text-left bg-white text-gray-700 truncate flex items-center gap-1">{autoForm.endLine ? <span>{autoForm.endLine}</span> : <span className="text-gray-400">选择线路...</span>}</button>
-                                    <select className="p-2 rounded border text-sm" disabled={!autoForm.endLine} value={autoForm.endStation} onChange={e => setAutoForm({ ...autoForm, endStation: e.target.value })}><option value="">车站...</option>{autoForm.endLine && railwayData[autoForm.endLine].stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                    <div className="flex-1">
+        <Select
+            className="text-sm"
+            isDisabled={!autoForm.endLine}
+            value={autoForm.endStation ? { value: autoForm.endStation, label: railwayData[autoForm.endLine || '']?.stations.find(s => s.id === autoForm.endStation)?.name_ja || autoForm.endStation } : null}
+            onChange={(option) => setAutoForm({ ...autoForm, endStation: option?.value || '' })}
+            options={autoForm.endLine ? railwayData[autoForm.endLine]?.stations.map(s => ({ value: s.id, label: s.name_ja })) : []}
+            placeholder="车站..."
+            isClearable
+            styles={getSelectStyles()}
+        />
+    </div>
                                 </div>
                             </div>
                         </div>
@@ -1058,16 +1129,38 @@ const GithubCardModal = ({ isOpen, onClose, user, folders, badgeSettings, onUpda
                     <div className="space-y-4">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 mb-1">Source</label>
-                            <select
-                                className="w-full p-2 border rounded-lg text-sm"
-                                value={source}
-                                onChange={e => setSource(e.target.value)}
-                            >
-                                <option value="global">Global (All Trips)</option>
-                                {publicFolders.map(f => (
-                                    <option key={f.id} value={f.id}>Folder: {f.name}</option>
-                                ))}
-                            </select>
+                            <Select
+                                className="text-sm"
+                                value={{
+                                    value: source,
+                                    label: source === 'global' ? 'Global (All Trips)' : `Folder: ${publicFolders.find(f => f.id === source)?.name || ''}`
+                                }}
+                                onChange={(option) => setSource(option?.value || 'global')}
+                                options={[
+                                    { value: 'global', label: 'Global (All Trips)' },
+                                    ...publicFolders.map(f => ({ value: f.id, label: `Folder: ${f.name}` }))
+                                ]}
+                                isSearchable={false}
+                                styles={{
+                                    control: (base) => ({
+                                        ...base,
+                                        borderRadius: '0.5rem',
+                                        borderColor: '#e5e7eb',
+                                        padding: '0.1rem',
+                                        minHeight: '42px',
+                                        boxShadow: 'none',
+                                        '&:hover': {
+                                            borderColor: '#d1d5db'
+                                        }
+                                    }),
+                                    menu: (base) => ({
+                                        ...base,
+                                        borderRadius: '0.5rem',
+                                        overflow: 'hidden',
+                                        zIndex: 100
+                                    })
+                                }}
+                            />
                         </div>
 
                         <div className="bg-slate-100 p-4 rounded-lg flex justify-center overflow-hidden min-h-[100px] items-center">

@@ -6,6 +6,7 @@ import * as turf from '@turf/turf';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
+import Select from 'react-select';
 
 const CITIES = {
     China: [ // Translations are handled below in rendering
@@ -26,7 +27,54 @@ const CITIES = {
     ]
 };
 
+
+const getSelectStyles = () => ({
+    control: (base: any) => ({
+        ...base,
+        backgroundColor: 'transparent',
+        border: 'none',
+        boxShadow: 'none',
+        minHeight: 'auto',
+        cursor: 'pointer',
+    }),
+    valueContainer: (base: any) => ({
+        ...base,
+        padding: '0',
+    }),
+    dropdownIndicator: (base: any) => ({
+        ...base,
+        padding: '0',
+        paddingLeft: '8px'
+    }),
+    indicatorSeparator: () => ({
+        display: 'none',
+    }),
+    singleValue: (base: any) => ({
+        ...base,
+        color: '#374151',
+        fontWeight: 'bold',
+        fontSize: '0.875rem'
+    }),
+    menu: (base: any) => ({
+        ...base,
+        fontSize: '0.875rem',
+        zIndex: 50,
+        minWidth: '150px',
+        right: 0
+    }),
+    option: (base: any, state: any) => ({
+        ...base,
+        cursor: 'pointer',
+        backgroundColor: state.isFocused ? '#f3f4f6' : 'white',
+        color: '#374151',
+        '&:active': {
+            backgroundColor: '#e5e7eb'
+        }
+    })
+});
+
 export const StatsPage: React.FC = () => {
+
     const {
         trips, railwayData, geoData, user, userProfile, segmentGeometries, companyDB, badgeSettings, setBadgeSettings, pins, folders
     } = useStore(useShallow(state => ({
@@ -179,20 +227,26 @@ export const StatsPage: React.FC = () => {
                             <Globe size={16} /> {t('statsPage.language', 'UI 语言 / Language')}
                         </div>
                         <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200">
-                            <select
-                                className="bg-transparent text-gray-700 text-sm font-bold w-full outline-none cursor-pointer"
-                                value={badgeSettings.language || 'zh-CN'}
-                                onChange={(e) => {
-                                    const newSettings = { ...badgeSettings, language: e.target.value };
+                            <Select
+                                value={{
+                                    value: badgeSettings.language || 'zh-CN',
+                                    label: (badgeSettings.language || 'zh-CN') === 'zh-CN' ? '简体中文' : ((badgeSettings.language === 'en') ? 'English' : ((badgeSettings.language === 'zh-TW') ? '繁體中文' : '日本語'))
+                                }}
+                                onChange={(option: any) => {
+                                    const newSettings = { ...badgeSettings, language: option.value };
                                     setBadgeSettings(newSettings);
                                     if (user) saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
                                 }}
-                            >
-                                <option value="zh-CN">简体中文</option>
-                                <option value="en">English</option>
-                                <option value="ja-JP">日本語</option>
-                                <option value="zh-TW">繁體中文</option>
-                            </select>
+                                options={[
+                                    { value: 'zh-CN', label: '简体中文' },
+                                    { value: 'en', label: 'English' },
+                                    { value: 'ja-JP', label: '日本語' },
+                                    { value: 'zh-TW', label: '繁體中文' }
+                                ]}
+                                isSearchable={false}
+                                styles={getSelectStyles()}
+                                className="w-full"
+                            />
                         </div>
                     </div>
 
@@ -226,24 +280,27 @@ export const StatsPage: React.FC = () => {
                     {(!badgeSettings.defaultMapCenter || badgeSettings.defaultMapCenter.mode === 'fixed') && (
                         <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200">
                             <MapPin size={14} className="text-emerald-500 shrink-0 ml-1" />
-                            <select
-                                className="bg-transparent text-gray-700 text-sm font-bold w-full outline-none cursor-pointer"
-                                value={`${badgeSettings.defaultMapCenter?.lat || 35.6812},${badgeSettings.defaultMapCenter?.lng || 139.7671}`}
-                                onChange={(e) => {
-                                    const [lat, lng] = e.target.value.split(',').map(Number);
+                            <Select
+                                value={{
+                                    value: `${badgeSettings.defaultMapCenter?.lat || 35.6812},${badgeSettings.defaultMapCenter?.lng || 139.7671}`,
+                                    label: Object.values(CITIES).flat().find(c => Math.abs(c.lat - (badgeSettings.defaultMapCenter?.lat || 35.6812)) < 0.001 && Math.abs(c.lng - (badgeSettings.defaultMapCenter?.lng || 139.7671)) < 0.001)?.name || 'Custom'
+                                }}
+                                onChange={(option: any) => {
+                                    const [lat, lng] = option.value.split(',').map(Number);
                                     const newSettings = { ...badgeSettings, defaultMapCenter: { mode: 'fixed' as const, lat, lng } };
                                     setBadgeSettings(newSettings);
                                     if (user) saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
                                 }}
-                            >
-                                {Object.entries(CITIES).map(([country, cities]) => (
-                                    <optgroup key={country} label={country === 'China' ? t('setup.china', '中国') : t('setup.japan', '日本')}>
-                                        {cities.map(city => (
-                                            <option key={city.name} value={`${city.lat},${city.lng}`}>{city.name}</option>
-                                        ))}
-                                    </optgroup>
-                                ))}
-                            </select>
+                                options={Object.entries(CITIES).map(([country, cities]) => ({
+                                    label: country === 'China' ? t('setup.china', '中国') : t('setup.japan', '日本'),
+                                    options: cities.map(city => ({
+                                        value: `${city.lat},${city.lng}`,
+                                        label: city.name
+                                    }))
+                                }))}
+                                styles={getSelectStyles()}
+                                className="w-full"
+                            />
                         </div>
                     )}
                 </div>

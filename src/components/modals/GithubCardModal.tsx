@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Github, Eye, EyeOff, Lock, Loader2 } from 'lucide-react';
+import Select from 'react-select';
 import { useStore } from '../../store';
 import { api } from '../../services/api';
 import { useShallow } from 'zustand/react/shallow';
@@ -96,16 +97,38 @@ export const GithubCardModal: React.FC = () => {
                     <div className="space-y-4">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 mb-1">Source</label>
-                            <select
-                                className="w-full p-2 border rounded-lg text-sm"
-                                value={source}
-                                onChange={e => setSource(e.target.value)}
-                            >
-                                <option value="global">Global (All Trips)</option>
-                                {publicFolders.map(f => (
-                                    <option key={f.id} value={f.id}>Folder: {f.name}</option>
-                                ))}
-                            </select>
+                            <Select
+                                className="text-sm"
+                                value={{
+                                    value: source,
+                                    label: source === 'global' ? 'Global (All Trips)' : `Folder: ${publicFolders.find(f => f.id === source)?.name || ''}`
+                                }}
+                                onChange={(option) => setSource(option?.value || 'global')}
+                                options={[
+                                    { value: 'global', label: 'Global (All Trips)' },
+                                    ...publicFolders.map(f => ({ value: f.id, label: `Folder: ${f.name}` }))
+                                ]}
+                                isSearchable={false}
+                                styles={{
+                                    control: (base) => ({
+                                        ...base,
+                                        borderRadius: '0.5rem',
+                                        borderColor: '#e5e7eb',
+                                        padding: '0.1rem',
+                                        minHeight: '42px',
+                                        boxShadow: 'none',
+                                        '&:hover': {
+                                            borderColor: '#d1d5db'
+                                        }
+                                    }),
+                                    menu: (base) => ({
+                                        ...base,
+                                        borderRadius: '0.5rem',
+                                        overflow: 'hidden',
+                                        zIndex: 100
+                                    })
+                                }}
+                            />
                         </div>
 
                         <div className="bg-slate-100 p-4 rounded-lg flex justify-center overflow-hidden min-h-[100px] items-center">

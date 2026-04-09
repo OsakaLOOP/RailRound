@@ -7,6 +7,38 @@ import { GlobalSearchModal } from './GlobalSearchModal';
 import { isCompanyCompatible, getTransferableLines, findRoute, computeLoopVia, getLandmarks } from '../../core/railwayRouting'; // Will need to ensure these are typed
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
+import Select from 'react-select';
+
+const getSelectStyles = (isSmall = false) => ({
+    control: (base: any) => ({
+        ...base,
+        minHeight: isSmall ? '28px' : '36px',
+        fontSize: isSmall ? '11px' : '14px',
+        borderRadius: '0.25rem',
+        borderColor: '#e5e7eb',
+        boxShadow: 'none',
+        '&:hover': {
+            borderColor: '#d1d5db'
+        }
+    }),
+    dropdownIndicator: (base: any) => ({
+        ...base,
+        padding: isSmall ? '2px' : '4px'
+    }),
+    menu: (base: any) => ({
+        ...base,
+        zIndex: 50,
+        fontSize: isSmall ? '11px' : '14px',
+    }),
+    option: (base: any) => ({
+        ...base,
+        padding: isSmall ? '4px 8px' : '8px 12px'
+    }),
+    valueContainer: (base: any) => ({
+        ...base,
+        padding: isSmall ? '0 4px' : '2px 8px'
+    })
+});
 
 export const TripEditor: React.FC = () => {
     const {
@@ -434,10 +466,15 @@ export const TripEditor: React.FC = () => {
                                                         setForm({ segments: newSegs });
                                                     }
                                                 }}>
-                                                    <select className="w-full p-2 border rounded text-xs bg-white" value={segment.fromId} onChange={e => updateSegment(idx, 'fromId', e.target.value)}>
-                                                        <option value="">{t('tripEdit.board', '乘车...')}</option>
-                                                        {segment.lineKey && railwayData[segment.lineKey]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}
-                                                    </select>
+                                                    <Select
+        className="w-full text-xs"
+        value={segment.fromId ? { value: segment.fromId, label: railwayData[segment.lineKey || '']?.stations.find(s => s.id === segment.fromId)?.name_ja || segment.fromId } : null}
+        onChange={(option: any) => updateSegment(idx, 'fromId', option?.value || '')}
+        options={segment.lineKey ? railwayData[segment.lineKey]?.stations.map(s => ({ value: s.id, label: s.name_ja })) : []}
+        placeholder={t('tripEdit.board', '乘车...')}
+        isClearable
+        styles={getSelectStyles()}
+    />
                                                 </DropZone>
 
                                                 <button
@@ -464,10 +501,15 @@ export const TripEditor: React.FC = () => {
                                                         setForm({ segments: newSegs });
                                                     }
                                                 }}>
-                                                    <select className="w-full p-2 border rounded bg-white text-xs" value={segment.toId} onChange={e => updateSegment(idx, 'toId', e.target.value)}>
-                                                        <option value="">{t('tripEdit.alight', '下车...')}</option>
-                                                        {segment.lineKey && railwayData[segment.lineKey]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}
-                                                    </select>
+                                                    <Select
+        className="w-full text-xs"
+        value={segment.toId ? { value: segment.toId, label: railwayData[segment.lineKey || '']?.stations.find(s => s.id === segment.toId)?.name_ja || segment.toId } : null}
+        onChange={(option: any) => updateSegment(idx, 'toId', option?.value || '')}
+        options={segment.lineKey ? railwayData[segment.lineKey]?.stations.map(s => ({ value: s.id, label: s.name_ja })) : []}
+        placeholder={t('tripEdit.alight', '下车...')}
+        isClearable
+        styles={getSelectStyles()}
+    />
                                                 </DropZone>
                                             </div>
 
@@ -476,15 +518,23 @@ export const TripEditor: React.FC = () => {
                                                 <div className="pl-2 mt-2 space-y-1">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-[11px] text-gray-400">环线经由</span>
-                                                        <select
-                                                            className="text-[11px] border rounded px-1.5 py-0.5 bg-white text-gray-600 focus:ring-1 focus:ring-blue-500 outline-none"
-                                                            value={segment.loopVia || 'auto'}
-                                                            onChange={e => updateSegment(idx, 'loopVia', e.target.value)}
-                                                        >
-                                                            <option value="auto">自动 (Auto)</option>
-                                                            <option value="up">内回り (Up)</option>
-                                                            <option value="down">外回り (Down)</option>
-                                                        </select>
+                                                        <div className="w-32">
+        <Select
+            className="text-[11px]"
+            value={{
+                value: segment.loopVia || 'auto',
+                label: (segment.loopVia || 'auto') === 'auto' ? '自动 (Auto)' : (segment.loopVia === 'up' ? '内回り (Up)' : '外回り (Down)')
+            }}
+            onChange={(option: any) => updateSegment(idx, 'loopVia', option?.value || 'auto')}
+            options={[
+                { value: 'auto', label: '自动 (Auto)' },
+                { value: 'up', label: '内回り (Up)' },
+                { value: 'down', label: '外回り (Down)' }
+            ]}
+            isSearchable={false}
+            styles={getSelectStyles(true)}
+        />
+    </div>
                                                     </div>
                                                     {(() => {
                                                         const line = railwayData[segment.lineKey];
@@ -528,7 +578,18 @@ export const TripEditor: React.FC = () => {
                                             <button onClick={() => openSelector('autoStart')} className="flex-1 p-2 text-sm text-left text-gray-700 truncate flex items-center gap-1 hover:bg-gray-50 border-r">{autoForm.startLine ? <span>{autoForm.startLine}</span> : <span className="text-gray-400">{t('tripEdit.selLine', '选择线路...')}</span>}</button>
                                             <button onClick={() => openSearch('autoStart')} className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 w-10 shrink-0 flex items-center justify-center"><Search size={16} /></button>
                                         </div>
-                                        <select className="p-2 rounded border text-sm" disabled={!autoForm.startLine} value={autoForm.startStation} onChange={e => setAutoForm({ ...autoForm, startStation: e.target.value })}><option value="">{t('tripEdit.station', '车站...')}</option>{autoForm.startLine && railwayData[autoForm.startLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                        <div className="flex-1">
+        <Select
+            className="text-sm"
+            isDisabled={!autoForm.startLine}
+            value={autoForm.startStation ? { value: autoForm.startStation, label: railwayData[autoForm.startLine || '']?.stations.find(s => s.id === autoForm.startStation)?.name_ja || autoForm.startStation } : null}
+            onChange={(option: any) => setAutoForm({ ...autoForm, startStation: option?.value || '' })}
+            options={autoForm.startLine ? railwayData[autoForm.startLine]?.stations.map(s => ({ value: s.id, label: s.name_ja })) : []}
+            placeholder={t('tripEdit.station', '车站...')}
+            isClearable
+            styles={getSelectStyles()}
+        />
+    </div>
                                     </div>
                                 </div>
                                 <div className="flex justify-center text-blue-300"><ArrowDown className="animate-bounce" size={20} /></div>
@@ -539,7 +600,18 @@ export const TripEditor: React.FC = () => {
                                             <button onClick={() => openSelector('autoEnd')} className="flex-1 p-2 text-sm text-left text-gray-700 truncate flex items-center gap-1 hover:bg-gray-50 border-r">{autoForm.endLine ? <span>{autoForm.endLine}</span> : <span className="text-gray-400">{t('tripEdit.selLine', '选择线路...')}</span>}</button>
                                             <button onClick={() => openSearch('autoEnd')} className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 w-10 shrink-0 flex items-center justify-center"><Search size={16} /></button>
                                         </div>
-                                        <select className="p-2 rounded border text-sm" disabled={!autoForm.endLine} value={autoForm.endStation} onChange={e => setAutoForm({ ...autoForm, endStation: e.target.value })}><option value="">{t('tripEdit.station', '车站...')}</option>{autoForm.endLine && railwayData[autoForm.endLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                        <div className="flex-1">
+        <Select
+            className="text-sm"
+            isDisabled={!autoForm.endLine}
+            value={autoForm.endStation ? { value: autoForm.endStation, label: railwayData[autoForm.endLine || '']?.stations.find(s => s.id === autoForm.endStation)?.name_ja || autoForm.endStation } : null}
+            onChange={(option: any) => setAutoForm({ ...autoForm, endStation: option?.value || '' })}
+            options={autoForm.endLine ? railwayData[autoForm.endLine]?.stations.map(s => ({ value: s.id, label: s.name_ja })) : []}
+            placeholder={t('tripEdit.station', '车站...')}
+            isClearable
+            styles={getSelectStyles()}
+        />
+    </div>
                                     </div>
                                 </div>
                             </div>

@@ -6,6 +6,7 @@ import Chest from './components/Chest';
 import Tutorial from './components/Tutorial';
 import { useAuth, useUserData, useGeo, useVersion } from './globalContext';
 import { VersionBadge } from './components/VersionBadge';
+import { Toaster } from 'react-hot-toast';
 import buildKMLString from './buildKml';
 import { DragProvider } from './components/DragContext';
 
@@ -300,6 +301,8 @@ export default function MainLayout() {
        </div>
 
        <Tutorial />
+
+       <Toaster position="top-center" reverseOrder={false} />
 
        {/* Navigation Bar (z-30) */}
        <nav className="absolute bottom-0 left-0 right-0 bg-white border-t p-2 flex justify-around shrink-0 pb-safe z-30 pointer-events-auto">

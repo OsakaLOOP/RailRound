@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, useMemo, useEffectEvent, useCallback, useRef } from "react";
 // createContext, 这是让一切好起来的关键!
+import toast from 'react-hot-toast';
 
 import { api } from "./services/api";
 import { db } from "./utils/db";
@@ -225,6 +226,7 @@ export const GlobalProvider = ({ children }) => {
     // Auto Load Data
     useEffect(() => {
         const initData = async () => {
+            const toastId = toast.loading('准备地理数据...', { id: 'geo-loading' });
             let cData = {};
             try {
                 const res = await fetch('/company_data.json');
@@ -253,6 +255,16 @@ export const GlobalProvider = ({ children }) => {
             const cachedNames = new Set(cached.map(f => f.fileName));
             const missing = geojsonFiles.filter(f => !cachedNames.has(f.replace(/\.(geojson|json)$/i, '')));
 
+            let loadedCount = 0;
+            const totalCount = missing.length;
+
+            const updateProgress = () => {
+                if (totalCount > 0) {
+                    const percent = Math.round((loadedCount / totalCount) * 100);
+                    toast.loading(`加载地理数据: ${percent}%`, { id: toastId });
+                }
+            };
+
             const downloads = await Promise.all(missing.map(async f => {
                 try {
                     const res = await fetch(`/geojson/${f}`);
@@ -262,9 +274,13 @@ export const GlobalProvider = ({ children }) => {
                     const comp = findBestCompanyKey(name, cIndex);
                     const item = { json, company: comp, fileName: name };
                     await db.set(db.STORE_FILES, name, item);
+                    loadedCount++;
+                    updateProgress();
                     return item;
                 } catch(e) { return null; }
             }));
+
+            toast.loading(`解析地理数据...`, { id: toastId });
 
             const allData = [...cached, ...downloads.filter(Boolean)];
 
@@ -321,6 +337,7 @@ export const GlobalProvider = ({ children }) => {
                 payload: { railwayData: rData, geoData: { type: "FeatureCollection", features: newFeatures } }
             });
             setIsGeoReady(true);
+            toast.success('地理数据加载完成', { id: toastId });
         };
 
         initData();

@@ -181,12 +181,21 @@ export const LocateButton: React.FC = () => {
       }
   };
 
+  // Mobile specific wrappers to handle touch gestures better
+  const eventProps = isMobile ? {
+      onTouchStart: handlePointerDown,
+      onTouchEnd: handlePointerUp,
+      onTouchCancel: handlePointerLeave
+  } : {
+      onPointerDown: handlePointerDown,
+      onPointerUp: handlePointerUp,
+      onPointerLeave: handlePointerLeave
+  };
+
   return (
     <div className="absolute bottom-20 right-4 z-[400] flex flex-col gap-3">
       <button
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerLeave}
+        {...eventProps}
         onContextMenu={(e) => e.preventDefault()}
         disabled={status === "locating"}
         className={`p-3 rounded-full shadow-lg transition-all active:scale-95 flex items-center justify-center w-12 h-12

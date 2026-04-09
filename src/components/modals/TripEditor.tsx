@@ -1,5 +1,8 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import { Edit2, Plus, X, ListFilter, AlertTriangle, ArrowRightLeft, ArrowDown, Search, Loader2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { showConfirm } from '../../utils/confirm';
 import { useStore, EditorMode } from '../../store';
 import { DropZone } from '../DragContext';
 import { LineSelector } from './LineSelector';
@@ -46,8 +49,8 @@ export const TripEditor: React.FC = () => {
     const onSave = () => {
         // Validation logic
         const validSegments = form.segments?.filter(s => s.fromId !== s.toId) || [];
-        if (validSegments.length === 0) { alert(t("tripEdit.atLeastOne", "至少包含一段有效行程")); return; }
-        if (validSegments.some(s => !s.lineKey || !s.fromId || !s.toId)) { alert(t("tripEdit.fillInfo", "请完善信息")); return; }
+        if (validSegments.length === 0) { toast.error(t("tripEdit.atLeastOne", "至少包含一段有效行程")); return; }
+        if (validSegments.some(s => !s.lineKey || !s.fromId || !s.toId)) { toast.error(t("tripEdit.fillInfo", "请完善信息")); return; }
 
         // Resolve 'auto' loops to permanent 'up' or 'down'
         const resolvedSegments = validSegments.map(seg => {
@@ -90,7 +93,7 @@ export const TripEditor: React.FC = () => {
 
         setTrips(finalTrips);
         if (user) {
-            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => alert('云端保存失败: ' + e.message));
+            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => toast.error('云端保存失败: ' + e.message));
         }
         closeEditor();
     };
@@ -125,7 +128,7 @@ export const TripEditor: React.FC = () => {
         }
     }, [autoRouteEasterEggType, isOpen, autoForm, form.date]);
 
-    const onAutoSearch = (retryWithInfiniteSearch = false) => {
+    const onAutoSearch = async (retryWithInfiniteSearch = false) => {
         const isInfinite = retryWithInfiniteSearch === true;
         const { startLine, startStation, endLine, endStation } = autoForm;
         if (!startLine || !startStation || !endLine || !endStation) return;
@@ -152,20 +155,20 @@ export const TripEditor: React.FC = () => {
             if (result.error) {
                 setIsRouteSearching(false);
                 if (!isInfinite && result.error.includes("超出最大换乘次数")) {
-                    setTimeout(() => {
-                        const wantRetry = window.confirm(t("tripEdit.autoMaxLimit", "自动规划超出6次换乘限制或无解。\n是否继续无限制深度搜索？(这可能需要较长等待时间)"));
+                    setTimeout(async () => {
+                        const wantRetry = await showConfirm(t('tripEdit.autoMaxLimitTitle', '换乘超限'), t("tripEdit.autoMaxLimit", "自动规划超出6次换乘限制或无解。\n是否继续无限制深度搜索？(这可能需要较长等待时间)"), t);
                         if (wantRetry) {
                             onAutoSearch(true);
                         }
                     }, 100);
                 } else {
                     setTimeout(() => {
-                        alert(`${t("tripEdit.autoFail", "无法规划: ")}${result.error}`);
+                        toast.error(`${t("tripEdit.autoFail", "无法规划: ")}${result.error}`);
                     }, 100);
                 }
             }
             else {
-                if (result.segments.length > 20) { setIsRouteSearching(false); alert(t("tripEdit.pathTooLong", "路径过长")); return; }
+                if (result.segments.length > 20) { setIsRouteSearching(false); toast.error(t("tripEdit.pathTooLong", "路径过长")); return; }
                 setForm({ segments: result.segments });
                 setEditorMode(EditorMode.Manual);
                 setTimeout(() => setIsRouteSearching(false), 200);
@@ -254,7 +257,7 @@ export const TripEditor: React.FC = () => {
     };
 
     const addSegment = () => {
-        if ((form.segments?.length || 0) >= 10) { alert(t("tripEdit.maxSegment", "最多 10 段")); return; }
+        if ((form.segments?.length || 0) >= 10) { toast.error(t("tripEdit.maxSegment", "最多 10 段")); return; }
         setForm({ segments: [...(form.segments || []), { id: Date.now().toString(), lineKey: '', fromId: '', toId: '', loopVia: 'auto' }] });
     };
 
@@ -365,11 +368,11 @@ export const TripEditor: React.FC = () => {
 
                     {editorMode === EditorMode.Manual && (
                         <div className="p-6 space-y-6 overflow-y-auto">
-                            <input type="date" className="w-full p-2 border rounded bg-gray-50 font-bold text-gray-800" value={form.date || ''} onChange={e => setForm({ date: e.target.value })} />
+                            <input type="date" className="w-full p-2 border rounded bg-gray-50 font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-shadow" value={form.date || ''} onChange={e => setForm({ date: e.target.value })} />
 
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><span className="font-bold text-gray-600">¥</span> {t('tripEdit.money', '金额 (JPY)')}</label>
-                                <input type="number" className="w-full p-2 border rounded text-sm" placeholder="0" value={form.cost || ''} onChange={e => setForm({ cost: parseInt(e.target.value) || 0 })} />
+                                <input type="number" className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-shadow" placeholder="0" value={form.cost || ''} onChange={e => setForm({ cost: parseInt(e.target.value) || 0 })} />
                             </div>
 
                             <div className="space-y-3">
@@ -397,7 +400,7 @@ export const TripEditor: React.FC = () => {
                                     return (
                                         <div key={segment.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 relative group">
                                             <div className="absolute -left-3 top-3 w-6 h-6 bg-gray-800 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-sm border-2 border-white">{idx + 1}</div>
-                                            {idx > 0 && <button onClick={() => removeSegment(idx)} className="absolute -right-2 -top-2 p-1 bg-white text-red-500 rounded-full shadow border border-gray-100 hover:bg-red-50"><X size={14} /></button>}
+                                            {idx > 0 && <button onClick={() => removeSegment(idx)} className="absolute -right-2 -top-2 p-1 bg-white text-red-500 rounded-full shadow border border-gray-100 hover:bg-red-50 active:scale-95 transition-transform"><X size={14} /></button>}
 
                                             <div className="mb-2 pl-2">
                                                 <div className="flex rounded shadow-sm w-full border bg-white overflow-hidden">
@@ -434,14 +437,14 @@ export const TripEditor: React.FC = () => {
                                                         setForm({ segments: newSegs });
                                                     }
                                                 }}>
-                                                    <select className="w-full p-2 border rounded text-xs bg-white" value={segment.fromId} onChange={e => updateSegment(idx, 'fromId', e.target.value)}>
+                                                    <select className="w-full p-2 border rounded text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-shadow" value={segment.fromId} onChange={e => updateSegment(idx, 'fromId', e.target.value)}>
                                                         <option value="">{t('tripEdit.board', '乘车...')}</option>
                                                         {segment.lineKey && railwayData[segment.lineKey]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}
                                                     </select>
                                                 </DropZone>
 
                                                 <button
-                                                    className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                                                    className="p-1 text-gray-400 hover:text-blue-500 transition-transform duration-300 hover:rotate-180 active:scale-90"
                                                     onClick={() => {
                                                         const newSegs = [...form.segments!];
                                                         newSegs[idx] = { ...newSegs[idx], fromId: segment.toId, toId: segment.fromId };
@@ -464,7 +467,7 @@ export const TripEditor: React.FC = () => {
                                                         setForm({ segments: newSegs });
                                                     }
                                                 }}>
-                                                    <select className="w-full p-2 border rounded bg-white text-xs" value={segment.toId} onChange={e => updateSegment(idx, 'toId', e.target.value)}>
+                                                    <select className="w-full p-2 border rounded bg-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-shadow" value={segment.toId} onChange={e => updateSegment(idx, 'toId', e.target.value)}>
                                                         <option value="">{t('tripEdit.alight', '下车...')}</option>
                                                         {segment.lineKey && railwayData[segment.lineKey]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}
                                                     </select>
@@ -528,7 +531,7 @@ export const TripEditor: React.FC = () => {
                                             <button onClick={() => openSelector('autoStart')} className="flex-1 p-2 text-sm text-left text-gray-700 truncate flex items-center gap-1 hover:bg-gray-50 border-r">{autoForm.startLine ? <span>{autoForm.startLine}</span> : <span className="text-gray-400">{t('tripEdit.selLine', '选择线路...')}</span>}</button>
                                             <button onClick={() => openSearch('autoStart')} className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 w-10 shrink-0 flex items-center justify-center"><Search size={16} /></button>
                                         </div>
-                                        <select className="p-2 rounded border text-sm" disabled={!autoForm.startLine} value={autoForm.startStation} onChange={e => setAutoForm({ ...autoForm, startStation: e.target.value })}><option value="">{t('tripEdit.station', '车站...')}</option>{autoForm.startLine && railwayData[autoForm.startLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                        <select className="p-2 rounded border text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-shadow" disabled={!autoForm.startLine} value={autoForm.startStation} onChange={e => setAutoForm({ ...autoForm, startStation: e.target.value })}><option value="">{t('tripEdit.station', '车站...')}</option>{autoForm.startLine && railwayData[autoForm.startLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
                                     </div>
                                 </div>
                                 <div className="flex justify-center text-blue-300"><ArrowDown className="animate-bounce" size={20} /></div>
@@ -539,7 +542,7 @@ export const TripEditor: React.FC = () => {
                                             <button onClick={() => openSelector('autoEnd')} className="flex-1 p-2 text-sm text-left text-gray-700 truncate flex items-center gap-1 hover:bg-gray-50 border-r">{autoForm.endLine ? <span>{autoForm.endLine}</span> : <span className="text-gray-400">{t('tripEdit.selLine', '选择线路...')}</span>}</button>
                                             <button onClick={() => openSearch('autoEnd')} className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 w-10 shrink-0 flex items-center justify-center"><Search size={16} /></button>
                                         </div>
-                                        <select className="p-2 rounded border text-sm" disabled={!autoForm.endLine} value={autoForm.endStation} onChange={e => setAutoForm({ ...autoForm, endStation: e.target.value })}><option value="">{t('tripEdit.station', '车站...')}</option>{autoForm.endLine && railwayData[autoForm.endLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                        <select className="p-2 rounded border text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-shadow" disabled={!autoForm.endLine} value={autoForm.endStation} onChange={e => setAutoForm({ ...autoForm, endStation: e.target.value })}><option value="">{t('tripEdit.station', '车站...')}</option>{autoForm.endLine && railwayData[autoForm.endLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
                                     </div>
                                 </div>
                             </div>

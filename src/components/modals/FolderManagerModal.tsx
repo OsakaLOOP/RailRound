@@ -3,6 +3,7 @@ import { X, Folder, Globe, Trash2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
+import { useTranslation } from 'react-i18next';
 
 export const FolderManagerModal: React.FC = () => {
     const { isOpen, folders, user, trips, pins, badgeSettings } = useStore(useShallow(state => ({
@@ -78,8 +79,8 @@ export const FolderManagerModal: React.FC = () => {
         <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2"><Folder size={24}/> {t('folder.title', '收藏夹')}</h3>
-                    <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
+                    <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2"><Folder size={24} /> {t('folder.title', '收藏夹')}</h3>
+                    <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600" /></button>
                 </div>
 
                 <form onSubmit={(e) => { e.preventDefault(); handleCreate(); }} className="flex gap-2 mb-4">
@@ -106,9 +107,9 @@ export const FolderManagerModal: React.FC = () => {
                                     className={`p-1.5 rounded-md transition-colors ${f.is_public ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-200 text-gray-400'}`}
                                     title={f.is_public ? "Public" : "Private"}
                                 >
-                                    <Globe size={16}/>
+                                    <Globe size={16} />
                                 </button>
-                                <button onClick={() => handleDelete(f.id)} className="p-1.5 rounded-md text-red-400 hover:bg-red-50 hover:text-red-500"><Trash2 size={16}/></button>
+                                <button onClick={() => handleDelete(f.id)} className="p-1.5 rounded-md text-red-400 hover:bg-red-50 hover:text-red-500"><Trash2 size={16} /></button>
                             </div>
                         </div>
                     ))}

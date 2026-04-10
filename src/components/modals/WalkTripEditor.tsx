@@ -1,3 +1,6 @@
+import { showConfirm } from '../../utils/confirm';
+import { toast } from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import React, { useEffect } from 'react';
 import { Edit2, X, AlertTriangle, Save, Trash2 } from 'lucide-react';
 import { useStore } from '../../store';
@@ -6,6 +9,7 @@ import { useUserData } from '../../hooks/useUserData';
 import * as turf from '@turf/turf';
 
 export const WalkTripEditor: React.FC = () => {
+    const { t } = useTranslation();
     const {
         isOpen, isEditing, form, railwayData, trips, pins, folders, badgeSettings, user
     } = useStore(useShallow(state => ({
@@ -67,7 +71,7 @@ export const WalkTripEditor: React.FC = () => {
     const onSave = async () => {
         if (!form.date) return;
         if (!form.fromId || !form.toId) {
-            alert(t('walk.noStartEnd', '缺少起止点'));
+            toast.error(t('walk.noStartEnd', '缺少起止点'));
             return;
         }
 
@@ -109,17 +113,18 @@ export const WalkTripEditor: React.FC = () => {
 
         setTrips(finalTrips);
         if (user) {
-            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => alert(t('walk.saveFail', '云端保存失败: ') + e.message));
+            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => toast.error(t('walk.saveFail', '云端保存失败: ') + e.message));
         }
         closeEditor();
     };
 
     const onDelete = async () => {
-        if (!window.confirm(t('walk.delConfirm', "确定要删除这条步行记录吗？"))) return;
+        const isConfirmed = await showConfirm(t('walk.deleteTitle', '删除步行记录'), t('walk.delConfirm', '确定要删除这条步行记录吗？'), t);
+        if (!isConfirmed) return;
         const nextTrips = trips.filter(t => t.id !== form.id);
         setTrips(nextTrips);
         if (user) {
-            saveData(user.token, nextTrips, pins, folders, badgeSettings).catch((e: any) => alert(t('walk.delFail', '云端删除失败: ') + e.message));
+            saveData(user.token, nextTrips, pins, folders, badgeSettings).catch((e: any) => toast.error(t('walk.delFail', '云端删除失败: ') + e.message));
         }
         closeEditor();
     };
@@ -157,7 +162,7 @@ export const WalkTripEditor: React.FC = () => {
                     <Edit2 size={18} />
                     {isEditing ? t('walk.editTitle', '编辑步行路线') : t('walk.newTitle', '新建步行路线')}
                  </h3>
-                 <button onClick={closeEditor}><X className="text-gray-400 hover:text-gray-600"/></button>
+                 <button onClick={(e) => { e.currentTarget.blur(); closeEditor(); }}><X className="text-gray-400 hover:text-gray-600 active:scale-95 transition-all"/></button>
               </div>
             </div>
 
@@ -181,26 +186,26 @@ export const WalkTripEditor: React.FC = () => {
                 <div className="space-y-4 pt-4 border-t">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">{t('walk.date', '日期')}</label>
-                        <input type="date" value={form.date || ''} onChange={(e) => setForm({ date: e.target.value })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} outline-none`} />
+                        <input type="date" value={form.date || ''} onChange={(e) => setForm({ date: e.target.value })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} focus:border-transparent outline-none transition-shadow`} />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">{t('walk.memo', '备注')}</label>
-                        <textarea placeholder={t('walk.memoPlaceholder', "例如：逛街、散步...")} value={form.memo || ''} onChange={(e) => setForm({ memo: e.target.value })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} outline-none min-h-[80px]`} />
+                        <textarea placeholder={t('walk.memoPlaceholder', "例如：逛街、散步...")} value={form.memo || ''} onChange={(e) => setForm({ memo: e.target.value })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} focus:border-transparent outline-none transition-shadow min-h-[80px]`} />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">{t('walk.cost', '花费 (可选)')}</label>
-                        <input type="number" placeholder={t('walk.costPlaceholder', "花费 (円)")} value={form.cost || ''} onChange={(e) => setForm({ cost: parseInt(e.target.value) || 0 })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} outline-none`} />
+                        <input type="number" placeholder={t('walk.costPlaceholder', "花费 (円)")} value={form.cost || ''} onChange={(e) => setForm({ cost: parseInt(e.target.value) || 0 })} className={`w-full border rounded-lg p-2 focus:ring-2 ${colors.ringFocus} focus:border-transparent outline-none transition-shadow`} />
                     </div>
                 </div>
             </div>
 
             <div className="p-4 border-t bg-gray-50 flex justify-between gap-3">
                {isEditing && (
-                 <button onClick={onDelete} className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors">
+                 <button onClick={onDelete} className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-all active:scale-[0.98] active:shadow-none">
                      <Trash2 size={16} /> {t('walk.delete', '删除')}
                  </button>
                )}
-               <button onClick={onSave} className={`flex-1 text-white py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition shadow-sm ${colors.bgSaveBtn}`}>
+               <button onClick={onSave} className={`flex-1 text-white py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] active:shadow-none shadow-sm ${colors.bgSaveBtn}`}>
                    <Save size={16} /> {t('walk.save', '保存行程')}
                </button>
             </div>

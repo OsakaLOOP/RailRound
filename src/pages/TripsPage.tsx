@@ -34,7 +34,7 @@ const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
         [segments, segmentGeometries, railwayData, geoData]
     );
 
-    if (visualPaths.length === 0) return <div className="w-28 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">{t('tripsPage.noPreview', '无预览')}</div>;
+    if (visualPaths.length === 0) return <div className="w-28 shrink-0 flex items-center justify-center text-xs text-gray-200 ml-2 border-l border-gray-50">{window.i18n?.t('tripsPage.noPreview', '无预览') || '无预览'}</div>;
 
     const maxWidth = Math.max(0, containerWidth - 300);
     const shouldRotate = isMobile && widthPx > maxWidth && maxWidth > 0;
@@ -66,11 +66,13 @@ const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
     });
 });
 
+import { useTranslation } from 'react-i18next';
 import { useUserData } from '../hooks/useUserData';
 import { processSuicaCSV } from '../utils/suicaParser';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 export const TripsPage: React.FC = () => {
+    const { t } = useTranslation();
     const { trips, railwayData, segmentGeometries, user, pins, folders, badgeSettings } = useStore(useShallow(state => ({
         trips: state.trips,
         railwayData: state.railwayData,
@@ -106,7 +108,12 @@ export const TripsPage: React.FC = () => {
                     if (newTrips.length > 0) {
                         toast.dismiss(toastId);
                         const skipMsg = skippedCount > 0 ? t('tripsPage.skipMsg', '\n(已跳过 {{count}} 条重复记录)', { count: skippedCount }) : '';
-                        if (window.confirm(t('tripsPage.parseSuccess', '成功解析 {{count}} 条新行程。是否导入？{{skipMsg}}\n(按 F12 打开控制台查看详细匹配日志)', { count: newTrips.length, skipMsg: skipMsg }))) {
+
+                    // Changed to SweetAlert2 Promise
+                    const confirmMsg = t('tripsPage.parseSuccess', '成功解析 {{count}} 条新行程。是否导入？{{skipMsg}}\n(按 F12 打开控制台查看详细匹配日志)', { count: newTrips.length, skipMsg: skipMsg });
+                    const isConfirmed = await showConfirm(t('tripsPage.importTitle', '导入确认'), confirmMsg, t);
+                    if (isConfirmed) {
+
                             newTrips.forEach(trip => addTrip(trip));
                             const skipMsgShort = skippedCount > 0 ? t('tripsPage.skipMsgShort', ' (跳过 {{count}} 重复)', { count: skippedCount }) : '';
                             toast.success(t('tripsPage.importSuccess', '导入了 {{count}} 条行程！{{skipMsg}}', { count: newTrips.length, skipMsg: skipMsgShort }));
@@ -136,8 +143,11 @@ export const TripsPage: React.FC = () => {
         event.target.value = '';
     };
 
-    const handleDeleteTrip = (id: string | number) => {
-        if (confirm(t('tripsPage.deleteConfirm', '确认删除?'))) {
+
+    const handleDeleteTrip = async (id: string | number) => {
+        const isConfirmed = await showConfirm(t('tripsPage.deleteTitle', '删除行程'), t('tripsPage.deleteConfirm', '确认删除?'), t);
+        if (isConfirmed) {
+
             removeTrip(id);
             if (user) {
                 const newTrips = trips.filter(t => t.id !== id);
@@ -156,21 +166,21 @@ export const TripsPage: React.FC = () => {
                     <p className="text-xs mt-2">{t('tripsPage.addFirstTrip', '点击下方按钮添加你的第一次乗り鉄')}<br/>{t('tripsPage.addFirstTripNote', '注意: 自定义线路可以导入 company_data 和 geojson')}</p>
                 </div>
             ) : (
-                trips.map(t => {
-                    const segments = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
-                    const isWalk = t.isWalk;
+                trips.map(trip => {
+                    const segments = trip.segments || [{ lineKey: trip.lineKey, fromId: trip.fromId, toId: trip.toId }];
+                    const isWalk = trip.isWalk;
 
                     if (isWalk) {
-                        let startName = t.fromId || '';
-                        let endName = t.toId || '';
+                        let startName = trip.fromId || '';
+                        let endName = trip.toId || '';
                         Object.values(railwayData).forEach(line => {
-                            const s = line.stations.find(st => st.id === t.fromId);
+                            const s = line.stations.find(st => st.id === trip.fromId);
                             if (s) startName = s.name_ja;
-                            const e = line.stations.find(st => st.id === t.toId);
+                            const e = line.stations.find(st => st.id === trip.toId);
                             if (e) endName = e.name_ja;
                         });
 
-                        const isTree = t.walkType === 'tree';
+                        const isTree = trip.walkType === 'tree';
                         const cls = {
                             bg: isTree ? 'bg-green-50' : 'bg-purple-50',
                             border: isTree ? 'border-green-100' : 'border-purple-100',
@@ -188,13 +198,13 @@ export const TripsPage: React.FC = () => {
                         };
 
                         return (
-                            <div key={t.id} className={`${cls.bg} p-4 rounded-lg border ${cls.border} shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-pointer`} onClick={() => useStore.getState().startEditingWalkTrip(t)}>
+                            <div key={trip.id} className={`${cls.bg} p-4 rounded-lg border ${cls.border} shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-pointer`} onClick={() => useStore.getState().startEditingWalkTrip(trip)}>
                                 <div className={`flex justify-between mb-2 pb-2 border-b ${cls.border}`}>
-                                    <span className={`text-xs font-bold ${cls.date}`}>{t.date}</span>
+                                    <span className={`text-xs font-bold ${cls.date}`}>{trip.date}</span>
                                     <div className="flex items-center gap-2">
                                         <span className={`text-xs font-mono ${cls.tagText} ${cls.tagBg} px-1.5 py-0.5 rounded`}>{t('tripsPage.walk', '步行')}</span>
-                                        <button onClick={(e) => { e.stopPropagation(); useStore.getState().startEditingWalkTrip(t); }} className={cls.btnEdit}><Edit2 size={14}/></button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className={cls.btnDel}><Trash2 size={14}/></button>
+                                        <button onClick={(e) => { e.stopPropagation(); useStore.getState().startEditingWalkTrip(trip); }} className={`${cls.btnEdit} active:scale-90 transition-transform`}><Edit2 size={14}/></button>
+                                        <button onClick={(e) => { e.currentTarget.blur(); e.stopPropagation(); handleDeleteTrip(trip.id); }} className={`${cls.btnDel} active:scale-90 transition-transform`}><Trash2 size={14}/></button>
                                     </div>
                                 </div>
                                 <div className="relative z-10 flex flex-row">
@@ -208,20 +218,20 @@ export const TripsPage: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
-                                {t.memo && <div className={`text-xs ${cls.memo} bg-white/60 p-2 rounded mt-3`}>{t.memo}</div>}
+                                {trip.memo && <div className={`text-xs ${cls.memo} bg-white/60 p-2 rounded mt-3`}>{trip.memo}</div>}
                             </div>
                         );
                     }
 
                     return (
-                        <div key={t.id} className="bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1">
+                        <div key={trip.id} className="bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1">
                             <div className="flex justify-between mb-2 pb-2 border-b border-gray-50">
-                                <span className="text-xs font-bold text-gray-400">{t.date}</span>
+                                <span className="text-xs font-bold text-gray-400">{trip.date}</span>
                                 <div className="flex items-center gap-2">
-                                    {(t.cost || 0) > 0 && <span className="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">¥{t.cost}</span>}
-                                    <button onClick={() => setModalState({ addToFolderModalOpen: true, currentTripForFolder: t })} className="text-gray-400 hover:text-yellow-500"><Star size={14}/></button>
-                                    <button onClick={() => startEditingTrip(t)} className="text-gray-400 hover:text-blue-500"><Edit2 size={14}/></button>
-                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
+                                    {(trip.cost || 0) > 0 && <span className="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">¥{trip.cost}</span>}
+                                    <button onClick={(e) => { e.currentTarget.blur(); setModalState({ addToFolderModalOpen: true, currentTripForFolder: trip }); }} className="text-gray-400 hover:text-yellow-500 active:scale-90 transition-transform"><Star size={14}/></button>
+                                    <button onClick={(e) => { e.currentTarget.blur(); startEditingTrip(trip); }} className="text-gray-400 hover:text-blue-500 active:scale-90 transition-transform"><Edit2 size={14}/></button>
+                                    <button onClick={(e) => { e.currentTarget.blur(); e.stopPropagation(); handleDeleteTrip(trip.id); }} className="text-gray-400 hover:text-red-500 active:scale-90 transition-transform"><Trash2 size={14}/></button>
                                 </div>
                             </div>
                             <div className="relative z-10 flex flex-row">
@@ -262,13 +272,14 @@ export const TripsPage: React.FC = () => {
                                 </div>
                                 <RouteSlice segments={segments} />
                             </div>
-                            {t.memo && <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded mt-3">{t.memo}</div>}
+                            {trip.memo && <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded mt-3">{trip.memo}</div>}
                         </div>
                     );
                 })
             )}
             </div>
             <FloatingActionButtons
+                t={t}
                 fileInputRef={fileInputRef}
                 handleImportSuica={handleImportSuica}
                 startEditingTrip={startEditingTrip}
@@ -279,13 +290,15 @@ export const TripsPage: React.FC = () => {
 };
 
 import { ArrowUp, ArrowDown } from 'lucide-react';
+import { showConfirm } from '../utils/confirm';
 
 export const FloatingActionButtons: React.FC<{
+    t: any,
     fileInputRef: React.RefObject<HTMLInputElement>,
     handleImportSuica: (event: React.ChangeEvent<HTMLInputElement>) => void,
     startEditingTrip: (data?: any) => void,
     alwaysVisible?: boolean
-}> = ({ fileInputRef, handleImportSuica, startEditingTrip, alwaysVisible = false }) => {
+}> = ({ fileInputRef, handleImportSuica, startEditingTrip, alwaysVisible = false, t }) => {
     const [isVisible, setIsVisible] = useState(true);
     const [isTutorialActive, setIsTutorialActive] = useState(false);
     const [scrollPos, setScrollPos] = useState<'top' | 'middle' | 'bottom'>('top');
@@ -459,12 +472,12 @@ export const FloatingActionButtons: React.FC<{
             {/* Scroll Buttons */}
             <div className={`flex flex-col gap-2 mr-2 transition-opacity duration-300 pointer-events-auto ${showScrollBtns ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 {scrollPos !== 'top' && (
-                    <button onClick={scrollToTop} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors active:scale-95 touch-manipulation">
+                    <button onClick={scrollToTop} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors active:scale-90 touch-manipulation">
                         <ArrowUp size={20} />
                     </button>
                 )}
                 {scrollPos !== 'bottom' && (
-                    <button onClick={scrollToBottom} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors active:scale-95 touch-manipulation">
+                    <button onClick={scrollToBottom} className="bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-md border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors active:scale-90 touch-manipulation">
                         <ArrowDown size={20} />
                     </button>
                 )}
@@ -486,10 +499,10 @@ export const FloatingActionButtons: React.FC<{
                 }
             }}>
                 <div className="flex gap-2 p-2 rounded-2xl">
-                    <button id="btn-add-trip" onClick={() => startEditingTrip()} className="flex-1 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
+                    <button id="btn-add-trip" onClick={(e) => { e.currentTarget.blur(); startEditingTrip(); }} className="flex-1 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-95 group flex items-center justify-center gap-2">
                         <Plus className="group-hover:rotate-90 transition-transform duration-300" size={18} /> {t('tripsPage.recordNewTrip', '记录新行程')}
                     </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="flex-none px-4 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2" title={t('tripsPage.importSuica', '导入 Suica CSV')}>
+                    <button onClick={(e) => { e.currentTarget.blur(); fileInputRef.current?.click(); }} className="flex-none px-4 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-bold transition-all duration-300 active:scale-95 group flex items-center justify-center gap-2" title={t('tripsPage.importSuica', '导入 Suica CSV')}>
                         <Upload size={18} />
                     </button>
                     <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportSuica} />

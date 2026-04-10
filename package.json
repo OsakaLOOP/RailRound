@@ -25,6 +25,8 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.0",
     "remark-gfm": "^4.0.1",
+    "sweetalert2": "^11.26.24",
+    "sweetalert2-react-content": "^5.1.2",
     "typescript": "^5.9.3",
     "zustand": "^5.0.11"
   },

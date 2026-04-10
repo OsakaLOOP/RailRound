@@ -1,0 +1,44 @@
+--- src/components/map/LocateButton.tsx
++++ src/components/map/LocateButton.tsx
+@@ -3,6 +3,7 @@
+ import toast from "react-hot-toast";
+ import { useTranslation } from "react-i18next";
+ import { useStore } from "../../store";
++import { isMobile } from 'react-device-detect';
+
+ type LocateStatus = "idle" | "locating" | "located";
+ const ZOOM_LEVELS = [14, 16, 18];
+@@ -165,7 +166,7 @@
+     pressTimerRef.current = setTimeout(() => {
+         pressTimerRef.current = null;
+         handleLongPress();
+-    }, 600);
++    }, isMobile ? 800 : 600); // Slightly longer on mobile to avoid accidental long presses when trying to tap quickly
+   };
+
+   const handlePointerUp = () => {
+@@ -183,12 +184,20 @@
+       }
+   };
+
++  // Mobile specific wrappers to handle touch gestures better
++  const eventProps = isMobile ? {
++      onTouchStart: handlePointerDown,
++      onTouchEnd: handlePointerUp,
++      onTouchCancel: handlePointerLeave
++  } : {
++      onPointerDown: handlePointerDown,
++      onPointerUp: handlePointerUp,
++      onPointerLeave: handlePointerLeave
++  };
++
+   return (
+     <div className="absolute bottom-20 right-4 z-[400] flex flex-col gap-3">
+       <button
+-        onPointerDown={handlePointerDown}
+-        onPointerUp={handlePointerUp}
+-        onPointerLeave={handlePointerLeave}
++        {...eventProps}
+         onContextMenu={(e) => e.preventDefault()}
+         disabled={status === "locating"}
+         className={`p-3 rounded-full shadow-lg transition-all active:scale-95 flex items-center justify-center w-12 h-12

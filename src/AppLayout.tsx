@@ -13,6 +13,7 @@ import { WalkTripEditor } from './components/modals/WalkTripEditor';
 import { MapContainer } from './components/map/MapContainer';
 import { PinEditor } from './components/map/PinEditor';
 import { FabButton } from './components/map/FabButton';
+import { LocateButton } from './components/map/LocateButton';
 import { Header } from './components/layout/Header';
 import { BottomNav } from './components/layout/BottomNav';
 import { TripsPage } from './pages/TripsPage';
@@ -1115,6 +1116,7 @@ export const AppLayout: React.FC = () => {
                     <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
                         <MapContainer setStationMenu={setStationMenu} isDraggingRef={isDraggingRef} />
                         <FabButton />
+                        <LocateButton />
                         <PinEditor />
                     </div>
                 </div>

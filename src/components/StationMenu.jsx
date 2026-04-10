@@ -56,9 +56,20 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
     // 1. Identify all lines for this station
     const lines = [];
     if (railwayData) {
-        Object.keys(railwayData).forEach(key => {
+        // ⚡ Bolt: Fast iterative search replacing Object.keys + array.find
+        for (const key in railwayData) {
+            if (!Object.prototype.hasOwnProperty.call(railwayData, key)) continue;
             const line = railwayData[key];
-            const match = line.stations.find(s => s.name_ja === stationData.name_ja);
+            if (!line.stations) continue;
+
+            let match = null;
+            for (let i = 0; i < line.stations.length; i++) {
+                if (line.stations[i].name_ja === stationData.name_ja) {
+                    match = line.stations[i];
+                    break;
+                }
+            }
+
             if (match) {
                 lines.push({
                     lineKey: key,
@@ -69,7 +80,7 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                     company: line.meta.company
                 });
             }
-        });
+        }
     }
 
     if (lines.length === 0) return null;

@@ -166,12 +166,29 @@ export const TripsPage: React.FC = () => {
                         if (isWalk) {
                             let startName = trip.fromId || '';
                             let endName = trip.toId || '';
-                            Object.values(railwayData).forEach(line => {
-                                const s = line.stations.find(st => st.id === trip.fromId);
-                                if (s) startName = s.name_ja;
-                                const e = line.stations.find(st => st.id === trip.toId);
-                                if (e) endName = e.name_ja;
-                            });
+
+                            // ⚡ Bolt: Fast iterative search replacing Object.values + array.find
+                            let foundStart = false;
+                            let foundEnd = false;
+                            for (const lineKey in railwayData) {
+                                if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+                                const stations = railwayData[lineKey].stations;
+                                if (!stations) continue;
+
+                                for (let i = 0; i < stations.length; i++) {
+                                    const st = stations[i];
+                                    if (!foundStart && st.id === trip.fromId) {
+                                        startName = st.name_ja;
+                                        foundStart = true;
+                                    }
+                                    if (!foundEnd && st.id === trip.toId) {
+                                        endName = st.name_ja;
+                                        foundEnd = true;
+                                    }
+                                    if (foundStart && foundEnd) break;
+                                }
+                                if (foundStart && foundEnd) break;
+                            }
 
                             const isTree = trip.walkType === 'tree';
                             const cls = {

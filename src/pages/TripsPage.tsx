@@ -6,8 +6,10 @@ import { getRouteVisualData } from '../core/tripCalculator';
 import { computeLoopVia, getLandmarks } from '../core/railwayRouting';
 import { isMobile } from 'react-device-detect';
 import { useShallow } from 'zustand/react/shallow';
+import { useTranslation } from 'react-i18next';
 
 const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
+    const { t } = useTranslation();
     const { segmentGeometries, railwayData, geoData } = useStore(useShallow(state => ({
         segmentGeometries: state.segmentGeometries,
         railwayData: state.railwayData,
@@ -19,10 +21,10 @@ const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
 
     useEffect(() => {
         const measure = () => {
-           if (containerRef.current) {
-             const parent = containerRef.current.closest('.bg-white') as HTMLElement;
-             if (parent) setContainerWidth(parent.offsetWidth);
-           }
+            if (containerRef.current) {
+                const parent = containerRef.current.closest('.bg-white') as HTMLElement;
+                if (parent) setContainerWidth(parent.offsetWidth);
+            }
         };
         measure();
         window.addEventListener('resize', measure);
@@ -42,11 +44,11 @@ const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
     return (
         <div ref={containerRef} className="absolute right-2 top-1/2 -translate-y-1/2 z-0 opacity-50 pointer-events-none flex flex-row items-center justify-end gap-2" style={{ minWidth: shouldRotate ? '40px' : '100px' }}>
             <div style={{ width: shouldRotate ? heightPx : widthPx, height: shouldRotate ? widthPx : heightPx, maxWidth: shouldRotate ? 'none' : '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg viewBox="0 0 100 50" preserveAspectRatio="none" style={{ width: widthPx, height: heightPx, transform: shouldRotate ? 'rotate(90deg)' : 'none', transformOrigin: 'center center' }}>
-                  {visualPaths.map((item: any, idx: number) => (
-                      <path key={idx} d={item.path} fill="none" stroke={item.color || '#94a3b8'} strokeWidth="4" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-                  ))}
-              </svg>
+                <svg viewBox="0 0 100 50" preserveAspectRatio="none" style={{ width: widthPx, height: heightPx, transform: shouldRotate ? 'rotate(90deg)' : 'none', transformOrigin: 'center center' }}>
+                    {visualPaths.map((item: any, idx: number) => (
+                        <path key={idx} d={item.path} fill="none" stroke={item.color || '#94a3b8'} strokeWidth="4" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+                    ))}
+                </svg>
             </div>
             <div className="text-[10px] font-bold text-gray-800 shrink-0 text-right opacity-100">{Math.round(totalDist)}km</div>
         </div>
@@ -59,10 +61,10 @@ const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
     return prevProps.segments.every((seg, idx) => {
         const nextSeg = nextProps.segments[idx];
         return seg.id === nextSeg.id &&
-               seg.lineKey === nextSeg.lineKey &&
-               seg.fromId === nextSeg.fromId &&
-               seg.toId === nextSeg.toId &&
-               seg.loopVia === nextSeg.loopVia;
+            seg.lineKey === nextSeg.lineKey &&
+            seg.fromId === nextSeg.fromId &&
+            seg.toId === nextSeg.toId &&
+            seg.loopVia === nextSeg.loopVia;
     });
 });
 
@@ -85,6 +87,7 @@ export const TripsPage: React.FC = () => {
     const removeTrip = useStore(state => state.removeTrip);
     const addTrip = useStore(state => state.addTrip);
     const { saveData } = useUserData();
+    const { t } = useTranslation();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -111,7 +114,7 @@ export const TripsPage: React.FC = () => {
                             const skipMsgShort = skippedCount > 0 ? t('tripsPage.skipMsgShort', ' (跳过 {{count}} 重复)', { count: skippedCount }) : '';
                             toast.success(t('tripsPage.importSuccess', '导入了 {{count}} 条行程！{{skipMsg}}', { count: newTrips.length, skipMsg: skipMsgShort }));
                             if (user) {
-                                const updatedTrips = [...newTrips, ...trips].sort((a,b) => b.date.localeCompare(a.date));
+                                const updatedTrips = [...newTrips, ...trips].sort((a, b) => b.date.localeCompare(a.date));
                                 saveData(user.token, updatedTrips, pins, folders, badgeSettings).catch((err: any) => toast.error('云端同步失败'));
                             }
                         }
@@ -140,7 +143,7 @@ export const TripsPage: React.FC = () => {
         if (confirm(t('tripsPage.deleteConfirm', '确认删除?'))) {
             removeTrip(id);
             if (user) {
-                const newTrips = trips.filter(t => t.id !== id);
+                const newTrips = trips.filter(trip => trip.id !== id);
                 saveData(user.token, newTrips, pins, folders, badgeSettings).catch((e: any) => alert('云端同步失败'));
             }
         }
@@ -149,124 +152,124 @@ export const TripsPage: React.FC = () => {
     return (
         <div className="relative h-full w-full flex flex-col overflow-hidden">
             <div id="trips-scroll-container" className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4">
-            {trips.length === 0 ? (
-                <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
-                    <Train size={48} className="opacity-20 mb-4"/>
-                    <p>{t('tripsPage.noTrips', '暂无行程记录')}</p>
-                    <p className="text-xs mt-2">{t('tripsPage.addFirstTrip', '点击下方按钮添加你的第一次乗り鉄')}<br/>{t('tripsPage.addFirstTripNote', '注意: 自定义线路可以导入 company_data 和 geojson')}</p>
-                </div>
-            ) : (
-                trips.map(t => {
-                    const segments = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
-                    const isWalk = t.isWalk;
+                {trips.length === 0 ? (
+                    <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
+                        <Train size={48} className="opacity-20 mb-4" />
+                        <p>{t('tripsPage.noTrips', '暂无行程记录')}</p>
+                        <p className="text-xs mt-2">{t('tripsPage.addFirstTrip', '点击下方按钮添加你的第一次乗り鉄')}<br />{t('tripsPage.addFirstTripNote', '注意: 自定义线路可以导入 company_data 和 geojson')}</p>
+                    </div>
+                ) : (
+                    trips.map(trip => {
+                        const segments = trip.segments || [{ lineKey: trip.lineKey, fromId: trip.fromId, toId: trip.toId }];
+                        const isWalk = trip.isWalk;
 
-                    if (isWalk) {
-                        let startName = t.fromId || '';
-                        let endName = t.toId || '';
-                        Object.values(railwayData).forEach(line => {
-                            const s = line.stations.find(st => st.id === t.fromId);
-                            if (s) startName = s.name_ja;
-                            const e = line.stations.find(st => st.id === t.toId);
-                            if (e) endName = e.name_ja;
-                        });
+                        if (isWalk) {
+                            let startName = trip.fromId || '';
+                            let endName = trip.toId || '';
+                            Object.values(railwayData).forEach(line => {
+                                const s = line.stations.find(st => st.id === trip.fromId);
+                                if (s) startName = s.name_ja;
+                                const e = line.stations.find(st => st.id === trip.toId);
+                                if (e) endName = e.name_ja;
+                            });
 
-                        const isTree = t.walkType === 'tree';
-                        const cls = {
-                            bg: isTree ? 'bg-green-50' : 'bg-purple-50',
-                            border: isTree ? 'border-green-100' : 'border-purple-100',
-                            date: isTree ? 'text-green-400' : 'text-purple-400',
-                            tagText: isTree ? 'text-green-600' : 'text-purple-500',
-                            tagBg: isTree ? 'bg-green-200/50' : 'bg-purple-200/50',
-                            btnEdit: isTree ? 'text-green-400 hover:text-green-600' : 'text-purple-400 hover:text-purple-600',
-                            btnDel: isTree ? 'text-green-400 hover:text-red-500' : 'text-purple-400 hover:text-red-500',
-                            icon: isTree ? 'text-green-500' : 'text-purple-500',
-                            title: isTree ? 'text-green-700' : 'text-purple-700',
-                            stations: isTree ? 'text-green-900' : 'text-purple-900',
-                            arrow: isTree ? 'text-green-300' : 'text-purple-300',
-                            memo: isTree ? 'text-green-600' : 'text-purple-600',
-                            label: isTree ? t('tripsPage.walk', '步行') : t('tripsPage.hitchhike', '搭便车')
-                        };
+                            const isTree = trip.walkType === 'tree';
+                            const cls = {
+                                bg: isTree ? 'bg-green-50' : 'bg-purple-50',
+                                border: isTree ? 'border-green-100' : 'border-purple-100',
+                                date: isTree ? 'text-green-400' : 'text-purple-400',
+                                tagText: isTree ? 'text-green-600' : 'text-purple-500',
+                                tagBg: isTree ? 'bg-green-200/50' : 'bg-purple-200/50',
+                                btnEdit: isTree ? 'text-green-400 hover:text-green-600' : 'text-purple-400 hover:text-purple-600',
+                                btnDel: isTree ? 'text-green-400 hover:text-red-500' : 'text-purple-400 hover:text-red-500',
+                                icon: isTree ? 'text-green-500' : 'text-purple-500',
+                                title: isTree ? 'text-green-700' : 'text-purple-700',
+                                stations: isTree ? 'text-green-900' : 'text-purple-900',
+                                arrow: isTree ? 'text-green-300' : 'text-purple-300',
+                                memo: isTree ? 'text-green-600' : 'text-purple-600',
+                                label: isTree ? t('tripsPage.walk', '步行') : t('tripsPage.hitchhike', '搭便车')
+                            };
+
+                            return (
+                                <div key={trip.id} className={`${cls.bg} p-4 rounded-lg border ${cls.border} shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-pointer`} onClick={() => useStore.getState().startEditingWalkTrip(trip)}>
+                                    <div className={`flex justify-between mb-2 pb-2 border-b ${cls.border}`}>
+                                        <span className={`text-xs font-bold ${cls.date}`}>{trip.date}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-xs font-mono ${cls.tagText} ${cls.tagBg} px-1.5 py-0.5 rounded`}>{t('tripsPage.walk', '步行')}</span>
+                                            <button onClick={(e) => { e.stopPropagation(); useStore.getState().startEditingWalkTrip(trip); }} className={cls.btnEdit}><Edit2 size={14} /></button>
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip.id); }} className={cls.btnDel}><Trash2 size={14} /></button>
+                                        </div>
+                                    </div>
+                                    <div className="relative z-10 flex flex-row">
+                                        <div className="flex-1 space-y-2 relative overflow-hidden">
+                                            <div className="relative z-10 flex flex-col text-sm">
+                                                <div className="flex items-center gap-2">
+                                                    <MapPin size={14} className={`${cls.icon} shrink-0`} />
+                                                    <span className={`font-bold ${cls.title} text-xs`}>{cls.label}</span>
+                                                </div>
+                                                <div className={`pl-5 font-medium ${cls.stations}`}>{startName} <span className={`${cls.arrow} mx-1`}>→</span> {endName}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {trip.memo && <div className={`text-xs ${cls.memo} bg-white/60 p-2 rounded mt-3`}>{trip.memo}</div>}
+                                </div>
+                            );
+                        }
 
                         return (
-                            <div key={t.id} className={`${cls.bg} p-4 rounded-lg border ${cls.border} shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-pointer`} onClick={() => useStore.getState().startEditingWalkTrip(t)}>
-                                <div className={`flex justify-between mb-2 pb-2 border-b ${cls.border}`}>
-                                    <span className={`text-xs font-bold ${cls.date}`}>{t.date}</span>
+                            <div key={trip.id} className="bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1">
+                                <div className="flex justify-between mb-2 pb-2 border-b border-gray-50">
+                                    <span className="text-xs font-bold text-gray-400">{trip.date}</span>
                                     <div className="flex items-center gap-2">
-                                        <span className={`text-xs font-mono ${cls.tagText} ${cls.tagBg} px-1.5 py-0.5 rounded`}>{t('tripsPage.walk', '步行')}</span>
-                                        <button onClick={(e) => { e.stopPropagation(); useStore.getState().startEditingWalkTrip(t); }} className={cls.btnEdit}><Edit2 size={14}/></button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className={cls.btnDel}><Trash2 size={14}/></button>
+                                        {(trip.cost || 0) > 0 && <span className="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">¥{trip.cost}</span>}
+                                        <button onClick={() => setModalState({ addToFolderModalOpen: true, currentTripForFolder: trip })} className="text-gray-400 hover:text-yellow-500"><Star size={14} /></button>
+                                        <button onClick={() => startEditingTrip(trip)} className="text-gray-400 hover:text-blue-500"><Edit2 size={14} /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
                                     </div>
                                 </div>
                                 <div className="relative z-10 flex flex-row">
                                     <div className="flex-1 space-y-2 relative overflow-hidden">
-                                        <div className="relative z-10 flex flex-col text-sm">
-                                            <div className="flex items-center gap-2">
-                                                <MapPin size={14} className={`${cls.icon} shrink-0`}/>
-                                                <span className={`font-bold ${cls.title} text-xs`}>{cls.label}</span>
-                                            </div>
-                                            <div className={`pl-5 font-medium ${cls.stations}`}>{startName} <span className={`${cls.arrow} mx-1`}>→</span> {endName}</div>
-                                        </div>
+                                        {segments.length > 1 && <div className="absolute left-[5px] top-2 bottom-2 w-0.5 bg-gray-200 z-0"></div>}
+                                        {segments.map((seg, idx) => {
+                                            const line = railwayData[seg.lineKey];
+                                            const icon = line?.meta?.icon;
+                                            const getSt = (id: string) => line?.stations.find(s => s.id === id)?.name_ja || id;
+                                            return (
+                                                <div key={idx} className="relative z-10 flex flex-col text-sm">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-white shadow-sm shrink-0"></div>
+                                                        {icon && <img src={icon} alt="" className="line-icon" />}
+                                                        <span className="font-bold text-emerald-700 text-xs">{seg.lineKey}</span>
+                                                    </div>
+                                                    <div className="pl-5 font-medium text-gray-700">{getSt(seg.fromId)} <span className="text-gray-300 mx-1">→</span> {getSt(seg.toId)}</div>
+                                                    {(() => {
+                                                        const isLoop = !!(line?.meta?.isLoop);
+                                                        if (!isLoop) return null;
+                                                        let realVia = seg.loopVia || 'auto';
+                                                        if (realVia === 'auto') {
+                                                            realVia = computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId);
+                                                        }
+                                                        const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realVia}`;
+                                                        const cachedLm = segmentGeometries.get(key)?.landmarks;
+
+                                                        // 回退方案：实时计算地标
+                                                        const lm = cachedLm || getLandmarks(line, seg.fromId, seg.toId, seg.loopVia);
+
+                                                        return lm?.length > 0 ? (
+                                                            <div className="pl-5 text-[11px] text-gray-400">{t('tripsPage.via', '经由 ')}{lm.join('、')}</div>
+                                                        ) : null;
+                                                    })()}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
+                                    <RouteSlice segments={segments} />
                                 </div>
-                                {t.memo && <div className={`text-xs ${cls.memo} bg-white/60 p-2 rounded mt-3`}>{t.memo}</div>}
+                                {trip.memo && <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded mt-3">{trip.memo}</div>}
                             </div>
                         );
-                    }
-
-                    return (
-                        <div key={t.id} className="bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1">
-                            <div className="flex justify-between mb-2 pb-2 border-b border-gray-50">
-                                <span className="text-xs font-bold text-gray-400">{t.date}</span>
-                                <div className="flex items-center gap-2">
-                                    {(t.cost || 0) > 0 && <span className="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">¥{t.cost}</span>}
-                                    <button onClick={() => setModalState({ addToFolderModalOpen: true, currentTripForFolder: t })} className="text-gray-400 hover:text-yellow-500"><Star size={14}/></button>
-                                    <button onClick={() => startEditingTrip(t)} className="text-gray-400 hover:text-blue-500"><Edit2 size={14}/></button>
-                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
-                                </div>
-                            </div>
-                            <div className="relative z-10 flex flex-row">
-                                <div className="flex-1 space-y-2 relative overflow-hidden">
-                                    {segments.length > 1 && <div className="absolute left-[5px] top-2 bottom-2 w-0.5 bg-gray-200 z-0"></div>}
-                                    {segments.map((seg, idx) => {
-                                        const line = railwayData[seg.lineKey];
-                                        const icon = line?.meta?.icon;
-                                        const getSt = (id: string) => line?.stations.find(s => s.id === id)?.name_ja || id;
-                                        return (
-                                            <div key={idx} className="relative z-10 flex flex-col text-sm">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-white shadow-sm shrink-0"></div>
-                                                    {icon && <img src={icon} alt="" className="line-icon" />}
-                                                    <span className="font-bold text-emerald-700 text-xs">{seg.lineKey}</span>
-                                                </div>
-                                                <div className="pl-5 font-medium text-gray-700">{getSt(seg.fromId)} <span className="text-gray-300 mx-1">→</span> {getSt(seg.toId)}</div>
-                                                {(() => {
-                                                    const isLoop = !!(line?.meta?.isLoop);
-                                                    if (!isLoop) return null;
-                                                    let realVia = seg.loopVia || 'auto';
-                                                    if (realVia === 'auto') {
-                                                        realVia = computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId);
-                                                    }
-                                                    const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realVia}`;
-                                                    const cachedLm = segmentGeometries.get(key)?.landmarks;
-                                                    
-                                                    // 回退方案：实时计算地标
-                                                    const lm = cachedLm || getLandmarks(line, seg.fromId, seg.toId, seg.loopVia);
-                                                    
-                                                    return lm?.length > 0 ? (
-                                                        <div className="pl-5 text-[11px] text-gray-400">{t('tripsPage.via', '经由 ')}{lm.join('、')}</div>
-                                                    ) : null;
-                                                })()}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                <RouteSlice segments={segments} />
-                            </div>
-                            {t.memo && <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded mt-3">{t.memo}</div>}
-                        </div>
-                    );
-                })
-            )}
+                    })
+                )}
             </div>
             <FloatingActionButtons
                 fileInputRef={fileInputRef}
@@ -286,6 +289,7 @@ export const FloatingActionButtons: React.FC<{
     startEditingTrip: (data?: any) => void,
     alwaysVisible?: boolean
 }> = ({ fileInputRef, handleImportSuica, startEditingTrip, alwaysVisible = false }) => {
+    const { t } = useTranslation();
     const [isVisible, setIsVisible] = useState(true);
     const [isTutorialActive, setIsTutorialActive] = useState(false);
     const [scrollPos, setScrollPos] = useState<'top' | 'middle' | 'bottom'>('top');
@@ -479,22 +483,22 @@ export const FloatingActionButtons: React.FC<{
                     setTimeout(() => setIsHovering(false), 2000);
                 }}
             >
-            <DropZone onDrop={(item: any) => {
-                if (item.type === 'station') {
-                    const newSegments = [{ id: Date.now().toString(), lineKey: item.lineKey, fromId: item.id, toId: '' }];
-                    startEditingTrip({ date: new Date().toISOString().split('T')[0], memo: '', segments: newSegments, cost: 0 });
-                }
-            }}>
-                <div className="flex gap-2 p-2 rounded-2xl">
-                    <button id="btn-add-trip" onClick={() => startEditingTrip()} className="flex-1 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
-                        <Plus className="group-hover:rotate-90 transition-transform duration-300" size={18} /> {t('tripsPage.recordNewTrip', '记录新行程')}
-                    </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="flex-none px-4 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2" title={t('tripsPage.importSuica', '导入 Suica CSV')}>
-                        <Upload size={18} />
-                    </button>
-                    <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportSuica} />
-                </div>
-            </DropZone>
+                <DropZone onDrop={(item: any) => {
+                    if (item.type === 'station') {
+                        const newSegments = [{ id: Date.now().toString(), lineKey: item.lineKey, fromId: item.id, toId: '' }];
+                        startEditingTrip({ date: new Date().toISOString().split('T')[0], memo: '', segments: newSegments, cost: 0 });
+                    }
+                }}>
+                    <div className="flex gap-2 p-2 rounded-2xl">
+                        <button id="btn-add-trip" onClick={() => startEditingTrip()} className="flex-1 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2">
+                            <Plus className="group-hover:rotate-90 transition-transform duration-300" size={18} /> {t('tripsPage.recordNewTrip', '记录新行程')}
+                        </button>
+                        <button onClick={() => fileInputRef.current?.click()} className="flex-none px-4 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2" title={t('tripsPage.importSuica', '导入 Suica CSV')}>
+                            <Upload size={18} />
+                        </button>
+                        <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportSuica} />
+                    </div>
+                </DropZone>
             </div>
         </div>
     );

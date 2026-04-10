@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useEffectEvent } from "react";
 import { verCalc, isVerSupported, verCmp } from "./utils/verCalc";
-
+import changelogData from '../public/changelog.json';
 import { MetaContext, VersionContext } from "./contexts";
 
 const meta = changelogData.meta;
@@ -11,10 +11,10 @@ export const GlobalProvider = ({ children }) => {
         currentVer: meta["currentVersion"],
         lastModified: meta["lastModified"],
         lastUpdated: meta["lastUpdated"],
-        minVer: meta["minVer"]||"0.20",
+        minVer: meta["minVer"] || "0.20",
         rawLogs: logs,
         ver: verCalc(meta["currentVersion"]),
-        isSupported: isVerSupported(meta["currentVersion"], meta["minVer"]||"0.20"),
+        isSupported: isVerSupported(meta["currentVersion"], meta["minVer"] || "0.20"),
     });
 
     const [hasUpdate, setHasUpdate] = useState(null);
@@ -40,13 +40,13 @@ export const GlobalProvider = ({ children }) => {
     });
 
     useEffect(() => {
-        const checkUpdate = async() => {
+        const checkUpdate = async () => {
             try {
                 const res = await fetch(`/changelog.json?t=${Date.now()}`);
                 if (!res.ok) return;
                 const data = await res.json();
                 onUpdateReceived(data);
-            } catch(e){ console.warn("[RailLOOP] Update Check failed", e); }
+            } catch (e) { console.warn("[RailLOOP] Update Check failed", e); }
         }
         const timer = setInterval(checkUpdate, 600000); // 10 minutes
         checkUpdate();

@@ -7,6 +7,7 @@ import { GlobalSearchModal } from './GlobalSearchModal';
 import { isCompanyCompatible, getTransferableLines, findRoute, computeLoopVia, getLandmarks } from '../../core/railwayRouting'; // Will need to ensure these are typed
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
+import { useTranslation } from 'react-i18next';
 
 export const TripEditor: React.FC = () => {
     const {
@@ -85,7 +86,7 @@ export const TripEditor: React.FC = () => {
 
         let nextTrips = [...trips];
         const editingTripId = useStore.getState().editingTripId;
-        if (editingTripId) { nextTrips = nextTrips.filter(t => t.id !== editingTripId); }
+        if (editingTripId) { nextTrips = nextTrips.filter(trip => trip.id !== editingTripId); }
         const finalTrips = [...newTripsToAdd, ...nextTrips].sort((a, b) => b.date.localeCompare(a.date));
 
         setTrips(finalTrips);

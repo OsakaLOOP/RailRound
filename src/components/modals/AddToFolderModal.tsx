@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import React, { useEffect } from 'react';
 import { X, Star, CheckCircle2 } from 'lucide-react';
 import { useStore } from '../../store';
@@ -64,7 +66,7 @@ export const AddToFolderModal: React.FC = () => {
 
         setFolders(foldersWithStats);
         if (user) {
-            saveData(user.token, trips, pins, foldersWithStats, badgeSettings).catch((e: any) => alert("保存失败: " + e.message));
+            saveData(user.token, trips, pins, foldersWithStats, badgeSettings).catch((e: any) => toast.error(t("folder.saveFail", "保存失败: ") + e.message));
         }
     };
 

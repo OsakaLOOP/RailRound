@@ -62,14 +62,16 @@
     "via": "経由 ",
     "recordNewTrip": "新しい旅を記録",
     "importSuica": "Suica CSVのインポート",
-    "deleteConfirm": "削除しますか?",
+    "deleteConfirm": "确认删除?",
     "parseSuccess": "{count}件の新しい旅の解析に成功しました。インポートしますか？{{skipMsg}}\n(F12で詳細なマッチングログを確認できます)",
     "skipMsg": "\n({{count}}件の重複記録をスキップしました)",
     "importSuccess": "{count}件の旅をインポートしました！{{skipMsg}}",
     "skipMsgShort": " ({{count}}件の重複をスキップ)",
     "allExist": "解析完了。すべての記録（{{count}}件）は既に存在するため、インポートは不要です。",
     "noImport": "インポート可能な旅が見つからないか、解析に失敗しました。",
-    "readError": "ファイルの読み込みまたは解析でエラーが発生しました。"
+    "readError": "ファイルの読み込みまたは解析でエラーが発生しました。",
+    "parsingSuica": "解析 Suica CSV 数据...",
+    "syncFail": "云端同步失败"
   },
   "search": {
     "close": "閉じる",
@@ -134,9 +136,10 @@
     "createBtn": "アカウント作成"
   },
   "folder": {
-    "saveFail": "保存に失敗しました: ",
+    "saveFail": "保存失败: ",
     "title": "フォルダ",
-    "placeholder": "名前..."
+    "placeholder": "名前...",
+    "deleteConfirm": "Delete this folder?"
   },
   "tripEdit": {
     "editTitle": "旅程の編集",
@@ -167,7 +170,8 @@
     "fillInfo": "情報を入力してください",
     "autoMaxLimit": "自動検索が6回の乗換制限を超えるか、解がありません。\n制限なしのディープサーチを続けますか？ (時間がかかる場合があります)",
     "autoFail": "検索失敗: ",
-    "pathTooLong": "ルートが長すぎます"
+    "pathTooLong": "ルートが長すぎます",
+    "saveFail": "云端保存失败: "
   },
   "app": {
     "fetchRemote": "リモートデータを取得中... (10%)",
@@ -199,6 +203,24 @@
     "parseFail": "解析に失敗しました",
     "fileSkip": "ファイル {{name}} の解析に失敗しました。スキップします",
     "importCount": "{{count}}個のファイルをインポートしました！",
-    "fileProcErr": "ファイル処理中に不明なエラーが発生しました"
+    "fileProcErr": "ファイル処理中に不明なエラーが発生しました",
+    "mergeDataConfirm": "检测到本地有数据或个人配置，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)"
+  },
+  "confirm": {
+    "yes": "はい",
+    "no": "いいえ",
+    "ok": "OK"
+  },
+  "map": {
+    "loadFail": "地图加载失败 ({{domain}})\n请检查网络或切换 VPN 节点",
+    "rubberBand": "哎呀！橡皮筋拉断了，弹到手了！💥"
+  },
+  "chest": {
+    "searchingRoute": "正在搜索路线...",
+    "routeFound": "找到了路线",
+    "routeNotFound": "未找到路线"
+  },
+  "pin": {
+    "deleteConfirm": "删除?"
   }
 }

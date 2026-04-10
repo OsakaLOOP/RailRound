@@ -62,14 +62,16 @@
     "via": "Via ",
     "recordNewTrip": "Record New Trip",
     "importSuica": "Import Suica CSV",
-    "deleteConfirm": "Confirm delete?",
+    "deleteConfirm": "确认删除?",
     "parseSuccess": "Successfully parsed {count} new trips. Import?{{skipMsg}}\n(Press F12 to see matching logs)",
     "skipMsg": "\n(Skipped {{count}} duplicate records)",
     "importSuccess": "Imported {count} trips!{{skipMsg}}",
     "skipMsgShort": " (Skipped {{count}} duplicates)",
     "allExist": "Parsing complete, but all records ({{count}}) already exist. No need to import.",
     "noImport": "No importable trips found, or parsing failed.",
-    "readError": "Error reading or parsing file."
+    "readError": "Error reading or parsing file.",
+    "parsingSuica": "解析 Suica CSV 数据...",
+    "syncFail": "云端同步失败"
   },
   "search": {
     "close": "Close",
@@ -134,9 +136,10 @@
     "createBtn": "Create Account"
   },
   "folder": {
-    "saveFail": "Save failed: ",
+    "saveFail": "保存失败: ",
     "title": "Folders",
-    "placeholder": "Name..."
+    "placeholder": "Name...",
+    "deleteConfirm": "Delete this folder?"
   },
   "tripEdit": {
     "editTitle": "Edit Trip",
@@ -167,7 +170,8 @@
     "fillInfo": "Please complete the info",
     "autoMaxLimit": "Auto route exceeds 6 transfers or has no solution.\nContinue deep search? (This may take a while)",
     "autoFail": "Failed to route: ",
-    "pathTooLong": "Path too long"
+    "pathTooLong": "Path too long",
+    "saveFail": "云端保存失败: "
   },
   "app": {
     "fetchRemote": "Fetching remote data... (10%)",
@@ -199,6 +203,24 @@
     "parseFail": "Parsing failed",
     "fileSkip": "File {{name}} parsing failed, skipped",
     "importCount": "Successfully imported {{count}} files!",
-    "fileProcErr": "Unknown error occurred during file processing"
+    "fileProcErr": "Unknown error occurred during file processing",
+    "mergeDataConfirm": "检测到本地有数据或个人配置，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)"
+  },
+  "confirm": {
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK"
+  },
+  "map": {
+    "loadFail": "地图加载失败 ({{domain}})\n请检查网络或切换 VPN 节点",
+    "rubberBand": "哎呀！橡皮筋拉断了，弹到手了！💥"
+  },
+  "chest": {
+    "searchingRoute": "正在搜索路线...",
+    "routeFound": "找到了路线",
+    "routeNotFound": "未找到路线"
+  },
+  "pin": {
+    "deleteConfirm": "删除?"
   }
 }

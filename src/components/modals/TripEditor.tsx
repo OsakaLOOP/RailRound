@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { Edit2, Plus, X, ListFilter, AlertTriangle, ArrowRightLeft, ArrowDown, Search, Loader2 } from 'lucide-react';
 import { useStore, EditorMode } from '../../store';
@@ -90,7 +91,7 @@ export const TripEditor: React.FC = () => {
 
         setTrips(finalTrips);
         if (user) {
-            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => alert('云端保存失败: ' + e.message));
+            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => toast.error(t('tripEdit.saveFail', '云端保存失败: ') + e.message));
         }
         closeEditor();
     };
@@ -160,7 +161,7 @@ export const TripEditor: React.FC = () => {
                     }, 100);
                 } else {
                     setTimeout(() => {
-                        alert(`${t("tripEdit.autoFail", "无法规划: ")}${result.error}`);
+                        toast.error(`${t("tripEdit.autoFail", "无法规划: ")}${result.error}`);
                     }, 100);
                 }
             }

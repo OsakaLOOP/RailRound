@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { X, Github, Eye, EyeOff, Lock, Loader2 } from 'lucide-react';
 import { useStore } from '../../store';
@@ -63,7 +65,7 @@ export const GithubCardModal: React.FC = () => {
     const onUpdateSettings = (s: any) => {
         setBadgeSettings(s);
         if (user) {
-            saveData(user.token, trips, pins, folders, s).catch((e: any) => alert("Failed to save settings: " + e.message));
+            saveData(user.token, trips, pins, folders, s).catch((e: any) => toast.error(t("statsPage.saveFail", "Failed to save settings: ") + e.message));
         }
     };
 

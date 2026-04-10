@@ -63,14 +63,16 @@
     "via": "經由 ",
     "recordNewTrip": "記錄新行程",
     "importSuica": "匯入 Suica CSV",
-    "deleteConfirm": "確認刪除?",
+    "deleteConfirm": "确认删除?",
     "parseSuccess": "成功解析 {{count}} 條新行程。是否匯入？{{skipMsg}}\n(按 F12 打開主控台查看詳細比對記錄)",
     "skipMsg": "\n(已跳過 {{count}} 條重複記錄)",
     "importSuccess": "匯入了 {{count}} 條行程！{{skipMsg}}",
     "skipMsgShort": " (跳過 {{count}} 重複)",
     "allExist": "解析完成，但所有記錄（{{count}}條）已存在，無需重複匯入。",
     "noImport": "未找到可匯入的行程，或者解析失敗。",
-    "readError": "讀取或解析檔案出錯。"
+    "readError": "讀取或解析檔案出錯。",
+    "parsingSuica": "解析 Suica CSV 数据...",
+    "syncFail": "云端同步失败"
   },
   "search": {
     "close": "關閉",
@@ -135,9 +137,10 @@
     "createBtn": "建立帳號"
   },
   "folder": {
-    "saveFail": "保存失敗: ",
+    "saveFail": "保存失败: ",
     "title": "收藏夾",
-    "placeholder": "名稱..."
+    "placeholder": "名稱...",
+    "deleteConfirm": "Delete this folder?"
   },
   "tripEdit": {
     "editTitle": "編輯行程",
@@ -168,7 +171,8 @@
     "fillInfo": "請完善信息",
     "autoMaxLimit": "自動規劃超出6次換乘限制或無解。\n是否繼續無限制深度搜索？(這可能需要較長等待時間)",
     "autoFail": "無法規劃: ",
-    "pathTooLong": "路徑過長"
+    "pathTooLong": "路徑過長",
+    "saveFail": "云端保存失败: "
   },
   "app": {
     "fetchRemote": "正在取得遠端資料... (10%)",
@@ -200,6 +204,24 @@
     "parseFail": "解析失敗",
     "fileSkip": "檔案 {{name}} 解析失敗，已跳過",
     "importCount": "成功匯入 {{count}} 個檔案！",
-    "fileProcErr": "檔案處理過程中發生未知錯誤"
+    "fileProcErr": "檔案處理過程中發生未知錯誤",
+    "mergeDataConfirm": "检测到本地有数据或个人配置，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)"
+  },
+  "confirm": {
+    "yes": "確定",
+    "no": "取消",
+    "ok": "好的"
+  },
+  "map": {
+    "loadFail": "地图加载失败 ({{domain}})\n请检查网络或切换 VPN 节点",
+    "rubberBand": "哎呀！橡皮筋拉断了，弹到手了！💥"
+  },
+  "chest": {
+    "searchingRoute": "正在搜索路线...",
+    "routeFound": "找到了路线",
+    "routeNotFound": "未找到路线"
+  },
+  "pin": {
+    "deleteConfirm": "删除?"
   }
 }

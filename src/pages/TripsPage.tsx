@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { showConfirm } from '../utils/confirm';
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Train, Edit2, Trash2, Star, Plus, MapPin, Upload } from 'lucide-react';
 import { useStore } from '../store';
@@ -19,6 +21,7 @@ const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
 
     useEffect(() => {
         const measure = () => {
+    const { t } = useTranslation();
            if (containerRef.current) {
              const parent = containerRef.current.closest('.bg-white') as HTMLElement;
              if (parent) setContainerWidth(parent.offsetWidth);
@@ -93,7 +96,7 @@ export const TripsPage: React.FC = () => {
         if (!file) return;
 
         const reader = new FileReader();
-        const toastId = toast.loading('解析 Suica CSV 数据...');
+        const toastId = toast.loading(t('tripsPage.parsingSuica', '解析 Suica CSV 数据...'));
 
         reader.onload = async (e) => {
             const text = e.target?.result as string;
@@ -106,13 +109,13 @@ export const TripsPage: React.FC = () => {
                     if (newTrips.length > 0) {
                         toast.dismiss(toastId);
                         const skipMsg = skippedCount > 0 ? t('tripsPage.skipMsg', '\n(已跳过 {{count}} 条重复记录)', { count: skippedCount }) : '';
-                        if (window.confirm(t('tripsPage.parseSuccess', '成功解析 {{count}} 条新行程。是否导入？{{skipMsg}}\n(按 F12 打开控制台查看详细匹配日志)', { count: newTrips.length, skipMsg: skipMsg }))) {
+                        if (await showConfirm(t('tripsPage.parseSuccess', '成功解析 {{count}} 条新行程。是否导入？{{skipMsg}}\n(按 F12 打开控制台查看详细匹配日志)', { count: newTrips.length, skipMsg: skipMsg }))) {
                             newTrips.forEach(trip => addTrip(trip));
                             const skipMsgShort = skippedCount > 0 ? t('tripsPage.skipMsgShort', ' (跳过 {{count}} 重复)', { count: skippedCount }) : '';
                             toast.success(t('tripsPage.importSuccess', '导入了 {{count}} 条行程！{{skipMsg}}', { count: newTrips.length, skipMsg: skipMsgShort }));
                             if (user) {
                                 const updatedTrips = [...newTrips, ...trips].sort((a,b) => b.date.localeCompare(a.date));
-                                saveData(user.token, updatedTrips, pins, folders, badgeSettings).catch((err: any) => toast.error('云端同步失败'));
+                                saveData(user.token, updatedTrips, pins, folders, badgeSettings).catch((err: any) => toast.error(t('tripsPage.syncFail', '云端同步失败')));
                             }
                         }
                     } else {
@@ -136,12 +139,12 @@ export const TripsPage: React.FC = () => {
         event.target.value = '';
     };
 
-    const handleDeleteTrip = (id: string | number) => {
-        if (confirm(t('tripsPage.deleteConfirm', '确认删除?'))) {
+    const handleDeleteTrip = async (id: string | number) => {
+        if (await showConfirm(t('tripsPage.deleteConfirm', '确认删除?'))) {
             removeTrip(id);
             if (user) {
                 const newTrips = trips.filter(t => t.id !== id);
-                saveData(user.token, newTrips, pins, folders, badgeSettings).catch((e: any) => alert('云端同步失败'));
+                saveData(user.token, newTrips, pins, folders, badgeSettings).catch((e: any) => toast.error(t('tripsPage.syncFail', '云端同步失败')));
             }
         }
     };
@@ -299,6 +302,7 @@ export const FloatingActionButtons: React.FC<{
 
     useEffect(() => {
         const handleTutorialStep = (e: Event) => {
+    const { t } = useTranslation();
             const customEvent = e as CustomEvent;
             if (customEvent.detail.id === 'add-trip') {
                 setIsTutorialActive(true);
@@ -321,6 +325,7 @@ export const FloatingActionButtons: React.FC<{
         }
 
         const handleScroll = (e: Event) => {
+    const { t } = useTranslation();
             const target = e.target as HTMLElement;
             if (!target) return;
 
@@ -377,6 +382,7 @@ export const FloatingActionButtons: React.FC<{
         };
 
         const handleWheelOrTouch = () => {
+    const { t } = useTranslation();
             const container = document.getElementById('trips-scroll-container');
             if (!container) return;
             const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
@@ -395,6 +401,7 @@ export const FloatingActionButtons: React.FC<{
 
         // Also check if container is actually scrollable. If not scrollable, keep visible.
         const checkScrollable = () => {
+    const { t } = useTranslation();
             if (container) {
                 if (container.scrollHeight <= container.clientHeight) {
                     setIsVisible(true);
@@ -444,11 +451,13 @@ export const FloatingActionButtons: React.FC<{
     }, [alwaysVisible, isTutorialActive, isHovering]);
 
     const scrollToTop = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const { t } = useTranslation();
         document.getElementById('trips-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' });
         e.currentTarget.blur();
     };
 
     const scrollToBottom = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const { t } = useTranslation();
         const container = document.getElementById('trips-scroll-container');
         if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
         e.currentTarget.blur();

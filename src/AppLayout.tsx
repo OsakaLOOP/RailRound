@@ -1,3 +1,4 @@
+import { showConfirm } from './utils/confirm';
 import React, { useState, useRef, useEffect } from 'react';
 import { DragProvider } from './components/DragContext';
 import Chest from './components/Chest';
@@ -981,13 +982,13 @@ export const AppLayout: React.FC = () => {
         const file = event.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (e: any) => {
+        reader.onload = async (e: any) => {
             try {
                 const backup = JSON.parse(e.target.result);
                 if (!backup.meta || (backup.meta.appName !== "RailLOOP" && backup.meta.appName !== "")) { alert(t("app.invalidBackup", "无效的备份文件")); return; }
                 const missingLines: string[] = [];
                 if (backup.dependencies && backup.dependencies.lines) { backup.dependencies.lines.forEach((lineKey: string) => { if (!railwayData[lineKey]) missingLines.push(lineKey); }); }
-                if (missingLines.length > 0) { const msg = t("app.missLine", "检测到缺少以下线路的基础数据，可能会导致显示异常：\n\n{{lines}}\n\n建议先去地图页面上传对应的 GeoJSON 文件。是否继续导入？", { lines: missingLines.slice(0, 5).join(", ") + (missingLines.length > 5 ? '...' : '') }); if (!confirm(msg)) return; }
+                if (missingLines.length > 0) { const msg = t("app.missLine", "检测到缺少以下线路的基础数据，可能会导致显示异常：\n\n{{lines}}\n\n建议先去地图页面上传对应的 GeoJSON 文件。是否继续导入？", { lines: missingLines.slice(0, 5).join(", ") + (missingLines.length > 5 ? '...' : '') }); if (!await showConfirm(msg)) return; }
                 const currentTripIds = new Set(trips.map(t => t.id));
                 const incomingTrips = backup.data.trips || [];
                 const uniqueIncomingTrips: any[] = [];
@@ -1019,7 +1020,7 @@ export const AppLayout: React.FC = () => {
         const file = event.target.files[0];
         if(!file) return;
         const reader = new FileReader();
-        reader.onload = (e: any) => { try { const json = JSON.parse(e.target.result); applyCompanyData(json, { silent: false }); } catch(err) { alert(t("app.parseFail", "解析失败")); } };
+        reader.onload = async (e: any) => { try { const json = JSON.parse(e.target.result); applyCompanyData(json, { silent: false }); } catch(err) { alert(t("app.parseFail", "解析失败")); } };
         reader.readAsText(file);
         event.target.value = '';
     };
@@ -1030,7 +1031,7 @@ export const AppLayout: React.FC = () => {
         const readTasks = Array.from(files).map((file: any) => {
           return new Promise((resolve) => {
             const reader = new FileReader();
-            reader.onload = (e: any) => {
+            reader.onload = async (e: any) => {
               try {
                 const json = JSON.parse(e.target.result);
                 const companyName = file.name.replace(/\.(geojson|json)$/i, "");

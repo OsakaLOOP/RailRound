@@ -1,3 +1,5 @@
+import { showConfirm } from '../utils/confirm';
+import i18n from '../i18n';
 import { useStore } from '../store';
 import { api } from '../services/api';
 import { calculateLatestStats } from '../core/tripCalculator';
@@ -32,7 +34,7 @@ export const useUserData = () => {
             let newBadgeSettings = cloudData.badge_settings || { enabled: true };
 
             if (isInteractive && (state.trips.length > 0 || state.pins.length > 0 || state.folders.length > 0 || state.badgeSettings?.defaultMapCenter)) {
-                if (window.confirm("检测到本地有数据或个人配置，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)")) {
+                if (await showConfirm(i18n.t("app.mergeDataConfirm", "检测到本地有数据或个人配置，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)"))) {
                     const tripMap = new Map();
                     newTrips.forEach((t: any) => tripMap.set(t.id, t));
                     state.trips.forEach((t: any) => tripMap.set(t.id, t));

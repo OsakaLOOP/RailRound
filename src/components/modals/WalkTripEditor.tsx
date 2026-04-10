@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { showConfirm } from '../../utils/confirm';
 import React, { useEffect } from 'react';
 import { Edit2, X, AlertTriangle, Save, Trash2 } from 'lucide-react';
 import { useStore } from '../../store';
@@ -29,6 +31,7 @@ export const WalkTripEditor: React.FC = () => {
     useEffect(() => {
         if (!isOpen) return;
         const handleKeyDown = (e: KeyboardEvent) => {
+    const { t } = useTranslation();
             if (e.key === 'Escape') closeEditor();
             else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 onSave();
@@ -115,7 +118,7 @@ export const WalkTripEditor: React.FC = () => {
     };
 
     const onDelete = async () => {
-        if (!window.confirm(t('walk.delConfirm', "确定要删除这条步行记录吗？"))) return;
+        if (!(await showConfirm(t('walk.delConfirm', "确定要删除这条步行记录吗？")))) return;
         const nextTrips = trips.filter(t => t.id !== form.id);
         setTrips(nextTrips);
         if (user) {

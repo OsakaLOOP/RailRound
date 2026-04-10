@@ -69,7 +69,9 @@
     "skipMsgShort": " (跳过 {{count}} 重复)",
     "allExist": "解析完成，但所有记录（{{count}}条）已存在，无需重复导入。",
     "noImport": "未找到可导入的行程，或者解析失败。",
-    "readError": "读取或解析文件出错。"
+    "readError": "读取或解析文件出错。",
+    "parsingSuica": "解析 Suica CSV 数据...",
+    "syncFail": "云端同步失败"
   },
   "search": {
     "close": "关闭",
@@ -136,7 +138,8 @@
   "folder": {
     "saveFail": "保存失败: ",
     "title": "收藏夹",
-    "placeholder": "名称..."
+    "placeholder": "名称...",
+    "deleteConfirm": "Delete this folder?"
   },
   "tripEdit": {
     "editTitle": "编辑行程",
@@ -167,7 +170,8 @@
     "fillInfo": "请完善信息",
     "autoMaxLimit": "自动规划超出6次换乘限制或无解。\n是否继续无限制深度搜索？(这可能需要较长等待时间)",
     "autoFail": "无法规划: ",
-    "pathTooLong": "路径过长"
+    "pathTooLong": "路径过长",
+    "saveFail": "云端保存失败: "
   },
   "app": {
     "fetchRemote": "正在获取远端数据... (10%)",
@@ -199,6 +203,24 @@
     "parseFail": "解析失败",
     "fileSkip": "文件 {{name}} 解析失败，已跳过",
     "importCount": "成功导入 {{count}} 个文件！",
-    "fileProcErr": "文件处理过程中发生未知错误"
+    "fileProcErr": "文件处理过程中发生未知错误",
+    "mergeDataConfirm": "检测到本地有数据或个人配置，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)"
+  },
+  "confirm": {
+    "yes": "确定",
+    "no": "取消",
+    "ok": "好的"
+  },
+  "map": {
+    "loadFail": "地图加载失败 ({{domain}})\n请检查网络或切换 VPN 节点",
+    "rubberBand": "哎呀！橡皮筋拉断了，弹到手了！💥"
+  },
+  "chest": {
+    "searchingRoute": "正在搜索路线...",
+    "routeFound": "找到了路线",
+    "routeNotFound": "未找到路线"
+  },
+  "pin": {
+    "deleteConfirm": "删除?"
   }
 }

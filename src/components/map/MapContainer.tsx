@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useRef } from "react";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -311,7 +312,7 @@ export const MapContainer: React.FC<Props> = ({
           now - lastTileErrorTime[domain] > 60000
         ) {
           lastTileErrorTime[domain] = now;
-          toast.error(`地图加载失败 (${domain})\n请检查网络或切换 VPN 节点`, {
+          toast.error(t("map.loadFail", "地图加载失败 ({{domain}})\n请检查网络或切换 VPN 节点", { domain }), {
             id: `tile-error-${domain}`,
             duration: 5000,
           });
@@ -548,7 +549,7 @@ export const MapContainer: React.FC<Props> = ({
             mapRef.current.classList.add("map-shake");
           }
 
-          toast.error("哎呀！橡皮筋拉断了，弹到手了！💥", {
+          toast.error(t("map.rubberBand", "哎呀！橡皮筋拉断了，弹到手了！💥"), {
             duration: 2500,
             position: "top-center",
           });

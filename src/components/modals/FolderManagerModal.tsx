@@ -1,3 +1,4 @@
+import { showConfirm } from '../../utils/confirm';
 import React, { useState, useEffect } from 'react';
 import { X, Folder, Globe, Trash2 } from 'lucide-react';
 import { useStore } from '../../store';
@@ -53,8 +54,8 @@ export const FolderManagerModal: React.FC = () => {
         setNewFolderName("");
     };
 
-    const handleDelete = (id: string) => {
-        if (confirm("Delete this folder?")) {
+    const handleDelete = async (id: string) => {
+        if (await showConfirm(t("folder.deleteConfirm", "Delete this folder?"))) {
             saveUserFolders(folders.filter(f => f.id !== id));
         }
     };

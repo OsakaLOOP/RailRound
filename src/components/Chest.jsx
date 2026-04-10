@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useRef } from 'react';
 import { useDrag, DropZone } from './DragContext';
 import chestGif from './../assets/chest_animated.gif';
@@ -22,6 +23,7 @@ const McSlotSvg = () => (
 );
 
 const Chest = ({ onDropItem } = {}) => {
+    const { t } = useTranslation();
     const { isDragging: isGlobalDragging } = useDrag();
     const [isOpen, setIsOpen] = useState(false);
     const [items, setItems] = useState([]);
@@ -234,7 +236,7 @@ const Chest = ({ onDropItem } = {}) => {
 
             // Trigger auto route search directly
             if (railwayData) {
-                const toastId = toast.loading('ルートを検索中...');
+                const toastId = toast.loading(t('chest.searchingRoute', '正在搜索路线...'));
                 setTimeout(() => {
                     const result = findRoute(
                         ticketStart.lineKey,
@@ -247,10 +249,10 @@ const Chest = ({ onDropItem } = {}) => {
                     );
 
                     if (result && result.path.length > 0) {
-                        toast.success('ルートが見つかりました', { id: toastId });
+                        toast.success(t('chest.routeFound', '找到了路线'), { id: toastId });
                         addTrip(result);
                     } else {
-                        toast.error('ルートが見つかりませんでした', { id: toastId });
+                        toast.error(t('chest.routeNotFound', '未找到路线'), { id: toastId });
                     }
                 }, 100);
             }

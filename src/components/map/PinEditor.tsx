@@ -1,3 +1,5 @@
+import { showConfirm } from '../../utils/confirm';
+import { useTranslation } from 'react-i18next';
 import React, { useEffect } from 'react';
 import { Move, Magnet, Camera, MessageSquare, Trash2, X } from 'lucide-react';
 import { useStore, PinMode } from '../../store';
@@ -37,8 +39,8 @@ export const PinEditor: React.FC = () => {
         setPinMode(PinMode.Idle);
     };
 
-    const deletePin = (id: string | number) => {
-        if(confirm('删除?')) {
+    const deletePin = async (id: string | number) => {
+        if(await showConfirm(t('pin.deleteConfirm', '删除?'))) {
             const newPins = pins.filter(p => p.id !== id);
             setPins(newPins);
             if (editingPin?.id === id) {

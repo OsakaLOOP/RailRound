@@ -607,9 +607,17 @@ export const AppLayout: React.FC = () => {
             const currentRailwayData = useStore.getState().railwayData;
 
             // Only trigger if we have data and missing distances
-            const needsCalc = Object.values(currentRailwayData).some(line =>
-               line.stations.length > 1 && line.stations[0].distToNext === undefined
-            );
+            // ⚡ Bolt: Replaced Object.values.some() with early-breaking for-in loop to prevent large array allocation.
+            let needsCalc = false;
+            for (const lineKey in currentRailwayData) {
+                if (Object.prototype.hasOwnProperty.call(currentRailwayData, lineKey)) {
+                    const line = currentRailwayData[lineKey];
+                    if (line.stations && line.stations.length > 1 && line.stations[0].distToNext === undefined) {
+                        needsCalc = true;
+                        break;
+                    }
+                }
+            }
 
             if (needsCalc) {
                 const showFakeProgress = useStore.getState().showFakeProgress;

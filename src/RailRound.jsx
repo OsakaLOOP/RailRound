@@ -1265,12 +1265,22 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
                 if (isWalk) {
                     let startName = t.fromId || '';
                     let endName = t.toId || '';
-                    Object.values(railwayData).forEach(line => {
-                        const s = line.stations.find(st => st.id === t.fromId);
-                        if (s) startName = s.name_ja;
-                        const e = line.stations.find(st => st.id === t.toId);
-                        if (e) endName = e.name_ja;
-                    });
+                    let foundStart = false;
+                    let foundEnd = false;
+                    // ⚡ Bolt: Replaced Object.values(railwayData).forEach with early-breaking for-in loop to prevent large array allocation and unnecessary traversal.
+                    for (const lineKey in railwayData) {
+                        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+                        const line = railwayData[lineKey];
+                        if (!foundStart) {
+                            const s = line.stations.find(st => st.id === t.fromId);
+                            if (s) { startName = s.name_ja; foundStart = true; }
+                        }
+                        if (!foundEnd) {
+                            const e = line.stations.find(st => st.id === t.toId);
+                            if (e) { endName = e.name_ja; foundEnd = true; }
+                        }
+                        if (foundStart && foundEnd) break;
+                    }
 
                     const isTree = t.walkType === 'tree';
                     const cls = {
@@ -1460,9 +1470,16 @@ const StatsView = ({ trips, railwayData, geoData, user, userProfile, segmentGeom
                     let count = 0;
                     if (railwayData) {
                         const uniqueStations = new Set();
-                        Object.values(railwayData).forEach(line => {
-                            if (line.stations) line.stations.forEach(s => uniqueStations.add(s.id));
-                        });
+                        // ⚡ Bolt: Replaced Object.values.forEach and inner map iteration with faster for-in and classic for loop to prevent O(N) array allocation overhead.
+                        for (const lineKey in railwayData) {
+                            if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+                            const line = railwayData[lineKey];
+                            if (line.stations) {
+                                for (let i = 0; i < line.stations.length; i++) {
+                                    uniqueStations.add(line.stations[i].id);
+                                }
+                            }
+                        }
                         count = uniqueStations.size;
                     }
                     return count;

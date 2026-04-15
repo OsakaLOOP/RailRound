@@ -162,6 +162,7 @@
     "fixedInterestDesc": "Choose a favorite city<br/>as your default base",
     "followLatest": "Follow Latest",
     "followLatestDesc": "Always continue your unfinished journey<br/>from the end of your last trip",
+    "followLatestSummary": "All set! The app will automatically center on your last trip destination every time it starts.",
     "backToMode": "Back to Mode Selection",
     "chooseCountry": "Choose Country or Region",
     "china": "China",

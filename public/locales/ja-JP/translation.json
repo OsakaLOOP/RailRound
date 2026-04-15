@@ -162,6 +162,7 @@
     "fixedInterestDesc": "お気に入りの都市を選択し、<br/>デフォルトの拠点にします",
     "followLatest": "最新を追跡",
     "followLatestDesc": "常に前回の旅の終点から<br/>未完了の旅を続けます",
+    "followLatestSummary": "設定完了！アプリを起動するたびに、前回の旅行の目的地が自動的に表示されます。",
     "backToMode": "モード選択に戻る",
     "chooseCountry": "国または地域を選択",
     "china": "中国",

@@ -167,7 +167,7 @@ const VersionBadge = ({ version: currentVersion }) => {
                                                 </div>
 
                                                 <div className="flex-1 pt-0.5">
-                                                    <div className="text-xs text-gray-700 leading-relaxed font-medium group-hover:text-black transition-colors">
+                                                    <div className="text-xs text-gray-700 leading-relaxed font-medium group-hover:text-black transition-colors whitespace-pre-line">
                                                         {log.content}
                                                     </div>
                                                     <div className="text-[10px] text-gray-300 mt-1">{log.date}</div>

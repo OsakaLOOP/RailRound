@@ -162,6 +162,7 @@
     "fixedInterestDesc": "选择一个心仪的 city<br/>作为每次探索的默认大本营",
     "followLatest": "跟随最新",
     "followLatestDesc": "总是从上一次旅行的终点<br/>继续你的未竟之旅",
+    "followLatestSummary": "已准备就绪！每次启动应用将自动定位到您上一次记录的终点。",
     "backToMode": "返回选择模式",
     "chooseCountry": "选择国家或地区",
     "china": "中国",

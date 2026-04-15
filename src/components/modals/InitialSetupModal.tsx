@@ -484,6 +484,26 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
         { id: 'zh-TW', label: '繁體中文' }
     ];
 
+    // Helper to check if selection is complete
+    const isComplete = (mode === 'latest') || (mode === 'fixed' && selectedCity);
+
+    const handleLanguageSelect = (langId: string) => {
+        setSelectedLanguage(langId);
+        setStep(2);
+    };
+
+    const handleBack = () => {
+        if (step === 2) {
+            if (mode) {
+                setMode(null);
+                setSelectedCountry(null);
+                setSelectedCity(null);
+            } else {
+                setStep(1);
+            }
+        }
+    };
+
     const handleSave = (overrideMode?: 'fixed' | 'latest') => {
         const finalMode = overrideMode || mode || 'fixed';
         const newSettings = {
@@ -522,18 +542,13 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
                             {languages.map(lang => (
                                 <button
                                     key={lang.id}
-                                    onClick={() => setSelectedLanguage(lang.id)}
+                                    onClick={() => handleLanguageSelect(lang.id)}
                                     className={`p-4 rounded-xl border-2 flex items-center justify-center font-bold transition-all ${selectedLanguage === lang.id ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md' : 'border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50/50'}`}
                                 >
                                     <Globe size={18} className="mr-2 opacity-70" /> {lang.label}
                                 </button>
                             ))}
                         </div>
-                    </div>
-                    <div className="p-6 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
-                        <button onClick={() => setStep(2)} className="px-6 py-2.5 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 transition-all flex items-center gap-2">
-                            Next <ChevronRight size={16} />
-                        </button>
                     </div>
                 </div>
 
@@ -562,10 +577,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
                                 </button>
 
                                 <button
-                                    onClick={() => {
-                                        setMode('latest');
-                                        handleSave('latest'); // Fast path
-                                    }}
+                                    onClick={() => setMode('latest')}
                                     className="group relative flex flex-col items-center p-6 bg-gray-50 rounded-2xl border-2 border-transparent hover:border-amber-500 hover:bg-amber-50 transition-all duration-300"
                                 >
                                     <div className="w-40 h-40 mb-4 group-hover:scale-105 transition-transform duration-500">
@@ -580,88 +592,94 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
                                 </button>
                             </div>
                         ) : (
-                            <div className="animate-fade-in">
-                                <div className="flex items-center gap-2 mb-6 text-sm text-gray-500 cursor-pointer w-fit hover:text-gray-800 transition-colors" onClick={() => { setMode(null); setSelectedCountry(null); }}>
-                                    <ChevronRight className="rotate-180" size={16} /> {t('setup.backToMode', '返回选择模式')}
-                                </div>
-
-                                {!selectedCountry ? (
-                                    <div className="space-y-4">
-                                        <h3 className="text-lg font-bold text-gray-800 mb-4">{t('setup.chooseCountry', '选择国家或地区')}</h3>
-                                        {(Object.keys(CITIES) as Array<keyof typeof CITIES>).map(country => (
-                                            <button
-                                                key={country}
-                                                onClick={() => setSelectedCountry(country)}
-                                                className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 rounded-xl transition-colors group"
-                                            >
-                                                <span className="font-bold text-gray-700 group-hover:text-emerald-700">{country === 'China' ? t('setup.china', '中国') : t('setup.japan', '日本')}</span>
-                                                <ChevronRight className="text-gray-400 group-hover:text-emerald-500" />
-                                            </button>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-2 mb-4 text-sm text-gray-500 cursor-pointer w-fit hover:text-gray-800 transition-colors" onClick={() => setSelectedCountry(null)}>
-                                            <ChevronRight className="rotate-180" size={16} /> {t('setup.backToCountry', '返回选择国家')}
-                                        </div>
-                                        <h3 className="text-lg font-bold text-gray-800 mb-4">{t('setup.chooseBase', '选择你的默认大本营')}</h3>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {CITIES[selectedCountry].map(city => {
-                                                const isAvailable = selectedCountry === 'Japan' || city.name === '北京' || city.name === '南京';
-                                                return (
+                            <div className="animate-fade-in px-2">
+                                {mode === 'fixed' ? (
+                                    <>
+                                        {!selectedCountry ? (
+                                            <div className="space-y-4">
+                                                <h3 className="text-lg font-bold text-gray-800 mb-4">{t('setup.chooseCountry', '选择国家或地区')}</h3>
+                                                {(Object.keys(CITIES) as Array<keyof typeof CITIES>).map(country => (
                                                     <button
-                                                        key={city.name}
-                                                        onClick={() => isAvailable && setSelectedCity(city)}
-                                                        className={`p-3 rounded-xl border flex items-center justify-between transition-all ${isAvailable
-                                                            ? selectedCity?.name === city.name
-                                                                ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
-                                                                : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-300 hover:bg-emerald-50/50'
-                                                            : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-60'
-                                                            }`}
-                                                        disabled={!isAvailable}
+                                                        key={country}
+                                                        onClick={() => setSelectedCountry(country)}
+                                                        className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 rounded-xl transition-colors group"
                                                     >
-                                                        <div className="flex items-center gap-2">
-                                                            <MapPin size={16} className={selectedCity?.name === city.name && isAvailable ? 'text-emerald-500' : 'text-gray-400'} />
-                                                            <span className="font-bold">
-                                                                {city.name}
-                                                                {!isAvailable && (
-                                                                    <span className="ml-1.5 text-[10px] font-normal px-1 px-1 py-0.5 rounded bg-gray-200 text-gray-400 align-middle">
-                                                                        {t('common.comingSoon', 'TODO')}
-                                                                    </span>
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                        {selectedCity?.name === city.name && isAvailable ? (
-                                                            <Check size={16} className="text-emerald-600" />
-                                                        ) : !isAvailable && (
-                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gray-200 text-gray-500 rounded">{t('common.comingSoon', 'TODO')}</span>
-                                                        )}
+                                                        <span className="font-bold text-gray-700 group-hover:text-emerald-700">{country === 'China' ? t('setup.china', '中国') : t('setup.japan', '日本')}</span>
+                                                        <ChevronRight className="text-gray-400 group-hover:text-emerald-500" />
                                                     </button>
-                                                );
-                                            })}
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <h3 className="text-lg font-bold text-gray-800 mb-4">{t('setup.chooseBase', '选择你的默认大本营')}</h3>
+                                                <div className="grid grid-cols-2 gap-3 pb-8">
+                                                    {CITIES[selectedCountry].map(city => {
+                                                        const isAvailable = selectedCountry === 'Japan' || city.name === '北京' || city.name === '南京';
+                                                        return (
+                                                            <button
+                                                                key={city.name}
+                                                                onClick={() => isAvailable && setSelectedCity(city)}
+                                                                className={`p-3 rounded-xl border flex items-center justify-between transition-all min-h-[56px] ${isAvailable
+                                                                    ? selectedCity?.name === city.name
+                                                                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
+                                                                        : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-300 hover:bg-emerald-50/50'
+                                                                    : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-60'
+                                                                    }`}
+                                                                disabled={!isAvailable}
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <MapPin size={16} className={selectedCity?.name === city.name && isAvailable ? 'text-emerald-500' : 'text-gray-400'} />
+                                                                    <span className="font-bold text-sm">
+                                                                        {city.name}
+                                                                    </span>
+                                                                </div>
+                                                                {selectedCity?.name === city.name && isAvailable ? (
+                                                                    <Check size={16} className="text-emerald-600" />
+                                                                ) : !isAvailable && (
+                                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gray-200 text-gray-500 rounded">{t('common.comingSoon', 'TODO')}</span>
+                                                                )}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-12 text-center animate-scale-up">
+                                        <div className="w-48 h-48 mb-6">
+                                            <FollowLatestSVG />
                                         </div>
+                                        <h3 className="text-2xl font-bold text-gray-800 mb-2">{t('setup.followLatest', '跟随最新')}</h3>
+                                        <p className="text-gray-500 max-w-sm">{t('setup.followLatestSummary', '已准备就绪！每次启动应用将自动定位到您上一次记录的终点。')}</p>
                                     </div>
                                 )}
                             </div>
                         )}
                     </div>
 
-                    <div className="p-6 bg-gray-50 flex justify-between items-center border-t border-gray-100">
-                        <button onClick={() => setStep(1)} className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors flex items-center gap-2">
-                            <ChevronRight size={16} className="rotate-180" /> Back
-                        </button>
+                    <div className="p-6 bg-gray-50 flex justify-between items-center border-t border-gray-100 shrink-0">
+                        <div>
+                            {step === 2 && (
+                                <button onClick={handleBack} className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors flex items-center gap-2">
+                                    <ChevronRight size={16} className="rotate-180" /> {t('common.back', '返回')}
+                                </button>
+                            )}
+                        </div>
                         <div className="flex gap-3">
-                            <button onClick={onComplete} className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors">
-                                跳过
-                            </button>
-                            {(mode === 'fixed' && selectedCity) && (
-                                <button onClick={() => handleSave()} className="px-6 py-2.5 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 transition-all">
-                                    {t('setup.confirm', '确定设置')}
+                            {!isComplete ? (
+                                <button onClick={() => handleSave()} className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors">
+                                    {t('setup.skip', '跳过')}
+                                </button>
+                            ) : (
+                                <button onClick={() => handleSave()} className="px-8 py-2.5 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 transition-all transform active:scale-95">
+                                    {t('common.confirm', '确认完成')}
                                 </button>
                             )}
                         </div>
                     </div>
                 </div>
+
 
             </div>
         </div>

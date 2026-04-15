@@ -1,5 +1,6 @@
 /* eslint-disable */
 /* legacy code for inspection/ comparision only */
+/* no more changes. go to applayout.tsx */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import buildKMLString from './buildKml';

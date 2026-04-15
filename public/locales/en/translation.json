@@ -31,11 +31,11 @@
     },
     "importExport": {
       "title": "Escape Pods",
-      "content": "We believe your data belongs to you—provided you know how to back it up. Export your trips to KML/JSON here."
+      "content": "We believe your data belongs to you—provided you know how to back it up. Export your trips to KML/JSON here.　Please bring your own heat shield for atmospheric re-entry."
     },
     "tabMap": {
       "title": "Map Mode",
-      "content": "Toggle to view the railway network. Grey segments are unridden, while ridden ones are highlighted. The base map features detailed alignment from OpenRailwayMap. In this version, we've replaced SVG rendering with rich station interactions: long-press and drag between stations to auto-plan."
+      "content": "Toggle to view the railway network. Grey segments are unridden, while ridden ones are highlighted. The base map features detailed alignment from OpenRailwayMap. In this version, we introduce you to richer station interactions: long-press and drag between stations to auto-plan."
     },
     "mapPins": {
       "title": "Map Pins",
@@ -70,7 +70,7 @@
     "login": "Login to RailLOOP",
     "register": "Register New Account",
     "welcomeBack": "Welcome back, railfan",
-    "startJourney": "Start your railway mastery journey",
+    "startJourney": "Begin your quest for railway domination!",
     "username": "Username",
     "password": "Password",
     "loginBtn": "Login",
@@ -90,13 +90,13 @@
     "badgeCode": "Badge Code",
     "totalTrips": "Total Trips",
     "uniqueLines": "Lines Mastered",
-    "starFolders": "Star Folders",
+    "starFolders": "Starred Folders",
     "starFoldersDesc": "Manage trip collections & badges",
     "personalSettings": "Personal Settings",
     "language": "UI Language",
     "mapCenter": "Default Map Center",
     "fixedInterest": "Fixed Interest",
-    "followLatest": "Follow Latest",
+    "followLatest": "Track Last Destination",
     "totalDist": "Total Distance",
     "totalCost": "Total Cost",
     "topLines": "Top Ridden Lines",
@@ -162,7 +162,7 @@
     "fixedInterestDesc": "Choose a favorite city<br/>as your default base",
     "followLatest": "Follow Latest",
     "followLatestDesc": "Always continue your unfinished journey<br/>from the end of your last trip",
-    "followLatestSummary": "All set! The app will automatically center on your last trip destination every time it starts.",
+    "followLatestSummary": "All set! We'll drop you at your last destination on every startup.",
     "backToMode": "Back to Mode Selection",
     "chooseCountry": "Choose Country or Region",
     "china": "China",
@@ -180,7 +180,7 @@
     "allRegions": "All Regions",
     "noRegion": "No Region",
     "noResult": "No matching lines",
-    "cnMainlandEnt": "Mainland CN Entrance"
+    "cnMainlandEnt": "Mainland China Portal"
   },
   "githubReg": {
     "title": "Complete Registration",
@@ -201,7 +201,7 @@
     "addToTitle": "Add to Bookmark"
   },
   "pin": {
-    "titleSnap": "Snap: {{line}}",
+    "titleSnap": "Snapped to: {{line}}",
     "titleFree": "Free position",
     "placeholderMemo": "Memo...",
     "placeholderUrl": "Image URL...",
@@ -221,9 +221,9 @@
     "editTitle": "Edit Trip",
     "newTitle": "New Trip",
     "manual": "Manual Input",
-    "auto": "Auto Route",
+    "auto": "Auto Routing",
     "money": "Cost (JPY)",
-    "noTransferWarning": "No transferable same-company/JR line",
+    "noTransferWarning": "No connecting same-company/JR line to transfer.",
     "selLine": "Select line...",
     "selTransfer": "Select transfer line...",
     "board": "Board...",
@@ -242,7 +242,7 @@
     "errNoPath": "No connecting path found.",
     "errTransferCalc": "Transfer calculation error",
     "maxSegment": "Max 10 segments",
-    "atLeastOne": "Include at least one valid segment",
+    "atLeastOne": "Add at least one valid leg.",
     "fillInfo": "Please complete the info",
     "autoMaxLimit": "Auto route exceeds 6 transfers or has no solution.\nContinue deep search? (This may take a while)",
     "autoFail": "Failed to route: ",
@@ -255,16 +255,16 @@
   },
   "app": {
     "fetchRemote": "Fetching remote data... (10%)",
-    "calcDist": "Pre-calculating map distances... (50%)",
-    "calcDistProg": "Pre-calculating map distances... ({{prog}}%)",
+    "calcDist": "Pre-calculating network distances... (50%)",
+    "calcDistProg": "Pre-calculating network distances... ({{prog}}%)",
     "calcHard": "Calculations are too hard, giving up... (30%)",
     "dlAll": "Downloading all railway lines in the universe... (114514%)",
-    "initFailOk": "Initialization failed, but app is ready, bear with it",
+    "initFailOk": "Initialization failed, but app is ready. Deal with it.",
     "githubBindSuccess": "GitHub bind successful!",
     "init0": "Initializing... (0%)",
     "loadCompany": "Loading company data... (5%)",
     "readCache": "Reading local cache... (10%)",
-    "fastCache": "Cache hit rapidly... (20%)",
+    "fastCache": "Ludicrous speed cache hit!!! (20%)",
     "parseLocal": "Parsing local data... (20%)",
     "loadThumb": "Loading trip thumbnails... (25%)",
     "checkUpdate": "Checking cloud updates... (30%)",
@@ -276,7 +276,7 @@
     "backupGen": "KML backup file generated, please check!",
     "exportErr": "Error occurred during export.",
     "invalidBackup": "Invalid backup file",
-    "missLine": "Missing base data for the following lines, which may cause display issues:\n\n{{lines}}\n\nIt is recommended to upload the corresponding GeoJSON files on the map page first. Continue importing?",
+    "missLine": "Missing base data for:\n{{lines}}\nExpect display glitches. Upload GeoJSON on the Map page to fix. Import anyway?",
     "missLineTitle": "Missing Data",
     "importSuccess": "Data import complete!\n\nTrips: Added {{newT}} (Skipped duplicate/invalid {{skipT}})\nPins: Added {{newP}} (Skipped duplicate/invalid {{skipP}})",
     "fileParseErr": "File parsing failed",
@@ -290,7 +290,7 @@
     "systemBackupGen": "System backup generated!",
     "saveFail": "Save failed: ",
     "syncFail": "Cloud sync failed",
-    "mergeConfirm": "Local data detected. Merge with cloud?\n\nOK: Merge (Keep Local)\nCancel: Overwrite (Cloud Only)",
+    "mergeConfirm": "Local data detected. Resolve conflict: \n [Merge (Keep Local)] \n [Overwrite (Cloud Only)]",
     "mergeConfirmTitle": "Data Conflict"
   },
   "header": {
@@ -344,7 +344,7 @@
     "中国地方": "Chugoku",
     "四国": "Shikoku",
     "九州・沖縄": "Kyushu・Okinawa",
-    "其他": "Others",
+    "其他": "Other",
     "未知": "Unknown",
     "中国大陆": "Mainland China"
   }

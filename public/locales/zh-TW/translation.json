@@ -35,7 +35,7 @@
     },
     "tabMap": {
       "title": "地圖模式",
-      "content": "切換並查看鐵路網絡. 灰色的是未乘區段, 而已乘線路將以對應的顏色高亮顯示. 底圖包含來自 OpenRailwayMap 的配線詳情. 新版本不再渲染已乘區間的svg圖形, 而豐富了站點交互. 你可以長按站點並拖動連接, 以自動規劃。"
+      "content": "切換並查看鐵路網絡. 灰色的是未乘區段, 而已乘線路將以對應的顏色高亮顯示. \n底圖包含來自 OpenRailwayMap 的配線詳情. 新版豐富了站點交互. 你可以長按站點並拖動連接, 以自動規劃。"
     },
     "mapPins": {
       "title": "安放地圖圖釘",
@@ -82,7 +82,7 @@
     "toRegister": "建立新帳號",
     "toLogin": "去登入",
     "guideTitle": "用戶指南 / 協議",
-    "disclaimer": "註冊/登入後使用即代表您同意上述協議內容，否則您的數據將僅在本地(前端)處理。"
+    "disclaimer": "登入即代表同意上述協議。否則您的資料將僅留存於本機。"
   },
   "statsPage": {
     "bindGithub": "綁定 GitHub",
@@ -120,7 +120,7 @@
     "skipMsg": "\n(已跳過 {{count}} 條重複記錄)",
     "importSuccess": "匯入了 {count} 條行程！{{skipMsg}}",
     "skipMsgShort": " (跳過 {{count}} 重複)",
-    "allExist": "解析完成，但所有記錄（{{count}}條）已存在，無需重複匯入。",
+    "allExist": "解析完成。{{count}} 條記錄均已存在，無需重複匯入。",
     "noImport": "未找到可匯入的行程，或者解析失敗。",
     "readError": "讀取或解析檔案出錯。",
     "parsingSuica": "解析 Suica CSV 資料..."
@@ -263,7 +263,7 @@
     "init0": "正在初始化... (0%)",
     "loadCompany": "載入公司資料... (5%)",
     "readCache": "讀取本機快取... (10%)",
-    "fastCache": "極速命中快取... (20%)",
+    "fastCache": "極速命中快取!!! (20%)",
     "parseLocal": "解析本機資料... (20%)",
     "loadThumb": "載入行程縮圖... (25%)",
     "checkUpdate": "檢查雲端更新... (30%)",
@@ -289,7 +289,7 @@
     "systemBackupGen": "已產生系統備份檔案，請注意查收！",
     "saveFail": "保存失敗: ",
     "syncFail": "雲端同步失敗",
-    "mergeConfirm": "檢測到本地有數據或個人配置，是否保留並與雲端數據合併？\n\n點擊【確定】合併 (Keep Local)\n點擊【取消】僅使用雲端數據 (Overwrite Local)",
+    "mergeConfirm": "偵測到本機資料。要與雲端合併嗎？\n\n[確定] 保留本機並合併\n[取消] 覆寫本機 (僅用雲端)",
     "mergeConfirmTitle": "數據衝突"
   },
   "header": {

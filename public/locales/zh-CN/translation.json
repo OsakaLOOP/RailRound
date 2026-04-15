@@ -4,14 +4,14 @@
     "skipBtn": "跳过教程",
     "nextBtn": "继续",
     "finishBtn": "结束",
-    "waitAction": "请按照指示操作",
+    "waitAction": "请按提示操作",
     "welcome": {
       "title": "欢迎来到 RailLOOP",
-      "content": "RailLOOP 是一个个人向旅铁手账, 旨在帮助你追踪和管理你的铁路旅程, 直观可感地展示旅行足迹."
+      "content": "RailLOOP 是一个个人向旅铁手账应用, 旨在帮助追踪和管理你的铁路旅程, 直观可感地展示旅行足迹."
     },
     "tabRecords": {
       "title": "行程记录",
-      "content": "这个标签页是你的旅程控制中心. 你可以在这里查看、添加和管理所有的铁路旅行记录, 或者添加到收藏"
+      "content": "这个标签页是你的旅程控制中心. 你可以在这里查看、添加和管理所有的铁路旅行记录, 或者将它们添加到收藏夹"
     },
     "addTrip": {
       "title": "初次记录",
@@ -23,19 +23,19 @@
     },
     "autoPlanningView": {
       "title": "自动规划",
-      "content": "在这里选择起点和终点，系统会自动为你规划一条基于新干线优先的路线。完成后，我们继续。"
+      "content": "在这里选择起点和终点，系统会自动为你基于A*规划(理论)最佳的路线, 并且有且仅有一条, 治好你的选择困难症。完成后，我们继续。"
     },
     "closeEditor": {
       "title": "关闭编辑器",
-      "content": "先关掉它. 继续参观飞船的其他部分，别让编辑器挡住了视线. "
+      "content": "先关掉它. 继续参观飞船的其他部分，别让编辑器挡住了IVA. "
     },
     "importExport": {
-      "title": "Escape Pods",
-      "content": "我们坚信数据归你自己所有, 前提是你得学会备份. 在这里你可以将行程导出为 KML/JSON. "
+      "title": "小绿人逃生舱",
+      "content": "我们坚信数据归你自己所有, 前提是你得学会备份, 并且自备隔热罩与降落伞. 在这里你可以将行程导出为 KML/JSON. "
     },
     "tabMap": {
       "title": "地图模式",
-      "content": "切换并查看铁路网络. 灰色的是未乘区段, 而已乘线路将以对应的颜色高亮显示. 底图包含来自 OpenRailwayMap 的配线详情. 新版本不再渲染已乘区间的svg图形, 而丰富了站点交互. 你可以长按站点并拖动连接, 以自动规划。"
+      "content": "切换并查看铁路网络. 灰色的是未乘区段, 而已乘线路将以对应的颜色高亮显示. \n底图包含来自 OpenRailwayMap 的配线详情. 新版本丰富了站点交互. 你可以长按站点并拖动连接, 以自动规划。"
     },
     "mapPins": {
       "title": "安放地图图钉",
@@ -59,7 +59,7 @@
     },
     "finishLogin": {
       "title": "RailLOOP, 轻而易举啊",
-      "content": "引导结束。现在我们将打开登录界面，建议你绑定 GitHub 账号，这能让你生成酷炫的 SVG 卡片去主页显摆."
+      "content": "引导结束。现在我们将打开登录界面，建议你绑定 GitHub 账号，这能让你生成 SVG 卡片来证明自己的无可救药."
     },
     "loginGuide": {
       "title": "阅读协议",
@@ -157,12 +157,12 @@
     "langTitle": "Language / 语言",
     "langDesc": "Choose your preferred language / 选择你的偏好语言",
     "startTitle": "你的探索起点",
-    "startDesc": "每次打开地图时，你希望从哪里开始你的旅程？",
+    "startDesc": "每次打开地图时，希望从哪里开始你的旅程？",
     "fixedInterest": "固定兴趣",
     "fixedInterestDesc": "选择一个心仪的 city<br/>作为每次探索的默认大本营",
     "followLatest": "跟随最新",
     "followLatestDesc": "总是从上一次旅行的终点<br/>继续你的未竟之旅",
-    "followLatestSummary": "已准备就绪！每次启动应用将自动定位到您上一次记录的终点。",
+    "followLatestSummary": "已准备就绪！每次启动应用将自动定位到上一次记录的终点。",
     "backToMode": "返回选择模式",
     "chooseCountry": "选择国家或地区",
     "china": "中国",
@@ -210,7 +210,7 @@
   },
   "githubCard": {
     "title": "GitHub 个人资料装饰",
-    "enabled": "开启公开挂件访问",
+    "enabled": "公开挂件svg",
     "source": "数据来源",
     "global": "全局 (所有行程)",
     "noUrl": "没有可用的公开 URL",
@@ -244,7 +244,7 @@
     "maxSegment": "最多 10 段",
     "atLeastOne": "至少包含一段有效行程",
     "fillInfo": "请完善信息",
-    "autoMaxLimit": "自动规划超出6次换乘限制或无解。\n是否继续无限制深度搜索？(这可能需要较长等待时间)",
+    "autoMaxLimit": "自动规划超出6次换乘限制或无解。\n是否继续无限制深度搜索？(可能需要较长等待时间)",
     "autoFail": "无法规划: ",
     "autoFailTitle": "换乘超限",
     "pathTooLong": "路径过长",
@@ -264,7 +264,7 @@
     "init0": "正在初始化... (0%)",
     "loadCompany": "加载公司数据... (5%)",
     "readCache": "读取本地缓存... (10%)",
-    "fastCache": "极速命中缓存... (20%)",
+    "fastCache": "极速命中缓存!!! (20%)",
     "parseLocal": "解析本地数据... (20%)",
     "loadThumb": "加载行程缩略图... (25%)",
     "checkUpdate": "检查云端更新... (30%)",

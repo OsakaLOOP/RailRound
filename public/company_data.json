@@ -7,7 +7,16 @@
   "南京地铁": {
     "region": "中国大陆",
     "type": "地下鉄",
-    "logo": "/assets/company_logos/002_南京地铁.png"
+    "logo": "/assets/company_logos/002_南京地铁.png",
+    "icon": "/assets/company_logos/002_南京地铁 copy.png",
+    "recolor": true
+  },
+  "北京地铁": {
+    "region": "中国大陆",
+    "type": "地下鉄",
+    "icon": "/assets/company_logos/300_北京地铁 copy.svg",
+    "logo": "/assets/company_logos/300_北京地铁.svg",
+    "recolor": true
   },
   "東日本旅客鉄道": {
     "region": "関東",

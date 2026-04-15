@@ -12,6 +12,58 @@
     "tabRecords": {
       "title": "Trip Records",
       "content": "This tab is your journey's command center. You can view, add, and manage all railway trip records here, or add them to your collections."
+    },
+    "addTrip": {
+      "title": "First Record",
+      "content": "Click the floating 'New Trip' button below to open the session editor."
+    },
+    "editorModes": {
+      "title": "Editor Modes",
+      "content": "Choose 'Manual' to pay homage to the craftsmanship of old, or try 'Auto' to leave your fate to the Infinite Improbability Drive."
+    },
+    "autoPlanningView": {
+      "title": "Auto Planning",
+      "content": "Select origin and destination here; the system will plan a route prioritized by Shinkansen. Once done, let's continue."
+    },
+    "closeEditor": {
+      "title": "Close Editor",
+      "content": "Close it for now. Continue exploring other parts of the ship, don't let the editor block your view."
+    },
+    "importExport": {
+      "title": "Escape Pods",
+      "content": "We believe your data belongs to you—provided you know how to back it up. Export your trips to KML/JSON here."
+    },
+    "tabMap": {
+      "title": "Map Mode",
+      "content": "Toggle to view the railway network. Grey segments are unridden, while ridden ones are highlighted. The base map features detailed alignment from OpenRailwayMap. In this version, we've replaced SVG rendering with rich station interactions: long-press and drag between stations to auto-plan."
+    },
+    "mapPins": {
+      "title": "Map Pins",
+      "content": "Pin photos or comments to the map here. It's likely sturdier than a certain Joseph's son's cross."
+    },
+    "closePinEditor": {
+      "title": "Exit Pin Mode",
+      "content": "The pin editor appears at the bottom. Click the 'X' button or the FAB again to close it."
+    },
+    "mapLayers": {
+      "title": "Map Styles",
+      "content": "Switch between dark and light map styles, whether to save battery or match your midnight snacks."
+    },
+    "tabStats": {
+      "title": "Aftermath",
+      "content": "Click here for stats. See how much money you've burned on the tracks of this planet and your carbon footprint (TODO)."
+    },
+    "statsContent": {
+      "title": "Railfan Medals",
+      "content": "Your total mileage, expenses, and most visited lines are showcased here."
+    },
+    "finishLogin": {
+      "title": "RailLOOP, Easy Peasy",
+      "content": "Tutorial finished. We'll open the login screen now. We recommend binding your GitHub account to generate cool SVG cards for show."
+    },
+    "loginGuide": {
+      "title": "Read Agreement",
+      "content": "Before you start, please read this 'User Guide' (mostly a disclaimer). If you are an alien, time traveler, or psychic, please ignore the physical limitation clauses."
     }
   },
   "loginModal": {
@@ -64,12 +116,14 @@
     "importSuica": "Import Suica CSV",
     "deleteConfirm": "Confirm delete?",
     "parseSuccess": "Successfully parsed {count} new trips. Import?{{skipMsg}}\n(Press F12 to see matching logs)",
+    "parseSuccessTitle": "Parsed Successfully",
     "skipMsg": "\n(Skipped {{count}} duplicate records)",
     "importSuccess": "Imported {count} trips!{{skipMsg}}",
     "skipMsgShort": " (Skipped {{count}} duplicates)",
     "allExist": "Parsing complete, but all records ({{count}}) already exist. No need to import.",
     "noImport": "No importable trips found, or parsing failed.",
-    "readError": "Error reading or parsing file."
+    "readError": "Error reading or parsing file.",
+    "parsingSuica": "Parsing Suica CSV data..."
   },
   "search": {
     "close": "Close",
@@ -108,6 +162,7 @@
     "fixedInterestDesc": "Choose a favorite city<br/>as your default base",
     "followLatest": "Follow Latest",
     "followLatestDesc": "Always continue your unfinished journey<br/>from the end of your last trip",
+    "followLatestSummary": "All set! The app will automatically center on your last trip destination every time it starts.",
     "backToMode": "Back to Mode Selection",
     "chooseCountry": "Choose Country or Region",
     "china": "China",
@@ -124,7 +179,8 @@
     "subway": "Subway / New Transit",
     "allRegions": "All Regions",
     "noRegion": "No Region",
-    "noResult": "No matching lines"
+    "noResult": "No matching lines",
+    "cnMainlandEnt": "Mainland CN Entrance"
   },
   "githubReg": {
     "title": "Complete Registration",
@@ -135,8 +191,31 @@
   },
   "folder": {
     "saveFail": "Save failed: ",
-    "title": "Folders",
-    "placeholder": "Name..."
+    "title": "Bookmark",
+    "titleShort": "Bookmark",
+    "placeholder": "Name...",
+    "deleteConfirm": "Confirm delete folder?",
+    "noFolders": "No folders",
+    "noFoldersShort": "No folders found. Create one in Stats page.",
+    "tripCount": "{{count}} trips",
+    "addToTitle": "Add to Bookmark"
+  },
+  "pin": {
+    "titleSnap": "Snap: {{line}}",
+    "titleFree": "Free position",
+    "placeholderMemo": "Memo...",
+    "placeholderUrl": "Image URL...",
+    "btnCreate": "Add",
+    "btnUpdate": "Update"
+  },
+  "githubCard": {
+    "title": "GitHub Profile Decoration",
+    "enabled": "Enable Public Access",
+    "source": "Data Source",
+    "global": "Global (All trips)",
+    "noUrl": "No public URL available",
+    "disabled": "Widget disabled",
+    "markdownTitle": "Markdown (copy to README)"
   },
   "tripEdit": {
     "editTitle": "Edit Trip",
@@ -167,7 +246,12 @@
     "fillInfo": "Please complete the info",
     "autoMaxLimit": "Auto route exceeds 6 transfers or has no solution.\nContinue deep search? (This may take a while)",
     "autoFail": "Failed to route: ",
-    "pathTooLong": "Path too long"
+    "autoFailTitle": "Transfer limit exceeded",
+    "pathTooLong": "Path too long",
+    "saveFail": "Cloud save failed: ",
+    "disconnected": "Start station is not connected to the previous end station",
+    "disconnectTitle": "Disconnection Warning",
+    "disconnectMsg": "Disconnected segments detected. Saving anyway may break the structure. Save anyway?"
   },
   "app": {
     "fetchRemote": "Fetching remote data... (10%)",
@@ -193,12 +277,75 @@
     "exportErr": "Error occurred during export.",
     "invalidBackup": "Invalid backup file",
     "missLine": "Missing base data for the following lines, which may cause display issues:\n\n{{lines}}\n\nIt is recommended to upload the corresponding GeoJSON files on the map page first. Continue importing?",
+    "missLineTitle": "Missing Data",
     "importSuccess": "Data import complete!\n\nTrips: Added {{newT}} (Skipped duplicate/invalid {{skipT}})\nPins: Added {{newP}} (Skipped duplicate/invalid {{skipP}})",
     "fileParseErr": "File parsing failed",
     "companyUpdated": "Company database updated",
     "parseFail": "Parsing failed",
     "fileSkip": "File {{name}} parsing failed, skipped",
     "importCount": "Successfully imported {{count}} files!",
-    "fileProcErr": "Unknown error occurred during file processing"
+    "fileProcErr": "Unknown error occurred during file processing",
+    "unknown": "Unknown",
+    "uploadedData": "Uploaded Data",
+    "systemBackupGen": "System backup generated!",
+    "saveFail": "Save failed: ",
+    "syncFail": "Cloud sync failed",
+    "mergeConfirm": "Local data detected. Merge with cloud?\n\nOK: Merge (Keep Local)\nCancel: Overwrite (Cloud Only)",
+    "mergeConfirmTitle": "Data Conflict"
+  },
+  "header": {
+    "welcome": "Welcome, {{name}}",
+    "loginRegister": "Login / Register",
+    "logout": "Logout",
+    "exportKML": "Export KML",
+    "data": "DB",
+    "mapData": "Map"
+  },
+  "common": {
+    "deleteConfirm": "Confirm delete?",
+    "syncFail": "Cloud sync failed",
+    "saveFail": "Save failed: ",
+    "error": "Error",
+    "ok": "OK",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "create": "Create",
+    "close": "Close",
+    "search": "Search",
+    "comingSoon": "TODO"
+  },
+  "map": {
+    "loadFail": "Map load failed ({{domain}})\nPlease check network or VPN",
+    "rubberBandBreak": "Oops! Rubber band snapped! 💥",
+    "geoNotSupported": "Geolocation not supported",
+    "geoDenied": "Permission denied",
+    "geoFail": "Failed to get location",
+    "geoTimeout": "Timeout getting location",
+    "geoUnavailable": "Location unavailable"
+  },
+  "chest": {
+    "searchingRoute": "Searching path...",
+    "routeFound": "Route found",
+    "routeNotFound": "Route not found",
+    "inventory": "Inventory",
+    "slots": "{{count}} slots",
+    "empty": "Empty Inventory",
+    "origin": "Origin",
+    "dest": "Destination",
+    "memorial": "Stamp",
+    "used": "Used",
+    "autoGenerated": "Chest Auto Planned"
+  },
+  "regions": {
+    "北海道・東北": "Hokkaido・Tohoku",
+    "関東": "Kanto",
+    "中部": "Chubu",
+    "近畿": "Kinki",
+    "中国地方": "Chugoku",
+    "四国": "Shikoku",
+    "九州・沖縄": "Kyushu・Okinawa",
+    "其他": "Others",
+    "未知": "Unknown",
+    "中国大陆": "Mainland China"
   }
 }

@@ -194,7 +194,7 @@ export const LocateButton: React.FC = () => {
   };
 
   return (
-    <div className="absolute bottom-20 right-4 z-[400] flex flex-col gap-3">
+    <div className="absolute bottom-4 right-4 z-[400] flex flex-col gap-3">
       <button
         {...eventProps}
         onContextMenu={(e) => e.preventDefault()}

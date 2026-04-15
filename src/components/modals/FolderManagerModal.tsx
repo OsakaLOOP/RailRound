@@ -4,6 +4,7 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
+import { showAlert, showConfirm } from '../../utils/alerts';
 
 export const FolderManagerModal: React.FC = () => {
     const { isOpen, folders, user, trips, pins, badgeSettings } = useStore(useShallow(state => ({
@@ -36,7 +37,7 @@ export const FolderManagerModal: React.FC = () => {
     const saveUserFolders = (newFolders: any[]) => {
         setFolders(newFolders);
         if (user) {
-            saveData(user.token, trips, pins, newFolders, badgeSettings).catch((e: any) => alert(t('folder.saveFail', "保存失败: ") + e.message));
+            saveData(user.token, trips, pins, newFolders, badgeSettings).catch((e: any) => showAlert(t('folder.saveFail', "保存失败: ") + e.message, '', 'error'));
         }
     };
 
@@ -54,8 +55,8 @@ export const FolderManagerModal: React.FC = () => {
         setNewFolderName("");
     };
 
-    const handleDelete = (id: string) => {
-        if (confirm("Delete this folder?")) {
+    const handleDelete = async (id: string) => {
+        if (await showConfirm(t('folder.deleteConfirm', "确认删除文件夹？"))) {
             saveUserFolders(folders.filter(f => f.id !== id));
         }
     };
@@ -90,16 +91,16 @@ export const FolderManagerModal: React.FC = () => {
                         value={newFolderName}
                         onChange={e => setNewFolderName(e.target.value)}
                     />
-                    <button type="submit" disabled={!newFolderName.trim()} className="bg-gray-800 text-white px-4 py-2 rounded-lg font-bold text-sm disabled:opacity-50">Create</button>
+                    <button type="submit" disabled={!newFolderName.trim()} className="bg-gray-800 text-white px-4 py-2 rounded-lg font-bold text-sm disabled:opacity-50">{t('common.create', '创建')}</button>
                 </form>
 
                 <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                    {folders.length === 0 && <div className="text-center text-gray-400 py-4 text-sm">No folders yet.</div>}
+                    {folders.length === 0 && <div className="text-center text-gray-400 py-4 text-sm">{t('folder.noFolders', '暂无收藏夹')}</div>}
                     {folders.map(f => (
                         <div key={f.id} className="p-3 border rounded-lg flex items-center justify-between bg-gray-50">
                             <div>
                                 <div className="font-bold text-sm text-gray-700">{f.name}</div>
-                                <div className="text-xs text-gray-400">{f.trip_ids?.length || 0} trips</div>
+                                <div className="text-xs text-gray-400">{t('folder.tripCount', '{{count}} 条行程', { count: f.trip_ids?.length || 0 })}</div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button

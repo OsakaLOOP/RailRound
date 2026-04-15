@@ -4,6 +4,8 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import { calculateLatestStats } from '../../core/tripCalculator';
+import { useTranslation } from 'react-i18next';
+import { showAlert } from '../../utils/alerts';
 
 export const AddToFolderModal: React.FC = () => {
     const { isOpen, trip, folders, user, trips, pins, badgeSettings, segmentGeometries, railwayData, geoData } = useStore(useShallow(state => ({
@@ -21,6 +23,7 @@ export const AddToFolderModal: React.FC = () => {
     const setModalState = useStore(state => state.setModalState);
     const setFolders = useStore(state => state.setFolders);
     const { saveData } = useUserData();
+    const { t } = useTranslation();
 
     const onClose = () => setModalState({ addToFolderModalOpen: false, currentTripForFolder: null });
 
@@ -52,7 +55,7 @@ export const AddToFolderModal: React.FC = () => {
         // Recalculate stats for modified folders
         const foldersWithStats = updatedFolders.map(f => {
             if (f.trip_ids && f.trip_ids.length > 0) {
-                const folderTrips = trips.filter(t => f.trip_ids.includes(t.id));
+                const folderTrips = trips.filter(tripItem => f.trip_ids.includes(tripItem.id));
                 // Sort by date desc
                 folderTrips.sort((a,b) => b.date.localeCompare(a.date));
                 const stats = calculateLatestStats(folderTrips, segmentGeometries, railwayData, geoData);
@@ -64,7 +67,7 @@ export const AddToFolderModal: React.FC = () => {
 
         setFolders(foldersWithStats);
         if (user) {
-            saveData(user.token, trips, pins, foldersWithStats, badgeSettings).catch((e: any) => alert("保存失败: " + e.message));
+            saveData(user.token, trips, pins, foldersWithStats, badgeSettings).catch((e: any) => showAlert(t('folder.saveFail', "保存失败: ") + e.message, '', 'error'));
         }
     };
 
@@ -72,11 +75,11 @@ export const AddToFolderModal: React.FC = () => {
         <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
             <div className="bg-white w-full max-w-xs rounded-xl shadow-2xl p-4 animate-slide-up" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-base text-gray-800 flex items-center gap-2"><Star size={18} className="text-yellow-500 fill-yellow-500"/> Add to Folder</h3>
+                    <h3 className="font-bold text-base text-gray-800 flex items-center gap-2"><Star size={18} className="text-yellow-500 fill-yellow-500"/> {t('folder.addToTitle', '添加到收藏夹')}</h3>
                     <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
                 </div>
                 <div className="space-y-2 max-h-[40vh] overflow-y-auto">
-                    {folders.length === 0 && <div className="text-center text-gray-400 text-xs py-4">No folders created. Go to Stats page to create one.</div>}
+                    {folders.length === 0 && <div className="text-center text-gray-400 text-xs py-4">{t('folder.noFoldersShort', '暂无收藏夹。请前往统计页面创建。')}</div>}
                     {folders.map(f => {
                         const isSelected = f.trip_ids?.includes(trip.id);
                         return (

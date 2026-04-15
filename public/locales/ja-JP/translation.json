@@ -12,6 +12,58 @@
     "tabRecords": {
       "title": "旅行記録",
       "content": "このタブは旅のコマンドセンターです。ここで鉄道旅行の記録を表示、追加、編集、管理したり、コレクションに追加したりできます。"
+    },
+    "addTrip": {
+      "title": "初めての記録",
+      "content": "下の浮遊ボタン「新しい旅」をクリックして編集メニューを開きます。"
+    },
+    "editorModes": {
+      "title": "編集モード",
+      "content": "「手動入力」で職人魂を呼び覚ますか、「自動計画」で無限不可能性ドライブに運命を任せるか選べます。"
+    },
+    "autoPlanningView": {
+      "title": "自動ルート案内",
+      "content": "出発地と目的地を選択すると、新幹線優先のルートを自動で計画します。完了したら次に進みます。"
+    },
+    "closeEditor": {
+      "title": "エディタを閉じる",
+      "content": "一旦閉じましょう。宇宙船の他の部分も案内します。視界を遮らないように。"
+    },
+    "importExport": {
+      "title": "脱出ポッド",
+      "content": "データはあなたのものです。ただし、バックアップの仕方を覚えていることが前提です。ここでKML/JSONに書き出せます。"
+    },
+    "tabMap": {
+      "title": "マップモード",
+      "content": "鉄道路線網を確認できます。未乗区間はグレー、既乗区間は強調表示されます。OpenRailwayMap によるの配線詳細が含まれています。最新版では、駅を長押ししてドラッグすることで自動ルート計算ができるようになりました。"
+    },
+    "mapPins": {
+      "title": "マップピン",
+      "content": "写真やコメントを地図に固定します。某救世主の十字架より頑丈かもしれません。"
+    },
+    "closePinEditor": {
+      "title": "ピンモード終了",
+      "content": "ピンエディタは下に表示されます。右上の「X」またはボタンを再クリックして閉じます。"
+    },
+    "mapLayers": {
+      "title": "マップスタイル",
+      "content": "バッテリー節約や夜食に合わせて、ダークモードとライトモードを切り替えられます。"
+    },
+    "tabStats": {
+      "title": "アフターマス",
+      "content": "統計を確認します。この惑星のレールの上でいくら使ったか、どれだけ炭素を排出したか（TODO）見てみましょう。"
+    },
+    "statsContent": {
+      "title": "乗り鉄の証",
+      "content": "総距離、総出費、よく利用する路線などがここに表示されます。"
+    },
+    "finishLogin": {
+      "title": "RailLOOP、朝飯前さ",
+      "content": "ガイド終了です。ログイン画面を開きます。GitHub 連携をすると、自慢できるクールな SVG カードを生成できます。"
+    },
+    "loginGuide": {
+      "title": "規約を読む",
+      "content": "始める前に、この免責事項（ユーザーガイド）を必ず読んでください。宇宙人、未来人、超能力者の方は、物理的制限条項を無視して構いません。"
     }
   },
   "loginModal": {
@@ -64,12 +116,14 @@
     "importSuica": "Suica CSVのインポート",
     "deleteConfirm": "削除しますか?",
     "parseSuccess": "{count}件の新しい旅の解析に成功しました。インポートしますか？{{skipMsg}}\n(F12で詳細なマッチングログを確認できます)",
+    "parseSuccessTitle": "解析成功",
     "skipMsg": "\n({{count}}件の重複記録をスキップしました)",
     "importSuccess": "{count}件の旅をインポートしました！{{skipMsg}}",
     "skipMsgShort": " ({{count}}件の重複をスキップ)",
     "allExist": "解析完了。すべての記録（{{count}}件）は既に存在するため、インポートは不要です。",
     "noImport": "インポート可能な旅が見つからないか、解析に失敗しました。",
-    "readError": "ファイルの読み込みまたは解析でエラーが発生しました。"
+    "readError": "ファイルの読み込みまたは解析でエラーが発生しました。",
+    "parsingSuica": "Suica CSV データを解析中..."
   },
   "search": {
     "close": "閉じる",
@@ -108,6 +162,7 @@
     "fixedInterestDesc": "お気に入りの都市を選択し、<br/>デフォルトの拠点にします",
     "followLatest": "最新を追跡",
     "followLatestDesc": "常に前回の旅の終点から<br/>未完了の旅を続けます",
+    "followLatestSummary": "設定完了！アプリを起動するたびに、前回の旅行の目的地が自動的に表示されます。",
     "backToMode": "モード選択に戻る",
     "chooseCountry": "国または地域を選択",
     "china": "中国",
@@ -124,7 +179,8 @@
     "subway": "地下鉄・新交通",
     "allRegions": "全地域",
     "noRegion": "地域分類なし",
-    "noResult": "条件に一致する路線がありません"
+    "noResult": "条件に一致する路線がありません",
+    "cnMainlandEnt": "中国大陸入口"
   },
   "githubReg": {
     "title": "登録完了",
@@ -136,7 +192,30 @@
   "folder": {
     "saveFail": "保存に失敗しました: ",
     "title": "フォルダ",
-    "placeholder": "名前..."
+    "titleShort": "フォルダ",
+    "placeholder": "名前...",
+    "deleteConfirm": "フォルダを削除しますか？",
+    "noFolders": "フォルダがありません",
+    "noFoldersShort": "フォルダが見つかりません。統計ページで作成してください。",
+    "tripCount": "{{count}} 件の旅行",
+    "addToTitle": "フォルダに追加"
+  },
+  "pin": {
+    "titleSnap": "吸着: {{line}}",
+    "titleFree": "自由位置",
+    "placeholderMemo": "メモ...",
+    "placeholderUrl": "画像URL...",
+    "btnCreate": "追加",
+    "btnUpdate": "更新"
+  },
+  "githubCard": {
+    "title": "GitHub プロフィール装飾",
+    "enabled": "公開アクセスを有効化",
+    "source": "データ元",
+    "global": "全体 (すべての旅行)",
+    "noUrl": "公開 URL がありません",
+    "disabled": "ウィジェットは無効です",
+    "markdownTitle": "Markdown コード (README にコピー)"
   },
   "tripEdit": {
     "editTitle": "旅程の編集",
@@ -167,7 +246,12 @@
     "fillInfo": "情報を入力してください",
     "autoMaxLimit": "自動検索が6回の乗換制限を超えるか、解がありません。\n制限なしのディープサーチを続けますか？ (時間がかかる場合があります)",
     "autoFail": "検索失敗: ",
-    "pathTooLong": "ルートが長すぎます"
+    "autoFailTitle": "乗換制限過多",
+    "pathTooLong": "ルートが長すぎます",
+    "disconnected": "出発駅が前回の到着駅と接続されていません",
+    "disconnectTitle": "接続切断の警告",
+    "disconnectMsg": "接続されていない区間が検出されました。このまま保存すると構造が壊れる可能性があります。保存しますか？",
+    "saveFail": "クラウド保存に失敗しました: "
   },
   "app": {
     "fetchRemote": "リモートデータを取得中... (10%)",
@@ -193,12 +277,75 @@
     "exportErr": "エクスポート中にエラーが発生しました。",
     "invalidBackup": "無効なバックアップファイルです",
     "missLine": "以下の路線の基本データが不足しているため、表示異常が発生する可能性があります:\n\n{{lines}}\n\n先にマップページで対応するGeoJSONファイルをアップロードすることをお勧めします。インポートを続行しますか？",
+    "missLineTitle": "データ不足",
     "importSuccess": "データのインポートが完了しました！\n\n旅行: 追加 {{newT}} 件 (重複/無効をスキップ {{skipT}} 件)\nピン: 追加 {{newP}} 個 (重複/無効をスキップ {{skipP}} 個)",
     "fileParseErr": "ファイルの解析に失敗しました",
     "companyUpdated": "会社データベースが更新されました",
     "parseFail": "解析に失敗しました",
     "fileSkip": "ファイル {{name}} の解析に失敗しました。スキップします",
     "importCount": "{{count}}個のファイルをインポートしました！",
-    "fileProcErr": "ファイル処理中に不明なエラーが発生しました"
+    "fileProcErr": "ファイル処理中に不明なエラーが発生しました",
+    "unknown": "不明",
+    "uploadedData": "アップロードされたデータ",
+    "systemBackupGen": "システムバックアップが生成されました！",
+    "saveFail": "保存失敗: ",
+    "syncFail": "クラウド同期失敗",
+    "mergeConfirm": "ローカルデータが検出されました。クラウドとマージしますか？\n\nはい: マージ (ローカルを保持)\nいいえ: 上書き (クラウドのみ)",
+    "mergeConfirmTitle": "データ競合"
+  },
+  "header": {
+    "welcome": "ようこそ, {{name}}",
+    "loginRegister": "ログイン / 登録",
+    "logout": "ログアウト",
+    "exportKML": "KML エクスポート",
+    "data": "DB",
+    "mapData": "マップ"
+  },
+  "common": {
+    "deleteConfirm": "削除しますか?",
+    "syncFail": "クラウド同期失敗",
+    "saveFail": "保存失敗: ",
+    "error": "エラー",
+    "ok": "OK",
+    "confirm": "確定",
+    "cancel": "キャンセル",
+    "create": "作成",
+    "close": "閉じる",
+    "search": "検索",
+    "comingSoon": "TODO"
+  },
+  "map": {
+    "loadFail": "マップの読み込みに失敗しました ({{domain}})\nネットワークまたは VPN を確認してください",
+    "rubberBandBreak": "ああっ！ラバーバンドが切れちゃった！💥",
+    "geoNotSupported": "位置情報の取得に対応していません",
+    "geoDenied": "権限が拒否されました",
+    "geoFail": "位置情報の取得に失敗しました",
+    "geoTimeout": "タイムアウトしました",
+    "geoUnavailable": "位置情報が利用できません"
+  },
+  "chest": {
+    "searchingRoute": "ルートを検索中...",
+    "routeFound": "ルートが見つかりました",
+    "routeNotFound": "ルートが見つかりませんでした",
+    "inventory": "インベントリ",
+    "slots": "{{count}} スロット",
+    "empty": "インベントリは空です",
+    "origin": "起点",
+    "dest": "終点",
+    "memorial": "乗車記念",
+    "used": "使用済",
+    "autoGenerated": "Chest 自動計画"
+  },
+  "regions": {
+    "北海道・東北": "北海道・東北",
+    "関東": "関東",
+    "中部": "中部",
+    "近畿": "近畿",
+    "中国地方": "中国地方",
+    "四国": "四国",
+    "九州・沖縄": "九州・沖縄",
+    "其他": "その他",
+    "未知": "未知",
+    "中国大陆": "中国大陸"
   }
 }

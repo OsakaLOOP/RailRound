@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SVG Preview - InitialSetupModal Illustrations</title>
+<style>
+  body { background: #1a1a2e; display: flex; gap: 40px; padding: 60px; justify-content: center; align-items: flex-start; flex-wrap: wrap; font-family: system-ui; }
+  .card { background: #fff; border-radius: 24px; padding: 32px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .card h3 { margin: 0; color: #333; font-size: 14px; }
+  .card svg { width: 200px; height: 200px; }
+</style>
+</head>
+<body>
+<!-- ============ 1. LANGUAGE SVG ============ -->
+<div class="card">
+  <h3>Step 1: Language / 语言</h3>
+  <svg viewBox="0 0 200 200" overflow="hidden">
+    <defs>
+      <radialGradient id="langBg" cx="50%" cy="45%" r="55%">
+        <stop offset="0%" stop-color="#4f46e5" />
+        <stop offset="100%" stop-color="#1e1b4b" />
+      </radialGradient>
+      <radialGradient id="earthGrad" cx="40%" cy="35%" r="60%">
+        <stop offset="0%" stop-color="#60a5fa" />
+        <stop offset="40%" stop-color="#3b82f6" />
+        <stop offset="100%" stop-color="#1e40af" />
+      </radialGradient>
+      <radialGradient id="earthHighlight" cx="30%" cy="25%" r="50%">
+        <stop offset="0%" stop-color="#93c5fd" stop-opacity="0.6" />
+        <stop offset="100%" stop-color="#3b82f6" stop-opacity="0" />
+      </radialGradient>
+      <linearGradient id="landGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#34d399" />
+        <stop offset="100%" stop-color="#059669" />
+      </linearGradient>
+      <filter id="langGlow">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="textGlow">
+        <feGaussianBlur stdDeviation="2" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <clipPath id="earthClip">
+        <circle cx="100" cy="100" r="48"/>
+      </clipPath>
+      <clipPath id="circleClip">
+        <circle cx="100" cy="100" r="100"/>
+      </clipPath>
+    </defs>
+    <!-- Outer circle clip -->
+    <g clip-path="url(#circleClip)">
+      <!-- Background -->
+      <circle cx="100" cy="100" r="100" fill="url(#langBg)" />
+      <!-- Subtle star dots -->
+      <circle cx="25" cy="30" r="1" fill="#c7d2fe" opacity="0.5"/>
+      <circle cx="170" cy="25" r="1.2" fill="#c7d2fe" opacity="0.4"/>
+      <circle cx="45" cy="165" r="0.8" fill="#c7d2fe" opacity="0.6"/>
+      <circle cx="160" cy="170" r="1" fill="#c7d2fe" opacity="0.3"/>
+      <circle cx="15" cy="90" r="0.8" fill="#c7d2fe" opacity="0.4"/>
+      <circle cx="185" cy="85" r="1" fill="#c7d2fe" opacity="0.5"/>
+      <circle cx="80" cy="15" r="0.9" fill="#c7d2fe" opacity="0.3"/>
+      <circle cx="130" cy="185" r="0.7" fill="#c7d2fe" opacity="0.4"/>
+      <!-- Signal wave rings from earth -->
+      <circle cx="100" cy="100" r="60" fill="none" stroke="#818cf8" stroke-width="0.8" opacity="0.25">
+        <animate attributeName="r" values="55;70;55" dur="4s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.25;0.05;0.25" dur="4s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="100" cy="100" r="72" fill="none" stroke="#818cf8" stroke-width="0.6" opacity="0.15">
+        <animate attributeName="r" values="68;85;68" dur="5s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.15;0.03;0.15" dur="5s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="100" cy="100" r="88" fill="none" stroke="#818cf8" stroke-width="0.4" opacity="0.08">
+        <animate attributeName="r" values="85;98;85" dur="6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.08;0.01;0.08" dur="6s" repeatCount="indefinite"/>
+      </circle>
+      <!-- ===== EARTH GLOBE ===== -->
+      <g>
+        <!-- Earth base sphere -->
+        <circle cx="100" cy="100" r="48" fill="url(#earthGrad)" />
+        <!-- Continent shapes clipped to earth (simplified but recognizable) -->
+        <g clip-path="url(#earthClip)" fill="url(#landGrad)" opacity="0.85">
+          <!-- East Asia (China/Japan region - prominent since this is a rail app) -->
+          <path d="M115,78 L122,75 L128,78 L130,85 L126,92 L128,98 L124,105 L118,108 L112,105 L108,98 L105,90 L108,82 Z" />
+          <!-- Japan archipelago -->
+          <path d="M132,80 L134,76 L136,78 L135,84 L133,88 L131,86 Z" />
+          <path d="M134,88 L136,86 L137,90 L135,93 Z" />
+          <!-- Southeast Asia -->
+          <path d="M118,112 L122,110 L125,114 L120,118 L116,116 Z" />
+          <!-- India subcontinent -->
+          <path d="M102,95 L106,92 L108,98 L105,106 L100,108 L98,102 Z" />
+          <!-- Europe partial -->
+          <path d="M82,72 L88,68 L92,70 L94,76 L90,80 L84,78 Z" />
+          <!-- Africa partial (east coast visible) -->
+          <path d="M88,88 L94,85 L96,92 L94,100 L90,108 L86,112 L82,108 L80,98 L82,92 Z" />
+          <!-- Australia hint -->
+          <path d="M128,120 L136,118 L140,122 L138,128 L132,128 L128,125 Z" />
+        </g>
+        <!-- Latitude/longitude grid lines -->
+        <g clip-path="url(#earthClip)" fill="none" stroke="#bfdbfe" stroke-width="0.4" opacity="0.3">
+          <!-- Equator -->
+          <ellipse cx="100" cy="100" rx="48" ry="3"/>
+          <!-- Tropics -->
+          <ellipse cx="100" cy="86" rx="44" ry="3"/>
+          <ellipse cx="100" cy="114" rx="44" ry="3"/>
+          <!-- Meridians -->
+          <ellipse cx="100" cy="100" rx="3" ry="48"/>
+          <ellipse cx="100" cy="100" rx="20" ry="48"/>
+          <ellipse cx="100" cy="100" rx="36" ry="48"/>
+        </g>
+        <!-- 3D highlight/shine -->
+        <circle cx="100" cy="100" r="48" fill="url(#earthHighlight)" />
+        <!-- Atmosphere rim -->
+        <circle cx="100" cy="100" r="48" fill="none" stroke="#93c5fd" stroke-width="1.5" opacity="0.4" />
+        <circle cx="100" cy="100" r="50" fill="none" stroke="#93c5fd" stroke-width="0.5" opacity="0.15" />
+      </g>
+      <!-- ===== ORBITING TEXT CHARACTERS ===== -->
+      <!-- Top-left: Japanese -->
+      <g transform="translate(38, 42)" filter="url(#textGlow)">
+        <circle cx="0" cy="0" r="14" fill="#4338ca" opacity="0.8"/>
+        <text x="0" y="5" font-size="14" fill="#e0e7ff" text-anchor="middle" font-weight="700">あ</text>
+      </g>
+      <!-- Top-right: Latin -->
+      <g transform="translate(162, 48)" filter="url(#textGlow)">
+        <circle cx="0" cy="0" r="13" fill="#6366f1" opacity="0.75"/>
+        <text x="0" y="5" font-size="15" fill="#e0e7ff" text-anchor="middle" font-weight="800">A</text>
+      </g>
+      <!-- Bottom-left: Chinese -->
+      <g transform="translate(42, 158)" filter="url(#textGlow)">
+        <circle cx="0" cy="0" r="14" fill="#4338ca" opacity="0.8"/>
+        <text x="0" y="5" font-size="13" fill="#e0e7ff" text-anchor="middle" font-weight="700">文</text>
+      </g>
+      <!-- Bottom-right: Korean/Emoji -->
+      <g transform="translate(155, 155)" filter="url(#textGlow)">
+        <circle cx="0" cy="0" r="12" fill="#6366f1" opacity="0.7"/>
+        <text x="0" y="5" font-size="13" fill="#e0e7ff" text-anchor="middle" font-weight="700">한</text>
+      </g>
+      <!-- Connecting arc lines from text nodes to earth (communication paths) -->
+      <path d="M50,45 Q75,65 85,78" fill="none" stroke="#818cf8" stroke-width="1" opacity="0.4"/>
+      <path d="M150,52 Q135,65 125,78" fill="none" stroke="#818cf8" stroke-width="1" opacity="0.4"/>
+      <path d="M52,150 Q75,135 88,118" fill="none" stroke="#818cf8" stroke-width="1" opacity="0.4"/>
+      <path d="M145,150 Q130,135 120,120" fill="none" stroke="#818cf8" stroke-width="1" opacity="0.4"/>
+      <!-- Small traveling dots on arcs -->
+      <circle r="1.5" fill="#a5b4fc" opacity="0.8">
+        <animateMotion path="M50,45 Q75,65 85,78" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="1.5" fill="#a5b4fc" opacity="0.8">
+        <animateMotion path="M150,52 Q135,65 125,78" dur="3.5s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="1.5" fill="#a5b4fc" opacity="0.7">
+        <animateMotion path="M52,150 Q75,135 88,118" dur="4s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="1.5" fill="#a5b4fc" opacity="0.7">
+        <animateMotion path="M145,150 Q130,135 120,120" dur="3.2s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+  </svg>
+</div>
+<!-- ============ 2. FIXED INTEREST SVG ============ -->
+<div class="card">
+  <h3>Step 2a: Fixed Interest / 固定兴趣</h3>
+  <svg viewBox="0 0 200 200" overflow="hidden">
+    <defs>
+      <linearGradient id="fixBg" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#022c22" />
+        <stop offset="50%" stop-color="#064e3b" />
+        <stop offset="100%" stop-color="#0f766e" />
+      </linearGradient>
+      <linearGradient id="fixSky" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#042f2e" />
+        <stop offset="100%" stop-color="#115e59" />
+      </linearGradient>
+      <linearGradient id="fixTrainBody" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#10b981" />
+        <stop offset="50%" stop-color="#34d399" />
+        <stop offset="100%" stop-color="#6ee7b7" />
+      </linearGradient>
+      <linearGradient id="fixBuildingDark" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#0a3d36"/>
+        <stop offset="100%" stop-color="#042f2e"/>
+      </linearGradient>
+      <linearGradient id="fixBuildingMid" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#0d4f47"/>
+        <stop offset="100%" stop-color="#064e3b"/>
+      </linearGradient>
+      <linearGradient id="fixLed" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#042f2e"/>
+        <stop offset="100%" stop-color="#0a3d36"/>
+      </linearGradient>
+      <filter id="fixGlow">
+        <feGaussianBlur stdDeviation="2" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="fixHeadlight">
+        <feGaussianBlur stdDeviation="5" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="fixStarGlow">
+        <feGaussianBlur stdDeviation="1.5" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <clipPath id="fixClip"><circle cx="100" cy="100" r="100"/></clipPath>
+    </defs>
+    <g clip-path="url(#fixClip)">
+      <!-- Night sky background -->
+      <circle cx="100" cy="100" r="100" fill="url(#fixBg)" />
+      <!-- Stars -->
+      <g filter="url(#fixStarGlow)">
+        <circle cx="30" cy="25" r="1" fill="#a7f3d0" opacity="0.6"/>
+        <circle cx="85" cy="18" r="0.8" fill="#a7f3d0" opacity="0.4"/>
+        <circle cx="145" cy="22" r="1.2" fill="#a7f3d0" opacity="0.5"/>
+        <circle cx="170" cy="40" r="0.7" fill="#a7f3d0" opacity="0.3"/>
+        <circle cx="55" cy="35" r="0.9" fill="#a7f3d0" opacity="0.5"/>
+        <circle cx="120" cy="30" r="0.6" fill="#a7f3d0" opacity="0.4"/>
+      </g>
+      <!-- Moon crescent -->
+      <circle cx="160" cy="35" r="12" fill="#a7f3d0" opacity="0.15"/>
+      <circle cx="160" cy="35" r="12" fill="none" stroke="#a7f3d0" stroke-width="0.5" opacity="0.3"/>
+      <circle cx="155" cy="32" r="10" fill="url(#fixBg)"/>
+      <!-- ===== FAR BACKGROUND SKYLINE ===== -->
+      <path d="M0,130 L15,105 L25,105 L25,115 L35,95 L45,95 L50,100 L55,85 L65,85 L65,110 L75,100 L85,100 L85,115 L95,90 L105,90 L105,105 L115,80 L125,80 L130,95 L140,75 L150,75 L155,90 L165,85 L175,85 L175,105 L185,95 L200,95 L200,200 L0,200 Z"
+        fill="#0a3d36" opacity="0.5"/>
+      <!-- ===== MIDGROUND BUILDINGS ===== -->
+      <!-- Building cluster left -->
+      <g>
+        <rect x="10" y="95" width="30" height="105" fill="url(#fixBuildingDark)" />
+        <!-- Windows left building -->
+        <rect x="15" y="100" width="5" height="6" fill="#6ee7b7" filter="url(#fixGlow)" opacity="0.9"/>
+        <rect x="23" y="100" width="5" height="6" fill="#34d399" opacity="0.2"/>
+        <rect x="15" y="112" width="5" height="6" fill="#34d399" opacity="0.3"/>
+        <rect x="23" y="112" width="5" height="6" fill="#6ee7b7" filter="url(#fixGlow)" opacity="0.7"/>
+        <rect x="15" y="124" width="5" height="6" fill="#a7f3d0" filter="url(#fixGlow)" opacity="0.8"/>
+        <rect x="23" y="124" width="5" height="6" fill="#34d399" opacity="0.25"/>
+        <rect x="15" y="136" width="5" height="6" fill="#34d399" opacity="0.2"/>
+        <rect x="23" y="136" width="5" height="6" fill="#6ee7b7" filter="url(#fixGlow)" opacity="0.6"/>
+      </g>
+      <!-- Building left-center (tall) -->
+      <g>
+        <rect x="45" y="75" width="25" height="125" fill="url(#fixBuildingMid)" />
+        <rect x="50" y="80" width="6" height="7" fill="#6ee7b7" filter="url(#fixGlow)" opacity="0.85"/>
+        <rect x="58" y="80" width="6" height="7" fill="#34d399" opacity="0.3"/>
+        <rect x="50" y="93" width="6" height="7" fill="#34d399" opacity="0.2"/>
+        <rect x="58" y="93" width="6" height="7" fill="#a7f3d0" filter="url(#fixGlow)" opacity="0.7"/>
+        <rect x="50" y="106" width="6" height="7" fill="#6ee7b7" filter="url(#fixGlow)" opacity="0.9"/>
+        <rect x="58" y="106" width="6" height="7" fill="#34d399" opacity="0.15"/>
+        <rect x="50" y="119" width="6" height="7" fill="#34d399" opacity="0.3"/>
+        <rect x="58" y="119" width="6" height="7" fill="#6ee7b7" filter="url(#fixGlow)" opacity="0.5"/>
+      </g>
+      <!-- Building right-center -->
+      <g>
+        <rect x="120" y="85" width="28" height="115" fill="url(#fixBuildingDark)" />
+        <rect x="125" y="90" width="7" height="8" fill="#a7f3d0" filter="url(#fixGlow)" opacity="0.9"/>
+        <rect x="136" y="90" width="7" height="8" fill="#34d399" opacity="0.25"/>
+        <rect x="125" y="104" width="7" height="8" fill="#34d399" opacity="0.2"/>
+        <rect x="136" y="104" width="7" height="8" fill="#6ee7b7" filter="url(#fixGlow)" opacity="0.8"/>
+        <rect x="125" y="118" width="7" height="8" fill="#6ee7b7" filter="url(#fixGlow)" opacity="0.6"/>
+        <rect x="136" y="118" width="7" height="8" fill="#34d399" opacity="0.3"/>
+      </g>
+      <!-- Building far right -->
+      <g>
+        <rect x="155" y="100" width="22" height="100" fill="url(#fixBuildingMid)" />
+        <rect x="159" y="105" width="5" height="6" fill="#6ee7b7" filter="url(#fixGlow)" opacity="0.7"/>
+        <rect x="168" y="105" width="5" height="6" fill="#34d399" opacity="0.2"/>
+        <rect x="159" y="117" width="5" height="6" fill="#a7f3d0" filter="url(#fixGlow)" opacity="0.8"/>
+        <rect x="168" y="117" width="5" height="6" fill="#34d399" opacity="0.3"/>
+      </g>
+      <!-- ===== ELEVATED RAIL INFRASTRUCTURE ===== -->
+      <!-- Rail pillars -->
+      <rect x="72" y="140" width="4" height="30" fill="#115e59"/>
+      <rect x="95" y="140" width="4" height="25" fill="#115e59"/>
+      <rect x="118" y="140" width="4" height="20" fill="#115e59"/>
+      <!-- Rail platform/track surface -->
+      <path d="M65,140 L130,140 L128,144 L67,144 Z" fill="#0f766e"/>
+      <!-- Track rail highlights -->
+      <line x1="67" y1="141" x2="129" y2="141" stroke="#5eead4" stroke-width="1"/>
+      <line x1="67" y1="143" x2="129" y2="143" stroke="#5eead4" stroke-width="1"/>
+      <!-- ===== STATION SIGN / LED ===== -->
+      <!-- Station sign post -->
+      <rect x="84" y="122" width="2" height="18" fill="#115e59"/>
+      <!-- LED sign board -->
+      <rect x="74" y="118" width="38" height="14" rx="2" fill="url(#fixLed)" stroke="#14b8a6" stroke-width="0.8"/>
+      <!-- LED text (station name) -->
+      <text x="93" y="128" font-size="7" fill="#5eead4" text-anchor="middle" font-weight="700" font-family="monospace">駅 STN</text>
+      <!-- LED indicator dots -->
+      <circle cx="78" cy="125" r="1.2" fill="#10b981" filter="url(#fixGlow)">
+        <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
+      </circle>
+      <!-- ===== THE TRAIN ===== -->
+      <g>
+        <!-- Train body -->
+        <rect x="80" y="130" width="40" height="10" rx="3" fill="url(#fixTrainBody)"/>
+        <!-- Windshield -->
+        <path d="M117,131 L122,133 L122,138 L117,139 Z" fill="#022c22"/>
+        <!-- Front rounded cap -->
+        <path d="M120,130 Q126,135 120,140" fill="#6ee7b7" stroke="#10b981" stroke-width="0.5"/>
+        <!-- Passenger windows -->
+        <rect x="85" y="132" width="8" height="5" rx="1" fill="#ccfbf1" filter="url(#fixGlow)" opacity="0.9"/>
+        <rect x="96" y="132" width="8" height="5" rx="1" fill="#ccfbf1" filter="url(#fixGlow)" opacity="0.7"/>
+        <rect x="107" y="132" width="6" height="5" rx="1" fill="#ccfbf1" filter="url(#fixGlow)" opacity="0.8"/>
+        <!-- Headlight -->
+        <circle cx="124" cy="135" r="2" fill="#fff" filter="url(#fixHeadlight)"/>
+        <circle cx="124" cy="135" r="0.8" fill="#fff"/>
+        <!-- Headlight beam -->
+        <path d="M124,135 L145,128 L145,142 Z" fill="#a7f3d0" filter="url(#fixHeadlight)" opacity="0.15"/>
+        <!-- Green line stripe -->
+        <line x1="80" y1="138" x2="120" y2="138" stroke="#059669" stroke-width="1.5"/>
+      </g>
+      <!-- ===== FOREGROUND - Road/Ground ===== -->
+      <rect x="0" y="165" width="200" height="40" fill="#042f2e"/>
+      <!-- Street lights -->
+      <rect x="35" y="155" width="1.5" height="12" fill="#115e59"/>
+      <circle cx="36" cy="155" r="2.5" fill="#fde68a" filter="url(#fixGlow)" opacity="0.6"/>
+      <rect x="160" y="158" width="1.5" height="9" fill="#115e59"/>
+      <circle cx="161" cy="158" r="2.5" fill="#fde68a" filter="url(#fixGlow)" opacity="0.5"/>
+      <!-- Ground texture lines -->
+      <line x1="0" y1="170" x2="200" y2="170" stroke="#0a3d36" stroke-width="0.5"/>
+      <line x1="0" y1="180" x2="200" y2="180" stroke="#0a3d36" stroke-width="0.5"/>
+    </g>
+  </svg>
+</div>
+<!-- ============ 3. FOLLOW LATEST SVG ============ -->
+<div class="card">
+  <h3>Step 2b: Follow Latest / 跟随最新</h3>
+  <svg viewBox="0 0 200 200" overflow="hidden">
+    <defs>
+      <radialGradient id="expBg" cx="50%" cy="50%" r="55%">
+        <stop offset="0%" stop-color="#fef3c7" />
+        <stop offset="100%" stop-color="#fde68a" />
+      </radialGradient>
+      <linearGradient id="expCompassRing" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#b45309" />
+        <stop offset="50%" stop-color="#d97706" />
+        <stop offset="100%" stop-color="#92400e" />
+      </linearGradient>
+      <linearGradient id="expCompassFace" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#fffbeb" />
+        <stop offset="100%" stop-color="#fef3c7" />
+      </linearGradient>
+      <linearGradient id="expTrack" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#78350f" />
+        <stop offset="100%" stop-color="#451a03" />
+      </linearGradient>
+      <linearGradient id="expMtn1" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#d97706" stop-opacity="0.15"/>
+        <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.05"/>
+      </linearGradient>
+      <linearGradient id="expMtn2" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#92400e" stop-opacity="0.12"/>
+        <stop offset="100%" stop-color="#b45309" stop-opacity="0.04"/>
+      </linearGradient>
+      <linearGradient id="expFuji" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#f5f5f4" stop-opacity="0.8"/>
+        <stop offset="30%" stop-color="#a8a29e" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="#d6d3d1" stop-opacity="0.15"/>
+      </linearGradient>
+      <filter id="expShadow">
+        <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.15"/>
+      </filter>
+      <filter id="expGlow">
+        <feGaussianBlur stdDeviation="1.5" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <clipPath id="expClip"><circle cx="100" cy="100" r="100"/></clipPath>
+    </defs>
+    <g clip-path="url(#expClip)">
+      <!-- Warm background -->
+      <circle cx="100" cy="100" r="100" fill="url(#expBg)" />
+      <!-- Subtle map grid background texture -->
+      <g stroke="#f59e0b" stroke-width="0.3" opacity="0.12">
+        <line x1="0" y1="40" x2="200" y2="40"/>
+        <line x1="0" y1="80" x2="200" y2="80"/>
+        <line x1="0" y1="120" x2="200" y2="120"/>
+        <line x1="0" y1="160" x2="200" y2="160"/>
+        <line x1="40" y1="0" x2="40" y2="200"/>
+        <line x1="80" y1="0" x2="80" y2="200"/>
+        <line x1="120" y1="0" x2="120" y2="200"/>
+        <line x1="160" y1="0" x2="160" y2="200"/>
+      </g>
+      <!-- ===== CORNER DECORATIONS ===== -->
+      <!-- Top-left: Mt. Fuji silhouette -->
+      <g transform="translate(15, 20)">
+        <path d="M0,45 L18,8 L22,8 L40,45 Z" fill="url(#expFuji)"/>
+        <!-- Snow cap -->
+        <path d="M14,18 L18,8 L22,8 L26,18 Q20,22 14,18 Z" fill="white" opacity="0.85"/>
+      </g>
+      <!-- Top-right: Tree cluster -->
+      <g transform="translate(152, 28)" opacity="0.5">
+        <path d="M8,22 L14,6 L20,22 Z" fill="#059669" opacity="0.4"/>
+        <rect x="13" y="22" width="2" height="4" fill="#78350f" opacity="0.3"/>
+        <path d="M18,24 L24,10 L30,24 Z" fill="#047857" opacity="0.35"/>
+        <rect x="23" y="24" width="2" height="4" fill="#78350f" opacity="0.3"/>
+        <path d="M0,26 L6,12 L12,26 Z" fill="#10b981" opacity="0.3"/>
+        <rect x="5" y="26" width="2" height="3" fill="#78350f" opacity="0.3"/>
+      </g>
+      <!-- Bottom-left: Milestone marker -->
+      <g transform="translate(22, 150)">
+        <rect x="0" y="8" width="3" height="20" fill="#92400e" opacity="0.35"/>
+        <rect x="-4" y="0" width="11" height="12" rx="1.5" fill="#f59e0b" opacity="0.4"/>
+        <text x="1.5" y="9" font-size="6" fill="#78350f" text-anchor="middle" font-weight="700" opacity="0.6">km</text>
+      </g>
+      <!-- Bottom-right: Another milestone -->
+      <g transform="translate(168, 155)">
+        <rect x="0" y="6" width="3" height="16" fill="#92400e" opacity="0.3"/>
+        <rect x="-3" y="0" width="9" height="10" rx="1.5" fill="#f59e0b" opacity="0.35"/>
+        <text x="1.5" y="7.5" font-size="5" fill="#78350f" text-anchor="middle" font-weight="700" opacity="0.5">42</text>
+      </g>
+      <!-- ===== DUAL ARC RAIL TRACKS (center) ===== -->
+      <!-- Track pair - left arc -->
+      <path d="M35,165 Q60,100 100,85" fill="none" stroke="url(#expTrack)" stroke-width="3" stroke-linecap="round"/>
+      <path d="M40,170 Q65,105 100,90" fill="none" stroke="url(#expTrack)" stroke-width="3" stroke-linecap="round"/>
+      <!-- Sleepers / ties on left arc -->
+      <g stroke="#78350f" stroke-width="1.5" opacity="0.5">
+        <line x1="37" y1="163" x2="42" y2="167" />
+        <line x1="42" y1="152" x2="48" y2="155" />
+        <line x1="49" y1="140" x2="56" y2="143" />
+        <line x1="57" y1="128" x2="63" y2="130" />
+        <line x1="66" y1="117" x2="72" y2="118" />
+        <line x1="76" y1="106" x2="82" y2="107" />
+        <line x1="87" y1="97" x2="92" y2="97" />
+      </g>
+      <!-- Track pair - right arc -->
+      <path d="M165,165 Q140,100 100,85" fill="none" stroke="url(#expTrack)" stroke-width="3" stroke-linecap="round"/>
+      <path d="M160,170 Q135,105 100,90" fill="none" stroke="url(#expTrack)" stroke-width="3" stroke-linecap="round"/>
+      <!-- Sleepers / ties on right arc -->
+      <g stroke="#78350f" stroke-width="1.5" opacity="0.5">
+        <line x1="163" y1="163" x2="158" y2="167" />
+        <line x1="158" y1="152" x2="152" y2="155" />
+        <line x1="151" y1="140" x2="144" y2="143" />
+        <line x1="143" y1="128" x2="137" y2="130" />
+        <line x1="134" y1="117" x2="128" y2="118" />
+        <line x1="124" y1="106" x2="118" y2="107" />
+        <line x1="113" y1="97" x2="108" y2="97" />
+      </g>
+      <!-- Convergence point glow -->
+      <circle cx="100" cy="87" r="6" fill="#f59e0b" opacity="0.15" filter="url(#expGlow)"/>
+      <!-- ===== COMPASS (central, above track convergence) ===== -->
+      <g transform="translate(100, 72)" filter="url(#expShadow)">
+        <!-- Outer ring -->
+        <circle cx="0" cy="0" r="30" fill="url(#expCompassRing)"/>
+        <circle cx="0" cy="0" r="27" fill="url(#expCompassFace)"/>
+        <!-- Degree ticks -->
+        <g stroke="#92400e" stroke-width="1.2">
+          <line x1="0" y1="-25" x2="0" y2="-20"/>
+          <line x1="0" y1="25" x2="0" y2="20"/>
+          <line x1="-25" y1="0" x2="-20" y2="0"/>
+          <line x1="25" y1="0" x2="20" y2="0"/>
+        </g>
+        <g stroke="#b45309" stroke-width="0.6" transform="rotate(45)">
+          <line x1="0" y1="-25" x2="0" y2="-22"/>
+          <line x1="0" y1="25" x2="0" y2="22"/>
+          <line x1="-25" y1="0" x2="-22" y2="0"/>
+          <line x1="25" y1="0" x2="22" y2="0"/>
+        </g>
+        <!-- Cardinal letters -->
+        <text x="0" y="-13" font-size="6" fill="#92400e" text-anchor="middle" font-weight="800">N</text>
+        <text x="0" y="18" font-size="5" fill="#b45309" text-anchor="middle" font-weight="700">S</text>
+        <text x="-14" y="3" font-size="5" fill="#b45309" text-anchor="middle" font-weight="700">W</text>
+        <text x="14" y="3" font-size="5" fill="#b45309" text-anchor="middle" font-weight="700">E</text>
+        <!-- Rose star (subtle) -->
+        <path d="M0,-18 L4,-4 L18,0 L4,4 L0,18 L-4,4 L-18,0 L-4,-4 Z" fill="#fcd34d" opacity="0.2"/>
+        <!-- Needle -->
+        <g>
+          <animateTransform attributeName="transform" type="rotate" values="0;8;-5;3;0" dur="6s" repeatCount="indefinite"/>
+          <path d="M-3,0 L0,-16 L3,0 Z" fill="#dc2626"/>
+          <path d="M-3,0 L0,16 L3,0 Z" fill="#d1d5db"/>
+          <circle cx="0" cy="0" r="3.5" fill="#92400e"/>
+          <circle cx="0" cy="0" r="1.8" fill="#fcd34d"/>
+        </g>
+      </g>
+      <!-- ===== BACKGROUND MOUNTAIN RANGE (behind compass) ===== -->
+      <!-- Far mountains (very subtle) -->
+      <path d="M0,160 L30,120 L55,140 L80,105 L100,115 L120,100 L150,135 L175,115 L200,145 L200,200 L0,200 Z" fill="url(#expMtn1)" opacity="0.5"/>
+      <!-- Near hills -->
+      <path d="M0,175 L40,150 L70,160 L100,145 L130,158 L160,148 L200,170 L200,200 L0,200 Z" fill="url(#expMtn2)" opacity="0.4"/>
+    </g>
+  </svg>
+</div>
+</body>
+</html>

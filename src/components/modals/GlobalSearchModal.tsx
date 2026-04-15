@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, X, Map as MapIcon, MapPin, Building2, Train } from 'lucide-react';
+import { Search, X, Map as MapIcon, MapPin, Building2, Train, ListFilter } from 'lucide-react';
 import { useStore } from '../../store';
+import { useTranslation } from 'react-i18next';
+import { LineLogo } from '../LineLogo';
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
     onSelect: (lineKey: string, stationId?: string) => void;
+    onSwitchMode?: () => void;
+    isEmbedded?: boolean;
 }
 
-export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }) => {
+export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect, onSwitchMode, isEmbedded }) => {
     const railwayData = useStore(state => state.railwayData);
     const { t } = useTranslation();
     const [query, setQuery] = useState('');
@@ -47,7 +51,10 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
                     displayName,
                     company: lineData.meta.company || '',
                     logo: lineData.meta.logo || null,
-                    icon: lineData.meta.icon || null
+                    icon: lineData.meta.icon || null,
+                    companyIcon: lineData.meta.companyIcon || null,
+                    recolor: lineData.meta.recolor,
+                    color: lineData.meta.color
                 });
             }
 
@@ -61,7 +68,10 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
                         stationName: station.name_ja,
                         company: lineData.meta.company || '',
                         logo: lineData.meta.logo || null,
-                        icon: lineData.meta.icon || null
+                        icon: lineData.meta.icon || null,
+                        companyIcon: lineData.meta.companyIcon || null,
+                        recolor: lineData.meta.recolor,
+                        color: lineData.meta.color
                     });
                 }
             });
@@ -74,16 +84,12 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
         };
     }, [query, railwayData]);
 
-    if (!isOpen) return null;
+    if (!isOpen && !isEmbedded) return null;
 
-    return (
-        <div className="fixed inset-0 z-[700] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-            <div
-                className="bg-white w-full max-w-2xl max-h-[85vh] h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up ring-1 ring-black/5"
-                onClick={e => e.stopPropagation()}
-            >
-                {/* Header / Search Input */}
-                <div className="p-4 border-b bg-white flex items-center gap-3 shrink-0 sticky top-0 z-20 shadow-sm">
+    const content = (
+        <div className="flex flex-col h-full w-full bg-white">
+            {/* Header / Search Input */}
+            <div className="p-4 border-b bg-white flex items-center gap-3 shrink-0 sticky top-0 z-20 shadow-sm">
                     <Search className="text-gray-400" size={20} />
                     <input
                         ref={inputRef}
@@ -98,8 +104,18 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
                             <X size={16} />
                         </button>
                     )}
-                    <button onClick={onClose} className="p-2 ml-2 hover:bg-gray-100 rounded-full text-gray-500 transition">
-                        关闭
+                    {onSwitchMode && (
+                        <button
+                            onClick={onSwitchMode}
+                            className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-blue-600 bg-gray-50 border border-gray-200 hover:border-blue-300 px-2.5 py-1.5 rounded-lg shadow-sm transition-all whitespace-nowrap"
+                            title={t('lineSel.title', '选择线路')}
+                        >
+                            <ListFilter size={14} />
+                            <span className="hidden sm:inline">{t('lineSel.title', '选择线路')}</span>
+                        </button>
+                    )}
+                    <button onClick={onClose} className="p-2 ml-1 hover:bg-gray-100 rounded-full text-gray-500 transition shrink-0 font-bold whitespace-nowrap text-sm">
+                        {t('common.close', '关闭')}
                     </button>
                 </div>
 
@@ -120,7 +136,7 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
                             {results.lines.length > 0 && (
                                 <div>
                                     <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
-                                        <Train size={14} /> 线路 ({results.lines.length})
+                                        <Train size={14} /> {t('search.lines', '线路')} ({results.lines.length})
                                     </h4>
                                     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-50">
                                         {results.lines.map((line, idx) => (
@@ -130,7 +146,7 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
                                                 className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors flex items-center gap-3 text-sm text-gray-700 group"
                                             >
                                                 {line.icon ? (
-                                                    <img src={line.icon} alt="" className="line-icon w-5 h-5 object-contain" />
+                                                    <LineLogo src={line.icon!} companyIcon={line.companyIcon} recolor={line.recolor} color={line.color} className="line-icon w-5 h-5 object-contain" />
                                                 ) : line.logo ? (
                                                     <img src={line.logo} alt="" className="line-icon w-5 h-5 object-contain opacity-70 grayscale" />
                                                 ) : (
@@ -152,7 +168,7 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
                             {results.stations.length > 0 && (
                                 <div>
                                     <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
-                                        <MapPin size={14} /> 车站 ({results.stations.length})
+                                        <MapPin size={14} /> {t('search.stations', '车站')} ({results.stations.length})
                                     </h4>
                                     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-50">
                                         {results.stations.map((station, idx) => (
@@ -168,7 +184,7 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
                                                     <div className="font-bold text-gray-800 text-base">{station.stationName}</div>
                                                     <div className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5 truncate">
                                                         {station.icon ? (
-                                                            <img src={station.icon} alt="" className="w-3 h-3 object-contain inline-block" />
+                                                            <LineLogo src={station.icon!} companyIcon={station.companyIcon} recolor={station.recolor} color={station.color} className="w-3 h-3 object-contain inline-block" />
                                                         ) : station.logo ? (
                                                             <img src={station.logo} alt="" className="w-3 h-3 object-contain inline-block grayscale opacity-60" />
                                                         ) : (
@@ -185,6 +201,19 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect }
                         </div>
                     )}
                 </div>
+            </div>
+        </div>
+    );
+
+    if (isEmbedded) return content;
+
+    return (
+        <div className="fixed inset-0 z-[700] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+            <div
+                className="bg-white w-full max-w-2xl max-h-[85vh] h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up ring-1 ring-black/5"
+                onClick={e => e.stopPropagation()}
+            >
+                {content}
             </div>
         </div>
     );

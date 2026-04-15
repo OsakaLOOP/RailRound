@@ -7,6 +7,7 @@ import { computeLoopVia, getLandmarks } from '../core/railwayRouting';
 import { isMobile } from 'react-device-detect';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
+import { LineLogo } from '../components/LineLogo';
 
 const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
     const { t } = useTranslation();
@@ -71,6 +72,7 @@ const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
 import { useUserData } from '../hooks/useUserData';
 import { processSuicaCSV } from '../utils/suicaParser';
 import toast from 'react-hot-toast';
+import { showConfirm } from '../utils/alerts';
 
 export const TripsPage: React.FC = () => {
     const { trips, railwayData, segmentGeometries, user, pins, folders, badgeSettings } = useStore(useShallow(state => ({
@@ -96,7 +98,7 @@ export const TripsPage: React.FC = () => {
         if (!file) return;
 
         const reader = new FileReader();
-        const toastId = toast.loading('解析 Suica CSV 数据...');
+        const toastId = toast.loading(t('tripsPage.parsingSuica', '解析 Suica CSV 数据...'));
 
         reader.onload = async (e) => {
             const text = e.target?.result as string;
@@ -109,13 +111,17 @@ export const TripsPage: React.FC = () => {
                     if (newTrips.length > 0) {
                         toast.dismiss(toastId);
                         const skipMsg = skippedCount > 0 ? t('tripsPage.skipMsg', '\n(已跳过 {{count}} 条重复记录)', { count: skippedCount }) : '';
-                        if (window.confirm(t('tripsPage.parseSuccess', '成功解析 {{count}} 条新行程。是否导入？{{skipMsg}}\n(按 F12 打开控制台查看详细匹配日志)', { count: newTrips.length, skipMsg: skipMsg }))) {
+                        const confirmed = await showConfirm(
+                            t('tripsPage.parseSuccessTitle', '解析成功'),
+                            t('tripsPage.parseSuccess', '成功解析 {{count}} 条新行程。是否导入？{{skipMsg}}\n(按 F12 打开控制台查看详细匹配日志)', { count: newTrips.length, skipMsg: skipMsg })
+                        );
+                        if (confirmed) {
                             newTrips.forEach(trip => addTrip(trip));
                             const skipMsgShort = skippedCount > 0 ? t('tripsPage.skipMsgShort', ' (跳过 {{count}} 重复)', { count: skippedCount }) : '';
                             toast.success(t('tripsPage.importSuccess', '导入了 {{count}} 条行程！{{skipMsg}}', { count: newTrips.length, skipMsg: skipMsgShort }));
                             if (user) {
                                 const updatedTrips = [...newTrips, ...trips].sort((a, b) => b.date.localeCompare(a.date));
-                                saveData(user.token, updatedTrips, pins, folders, badgeSettings).catch((err: any) => toast.error('云端同步失败'));
+                                saveData(user.token, updatedTrips, pins, folders, badgeSettings).catch((err: any) => toast.error(t('common.syncFail', '云端同步失败')));
                             }
                         }
                     } else {
@@ -139,12 +145,12 @@ export const TripsPage: React.FC = () => {
         event.target.value = '';
     };
 
-    const handleDeleteTrip = (id: string | number) => {
-        if (confirm(t('tripsPage.deleteConfirm', '确认删除?'))) {
+    const handleDeleteTrip = async (id: string | number) => {
+        if (await showConfirm(t('common.deleteConfirm', '确认删除?'))) {
             removeTrip(id);
             if (user) {
                 const newTrips = trips.filter(trip => trip.id !== id);
-                saveData(user.token, newTrips, pins, folders, badgeSettings).catch((e: any) => alert('云端同步失败'));
+                saveData(user.token, newTrips, pins, folders, badgeSettings).catch((e: any) => toast.error(t('common.syncFail', '云端同步失败')));
             }
         }
     };
@@ -238,7 +244,7 @@ export const TripsPage: React.FC = () => {
                                                 <div key={idx} className="relative z-10 flex flex-col text-sm">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-white shadow-sm shrink-0"></div>
-                                                        {icon && <img src={icon} alt="" className="line-icon" />}
+                                                        {icon && <LineLogo src={icon} companyIcon={line?.meta?.companyIcon} recolor={line?.meta?.recolor} color={line?.meta?.color} className="line-icon" />}
                                                         <span className="font-bold text-emerald-700 text-xs">{seg.lineKey}</span>
                                                     </div>
                                                     <div className="pl-5 font-medium text-gray-700">{getSt(seg.fromId)} <span className="text-gray-300 mx-1">→</span> {getSt(seg.toId)}</div>

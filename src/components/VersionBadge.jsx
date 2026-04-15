@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Clock, GitCommit, Loader2, AlertCircle, MapPin } from 'lucide-react';
+import { Bell, Clock, GitCommit, Loader2, AlertCircle, MapPin, ChevronDown } from 'lucide-react';
 
 const VersionBadge = ({ version: currentVersion }) => {
     const [isHovered, setIsHovered] = useState(false);
@@ -128,7 +128,7 @@ const VersionBadge = ({ version: currentVersion }) => {
                         ) : (
                             <div className="relative">
                                 {data.logs.map((log, idx) => {
-                                    const showDivider = idx > 0 && data.logs[idx - 1].type === 'next' && log.type !== 'next';
+                                    const showDivider = log.version === data.meta.currentVersion;
                                     const isLastItem = idx === data.logs.length - 1;
                                     
                                     const isPrecedingDivider = !isLastItem && log.type === 'next' && data.logs[idx + 1] && data.logs[idx + 1].type !== 'next';
@@ -141,6 +141,7 @@ const VersionBadge = ({ version: currentVersion }) => {
                                                     <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 bg-white px-2 py-0.5 rounded-full border border-slate-100 shadow-sm">
                                                         <MapPin size={10} className="text-[#39C5BB]" fill="currentColor" />
                                                         You are here
+                                                        <ChevronDown size={10} className="text-[#39C5BB] animate-bounce" />
                                                     </span>
                                                     <div className="h-px bg-gradient-to-l from-transparent via-slate-200 to-slate-200 flex-1 border-t border-dashed border-slate-300"></div>
                                                 </div>
@@ -166,7 +167,7 @@ const VersionBadge = ({ version: currentVersion }) => {
                                                 </div>
 
                                                 <div className="flex-1 pt-0.5">
-                                                    <div className="text-xs text-gray-700 leading-relaxed font-medium group-hover:text-black transition-colors">
+                                                    <div className="text-xs text-gray-700 leading-relaxed font-medium group-hover:text-black transition-colors whitespace-pre-line">
                                                         {log.content}
                                                     </div>
                                                     <div className="text-[10px] text-gray-300 mt-1">{log.date}</div>

@@ -1,5 +1,6 @@
 /* eslint-disable */
 /* legacy code for inspection/ comparision only */
+/* no more changes. go to applayout.tsx */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import buildKMLString from './buildKml';
@@ -28,7 +29,8 @@ import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, s
 import { VersionBadge } from './components/VersionBadge';
 import manifest from '../public/geojson_manifest.json';
 
-const meta = { currentVersion: '1.0.0' };
+import changelog from '../public/changelog.json';
+const { meta } = changelog;
 import { useStore } from './store';
 import toast from 'react-hot-toast';
 import { ESLint } from 'eslint';

@@ -12,6 +12,58 @@
     "tabRecords": {
       "title": "行程記錄",
       "content": "這個分頁是你的旅程控制中心。你可以在這裡查看、添加和管理所有的鐵路旅行記錄，或者添加到收藏"
+    },
+    "addTrip": {
+      "title": "初次記錄",
+      "content": "點擊下方懸浮的「新旅程」按鈕打開編輯選單"
+    },
+    "editorModes": {
+      "title": "編輯模式",
+      "content": "你可以選擇「手動錄入」以致敬舊時代的工匠精神，或者嘗試「自動規劃」, 將命運交給無限非概率驅動"
+    },
+    "autoPlanningView": {
+      "title": "自動規劃",
+      "content": "在這裡選擇起點和終點，系統會自動為你規劃一條基於新幹線優先的路線。完成後，我們繼續。"
+    },
+    "closeEditor": {
+      "title": "關閉編輯器",
+      "content": "先關掉它. 繼續參觀飛船的其他部分，別讓編輯器擋住了視線. "
+    },
+    "importExport": {
+      "title": "Escape Pods",
+      "content": "我們堅信數據歸你自己所有, 前提是你得學會備份. 在這裡你可以將行程導出為 KML/JSON. "
+    },
+    "tabMap": {
+      "title": "地圖模式",
+      "content": "切換並查看鐵路網絡. 灰色的是未乘區段, 而已乘線路將以對應的顏色高亮顯示. 底圖包含來自 OpenRailwayMap 的配線詳情. 新版本不再渲染已乘區間的svg圖形, 而豐富了站點交互. 你可以長按站點並拖動連接, 以自動規劃。"
+    },
+    "mapPins": {
+      "title": "安放地圖圖釘",
+      "content": "在這裡把照片或評論釘在地圖上, 大概率比某个名叫 Jesus Christ 男人的十字架更牢固. "
+    },
+    "closePinEditor": {
+      "title": "關閉圖釘模式",
+      "content": "圖釘編輯器會出現在底部。你可以點擊編輯器右上角的 'X' 按鈕，或再次點擊地圖上的圖釘按鈕來關閉它。"
+    },
+    "mapLayers": {
+      "title": "切換底圖風格",
+      "content": "無論是為了省電還是為了配合夜宵，這裡可以在深色和淺色地圖風格間切換. "
+    },
+    "tabStats": {
+      "title": "Aftermath",
+      "content": "點擊這裡查看統計。看看你在這個星球的鐵軌上究竟燒掉了多少錢，以及產生了多少碳排放(已加入todo)。"
+    },
+    "statsContent": {
+      "title": "鐵道迷的勳章",
+      "content": "這裡展示你的總里程、消費和最常訪問的線路. "
+    },
+    "finishLogin": {
+      "title": "RailLOOP, 輕而易舉啊",
+      "content": "引導結束。現在我們將打開登錄界面，建議你綁定 GitHub 帳號，這能讓你生成酷炫的 SVG 卡片去主頁顯擺。"
+    },
+    "loginGuide": {
+      "title": "閱讀協議",
+      "content": "在開始之前，請務必閱讀這份實則是免責聲明的用戶指南. 如果你們當中有宇宙人、未來人、超能力者, 請忽略其中的物理限制條款。"
     }
   },
   "loginModal": {
@@ -30,8 +82,7 @@
     "toRegister": "建立新帳號",
     "toLogin": "去登入",
     "guideTitle": "用戶指南 / 協議",
-    "disclaimer": "註冊/登入後使用即代表您同意上述協議內容，否則您的數據將僅在本地(前端)處理。",
-    "createBtn": "建立帳號"
+    "disclaimer": "註冊/登入後使用即代表您同意上述協議內容，否則您的數據將僅在本地(前端)處理。"
   },
   "statsPage": {
     "bindGithub": "綁定 GitHub",
@@ -39,10 +90,10 @@
     "badgeCode": "裝飾代碼",
     "totalTrips": "記錄數",
     "uniqueLines": "制霸路線",
-    "starFolders": "Star Folders",
-    "starFoldersDesc": "Manage trip collections & badges",
+    "starFolders": "星標資料夾",
+    "starFoldersDesc": "管理路程集合和關聯的徽章",
     "personalSettings": "個人偏好設定",
-    "language": "UI 語言 / UI Language",
+    "language": "UI 語言 / Language",
     "mapCenter": "地圖初始位置",
     "fixedInterest": "固定興趣",
     "followLatest": "跟隨最新",
@@ -64,13 +115,15 @@
     "recordNewTrip": "記錄新行程",
     "importSuica": "匯入 Suica CSV",
     "deleteConfirm": "確認刪除?",
-    "parseSuccess": "成功解析 {{count}} 條新行程。是否匯入？{{skipMsg}}\n(按 F12 打開主控台查看詳細比對記錄)",
+    "parseSuccess": "成功解析 {count} 條新行程。是否匯入？{{skipMsg}}\n(按 F12 打開主控台查看詳細比對記錄)",
+    "parseSuccessTitle": "解析成功",
     "skipMsg": "\n(已跳過 {{count}} 條重複記錄)",
-    "importSuccess": "匯入了 {{count}} 條行程！{{skipMsg}}",
+    "importSuccess": "匯入了 {count} 條行程！{{skipMsg}}",
     "skipMsgShort": " (跳過 {{count}} 重複)",
     "allExist": "解析完成，但所有記錄（{{count}}條）已存在，無需重複匯入。",
     "noImport": "未找到可匯入的行程，或者解析失敗。",
-    "readError": "讀取或解析檔案出錯。"
+    "readError": "讀取或解析檔案出錯。",
+    "parsingSuica": "解析 Suica CSV 資料..."
   },
   "search": {
     "close": "關閉",
@@ -125,7 +178,8 @@
     "subway": "地下鐵・新交通",
     "allRegions": "全部地域",
     "noRegion": "無地域分類",
-    "noResult": "無符合條件的路線"
+    "noResult": "無符合條件的路線",
+    "cnMainlandEnt": "中國大陸入口"
   },
   "githubReg": {
     "title": "完成註冊",
@@ -137,7 +191,30 @@
   "folder": {
     "saveFail": "保存失敗: ",
     "title": "收藏夾",
-    "placeholder": "名稱..."
+    "titleShort": "收藏夾",
+    "placeholder": "名稱...",
+    "deleteConfirm": "確認刪除資料夾？",
+    "noFolders": "暫無收藏夾",
+    "noFoldersShort": "暫無收藏夾。請前往統計頁面建立。",
+    "tripCount": "{{count}} 條行程",
+    "addToTitle": "添加到收藏夾"
+  },
+  "pin": {
+    "titleSnap": "吸附: {{line}}",
+    "titleFree": "自由位置",
+    "placeholderMemo": "備註...",
+    "placeholderUrl": "圖片URL...",
+    "btnCreate": "添加",
+    "btnUpdate": "更新"
+  },
+  "githubCard": {
+    "title": "GitHub 個人資料裝飾",
+    "enabled": "開啟公開掛件訪問",
+    "source": "數據來源",
+    "global": "全局 (所有行程)",
+    "noUrl": "沒有可用的公開 URL",
+    "disabled": "掛件已禁用",
+    "markdownTitle": "Markdown 代碼 (複製到 README)"
   },
   "tripEdit": {
     "editTitle": "編輯行程",
@@ -168,7 +245,12 @@
     "fillInfo": "請完善信息",
     "autoMaxLimit": "自動規劃超出6次換乘限制或無解。\n是否繼續無限制深度搜索？(這可能需要較長等待時間)",
     "autoFail": "無法規劃: ",
-    "pathTooLong": "路徑過長"
+    "autoFailTitle": "換乘超限",
+    "pathTooLong": "路徑過長",
+    "saveFail": "雲端保存失敗: ",
+    "disconnected": "連接中斷",
+    "disconnectTitle": "連接錯誤",
+    "disconnectMsg": "段落之間未連通，請檢查起止站點。"
   },
   "app": {
     "fetchRemote": "正在取得遠端資料... (10%)",
@@ -194,12 +276,75 @@
     "exportErr": "匯出過程中發生錯誤。",
     "invalidBackup": "無效的備份檔案",
     "missLine": "偵測到缺少以下路線的基礎資料，可能會導致顯示異常：\n\n{{lines}}\n\n建議先去地圖頁面上傳對應的 GeoJSON 檔案。是否繼續匯入？",
+    "missLineTitle": "缺少數據",
     "importSuccess": "資料匯入完成！\n\n行程: 新增 {{newT}} 條 (跳過重複/無效 {{skipT}} 條)\n圖釘: 新增 {{newP}} 個 (跳過重複/無效 {{skipP}} 個)",
     "fileParseErr": "檔案解析失敗",
     "companyUpdated": "公司資料庫已更新",
     "parseFail": "解析失敗",
     "fileSkip": "檔案 {{name}} 解析失敗，已跳過",
     "importCount": "成功匯入 {{count}} 個檔案！",
-    "fileProcErr": "檔案處理過程中發生未知錯誤"
+    "fileProcErr": "檔案處理過程中發生未知錯誤",
+    "unknown": "未知",
+    "uploadedData": "上傳數據",
+    "systemBackupGen": "已產生系統備份檔案，請注意查收！",
+    "saveFail": "保存失敗: ",
+    "syncFail": "雲端同步失敗",
+    "mergeConfirm": "檢測到本地有數據或個人配置，是否保留並與雲端數據合併？\n\n點擊【確定】合併 (Keep Local)\n點擊【取消】僅使用雲端數據 (Overwrite Local)",
+    "mergeConfirmTitle": "數據衝突"
+  },
+  "header": {
+    "welcome": "歡迎, {{name}}",
+    "loginRegister": "登錄 / 註冊",
+    "logout": "退出",
+    "exportKML": "導出 KML",
+    "data": "資料庫",
+    "mapData": "地圖"
+  },
+  "common": {
+    "deleteConfirm": "確認刪除?",
+    "syncFail": "雲端同步失敗",
+    "saveFail": "保存失敗: ",
+    "error": "錯誤",
+    "ok": "確定",
+    "confirm": "確定",
+    "cancel": "取消",
+    "create": "創建",
+    "close": "關閉",
+    "search": "搜尋",
+    "comingSoon": "敬請期待"
+  },
+  "map": {
+    "loadFail": "地圖加載失敗 ({{domain}})\n請檢查網絡或切換 VPN 節點",
+    "rubberBandBreak": "哎呀！橡皮筋拉斷了，彈到手了！💥",
+    "geoNotSupported": "瀏覽器不支持地理定位",
+    "geoDenied": "位置訪問被拒絕。",
+    "geoFail": "獲取位置失敗。",
+    "geoTimeout": "獲取位置超時。",
+    "geoUnavailable": "位置信息不可用。"
+  },
+  "chest": {
+    "searchingRoute": "正在尋找路徑...",
+    "routeFound": "找到路徑",
+    "routeNotFound": "未找到路徑",
+    "inventory": "物品欄",
+    "slots": "{{count}} 個格子",
+    "empty": "物品欄為空",
+    "origin": "起點",
+    "dest": "終點",
+    "memorial": "乘車紀念",
+    "used": "使用済",
+    "autoGenerated": "自動規劃路線"
+  },
+  "regions": {
+    "北海道・東北": "北海道・東北",
+    "関東": "関東",
+    "中部": "中部",
+    "近畿": "近畿",
+    "中国地方": "中国地方",
+    "四国": "四国",
+    "九州・沖縄": "九州・沖縄",
+    "其他": "その他",
+    "未知": "未知",
+    "中国大陆": "中国大陸"
   }
 }

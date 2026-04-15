@@ -4,8 +4,11 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import * as turf from '@turf/turf';
+import { useTranslation } from 'react-i18next';
+import { showAlert, showConfirm } from '../../utils/alerts';
 
 export const WalkTripEditor: React.FC = () => {
+    const { t } = useTranslation();
     const {
         isOpen, isEditing, form, railwayData, trips, pins, folders, badgeSettings, user
     } = useStore(useShallow(state => ({
@@ -67,12 +70,12 @@ export const WalkTripEditor: React.FC = () => {
     const onSave = async () => {
         if (!form.date) return;
         if (!form.fromId || !form.toId) {
-            alert(t('walk.noStartEnd', '缺少起止点'));
+            showAlert(t('walk.noStartEnd', '缺少起止点'));
             return;
         }
 
         const newTripsToAdd = [];
-        const nextTrips = trips.filter(t => t.id !== form.id);
+        const nextTrips = trips.filter(trip => trip.id !== form.id);
 
         let walkPath = form.walkPath;
         if (!walkPath) {
@@ -121,17 +124,17 @@ export const WalkTripEditor: React.FC = () => {
 
         setTrips(finalTrips);
         if (user) {
-            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => alert(t('walk.saveFail', '云端保存失败: ') + e.message));
+            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => showAlert(t('walk.saveFail', '云端保存失败: ') + e.message, '', 'error'));
         }
         closeEditor();
     };
 
     const onDelete = async () => {
-        if (!window.confirm(t('walk.delConfirm', "确定要删除这条步行记录吗？"))) return;
-        const nextTrips = trips.filter(t => t.id !== form.id);
+        if (!await showConfirm(t('walk.delConfirm', "确定要删除这条步行记录吗？"))) return;
+        const nextTrips = trips.filter(trip => trip.id !== form.id);
         setTrips(nextTrips);
         if (user) {
-            saveData(user.token, nextTrips, pins, folders, badgeSettings).catch((e: any) => alert(t('walk.delFail', '云端删除失败: ') + e.message));
+            saveData(user.token, nextTrips, pins, folders, badgeSettings).catch((e: any) => showAlert(t('walk.delFail', '云端删除失败: ') + e.message, '', 'error'));
         }
         closeEditor();
     };

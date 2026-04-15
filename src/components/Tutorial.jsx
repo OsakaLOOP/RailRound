@@ -26,8 +26,8 @@ const getSteps = (t) => [
     {
         id: 'add-trip',
         target: '#btn-add-trip',
-        title: "初次记录",
-        content: "点击下方悬浮的“新旅程”按钮打开编辑菜单",
+        title: t('tutorial.addTrip.title', '初次记录'),
+        content: t('tutorial.addTrip.content', '点击下方悬浮的“新旅程”按钮打开编辑菜单'),
         position: 'top',
         action: 'wait-interaction', 
         check: ({ isTripEditing }) => isTripEditing
@@ -35,8 +35,8 @@ const getSteps = (t) => [
     {
         id: 'editor-modes',
         target: '#trip-editor-toggle-mode',
-        title: "编辑模式",
-        content: "你可以选择“手动录入”以致敬旧时代的工匠精神，或者尝试“自动规划”, 将命运交给无限非概率驱动",
+        title: t('tutorial.editorModes.title', '编辑模式'),
+        content: t('tutorial.editorModes.content', '你可以选择“手动录入”以致敬旧时代的工匠精神，或者尝试“自动规划”, 将命运交给无限非概率驱动'),
         position: 'bottom',
         action: 'wait-interaction',
         check: ({ editorMode }) => editorMode === 'auto'
@@ -44,16 +44,16 @@ const getSteps = (t) => [
     {
         id: 'auto-planning-view',
         target: '#auto-planning-form',
-        title: "自动规划",
-        content: "在这里选择起点和终点，系统会自动为你规划一条基于新干线优先的路线。完成后，我们继续。",
+        title: t('tutorial.autoPlanningView.title', '自动规划'),
+        content: t('tutorial.autoPlanningView.content', '在这里选择起点和终点，系统会自动为你规划一条基于新干线优先的路线。完成后，我们继续。'),
         position: 'bottom',
         action: 'next'
     },
     {
         id: 'close-editor',
         target: '#btn-close-editor',
-        title: "关闭编辑器",
-        content: "先关掉它. 继续参观飞船的其他部分，别让编辑器挡住了视线. ",
+        title: t('tutorial.closeEditor.title', '关闭编辑器'),
+        content: t('tutorial.closeEditor.content', '先关掉它. 继续参观飞船的其他部分，别让编辑器挡住了视线. '),
         position: 'bottom',
         action: 'wait-interaction',
         check: ({ isTripEditing }) => !isTripEditing
@@ -61,16 +61,16 @@ const getSteps = (t) => [
     {
         id: 'import-export',
         target: '#header-actions',
-        title: "Escape Pods",
-        content: "我们坚信数据归你自己所有, 前提是你得学会备份. 在这里你可以将行程导出为 KML/JSON. ",
+        title: t('tutorial.importExport.title', 'Escape Pods'),
+        content: t('tutorial.importExport.content', '我们坚信数据归你自己所有, 前提是你得学会备份. 在这里你可以将行程导出为 KML/JSON. '),
         position: 'bottom',
         action: 'next'
     },
     {
         id: 'tab-map',
         target: '#tab-btn-map',
-        title: "地图模式",
-        content: "切换并查看铁路网络. 灰色的是未乘区段, 而已乘线路将以对应的颜色高亮显示. 底图包含来自 OpenRailwayMap 的配线详情. 新版本不再渲染已乘区间的svg图形, 而丰富了站点交互. 你可以长按站点并拖动连接, 以自动规划.",
+        title: t('tutorial.tabMap.title', '地图模式'),
+        content: t('tutorial.tabMap.content', '切换并查看铁路网络. 灰色的是未乘区段, 而已乘线路将以对应的颜色高亮显示. 底图包含来自 OpenRailwayMap 的配线详情. 新版本不再渲染已乘区间的svg图形, 而丰富了站点交互. 你可以长按站点并拖动连接, 以自动规划。'),
         position: 'top',
         action: 'switch-tab',
         tab: 'map'
@@ -78,8 +78,8 @@ const getSteps = (t) => [
     {
         id: 'map-pins',
         target: '#btn-pins-fab',
-        title: "安放地图图钉",
-        content: "在这里把照片或评论钉在地图上, 大概率比某个名叫 Jesus Christ 男人的十字架更牢固. ",
+        title: t('tutorial.mapPins.title', '安放地图图钉'),
+        content: t('tutorial.mapPins.content', '在这里把照片或评论钉在地图上, 大概率比某个名叫 Jesus Christ 男人的十字架更牢固. '),
         position: 'right', // FAB is bottom-left
         action: 'wait-interaction',
         check: ({ pinMode }) => pinMode && pinMode !== 'idle'
@@ -87,8 +87,8 @@ const getSteps = (t) => [
     {
         id: 'close-pin-editor',
         target: '#pin-editor',
-        title: "关闭图钉模式",
-        content: "图钉编辑器会出现在底部。你可以点击编辑器右上角的 'X' 按钮，或再次点击地图上的图钉按钮来关闭它。",
+        title: t('tutorial.closePinEditor.title', '关闭图钉模式'),
+        content: t('tutorial.closePinEditor.content', '图钉编辑器会出现在底部。你可以点击编辑器右上角的 \'X\' 按钮，或再次点击地图上的图钉按钮来关闭它。'),
         position: 'top',
         action: 'wait-interaction',
         check: ({ pinMode }) => pinMode === 'idle'
@@ -96,16 +96,16 @@ const getSteps = (t) => [
     {
         id: 'map-layers',
         target: '.leaflet-control-layers',
-        title: "切换底图风格",
-        content: "无论是为了省电还是为了配合夜宵，这里可以在深色和浅色地图风格间切换. ",
+        title: t('tutorial.mapLayers.title', '切换底图风格'),
+        content: t('tutorial.mapLayers.content', '无论是为了省电还是为了配合夜宵，这里可以在深色和浅色地图风格间切换. '),
         position: 'left', // Top-right control
         action: 'next'
     },
     {
         id: 'tab-stats',
         target: '#tab-btn-stats',
-        title: "Aftermath",
-        content: "点击这里查看统计。看看你在这个星球的铁轨上究竟烧掉了多少钱，以及产生了多少碳排放(已加入todo).",
+        title: t('tutorial.tabStats.title', 'Aftermath'),
+        content: t('tutorial.tabStats.content', '点击这里查看统计。看看你在这个星球的铁轨上究竟烧掉了多少钱，以及产生了多少碳排放(已加入todo).'),
         position: 'top',
         action: 'wait-click-tab', // Specifically asked to guide click
         tab: 'stats',
@@ -114,24 +114,24 @@ const getSteps = (t) => [
     {
         id: 'stats-content',
         target: '#stats-view-content',
-        title: "铁道迷的勋章",
-        content: "这里展示你的总里程、消费和最常访问的线路. ",
+        title: t('tutorial.statsContent.title', '铁道迷的勋章'),
+        content: t('tutorial.statsContent.content', '这里展示你的总里程、消费和最常访问的线路. '),
         position: 'center', 
         action: 'next'
     },
     {
         id: 'finish-login',
         target: null,
-        title: "RailLOOP, 轻而易举啊",
-        content: "引导结束。现在我们将打开登录界面，建议你绑定 GitHub 账号，这能让你生成酷炫的 SVG 卡片去主页显摆.",
+        title: t('tutorial.finishLogin.title', 'RailLOOP, 轻而易举啊'),
+        content: t('tutorial.finishLogin.content', '引导结束。现在我们将打开登录界面，建议你绑定 GitHub 账号，这能让你生成酷炫的 SVG 卡片去主页显摆.'),
         position: 'center',
         action: 'finish'
     },
     {
          id: 'login-guide',
          target: '#login-readme-container',
-         title: "阅读协议",
-         content: "在开始之前，请务必阅读这份实则是免责声明的用户指南. 如果你们当中有宇宙人、未来人、超能力者, 请忽略其中的物理限制条款.",
+         title: t('tutorial.loginGuide.title', '阅读协议'),
+         content: t('tutorial.loginGuide.content', '在开始之前，请务必阅读这份实则是免责声明的用户指南. 如果你们当中有宇宙人、未来人、超能力者, 请忽略其中的物理限制条款。'),
          position: 'left',
          action: 'end'
     }
@@ -158,6 +158,19 @@ const Tutorial = ({
 
     // Ref for the tooltip card to measure strict dimensions
     const tooltipRef = useRef(null);
+    const isFirstTimeShowing = useRef(true);
+
+    // Reset first time showing when step changes, but we check it inside effects
+    useEffect(() => {
+        if (isVisible && step >= 0) {
+            const timer = setTimeout(() => {
+                isFirstTimeShowing.current = false;
+            }, 600); // Slightly longer than transition
+            return () => clearTimeout(timer);
+        } else {
+            isFirstTimeShowing.current = true;
+        }
+    }, [isVisible, step]);
 
     const handleNext = useCallback(() => {
         if (step === STEPS.length - 2) { // Finish step
@@ -165,22 +178,32 @@ const Tutorial = ({
             setIsLoginOpen(true);
             setTimeout(() => setStep(s => s + 1), 200);
         } else if (step >= STEPS.length - 1) {
-            // End -> Show City Selector
-            setStep(-3);
+            // End -> Show City Selector if not done
+            const setupDone = localStorage.getItem('rail_setup_done');
+            if (setupDone === 'true' || devMode) {
+                setStep(-2);
+            } else {
+                setStep(-3);
+            }
             setIsVisible(false);
         } else {
             setStep(s => s + 1);
         }
-    }, [step, setIsLoginOpen, setStep, setIsVisible]);
+    }, [step, setIsLoginOpen, setStep, setIsVisible, devMode]);
 
     const handleSkip = useCallback((dontShowAgain) => {
         if (dontShowAgain) {
             localStorage.setItem('rail_tutorial_skipped', 'true');
         }
-        // Skip -> Show City Selector
-        setStep(-3);
+        // Skip -> Show City Selector if not done
+        const setupDone = localStorage.getItem('rail_setup_done');
+        if (setupDone === 'true' || devMode) {
+            setStep(-2);
+        } else {
+            setStep(-3);
+        }
         setIsVisible(false);
-    }, [setStep, setIsVisible]);
+    }, [setStep, setIsVisible, devMode]);
 
     // Keyboard navigation for tutorial
     useEffect(() => {
@@ -206,36 +229,27 @@ const Tutorial = ({
         const skipped = localStorage.getItem('rail_tutorial_skipped');
         const setupDone = localStorage.getItem('rail_setup_done');
 
-        if (devMode || skipped === 'true' || user) {
-            if (!setupDone && !devMode) {
-                setStep(-3); // Show Initial Setup Modal if skipped/logged in but not done
-            } else {
-                setStep(-2); // Completely skipped
-            }
+        // Priority 1: Tutorial
+        if (!devMode && skipped !== 'true' && !user) {
+            setStep(0);
+            setIsVisible(true);
             return;
         }
 
-        // For new users who haven't skipped/logged in AND haven't done setup:
-        if (!setupDone && !devMode) {
+        // Priority 2: Initial Setup
+        if (!devMode && setupDone !== 'true') {
             setStep(-3);
             return;
         }
 
-        setStep(0);
-        setIsVisible(true);
+        // Otherwise: All set
+        setStep(-2);
     }, [user, devMode, i18n.language]);
 
     const handleCitySelectorComplete = useCallback(() => {
         localStorage.setItem('rail_setup_done', 'true');
-
-        const skipped = localStorage.getItem('rail_tutorial_skipped');
-        if (skipped === 'true' || user) {
-             setStep(-2); // Final skip if they are logged in or skipped previously
-        } else {
-             setStep(0); // Proceed to tutorial
-             setIsVisible(true);
-        }
-    }, [setStep, user]);
+        setStep(-2); // Finish onboarding flow
+    }, [setStep]);
 
     // Step Transition Logic & Rect Calculation
     useEffect(() => {
@@ -258,7 +272,7 @@ const Tutorial = ({
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
                     opacity: 1,
-                    transition: 'all 0.5s cubic-bezier(0.25, 1, 0.5, 1)'
+                    transition: isFirstTimeShowing.current ? 'opacity 0.4s ease-out' : 'all 0.5s cubic-bezier(0.25, 1, 0.5, 1)'
                 });
                 return;
             }
@@ -269,7 +283,7 @@ const Tutorial = ({
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
                     opacity: 1,
-                    transition: 'all 0.5s cubic-bezier(0.25, 1, 0.5, 1)'
+                    transition: isFirstTimeShowing.current ? 'opacity 0.4s ease-out' : 'all 0.5s cubic-bezier(0.25, 1, 0.5, 1)'
                 });
             }    
             const el = document.querySelector(currentStep.target);
@@ -329,7 +343,6 @@ const Tutorial = ({
         // Viewport Dimensions
         const winH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         const winW = window.visualViewport ? window.visualViewport.width : window.innerWidth;
-        const offsetTop = window.visualViewport ? window.visualViewport.offsetTop : 0;
 
         // Center of the target element
         const targetCenterX = rect.left + rect.width / 2;
@@ -340,36 +353,36 @@ const Tutorial = ({
         let pos = currentStep.position;
 
         // Helper to check collision
-        const checkBounds = (t, l) => {
-            return (t >= PADDING && l >= PADDING && (t + CARD_H) <= (winH - PADDING) && (l + CARD_W) <= (winW - PADDING));
+        const checkBounds = (topVal, leftVal) => {
+            return (topVal >= PADDING && leftVal >= PADDING && (topVal + CARD_H) <= (winH - PADDING) && (leftVal + CARD_W) <= (winW - PADDING));
         };
 
         // 1. Determine Initial Position & Flip if needed
         const getCoords = (p) => {
-            let t, l;
+            let topVal, leftVal;
             if (p === 'bottom') {
-                t = rect.top + rect.height + 20;
-                l = targetCenterX - (CARD_W / 2);
+                topVal = rect.top + rect.height + 20;
+                leftVal = targetCenterX - (CARD_W / 2);
             } else if (p === 'top') {
-                t = rect.top - CARD_H - 20;
-                l = targetCenterX - (CARD_W / 2);
+                topVal = rect.top - CARD_H - 20;
+                leftVal = targetCenterX - (CARD_W / 2);
             } else if (p === 'right') {
-                t = targetCenterY - (CARD_H / 2);
-                l = rect.left + rect.width + 20;
+                topVal = targetCenterY - (CARD_H / 2);
+                leftVal = rect.left + rect.width + 20;
             } else if (p === 'left') {
-                t = targetCenterY - (CARD_H / 2);
-                l = rect.left - CARD_W - 20;
+                topVal = targetCenterY - (CARD_H / 2);
+                leftVal = rect.left - CARD_W - 20;
             } else { // center
-                t = winH / 2 - CARD_H / 2;
-                l = winW / 2 - CARD_W / 2;
+                topVal = winH / 2 - CARD_H / 2;
+                leftVal = winW / 2 - CARD_W / 2;
             }
-            return { t, l };
+            return { top: topVal, left: leftVal };
         };
 
         let coords = getCoords(pos);
 
         // Smart Flip
-        if (!checkBounds(coords.t, coords.l) && pos !== 'center') {
+        if (!checkBounds(coords.top, coords.left) && pos !== 'center') {
             const opposites = { 'top': 'bottom', 'bottom': 'top', 'left': 'right', 'right': 'left' };
             const altPos = opposites[pos];
             if (altPos) {
@@ -377,14 +390,14 @@ const Tutorial = ({
                 // If alternative is better (or valid), take it
                 // Simple heuristic: check if alt fits vertically for top/bottom swap
                 if (pos === 'top' || pos === 'bottom') {
-                    if (altCoords.t >= PADDING && (altCoords.t + CARD_H) <= (winH - PADDING)) {
+                    if (altCoords.top >= PADDING && (altCoords.top + CARD_H) <= (winH - PADDING)) {
                         coords = altCoords;
                         pos = altPos;
                     }
                 }
                 // Check if alt fits horizontally for left/right swap
                 if (pos === 'left' || pos === 'right') {
-                    if (altCoords.l >= PADDING && (altCoords.l + CARD_W) <= (winW - PADDING)) {
+                    if (altCoords.left >= PADDING && (altCoords.left + CARD_W) <= (winW - PADDING)) {
                         coords = altCoords;
                         pos = altPos;
                     }
@@ -394,8 +407,8 @@ const Tutorial = ({
 
         // 2. Strict Clamping (The "Aggressive" Part)
         // Ensure card never goes off screen, even if it de-centers from target
-        top = Math.max(PADDING, Math.min(coords.t, winH - CARD_H - PADDING));
-        left = Math.max(PADDING, Math.min(coords.l, winW - CARD_W - PADDING));
+        top = Math.max(PADDING, Math.min(coords.top, winH - CARD_H - PADDING));
+        left = Math.max(PADDING, Math.min(coords.left, winW - CARD_W - PADDING));
 
         setTooltipStyle({
             position: 'fixed',
@@ -403,7 +416,7 @@ const Tutorial = ({
             left: `${left}px`,
             transform: 'none',
             opacity: 1,
-            transition: 'all 0.4s cubic-bezier(0.25, 1, 0.5, 1)' // Smooth transitions
+            transition: isFirstTimeShowing.current ? 'opacity 0.4s ease-out' : 'all 0.4s cubic-bezier(0.25, 1, 0.5, 1)' // Smooth transitions
         });
     };
 

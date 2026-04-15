@@ -36,6 +36,7 @@ export const parseGeoJsonBatch = (items: { json: any; company?: string }[], comp
                 if (!railwayUpdates[lineKey]) {
                     const info: any = companyData[comp] || {};
                     const icon = props.icon || info.logo || null;
+                    const color = props.stroke || props.color || props.lineColor || null;
                     railwayUpdates[lineKey] = {
                         meta: {
                             region: info.region || "未知",
@@ -43,6 +44,9 @@ export const parseGeoJsonBatch = (items: { json: any; company?: string }[], comp
                             company: comp,
                             logo: info.logo,
                             icon,
+                            companyIcon: info.icon || null,
+                            color,
+                            recolor: info.recolor === true,
                             // 任何同名 line feature 只要带 isLoop 即为环线
                             isLoop: props.isLoop === true || props.isLoop === 'true'
                         },
@@ -51,6 +55,9 @@ export const parseGeoJsonBatch = (items: { json: any; company?: string }[], comp
                 } else {
                     if (props.icon && !railwayUpdates[lineKey].meta.icon) {
                         railwayUpdates[lineKey].meta.icon = props.icon;
+                    }
+                    if ((props.stroke || props.color || props.lineColor) && !railwayUpdates[lineKey].meta.color) {
+                        railwayUpdates[lineKey].meta.color = props.stroke || props.color || props.lineColor;
                     }
                     if (props.isLoop === true || props.isLoop === 'true') {
                         railwayUpdates[lineKey].meta.isLoop = true;

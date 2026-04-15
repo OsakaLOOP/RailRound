@@ -1,7 +1,10 @@
 import { useStore } from '../store';
 import { api } from '../services/api';
 import { calculateLatestStats } from '../core/tripCalculator';
-const meta = { currentVersion: '1.0.0' };
+import { showConfirm } from '../utils/alerts';
+import i18next from 'i18next';
+import changelog from '../../public/changelog.json';
+const { meta } = changelog;
 
 const CURRENT_VERSION = meta["currentVersion"] || "1.0.0";
 
@@ -32,7 +35,10 @@ export const useUserData = () => {
             let newBadgeSettings = cloudData.badge_settings || { enabled: true };
 
             if (isInteractive && (state.trips.length > 0 || state.pins.length > 0 || state.folders.length > 0 || state.badgeSettings?.defaultMapCenter)) {
-                if (window.confirm("检测到本地有数据或个人配置，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)")) {
+                if (await showConfirm(
+                    i18next.t('app.mergeConfirmTitle', '数据冲突'),
+                    i18next.t('app.mergeConfirm', "检测到本地有数据或个人配置，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)")
+                )) {
                     const tripMap = new Map();
                     newTrips.forEach((t: any) => tripMap.set(t.id, t));
                     state.trips.forEach((t: any) => tripMap.set(t.id, t));
@@ -71,7 +77,13 @@ export const useUserData = () => {
             state.setTrips(newTrips.sort((a: any, b: any) => b.date.localeCompare(a.date)));
             state.setPins(newPins);
             state.setFolders(newFolders);
-            state.setBadgeSettings(newBadgeSettings);
+            
+            // Merge settings: Cloud > Local
+            const mergedBadgeSettings = {
+                ...state.badgeSettings,
+                ...(cloudData.badge_settings || {})
+            };
+            state.setBadgeSettings(mergedBadgeSettings);
             console.log('User data loaded successfully');
         } catch (e: any) {
             console.error('Failed to load user data:', e);

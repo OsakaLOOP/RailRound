@@ -377,9 +377,9 @@ export const TripEditor: React.FC = () => {
                                 {isEditing ? <Edit2 size={18} /> : <Plus size={18} />}
                                 {isEditing ? t('tripEdit.editTitle', '编辑行程') : t('tripEdit.newTitle', '新行程')}
                             </h3>
-                            <button onClick={closeEditor}><X className="text-gray-400 hover:text-gray-600" /></button>
+                            <button id="btn-close-editor" onClick={closeEditor}><X className="text-gray-400 hover:text-gray-600" /></button>
                         </div>
-                        <div className="grid grid-cols-2 p-1 bg-gray-200 rounded-lg relative isolate overflow-hidden">
+                        <div id="trip-editor-toggle-mode" className="grid grid-cols-2 p-1 bg-gray-200 rounded-lg relative isolate overflow-hidden">
                             <div 
                                 className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white shadow rounded-md z-0 transition-transform duration-300 ease-out`} 
                                 style={{ transform: editorMode === EditorMode.Manual ? 'translateX(0)' : 'translateX(100%)', left: '4px' }} 

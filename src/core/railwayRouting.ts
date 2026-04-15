@@ -461,21 +461,41 @@ export const findNearestPointOnLine = (railwayData: RailwayMap, targetLat: numbe
 };
 
 export const findNearbyStations = (railwayData: RailwayMap, targetLat: number, targetLng: number, limit = 5) => {
-    const stationsList: { lineKey: string, station: any, distSq: number }[] = [];
+    const topK: { lineKey: string, station: any, distSq: number }[] = [];
 
     for (const lineKey in railwayData) {
         if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
         const line = railwayData[lineKey];
         if (!line.stations) continue;
 
-        for (const station of line.stations) {
+        // Optimization: Avoid allocating a massive array and sorting it entirely.
+        // Instead, maintain a sorted array of size `limit` while iterating over stations.
+        for (let i = 0; i < line.stations.length; i++) {
+            const station = line.stations[i];
             const dSq = (targetLat - station.lat) ** 2 + (targetLng - station.lng) ** 2;
-            stationsList.push({ lineKey, station, distSq: dSq });
+
+            if (topK.length < limit) {
+                topK.push({ lineKey, station, distSq: dSq });
+                if (topK.length === limit) {
+                    topK.sort((a, b) => a.distSq - b.distSq);
+                }
+            } else if (dSq < topK[limit - 1].distSq) {
+                // Insert into sorted array of size limit
+                let j = limit - 2;
+                while (j >= 0 && topK[j].distSq > dSq) {
+                    topK[j + 1] = topK[j];
+                    j--;
+                }
+                topK[j + 1] = { lineKey, station, distSq: dSq };
+            }
         }
     }
 
-    stationsList.sort((a, b) => a.distSq - b.distSq);
+    // If we found fewer than `limit` stations, they might not be sorted yet
+    if (topK.length < limit) {
+        topK.sort((a, b) => a.distSq - b.distSq);
+    }
 
     // Extract up to `limit` unique stations by ID/Name, or just the top 5
-    return stationsList.slice(0, limit);
+    return topK;
 };

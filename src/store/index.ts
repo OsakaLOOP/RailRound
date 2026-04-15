@@ -76,6 +76,8 @@ export interface CompanyMeta {
   category?: CompanyCategory;
   logo: URLString | null;
   icon?: URLString | null;
+  color?: string | null;
+  recolor?: boolean; // 是否对line icon按lineColor上色
 }
 
 export interface Station {
@@ -91,6 +93,7 @@ export interface Station {
 export interface RailwayLineMeta extends CompanyMeta {
   company: string;
   icon?: URLString | null;
+  companyIcon?: URLString | null; // 显式引用 company 范畴的小图标
   isLoop?: boolean; // 环状线路标记
 }
 
@@ -229,6 +232,8 @@ export interface GlobalStore {
   pins: Pin[];
   folders: Folder[];
   badgeSettings: BadgeSettings;
+  isHydrated: boolean;
+  setHydrated: (hydrated: boolean) => void;
 
   login: (token: string, username: string) => void;
   logout: () => void;
@@ -274,7 +279,7 @@ export interface GlobalStore {
   setEditorMode: (mode: 'manual' | 'auto') => void;
   setIsRouteSearching: (isSearching: boolean) => void;
   setAutoRouteEasterEggType: (type: 'ufo' | 'tree' | null) => void;
-  startEditingTrip: (trip?: Partial<Trip>) => void;
+  startEditingTrip: (trip?: Partial<Trip> | null, mode?: 'manual' | 'auto', autoFormData?: any) => void;
   closeTripEditor: () => void;
 
   isWalkTripEditing: boolean;
@@ -323,7 +328,13 @@ export const useStore = create<GlobalStore>()(
       trips: [],
       pins: [],
       folders: [],
-      badgeSettings: { enabled: true, language: 'zh-CN', defaultMapCenter: { mode: 'fixed', lat: 35.6812, lng: 139.7671 } },
+      badgeSettings: { 
+        enabled: true, 
+        language: (typeof localStorage !== 'undefined' && localStorage.getItem('i18nextLng')) || 'zh-CN', 
+        defaultMapCenter: { mode: 'fixed', lat: 35.6812, lng: 139.7671 } 
+      },
+      isHydrated: false,
+      setHydrated: (hydrated) => set({ isHydrated: hydrated }),
 
       login: (token, username) => set({ isLoggedIn: true, user: { token, username } }),
       logout: () => set({ isLoggedIn: false, user: null, userProfile: null }),
@@ -376,15 +387,25 @@ export const useStore = create<GlobalStore>()(
       autoRouteEasterEggType: null,
       setAutoRouteEasterEggType: (type) => set({ autoRouteEasterEggType: type }),
 
-      startEditingTrip: (trip) => {
+      startEditingTrip: (trip, mode = EditorMode.Manual, autoFormData = null) => {
+          let updates: any = { isTripEditing: true, editorMode: mode };
+          
           if (trip) {
             const formState = trip.segments ? trip : { ...trip, segments: [{ id: 'legacy', lineKey: trip.lineKey, fromId: trip.fromId, toId: trip.toId }] };
-            set({ isTripEditing: true, editingTripId: trip.id, tripForm: JSON.parse(JSON.stringify(formState)) });
+            updates.editingTripId = trip.id;
+            updates.tripForm = JSON.parse(JSON.stringify(formState));
           } else {
-            set({ isTripEditing: true, editingTripId: null, tripForm: { date: new Date().toISOString().split('T')[0], memo: '', segments: [], cost: 0 } });
+            updates.editingTripId = null;
+            updates.tripForm = { date: new Date().toISOString().split('T')[0], memo: '', segments: [], cost: 0 };
           }
+
+          if (autoFormData) {
+              updates.autoForm = { ...get().autoForm, ...autoFormData };
+          }
+          
+          set(updates);
       },
-      closeTripEditor: () => set({ isTripEditing: false, editingTripId: null, autoRouteEasterEggType: null, tripForm: { date: new Date().toISOString().split('T')[0], memo: '', segments: [], cost: 0 } }),
+      closeTripEditor: () => set({ isTripEditing: false, editingTripId: null, autoRouteEasterEggType: null, editorMode: EditorMode.Manual, tripForm: { date: new Date().toISOString().split('T')[0], memo: '', segments: [], cost: 0 } }),
 
       isWalkTripEditing: false,
       startEditingWalkTrip: (trip) => {
@@ -428,6 +449,11 @@ export const useStore = create<GlobalStore>()(
         folders: state.folders,
         badgeSettings: state.badgeSettings
       }),
+      onRehydrateStorage: (state) => {
+        return () => {
+          state.setHydrated(true);
+        };
+      },
     }
   )
 );

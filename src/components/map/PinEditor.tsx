@@ -3,6 +3,8 @@ import { Move, Magnet, Camera, MessageSquare, Trash2, X } from 'lucide-react';
 import { useStore, PinMode } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
+import { useTranslation } from 'react-i18next';
+import { showConfirm } from '../../utils/alerts';
 
 const COLOR_PALETTE = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#64748b'];
 
@@ -20,6 +22,7 @@ export const PinEditor: React.FC = () => {
     const setPinMode = useStore(state => state.setPinMode);
     const setPins = useStore(state => state.setPins);
     const { saveData } = useUserData();
+    const { t } = useTranslation();
 
     const savePin = () => {
         if (!editingPin) return;
@@ -37,8 +40,8 @@ export const PinEditor: React.FC = () => {
         setPinMode(PinMode.Idle);
     };
 
-    const deletePin = (id: string | number) => {
-        if(confirm('删除?')) {
+    const deletePin = async (id: string | number) => {
+        if(await showConfirm(t('common.deleteConfirm', '删除?'))) {
             const newPins = pins.filter(p => p.id !== id);
             setPins(newPins);
             if (editingPin?.id === id) {
@@ -73,7 +76,7 @@ export const PinEditor: React.FC = () => {
             <div className="flex justify-between items-center mb-3 border-b pb-2">
                 <span className="font-bold text-gray-700 flex items-center gap-2">
                     {pinMode === PinMode.Snap ? <Magnet size={16} className="text-indigo-600"/> : <Move size={16} />}
-                    {pinMode === PinMode.Snap ? `吸附: ${editingPin.lineKey || '未知'}` : '自由位置'}
+                    {pinMode === PinMode.Snap ? t('pin.titleSnap', `吸附: {{line}}`, { line: editingPin.lineKey || t('app.unknown', '未知') }) : t('pin.titleFree', '自由位置')}
                 </span>
                 <button onClick={() => { setEditingPin(null); setPinMode(PinMode.Idle); }} className="absolute right-0">
                     <X size={18} className="text-gray-400"/>
@@ -81,9 +84,9 @@ export const PinEditor: React.FC = () => {
             </div>
             <div className="flex gap-3 mb-3">
                 <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
-                    {['photo', 'comment'].map(t => (
-                        <button key={t} onClick={() => setEditingPin({ ...editingPin, type: t as any })} className={`p-2 rounded-md ${editingPin.type === t ? 'bg-white shadow text-blue-600' : 'text-gray-400'}`}>
-                            {t === 'photo' ? <Camera size={18}/> : <MessageSquare size={18}/>}
+                    {['photo', 'comment'].map(type => (
+                        <button key={type} onClick={() => setEditingPin({ ...editingPin, type: type as any })} className={`p-2 rounded-md ${editingPin.type === type ? 'bg-white shadow text-blue-600' : 'text-gray-400'}`}>
+                            {type === 'photo' ? <Camera size={18}/> : <MessageSquare size={18}/>}
                         </button>
                     ))}
                 </div>
@@ -93,9 +96,9 @@ export const PinEditor: React.FC = () => {
                     ))}
                 </div>
             </div>
-            <input className="w-full p-2 border rounded text-sm mb-2" placeholder="备注..." value={editingPin.comment || ''} onChange={e => setEditingPin({ ...editingPin, comment: e.target.value })} />
+            <input className="w-full p-2 border rounded text-sm mb-2" placeholder={t('pin.placeholderMemo', "备注...")} value={editingPin.comment || ''} onChange={e => setEditingPin({ ...editingPin, comment: e.target.value })} />
             {editingPin.type === 'photo' && (
-                <input className="w-full p-2 border rounded text-sm mb-3" placeholder="图片URL..." value={editingPin.imageUrl || ''} onChange={e => setEditingPin({ ...editingPin, imageUrl: e.target.value })} />
+                <input className="w-full p-2 border rounded text-sm mb-3" placeholder={t('pin.placeholderUrl', "图片URL...")} value={editingPin.imageUrl || ''} onChange={e => setEditingPin({ ...editingPin, imageUrl: e.target.value })} />
             )}
             <div className="flex gap-2">
                 {!editingPin.isTemp && (
@@ -104,7 +107,7 @@ export const PinEditor: React.FC = () => {
                     </button>
                 )}
                 <button onClick={savePin} className="flex-1 bg-slate-800 text-white py-2 rounded-lg font-bold text-sm hover:bg-slate-700">
-                    {editingPin.isTemp ? '添加' : '更新'}
+                    {editingPin.isTemp ? t('pin.btnCreate', '添加') : t('pin.btnUpdate', '更新')}
                 </button>
             </div>
         </div>

@@ -27,7 +27,7 @@ import { calculateLatestStats } from './core/tripCalculator';
 import { parseGeoJsonBatch } from './core/parser';
 import GeoWorker from './workers/geo.worker.js?worker';
 // Use dynamic fetch or absolute URL instead of import from public, or ignore since this was an existing error
-const changelog = { meta: { currentVersion: '1.0.0' } };
+import changelog from '../public/changelog.json';
 const { meta } = changelog;
 import { api } from './services/api';
 import { useShallow } from 'zustand/react/shallow';
@@ -35,6 +35,8 @@ import { Toaster, toast } from 'react-hot-toast';
 import DistanceWorker from './workers/distance.worker.js?worker';
 import { useMeta } from './contexts';
 import { useTranslation } from 'react-i18next';
+import { showAlert, showConfirm } from './utils/alerts';
+import i18next from 'i18next';
 
 const CURRENT_VERSION = meta["currentVersion"];
 
@@ -43,7 +45,7 @@ export const AppLayout: React.FC = () => {
         activeTab, user, setModalState, setCompanyDB, setRailwayData, setGeoData,
         trips, pins, railwayData, geoData, companyDB, setTrips, setPins, folders, badgeSettings,
         setSegmentGeometries, setTripSegmentsGeometry, segmentGeometries, setVisitedStations,
-        isLoginOpen
+        isLoginOpen, isHydrated, isTripEditing, pinMode, editorMode
     } = useStore(useShallow(state => ({
         activeTab: state.activeTab,
         user: state.user,
@@ -64,19 +66,25 @@ export const AppLayout: React.FC = () => {
         setTripSegmentsGeometry: state.setTripSegmentsGeometry,
         setVisitedStations: state.setVisitedStations,
         segmentGeometries: state.segmentGeometries,
-        isLoginOpen: state.modals.isLoginOpen
+        isLoginOpen: state.modals.isLoginOpen,
+        isHydrated: state.isHydrated,
+        isTripEditing: state.isTripEditing,
+        pinMode: state.pinMode,
+        editorMode: state.editorMode
     })));
 
     const { loadUserData, saveData } = useUserData();
     const [stationMenu, setStationMenu] = useState<any>(null);
     const [isExportingKML, setIsExportingKML] = useState(false);
-    const { i18n } = useTranslation();
+    const { i18n, t } = useTranslation();
 
     useEffect(() => {
-        if (badgeSettings.language && badgeSettings.language !== i18n.language) {
+        // Only apply language change if store has hydrated and language is different.
+        // This prevents default 'zh-CN' from overriding detected language before hydration.
+        if (isHydrated && badgeSettings.language && badgeSettings.language !== i18n.language) {
             i18n.changeLanguage(badgeSettings.language);
         }
-    }, [badgeSettings.language, i18n]);
+    }, [badgeSettings.language, i18n, isHydrated]);
     const { devMode } = useMeta() as any;
     const isDraggingRef = useRef(false);
     const workerRef = useRef<Worker | null>(null);
@@ -85,7 +93,7 @@ export const AppLayout: React.FC = () => {
     // --- April Fool's initialization ---
     useEffect(() => {
         const today = new Date();
-        if (today.getMonth() === 3 && (today.getDate() === 1||today.getDate()===2)) { // 0-indexed month (3 = April)
+        if (today.getMonth() === 3 && (today.getDate() === 1 || today.getDate() === 2)) { // 0-indexed month (3 = April)
             useStore.getState().setIsAprilFool(true);
             if (Math.random() < 0.5) {
                 useStore.getState().setShowFakeProgress(true);
@@ -109,9 +117,9 @@ export const AppLayout: React.FC = () => {
             // Start fake loading sequence
             setTimeout(() => {
                 toast.loading(
-                    (t: any) => (
+                    () => (
                         <div className="flex flex-col gap-2">
-                            <span className="text-sm font-bold text-gray-700 whitespace-nowrap">正在获取远端数据... (10%)</span>
+                            <span className="text-sm font-bold text-gray-700 whitespace-nowrap">{t('app.fetchRemote', '正在获取远端数据... (10%)')}</span>
                             <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                 <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '10%' }}></div>
                             </div>
@@ -122,9 +130,9 @@ export const AppLayout: React.FC = () => {
 
                 setTimeout(() => {
                     toast.loading(
-                        (t: any) => (
+                        () => (
                             <div className="flex flex-col gap-2">
-                                <span className="text-sm font-bold text-gray-700 whitespace-nowrap">预计算全图站距... (50%)</span>
+                                <span className="text-sm font-bold text-gray-700 whitespace-nowrap">{t('app.calcDist', '预计算全图站距... (50%)')}</span>
                                 <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                     <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '50%' }}></div>
                                 </div>
@@ -135,9 +143,9 @@ export const AppLayout: React.FC = () => {
 
                     setTimeout(() => {
                         toast.loading(
-                            (t: any) => (
+                            () => (
                                 <div className="flex flex-col gap-2">
-                                    <span className="text-sm font-bold text-gray-700 whitespace-nowrap">发现计算太难了，正在放弃... (30%)</span>
+                                    <span className="text-sm font-bold text-gray-700 whitespace-nowrap">{t('app.calcHard', '发现计算太难了，正在放弃... (30%)')}</span>
                                     <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                         <div className="bg-red-400 h-1.5 rounded-full transition-all duration-[2000ms] ease-in-out" style={{ width: '30%' }}></div>
                                     </div>
@@ -148,9 +156,9 @@ export const AppLayout: React.FC = () => {
 
                         setTimeout(() => {
                             toast.loading(
-                                (t: any) => (
+                                () => (
                                     <div className="flex flex-col gap-2">
-                                        <span className="text-sm font-bold text-gray-700 whitespace-nowrap">正在下载全宇宙铁路线... (114514%)</span>
+                                        <span className="text-sm font-bold text-gray-700 whitespace-nowrap">{t('app.dlAll', '正在下载全宇宙铁路线... (114514%)')}</span>
                                         <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-visible relative">
                                             <div className="bg-purple-500 h-1.5 rounded-full transition-all duration-700 ease-in absolute left-0" style={{ width: '500%' }}></div>
                                         </div>
@@ -160,7 +168,7 @@ export const AppLayout: React.FC = () => {
                             );
 
                             setTimeout(() => {
-                                toast.error(t('app.initFailOk', t('app.initFailOk', '初始化失败，但应用已就绪，凑合用吧')), { id: fakeToastId, duration: 4000, position: 'top-center' });
+                                toast.error(t('app.initFailOk', '初始化失败，但应用已就绪，凑合用吧'), { id: fakeToastId, duration: 4000, position: 'top-center' });
                             }, 1500);
                         }, 2500);
                     }, 1000);
@@ -194,7 +202,7 @@ export const AppLayout: React.FC = () => {
         }
 
         if (status === 'bound_success') {
-            alert(t("app.githubBindSuccess", "GitHub 绑定成功！"));
+            toast.success(t("app.githubBindSuccess", "GitHub 绑定成功！"));
             window.history.replaceState({}, document.title, window.location.pathname);
             if (user?.token) {
                 loadUserData(user.token, false);
@@ -302,30 +310,30 @@ export const AppLayout: React.FC = () => {
             console.log('[Autoload] 正在初始化...');
             if (!showFakeProgress) {
                 toastId = toast.loading(
-                (t: any) => (
-                    <div className="flex flex-col gap-2 w-48">
-                        <span className="text-sm font-bold text-gray-700">正在初始化... (0%)</span>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '0%' }}></div>
+                    () => (
+                        <div className="flex flex-col gap-2 w-48">
+                            <span className="text-sm font-bold text-gray-700">{t('app.init0', '正在初始化... (0%)')}</span>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '0%' }}></div>
+                            </div>
                         </div>
-                    </div>
-                ),
-                { duration: Infinity }
-            );
+                    ),
+                    { duration: Infinity }
+                );
             }
             let currentCompanyData = {};
             if (toastId) {
                 toast.loading(
-                (t: any) => (
-                    <div className="flex flex-col gap-2 w-48">
-                        <span className="text-sm font-bold text-gray-700">加载公司数据... (5%)</span>
+                    () => (
+                        <div className="flex flex-col gap-2 w-48">
+                            <span className="text-sm font-bold text-gray-700">{t('app.loadCompany', '加载公司数据... (5%)')}</span>
                             <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                 <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '5%' }}></div>
+                            </div>
                         </div>
-                    </div>
-                ),
-                { id: toastId, duration: Infinity }
-            );
+                    ),
+                    { id: toastId, duration: Infinity }
+                );
             }
             try {
                 const companyRes = await fetch(`/company_data.json?v=${Date.now()}`);
@@ -352,7 +360,7 @@ export const AppLayout: React.FC = () => {
                             if (!next[key]) next[key] = val;
                             else {
                                 val.stations.forEach((s: any) => { if (!next[key].stations.find((ex: any) => ex.id === s.id)) next[key].stations.push(s); });
-                                if(val.meta.icon && !next[key].meta.icon) next[key].meta.icon = val.meta.icon;
+                                if (val.meta.icon && !next[key].meta.icon) next[key].meta.icon = val.meta.icon;
                             }
                         });
                         return next;
@@ -364,16 +372,16 @@ export const AppLayout: React.FC = () => {
             let realFiles: any[] = [];
             if (toastId) {
                 toast.loading(
-            (t: any) => (
-                <div className="flex flex-col gap-2 w-48">
-                    <span className="text-sm font-bold text-gray-700">读取本地缓存... (10%)</span>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '10%' }}></div>
-                    </div>
-                </div>
-            ),
-            { id: toastId, duration: Infinity }
-        );
+                    () => (
+                        <div className="flex flex-col gap-2 w-48">
+                            <span className="text-sm font-bold text-gray-700">{t('app.readCache', '读取本地缓存... (10%)')}</span>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '10%' }}></div>
+                            </div>
+                        </div>
+                    ),
+                    { id: toastId, duration: Infinity }
+                );
             }
             try {
                 const dbInstance: any = await db.open();
@@ -406,7 +414,7 @@ export const AppLayout: React.FC = () => {
                             reqRail.onsuccess = () => resolve(reqRail.result || null);
                             reqRail.onerror = () => resolve(null);
                         });
-                    } catch(e) {}
+                    } catch (e) { }
                 } else {
                     console.log('[Autoload] Dev mode enabled: skipping __precompiled_geodata cache.');
                 }
@@ -417,16 +425,16 @@ export const AppLayout: React.FC = () => {
                 if (precompiledGeoData && precompiledRailwayData && realFiles.length > 0) {
                     if (toastId) {
                         toast.loading(
-                (t: any) => (
-                    <div className="flex flex-col gap-2 w-48">
-                        <span className="text-sm font-bold text-gray-700">极速命中缓存... (20%)</span>
-                            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '20%' }}></div>
-                        </div>
-                    </div>
-                ),
-                { id: toastId, duration: Infinity }
-            );
+                            () => (
+                                <div className="flex flex-col gap-2 w-48">
+                                    <span className="text-sm font-bold text-gray-700">{t('app.fastCache', '极速命中缓存... (20%)')}</span>
+                                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '20%' }}></div>
+                                    </div>
+                                </div>
+                            ),
+                            { id: toastId, duration: Infinity }
+                        );
                     }
                     // Fast path hit! Skip heavy processing.
                     setGeoData(precompiledGeoData);
@@ -435,16 +443,16 @@ export const AppLayout: React.FC = () => {
                 } else if (realFiles.length > 0) {
                     if (toastId) {
                         toast.loading(
-                (t: any) => (
-                    <div className="flex flex-col gap-2 w-48">
-                        <span className="text-sm font-bold text-gray-700">解析本地数据... (20%)</span>
-                            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '20%' }}></div>
-                        </div>
-                    </div>
-                ),
-                { id: toastId, duration: Infinity }
-            );
+                            () => (
+                                <div className="flex flex-col gap-2 w-48">
+                                    <span className="text-sm font-bold text-gray-700">{t('app.parseLocal', '解析本地数据... (20%)')}</span>
+                                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '20%' }}></div>
+                                    </div>
+                                </div>
+                            ),
+                            { id: toastId, duration: Infinity }
+                        );
                     }
                     // Fallback to heavy processing and then cache the result
                     processGeoJsonBatch(realFiles, currentCompanyData);
@@ -454,25 +462,25 @@ export const AppLayout: React.FC = () => {
                         const currentRail = useStore.getState().railwayData;
                         if (currentGeo && currentGeo.features.length > 0) {
                             try {
-                                 await db.set(db.STORE_FILES, '__precompiled_geodata', currentGeo);
-                                 await db.set(db.STORE_FILES, '__precompiled_railwaydata', currentRail);
-                            } catch(e) {}
+                                await db.set(db.STORE_FILES, '__precompiled_geodata', currentGeo);
+                                await db.set(db.STORE_FILES, '__precompiled_railwaydata', currentRail);
+                            } catch (e) { }
                         }
                     }, 100);
                 }
 
                 if (toastId) {
                     toast.loading(
-            (t: any) => (
-                <div className="flex flex-col gap-2 w-48">
-                    <span className="text-sm font-bold text-gray-700">加载行程缩略图... (25%)</span>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '25%' }}></div>
-                    </div>
-                </div>
-            ),
-            { id: toastId, duration: Infinity }
-        );
+                        () => (
+                            <div className="flex flex-col gap-2 w-48">
+                                <span className="text-sm font-bold text-gray-700">{t('app.loadThumb', '加载行程缩略图... (25%)')}</span>
+                                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                    <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '25%' }}></div>
+                                </div>
+                            </div>
+                        ),
+                        { id: toastId, duration: Infinity }
+                    );
                 }
                 // 2. Pre-load all segment geometries into memory at once to eliminate massive I/O lag
                 const txSegments = dbInstance.transaction(db.STORE_SEGMENTS, 'readonly');
@@ -505,16 +513,16 @@ export const AppLayout: React.FC = () => {
 
             if (toastId) {
                 toast.loading(
-            (t: any) => (
-                <div className="flex flex-col gap-2 w-48">
-                    <span className="text-sm font-bold text-gray-700">检查云端更新... (30%)</span>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '30%' }}></div>
-                    </div>
-                </div>
-            ),
-            { id: toastId, duration: Infinity }
-        );
+                    () => (
+                        <div className="flex flex-col gap-2 w-48">
+                            <span className="text-sm font-bold text-gray-700">{t('app.checkUpdate', '检查云端更新... (30%)')}</span>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '30%' }}></div>
+                            </div>
+                        </div>
+                    ),
+                    { id: toastId, duration: Infinity }
+                );
             }
             const manifestRes = await fetch(`/geojson_manifest.json?v=${Date.now()}`).catch(() => null);
             if (manifestRes && manifestRes.ok) {
@@ -550,7 +558,7 @@ export const AppLayout: React.FC = () => {
                             const progress = 30 + Math.round((downloadedCount / totalToDownload) * 20); // Scale up to 50%
                             if (toastId) {
                                 toast.loading(
-                                    (t: any) => (
+                                    () => (
                                         <div className="flex flex-col gap-2 w-48">
                                             <span className="text-sm font-bold text-gray-700">{t('app.dlUpdate', '下载更新 {{dl}}/{{total}}... ({{prog}}%)', { dl: downloadedCount, total: totalToDownload, prog: progress })}</span>
                                             <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
@@ -585,7 +593,7 @@ export const AppLayout: React.FC = () => {
                                 try {
                                     await db.set(db.STORE_FILES, '__precompiled_geodata', updatedGeo);
                                     await db.set(db.STORE_FILES, '__precompiled_railwaydata', updatedRail);
-                                } catch(e) {}
+                                } catch (e) { }
                             }
                         }, 500);
                     }
@@ -608,7 +616,7 @@ export const AppLayout: React.FC = () => {
 
             // Only trigger if we have data and missing distances
             const needsCalc = Object.values(currentRailwayData).some(line =>
-               line.stations.length > 1 && line.stations[0].distToNext === undefined
+                line.stations.length > 1 && line.stations[0].distToNext === undefined
             );
 
             if (needsCalc) {
@@ -617,11 +625,11 @@ export const AppLayout: React.FC = () => {
                 if (!showFakeProgress) {
                     // Using a custom dynamic progress bar toast instead of plain text updates
                     toast.loading(
-                        (t: any) => (
+                        () => (
                             <div className="flex flex-col gap-2">
-                                <span className="text-sm font-bold text-gray-700 whitespace-nowrap">预计算全图站距... (50%)</span>
-                            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '50%' }}></div>
+                                <span className="text-sm font-bold text-gray-700 whitespace-nowrap">{t('app.calcDist', '预计算全图站距... (50%)')}</span>
+                                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                    <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: '50%' }}></div>
                                 </div>
                             </div>
                         ),
@@ -635,9 +643,9 @@ export const AppLayout: React.FC = () => {
                     if (type === 'PROGRESS' && toastId && !showFakeProgress) {
                         const scaledProgress = 50 + Math.round(payload.progress * 0.5); // Map 0-100 to 50-100
                         toast.loading(
-                            (t: any) => (
+                            () => (
                                 <div className="flex flex-col gap-2">
-                                    <span className="text-sm font-bold text-gray-700 whitespace-nowrap">预计算全图站距... ({scaledProgress}%)</span>
+                                    <span className="text-sm font-bold text-gray-700 whitespace-nowrap">{t('app.calcDistProg', '预计算全图站距... ({{prog}}%)', { prog: scaledProgress })}</span>
                                     <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                         <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-200 ease-out" style={{ width: `${scaledProgress}%` }}></div>
                                     </div>
@@ -646,7 +654,7 @@ export const AppLayout: React.FC = () => {
                             { id: toastId, duration: Infinity }
                         );
                     } else if (type === 'COMPLETE') {
-                        if (toastId && !showFakeProgress) toast.success(t('app.initDone', t('app.initDone', '初始化完成')), { id: toastId, duration: 3000 });
+                        if (toastId && !showFakeProgress) toast.success(t('app.initDone', '初始化完成'), { id: toastId, duration: 3000 });
                         distanceWorkerRef.current?.removeEventListener('message', handleDistanceWorkerMsg);
 
                         // Merge updated distances into CURRENT railway data instead of overwriting,
@@ -679,11 +687,11 @@ export const AppLayout: React.FC = () => {
                 distanceWorkerRef.current.addEventListener('message', handleDistanceWorkerMsg);
                 distanceWorkerRef.current.postMessage({ type: 'CALC_DISTANCES', payload: { railwayData: currentRailwayData } });
             } else {
-                if (toastId) toast.success(t('app.initDone', t('app.initDone', '初始化完成')), { id: toastId, duration: 3000 });
+                if (toastId) toast.success(t('app.initDone', '初始化完成'), { id: toastId, duration: 3000 });
             }
         } else {
             console.log('Distance Worker not initialized, skipping distance calculations');
-            if (toastId) toast.success(t('app.initDone', t('app.initDone', '初始化完成')), { id: toastId, duration: 3000 });
+            if (toastId) toast.success(t('app.initDone', '初始化完成'), { id: toastId, duration: 3000 });
         }
     };
 
@@ -693,7 +701,7 @@ export const AppLayout: React.FC = () => {
     useEffect(() => {
         // 使用 setTimeout 加上简单的防抖，防止编辑/添加行程时高频触发导致卡顿
         const timerId = setTimeout(() => {
-            const allSegments = trips.flatMap(t => t.segments || []);
+            const allSegments = trips.flatMap(trip => trip.segments || []);
 
 
             // Extract visited stations logic
@@ -716,7 +724,7 @@ export const AppLayout: React.FC = () => {
                         let currIdx = fromIdx;
                         const n = line.stations.length;
                         visited.add(line.stations[currIdx].id);
-                        
+
                         let safeCounter = 0;
                         while (currIdx !== toIdx && safeCounter <= n) {
                             if (realVia === 'up') {
@@ -823,9 +831,9 @@ export const AppLayout: React.FC = () => {
                         : `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
                     let data = await db.get(db.STORE_SEGMENTS, key).catch(() => null);
 
-                // 如果缓存是 fallback，但此时可能 geoData 已经加载好了，
-                // 我们允许它重新进入 Worker 计算队列，而不是永远被锁死在 [0,0] 的直线。
-                if (data && !data.fallback) {
+                    // 如果缓存是 fallback，但此时可能 geoData 已经加载好了，
+                    // 我们允许它重新进入 Worker 计算队列，而不是永远被锁死在 [0,0] 的直线。
+                    if (data && !data.fallback) {
                         newCache.set(key, data);
                         updated = true;
                     } else {
@@ -833,42 +841,42 @@ export const AppLayout: React.FC = () => {
                     }
                 }
 
-            // 如果有需要计算的，且 geoData 已经初步加载，再交给 Worker 计算
-            // (如果 geoData 为空，我们先不派发任务，免得算出大量 fallback 写入缓存)
-            if (toCalculateInWorker.length > 0 && workerRef.current && geoData && geoData.features.length > 0) {
+                // 如果有需要计算的，且 geoData 已经初步加载，再交给 Worker 计算
+                // (如果 geoData 为空，我们先不派发任务，免得算出大量 fallback 写入缓存)
+                if (toCalculateInWorker.length > 0 && workerRef.current && geoData && geoData.features.length > 0) {
                     try {
                         const results = await callWorker('GET_ALL_GEOMETRIES', { segments: toCalculateInWorker });
                         for (const res of results) {
                             const { key, data } = res;
-                        if (data && !data.fallback) {
+                            if (data && !data.fallback) {
                                 newCache.set(key, data);
                                 await db.set(db.STORE_SEGMENTS, key, data);
                                 updated = true;
                             } else {
-                            // 对于确实无法匹配的数据，生成一个基于车站经纬度的 fallback，而不是 [0,0]
-                            const seg = toCalculateInWorker.find((s: any) => {
-                                const isLoop = !!(railwayData[s.lineKey]?.meta?.isLoop);
-                                let realVia = s.loopVia;
-                                if (isLoop && realVia === 'auto') {
-                                    realVia = computeLoopVia(railwayData, s.lineKey, s.fromId, s.toId);
+                                // 对于确实无法匹配的数据，生成一个基于车站经纬度的 fallback，而不是 [0,0]
+                                const seg = toCalculateInWorker.find((s: any) => {
+                                    const isLoop = !!(railwayData[s.lineKey]?.meta?.isLoop);
+                                    let realVia = s.loopVia;
+                                    if (isLoop && realVia === 'auto') {
+                                        realVia = computeLoopVia(railwayData, s.lineKey, s.fromId, s.toId);
+                                    }
+                                    const k = (isLoop && realVia)
+                                        ? `${s.lineKey}_${s.fromId}_${s.toId}_${realVia}`
+                                        : `${s.lineKey}_${s.fromId}_${s.toId}`;
+                                    return k === key;
+                                });
+                                let fallbackCoords = [[0, 0], [0, 0]];
+                                if (seg && railwayData[seg.lineKey]) {
+                                    const line = railwayData[seg.lineKey];
+                                    const s1 = line.stations.find((s: any) => s.id === seg.fromId);
+                                    const s2 = line.stations.find((s: any) => s.id === seg.toId);
+                                    if (s1 && s2) {
+                                        fallbackCoords = [[s1.lat, s1.lng], [s2.lat, s2.lng]];
+                                    }
                                 }
-                                const k = (isLoop && realVia)
-                                    ? `${s.lineKey}_${s.fromId}_${s.toId}_${realVia}`
-                                    : `${s.lineKey}_${s.fromId}_${s.toId}`;
-                                return k === key;
-                            });
-                            let fallbackCoords = [[0, 0], [0, 0]];
-                            if (seg && railwayData[seg.lineKey]) {
-                                const line = railwayData[seg.lineKey];
-                                const s1 = line.stations.find((s: any) => s.id === seg.fromId);
-                                const s2 = line.stations.find((s: any) => s.id === seg.toId);
-                                if (s1 && s2) {
-                                    fallbackCoords = [[s1.lat, s1.lng], [s2.lat, s2.lng]];
-                                }
-                            }
-                            const fallbackData = { coords: fallbackCoords, color: '#ff0000', isMulti: false, fallback: true };
+                                const fallbackData = { coords: fallbackCoords, color: '#ff0000', isMulti: false, fallback: true };
                                 newCache.set(key, fallbackData);
-                            // 将真实的车站连线 fallback 存入 IDB
+                                // 将真实的车站连线 fallback 存入 IDB
                                 await db.set(db.STORE_SEGMENTS, key, fallbackData);
                                 updated = true;
                             }
@@ -881,10 +889,10 @@ export const AppLayout: React.FC = () => {
                 if (updated) {
                     setSegmentGeometries(newCache);
 
-                // 必须在这里同步生成并调用 setTripSegmentsGeometry，
-                // 否则首次加载从 IndexedDB 读出的数据将因为 setTimeout/useShallow 导致的依赖丢失而无法触发重新渲染。
-                const newRenderList = buildRenderList(newCache);
-                setTripSegmentsGeometry(newRenderList);
+                    // 必须在这里同步生成并调用 setTripSegmentsGeometry，
+                    // 否则首次加载从 IndexedDB 读出的数据将因为 setTimeout/useShallow 导致的依赖丢失而无法触发重新渲染。
+                    const newRenderList = buildRenderList(newCache);
+                    setTripSegmentsGeometry(newRenderList);
                 }
             };
 
@@ -912,7 +920,8 @@ export const AppLayout: React.FC = () => {
                 const compName = line.meta.company;
                 if (companyDB[compName]) {
                     const info = companyDB[compName] as any;
-                    if(!line.meta.region || !line.meta.type || line.meta.region === "未知" || line.meta.type === "未知") {
+                    const unknownLabel = t('app.unknown', '未知');
+                    if (!line.meta.region || !line.meta.type || line.meta.region === "未知" || line.meta.region === unknownLabel || line.meta.type === "未知" || line.meta.type === unknownLabel) {
                         next[lineKey] = { ...line, meta: { ...line.meta, region: info.region, type: info.type, logo: info.logo } };
                         changed = true;
                     }
@@ -928,15 +937,15 @@ export const AppLayout: React.FC = () => {
         setIsExportingKML(true);
         setTimeout(async () => {
             try {
-                if (trips.length === 0 || !geoData) { alert(t("app.noRecord", "无行程记录或地图数据未加载。")); setIsExportingKML(false); return; }
+                if (trips.length === 0 || !geoData) { showAlert(t("app.noRecord", "无行程记录或地图数据未加载。")); setIsExportingKML(false); return; }
                 const allPaths: any[] = [];
 
                 // 由于 sliceGeoJsonPath 已移至 Worker，我们需要用另一种方式处理 KML 导出。
                 // 最简单的方法是重用现有的 segmentGeometries 缓存！
-                trips.forEach(t => {
-                    if (t.isWalk) return; // Exclude walk trips
-                    const tripName = `${t.date} - Trip ${t.id}`;
-                    t.segments.forEach((seg: any, segIndex: number) => {
+                trips.forEach(trip => {
+                    if (trip.isWalk) return; // Exclude walk trips
+                    const tripName = `${trip.date} - Trip ${trip.id}`;
+                    trip.segments.forEach((seg: any, segIndex: number) => {
                         const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
                         const cached = segmentGeometries.get(key);
                         if (cached && cached.coords) {
@@ -949,7 +958,7 @@ export const AppLayout: React.FC = () => {
                     });
                 });
 
-                if (allPaths.length === 0) { alert(t("app.noExportPath", "未找到可导出路径（请确保路线在地图上已显示）。")); setIsExportingKML(false); return; }
+                if (allPaths.length === 0) { showAlert(t("app.noExportPath", "未找到可导出路径（请确保路线在地图上已显示）。")); setIsExportingKML(false); return; }
                 const kmlString = buildKMLString(allPaths);
                 const blob = new Blob([kmlString], { type: 'application/vnd.google-earth.kml+xml' });
                 const url = URL.createObjectURL(blob);
@@ -963,47 +972,50 @@ export const AppLayout: React.FC = () => {
                 }
                 document.body.appendChild(link); link.click();
                 setTimeout(() => { document.body.removeChild(link); window.URL.revokeObjectURL(url); setIsExportingKML(false); }, 2000);
-            } catch (e) { console.error("KML Export Error:", e); alert(t("app.exportErr", "导出过程中发生错误。")); setIsExportingKML(false); }
+            } catch (e) { console.error("KML Export Error:", e); showAlert(t("app.exportErr", "导出过程中发生错误。"), '', 'error'); setIsExportingKML(false); }
         }, 100);
     };
 
     const handleExportUserData = () => {
         const linesUsed = new Set();
         const companiesUsed = new Set();
-        trips.forEach(t => { (t.segments || []).forEach((s: any) => { if(s.lineKey) { linesUsed.add(s.lineKey); const meta = railwayData[s.lineKey]?.meta; if(meta && meta.company) companiesUsed.add(meta.company); } }); });
+        trips.forEach(trip => { (trip.segments || []).forEach((s: any) => { if (s.lineKey) { linesUsed.add(s.lineKey); const meta = railwayData[s.lineKey]?.meta; if (meta && meta.company) companiesUsed.add(meta.company); } }); });
         const backupData = { meta: { version: CURRENT_VERSION, exportedAt: new Date().toISOString(), appName: "RailLOOP" }, dependencies: { lines: Array.from(linesUsed), companies: Array.from(companiesUsed) }, data: { trips: trips, pins: pins } };
         const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement('a'); link.href = url; link.download = `railround_backup_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        const link = document.createElement('a'); link.href = url; link.download = `railround_backup_${new Date().toISOString().slice(0, 10)}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
     };
 
     const handleImportUserData = (event: any) => {
         const file = event.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (e: any) => {
+        reader.onload = async (e: any) => {
             try {
                 const backup = JSON.parse(e.target.result);
-                if (!backup.meta || (backup.meta.appName !== "RailLOOP" && backup.meta.appName !== "")) { alert(t("app.invalidBackup", "无效的备份文件")); return; }
+                if (!backup.meta || (backup.meta.appName !== "RailLOOP" && backup.meta.appName !== "")) { showAlert(t("app.invalidBackup", "无效的备份文件"), '', 'error'); return; }
                 const missingLines: string[] = [];
                 if (backup.dependencies && backup.dependencies.lines) { backup.dependencies.lines.forEach((lineKey: string) => { if (!railwayData[lineKey]) missingLines.push(lineKey); }); }
-                if (missingLines.length > 0) { const msg = t("app.missLine", "检测到缺少以下线路的基础数据，可能会导致显示异常：\n\n{{lines}}\n\n建议先去地图页面上传对应的 GeoJSON 文件。是否继续导入？", { lines: missingLines.slice(0, 5).join(", ") + (missingLines.length > 5 ? '...' : '') }); if (!confirm(msg)) return; }
-                const currentTripIds = new Set(trips.map(t => t.id));
+                if (missingLines.length > 0) {
+                    const msg = t("app.missLine", "检测到缺少以下线路的基础数据，可能会导致显示异常：\n\n{{lines}}\n\n建议先去地图页面上传对应的 GeoJSON 文件。是否继续导入？", { lines: missingLines.slice(0, 5).join(", ") + (missingLines.length > 5 ? '...' : '') });
+                    if (!await showConfirm(t('app.missLineTitle', '缺少数据'), msg)) return;
+                }
+                const currentTripIds = new Set(trips.map(trip => trip.id));
                 const incomingTrips = backup.data.trips || [];
                 const uniqueIncomingTrips: any[] = [];
                 const tempTripIds = new Set();
-                incomingTrips.forEach((t: any) => { if (!tempTripIds.has(t.id)) { tempTripIds.add(t.id); uniqueIncomingTrips.push(t); } });
-                const newTrips = uniqueIncomingTrips.filter(t => !currentTripIds.has(t.id));
+                incomingTrips.forEach((trip: any) => { if (!tempTripIds.has(trip.id)) { tempTripIds.add(trip.id); uniqueIncomingTrips.push(trip); } });
+                const newTrips = uniqueIncomingTrips.filter(trip => !currentTripIds.has(trip.id));
                 const currentPinIds = new Set(pins.map(p => p.id));
                 const incomingPins = backup.data.pins || [];
                 const uniqueIncomingPins: any[] = [];
                 const tempPinIds = new Set();
                 incomingPins.forEach((p: any) => { if (!tempPinIds.has(p.id)) { tempPinIds.add(p.id); uniqueIncomingPins.push(p); } });
                 const newPins = uniqueIncomingPins.filter(p => !currentPinIds.has(p.id));
-                if (newTrips.length > 0) { setTrips(prev => [...prev, ...newTrips].sort((a,b) => b.date.localeCompare(a.date))); }
+                if (newTrips.length > 0) { setTrips(prev => [...prev, ...newTrips].sort((a, b) => b.date.localeCompare(a.date))); }
                 if (newPins.length > 0) { setPins(prev => [...prev, ...newPins]); }
-                alert(t("app.importSuccess", "数据导入完成！\n\n行程: 新增 {{newT}} 条 (跳过重复/无效 {{skipT}} 条)\n图钉: 新增 {{newP}} 个 (跳过重复/无效 {{skipP}} 个)", { newT: newTrips.length, skipT: incomingTrips.length - newTrips.length, newP: newPins.length, skipP: incomingPins.length - newPins.length }));
-            } catch (err) { alert(t("app.fileParseErr", "文件解析失败")); }
+                showAlert(t("app.importSuccess", "数据导入完成！\n\n行程: 新增 {{newT}} 条 (跳过重复/无效 {{skipT}} 条)\n图钉: 新增 {{newP}} 个 (跳过重复/无效 {{skipP}} 个)", { newT: newTrips.length, skipT: incomingTrips.length - newTrips.length, newP: newPins.length, skipP: incomingPins.length - newPins.length }), '', 'success');
+            } catch (err) { showAlert(t("app.fileParseErr", "文件解析失败"), '', 'error'); }
         };
         reader.readAsText(file); event.target.value = '';
     };
@@ -1011,89 +1023,91 @@ export const AppLayout: React.FC = () => {
     const applyCompanyData = (data: any, { silent = true } = {}) => {
         if (!data || typeof data !== 'object') return;
         setCompanyDB((prev: any) => ({ ...prev, ...data }));
-        try { (window as any).__companyData = { ...((window as any).__companyData || {}), ...data }; } catch (e) {}
-        if (!silent) alert(t('app.companyUpdated', '公司数据库已更新'));
+        try { (window as any).__companyData = { ...((window as any).__companyData || {}), ...data }; } catch (e) { }
+        if (!silent) showAlert(t('app.companyUpdated', '公司数据库已更新'), '', 'success');
     };
 
     const handleCompanyUpload = (event: any) => {
         const file = event.target.files[0];
-        if(!file) return;
+        if (!file) return;
         const reader = new FileReader();
-        reader.onload = (e: any) => { try { const json = JSON.parse(e.target.result); applyCompanyData(json, { silent: false }); } catch(err) { alert(t("app.parseFail", "解析失败")); } };
+        reader.onload = (e: any) => { try { const json = JSON.parse(e.target.result); applyCompanyData(json, { silent: false }); } catch (err) { showAlert(t("app.parseFail", "解析失败"), '', 'error'); } };
         reader.readAsText(file);
         event.target.value = '';
     };
 
-    const handleFileUpload = async(event: any) => {
+    const handleFileUpload = async (event: any) => {
         const files = event.target.files;
         if (!files || files.length === 0) return;
         const readTasks = Array.from(files).map((file: any) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e: any) => {
-              try {
-                const json = JSON.parse(e.target.result);
-                const companyName = file.name.replace(/\.(geojson|json)$/i, "");
-                resolve({ json, companyName });
-              } catch (err) { alert(t("app.fileSkip", "文件 {{name}} 解析失败，已跳过", { name: file.name })); resolve(null); }
-            };
-            reader.onerror = () => resolve(null);
-            reader.readAsText(file);
-          });
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e: any) => {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        const companyName = file.name.replace(/\.(geojson|json)$/i, "");
+                        resolve({ json, companyName });
+                    } catch (err) { showAlert(t("app.fileSkip", "文件 {{name}} 解析失败，已跳过", { name: file.name }), '', 'warning'); resolve(null); }
+                };
+                reader.onerror = () => resolve(null);
+                reader.readAsText(file);
+            });
         });
         try {
-          const results = await Promise.all(readTasks);
-          const validResults = results.filter(r => r !== null) as any[];
-          if (validResults.length === 0) return;
+            const results = await Promise.all(readTasks);
+            const validResults = results.filter(r => r !== null) as any[];
+            if (validResults.length === 0) return;
 
-          const newFeatures: any[] = [];
-          const railwayUpdates: any = {};
-          validResults.forEach(({ json, companyName: defaultCompany }) => {
-            if (!json.features) return;
-            const enriched = json.features.map((f: any) => ({ ...f, properties: { ...f.properties, company: f.properties.company || f.properties.operator || defaultCompany || "上传数据" } }));
-            newFeatures.push(...enriched);
-            enriched.forEach((f: any) => {
-                 const p = f.properties;
-                 const comp = p.company;
-                 const ensureLineInTemp = (lineName: string, props: any) => {
-                     const lineKey = `${comp}:${lineName}`;
-                     if (!railwayUpdates[lineKey]) {
-                         const info = ((window as any).__companyData && (window as any).__companyData[comp]) || companyDB[comp] || {};
-                         const icon = props.icon || info.logo || null;
-                         railwayUpdates[lineKey] = { meta: { region: info.region || "未知", type: info.type || "未知", company: comp, logo: info.logo, icon }, stations: [] };
-                     } else if (props.icon && !railwayUpdates[lineKey].meta.icon) {
-                         railwayUpdates[lineKey].meta.icon = props.icon;
-                     }
-                     return lineKey;
-                 };
-                 if (p.type === 'line' && p.name) {
-                     ensureLineInTemp(p.name, p);
-                 } else if (p.type === 'station' && p.line && p.name && f.geometry?.coordinates) {
-                     const lineKey = ensureLineInTemp(p.line, p);
-                     const stations = railwayUpdates[lineKey].stations;
-                     if (!stations.find((s: any) => s.name_ja === p.name)) {
-                         const stationId = p.id || `${comp}:${p.line}:${p.name}`;
-                         stations.push({ id: stationId, name_ja: p.name, lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], transfers: p.transfers || [] });
-                     }
-                 }
-            });
-          });
-          if (newFeatures.length > 0) setGeoData((prev: any) => ({ type: "FeatureCollection", features: [...prev.features, ...newFeatures] }));
-          if (Object.keys(railwayUpdates).length > 0) {
-              setRailwayData((prev: any) => {
-                const next = { ...prev };
-                Object.entries(railwayUpdates).forEach(([key, val]: [string, any]) => {
-                    if (!next[key]) { next[key] = val; }
-                    else {
-                        val.stations.forEach((s: any) => { if (!next[key].stations.find((ex: any) => ex.id === s.id)) next[key].stations.push(s); });
-                        if(val.meta.icon && !next[key].meta.icon) next[key].meta.icon = val.meta.icon;
+            const newFeatures: any[] = [];
+            const railwayUpdates: any = {};
+            validResults.forEach(({ json, companyName: defaultCompany }) => {
+                if (!json.features) return;
+                const uploadedLabel = t('app.uploadedData', '上传数据');
+                const enriched = json.features.map((f: any) => ({ ...f, properties: { ...f.properties, company: f.properties.company || f.properties.operator || defaultCompany || uploadedLabel } }));
+                newFeatures.push(...enriched);
+                enriched.forEach((f: any) => {
+                    const p = f.properties;
+                    const comp = p.company;
+                    const ensureLineInTemp = (lineName: string, props: any) => {
+                        const lineKey = `${comp}:${lineName}`;
+                        if (!railwayUpdates[lineKey]) {
+                            const info = ((window as any).__companyData && (window as any).__companyData[comp]) || companyDB[comp] || {};
+                            const icon = props.icon || info.logo || null;
+                            const unknownLabel = t('app.unknown', '未知');
+                            railwayUpdates[lineKey] = { meta: { region: info.region || unknownLabel, type: info.type || unknownLabel, company: comp, logo: info.logo, icon }, stations: [] };
+                        } else if (props.icon && !railwayUpdates[lineKey].meta.icon) {
+                            railwayUpdates[lineKey].meta.icon = props.icon;
+                        }
+                        return lineKey;
+                    };
+                    if (p.type === 'line' && p.name) {
+                        ensureLineInTemp(p.name, p);
+                    } else if (p.type === 'station' && p.line && p.name && f.geometry?.coordinates) {
+                        const lineKey = ensureLineInTemp(p.line, p);
+                        const stations = railwayUpdates[lineKey].stations;
+                        if (!stations.find((s: any) => s.name_ja === p.name)) {
+                            const stationId = p.id || `${comp}:${p.line}:${p.name}`;
+                            stations.push({ id: stationId, name_ja: p.name, lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], transfers: p.transfers || [] });
+                        }
                     }
                 });
-                return next;
-              });
-          }
-          alert(t("app.importCount", "成功导入 {{count}} 个文件！", { count: validResults.length }));
-        } catch (err) { alert(t("app.fileProcErr", "文件处理过程中发生未知错误")); }
+            });
+            if (newFeatures.length > 0) setGeoData((prev: any) => ({ type: "FeatureCollection", features: [...prev.features, ...newFeatures] }));
+            if (Object.keys(railwayUpdates).length > 0) {
+                setRailwayData((prev: any) => {
+                    const next = { ...prev };
+                    Object.entries(railwayUpdates).forEach(([key, val]: [string, any]) => {
+                        if (!next[key]) { next[key] = val; }
+                        else {
+                            val.stations.forEach((s: any) => { if (!next[key].stations.find((ex: any) => ex.id === s.id)) next[key].stations.push(s); });
+                            if (val.meta.icon && !next[key].meta.icon) next[key].meta.icon = val.meta.icon;
+                        }
+                    });
+                    return next;
+                });
+            }
+            showAlert(t("app.importCount", "成功导入 {{count}} 个文件！", { count: validResults.length }), '', 'success');
+        } catch (err) { showAlert(t("app.fileProcErr", "文件处理过程中发生未知错误"), '', 'error'); }
         finally { event.target.value = ''; }
     };
 
@@ -1133,21 +1147,21 @@ export const AppLayout: React.FC = () => {
 
                 <Tutorial
                     activeTab={activeTab}
-                    setActiveTab={(t: any) => useStore.getState().setActiveTab(t)}
-                    isTripEditing={useStore.getState().isTripEditing}
+                    setActiveTab={(tab: any) => useStore.getState().setActiveTab(tab)}
+                    isTripEditing={isTripEditing}
                     setIsTripEditing={(b: boolean) => b ? useStore.getState().startEditingTrip() : useStore.getState().closeTripEditor()}
                     isLoginOpen={isLoginOpen}
                     setIsLoginOpen={(b: boolean) => setModalState({ isLoginOpen: b })}
                     user={user}
-                    pinMode={useStore.getState().pinMode}
-                    editorMode={useStore.getState().editorMode}
+                    pinMode={pinMode}
+                    editorMode={editorMode}
                 />
 
                 {stationMenu && (
                     <StationMenu
                         position={stationMenu}
                         stationData={stationMenu.stationData}
-                        railwayData={useStore.getState().railwayData}
+                        railwayData={railwayData}
                         onClose={() => setStationMenu(null)}
                     />
                 )}

@@ -5,6 +5,9 @@ export interface SelectableLine {
     key: string;            // Original lineKey e.g. "JR東日本:山手線"
     displayName: string;    // Display name without company prefix
     icon: string | null;    // Line-specific icon
+    recolor?: boolean;
+    color?: string | null;
+    companyIcon?: string | null;
 }
 
 export interface CompanyGroup {
@@ -59,7 +62,11 @@ const abbrMap: Record<string, Record<string, string>> = {
 /**
  * Builds structured, grouped, and sorted line data specifically for the LineSelector component.
  */
-export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: string[] | null): Record<CategoryKey, RegionGroup[]> => {
+export const buildLineSelectorGroups = (
+    railwayData: RailwayMap, 
+    allowedLines: string[] | null = null,
+    priorityRegion?: string
+): Record<CategoryKey, RegionGroup[]> => {
 
     // 1. Initial rough grouping into objects for easy aggregation
     const rawGroups: Record<CategoryKey, Record<string, Record<string, { logo: string | null, lines: SelectableLine[] }>>> = {
@@ -92,7 +99,10 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
         rawGroups[category][normRegion][compKey].lines.push({
             key,
             displayName,
-            icon: icon || null
+            icon: icon || null,
+            recolor: line.meta.recolor,
+            color: line.meta.color,
+            companyIcon: line.meta.companyIcon
         });
     }
 
@@ -186,6 +196,10 @@ export const buildLineSelectorGroups = (railwayData: RailwayMap, allowedLines: s
 
         // Sort Regions according to predefined geographical order
         regions.sort((a, b) => {
+            if (priorityRegion) {
+                if (a.name === priorityRegion) return -1;
+                if (b.name === priorityRegion) return 1;
+            }
             const idxA = REGION_ORDER.indexOf(a.name);
             const idxB = REGION_ORDER.indexOf(b.name);
             if (idxA !== -1 && idxB !== -1) return idxA - idxB;

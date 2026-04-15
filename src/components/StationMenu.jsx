@@ -1,7 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { useDrag } from './DragContext';
+import { useStore, EditorMode } from '../store';
 import { X } from 'lucide-react';
+import { isMobile } from 'react-device-detect';
 import railBg from './../assets/rail_bg.png'
+import { LineLogo } from './LineLogo';
 
 const McSlotSvg = ({ className = "" }) => (
     <svg
@@ -22,6 +25,19 @@ const McSlotSvg = ({ className = "" }) => (
 const StationMenu = ({ position, stationData, railwayData, onClose }) => {
     const { startDrag, isDragging, dragItem } = useDrag();
     const menuRef = useRef(null);
+    const setEditorMode = useStore(state => state.setEditorMode);
+    const setAutoForm = useStore(state => state.setAutoForm);
+    const startEditingTrip = useStore(state => state.startEditingTrip);
+
+    const handleItemClick = (line) => {
+        startEditingTrip(null, EditorMode.Auto, {
+            startLine: line.lineKey,
+            startStation: line.stationId,
+            endLine: '', // As per user's "不需要" comment
+            endStation: ''
+        });
+        onClose();
+    };
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -57,16 +73,19 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
     const lines = [];
     if (railwayData) {
         Object.keys(railwayData).forEach(key => {
-            const line = railwayData[key];
-            const match = line.stations.find(s => s.name_ja === stationData.name_ja);
+            const lineData = railwayData[key];
+            const match = lineData.stations.find(s => s.name_ja === stationData.name_ja);
             if (match) {
                 lines.push({
                     lineKey: key,
                     stationId: match.id,
                     name: match.name_ja,
-                    logo: line.meta.logo, // Company logo
-                    icon: line.meta.icon, // Line icon
-                    company: line.meta.company
+                    logo: lineData.meta.logo,
+                    icon: lineData.meta.icon,
+                    companyIcon: lineData.meta.companyIcon,
+                    recolor: lineData.meta.recolor,
+                    color: lineData.meta.color,
+                    company: lineData.meta.company
                 });
             }
         });
@@ -123,7 +142,8 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                                         name: line.name,
                                         logo: line.icon || line.logo,
                                         lat: stationData.lat,
-                                        lng: stationData.lng
+                                        lng: stationData.lng,
+                                        onClick: () => handleItemClick(line)
                                     }, e);
                                 }}
                                 onTouchStart={(e) => {
@@ -135,7 +155,8 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                                         name: line.name,
                                         logo: line.icon || line.logo,
                                         lat: stationData.lat,
-                                        lng: stationData.lng
+                                        lng: stationData.lng,
+                                        onClick: () => handleItemClick(line)
                                     }, e);
                                 }}
                             >
@@ -149,11 +170,11 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                                     <div className="absolute inset-0 z-10 p-1 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-white/10 transition-colors">
                                         <div className="relative w-full h-full flex items-center justify-center">
                                             {/* Rail (as requested, floating on rail) */}
-                                            <img src={railBg} className="absolute inset-0 w-full h-full object-contain pixelated opacity-80" alt="" />
+                                            <img src={railBg} className="absolute inset-0 w-full h-full object-contain pixelated opacity-80" alt="" draggable={false} />
 
                                             {/* Icon */}
                                             {(line.icon || line.logo) && (
-                                                <img src={line.icon || line.logo} className="w-4 h-4 mb-2 object-contain z-20 filter drop-shadow-sm" alt="" />
+                                                <LineLogo src={line.icon || line.logo} companyIcon={line.companyIcon} recolor={line.recolor} color={line.color} className="w-4 h-4 mb-2 object-contain z-20 filter drop-shadow-sm" />
                                             )}
                                         </div>
 
@@ -162,10 +183,12 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                                             {line.company || line.name}
                                         </div>
 
-                                        {/* Tooltip on Hover */}
-                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#100010] border-2 border-[#2a007a] text-white text-[10px] px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 pixel-font">
-                                            {line.lineKey.split(':')[1] || line.lineKey}
-                                        </div>
+                                        {/* Tooltip on Hover - Desktop Only */}
+                                        {!isMobile && (
+                                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#100010] border-2 border-[#2a007a] text-white text-[10px] px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 pixel-font">
+                                                {line.lineKey.split(':')[1] || line.lineKey}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

@@ -31,6 +31,13 @@ export const DragProvider = ({ children }) => {
 
       setCursorPos({ x, y });
 
+      // 拖拽激活时, 禁止全局文字选择 / Prevent global text selection during active drag
+      if (!document.body.classList.contains('dragging-active')) {
+          document.body.classList.add('dragging-active');
+          document.body.style.userSelect = 'none';
+          document.body.style.webkitUserSelect = 'none';
+      }
+
       const target = document.elementFromPoint(x, y);
       if (target) {
           const zone = target.closest('[data-dropzone-id]');
@@ -57,6 +64,9 @@ export const DragProvider = ({ children }) => {
     const onEnd = () => {
       if (!dragThresholdMet.current) {
           // It was a click, not a drag.
+          if (dragItem?.onClick) {
+              dragItem.onClick();
+          }
           setIsDragging(false);
           setDragItem(null);
           setDropZone(null);
@@ -76,22 +86,34 @@ export const DragProvider = ({ children }) => {
       setIsDragging(false);
       setDragItem(null);
       setDropZone(null);
+      document.body.classList.remove('dragging-active');
+      document.body.style.userSelect = '';
+      document.body.style.webkitUserSelect = '';
+    };
+
+    const onBlur = () => {
+        if (isDragging) onEnd();
     };
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('touchmove', onTouchMove, { passive: false });
     window.addEventListener('mouseup', onEnd);
     window.addEventListener('touchend', onEnd);
+    window.addEventListener('blur', onBlur);
 
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('mouseup', onEnd);
       window.removeEventListener('touchend', onEnd);
+      window.removeEventListener('blur', onBlur);
     };
   }, [isDragging, dragItem, dropZone]);
 
   const startDrag = (item, e) => {
+    if (e && e.type === 'mousedown') {
+        e.preventDefault(); // 阻止默认事件, 防止文字选择和原生拖拽 / Prevent default to avoid text selection and native drag
+    }
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     setDragItem(item);
@@ -99,11 +121,9 @@ export const DragProvider = ({ children }) => {
     dragStartPos.current = { x: clientX, y: clientY };
     dragThresholdMet.current = false;
 
-    // For mouse events we can just start immediately, for touch we wait for threshold
-    if (!e.touches) {
-       dragThresholdMet.current = true;
-       setIsDragging(true);
-    }
+    // We no longer start dragging immediately for mouse, 
+    // to allow distinguishing between click and drag.
+    // Movement threshold (5px) will be checked in handleMove.
   };
 
   return (
@@ -120,7 +140,7 @@ export const useDrag = () => useContext(DragContext);
 
 if (!window.__dropZoneRegistry) window.__dropZoneRegistry = {};
 
-export const DropZone = ({ onDrop, children, className = "", activeClassName = "ring-2 ring-emerald-400 bg-emerald-50" }) => {
+export const DropZone = ({ onDrop, children, className = "", activeClassName = "dropzone-glow" }) => {
     const { isDragging, setDropZone } = useDrag();
     const [isOver, setIsOver] = useState(false);
     const idRef = useRef(Math.random().toString(36).substr(2, 9));
@@ -158,12 +178,13 @@ const DragOverlay = ({ item, pos }) => {
             className="animate-pop-in filter drop-shadow-xl"
         >
             <div className="relative w-full h-full">
-                <img src={railBg} alt="" className="w-full h-full object-contain pixelated" />
+                <img src={railBg} alt="" className="w-full h-full object-contain pixelated" draggable={false} />
                 {item.logo && (
                     <img
                         src={item.logo}
                         alt=""
                         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full w-12 h-12 object-contain"
+                        draggable={false}
                     />
                 )}
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded whitespace-nowrap font-bold border border-white/20">

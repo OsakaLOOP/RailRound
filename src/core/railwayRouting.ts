@@ -58,7 +58,7 @@ export const getTransferableLines = (station: Station | undefined, currentLineKe
         const sameNameStation = railwayData[lineKey].stations.find(s => s.name_ja === station.name_ja);
         if (sameNameStation) {
             const dist = calcDist(station.lat, station.lng, sameNameStation.lat, sameNameStation.lng);
-            if (dist < 2.0) validLines.add(lineKey);
+            if (dist < 0.5) validLines.add(lineKey);
         }
     }
     return Array.from(validLines);
@@ -244,7 +244,7 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
             const targetStation = nextLine.stations[tNode.stationIndex];
             const dist = calcDist(currentStation.lat, currentStation.lng, targetStation.lat, targetStation.lng);
 
-            if (dist > 1.0) continue;
+            if (dist > 0.5) continue;
 
             const targetId = `${tNode.lineKey}:${tNode.stationIndex}`;
             if (!closedSet.has(targetId) && !validTransfers.has(targetId)) {

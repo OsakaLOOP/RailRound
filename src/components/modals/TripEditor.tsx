@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Edit2, Plus, X, ListFilter, AlertTriangle, ArrowRightLeft, ArrowDown, Search, Loader2 } from 'lucide-react';
 import { useStore, EditorMode } from '../../store';
 import { DropZone } from '../DragContext';
-import { LineSelector } from './LineSelector';
-import { GlobalSearchModal } from './GlobalSearchModal';
+import { StationLineSearchModal, SearchModalMode } from './StationSearchModal';
+import { LineLogo } from '../LineLogo';
 import { isCompanyCompatible, getTransferableLines, findRoute, computeLoopVia, getLandmarks } from '../../core/railwayRouting'; // Will need to ensure these are typed
+import { calcDist } from '../../core/tripCalculator';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
+import { showAlert, showConfirm } from '../../utils/alerts';
 
 export const TripEditor: React.FC = () => {
     const {
@@ -39,16 +41,35 @@ export const TripEditor: React.FC = () => {
     const { saveData } = useUserData();
 
     const { t } = useTranslation();
-    const [selectorOpen, setSelectorOpen] = useState(false);
-    const [searchOpen, setSearchOpen] = useState(false);
+    const [stationModalOpen, setStationModalOpen] = useState(false);
+    const [stationModalMode, setStationModalMode] = useState<SearchModalMode>('line');
     const [selectorTarget, setSelectorTarget] = useState<{ type: string; index?: number } | null>(null);
     const [allowedLines, setAllowedLines] = useState<string[] | null>(null);
 
-    const onSave = () => {
+    const onSave = async () => {
         // Validation logic
         const validSegments = form.segments?.filter(s => s.fromId !== s.toId) || [];
-        if (validSegments.length === 0) { alert(t("tripEdit.atLeastOne", "至少包含一段有效行程")); return; }
-        if (validSegments.some(s => !s.lineKey || !s.fromId || !s.toId)) { alert(t("tripEdit.fillInfo", "请完善信息")); return; }
+        if (validSegments.length === 0) { showAlert(t("tripEdit.atLeastOne", "至少包含一段有效行程")); return; }
+        if (validSegments.some(s => !s.lineKey || !s.fromId || !s.toId)) { showAlert(t("tripEdit.fillInfo", "请完善信息")); return; }
+
+        let hasDisconnect = false;
+        for (let i = 1; i < validSegments.length; i++) {
+            const prev = validSegments[i - 1];
+            const curr = validSegments[i];
+            const prevSt = railwayData[prev.lineKey]?.stations.find(s => s.id === prev.toId);
+            const currSt = railwayData[curr.lineKey]?.stations.find(s => s.id === curr.fromId);
+            if (prevSt && currSt) {
+                const dist = calcDist(prevSt.lat, prevSt.lng, currSt.lat, currSt.lng);
+                if (dist > 0.5 && prevSt.name_ja !== currSt.name_ja) {
+                    hasDisconnect = true;
+                    break;
+                }
+            }
+        }
+        if (hasDisconnect) {
+            const confirm = await showConfirm(t('tripEdit.disconnectTitle', '行程断连提示'), t('tripEdit.disconnectMsg', '检测到中间存在不相连的独立行程段，强行保存可能会破坏结构。确定要保存吗？'));
+            if (!confirm) return;
+        }
 
         // Resolve 'auto' loops to permanent 'up' or 'down'
         const resolvedSegments = validSegments.map(seg => {
@@ -91,7 +112,7 @@ export const TripEditor: React.FC = () => {
 
         setTrips(finalTrips);
         if (user) {
-            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => alert('云端保存失败: ' + e.message));
+            saveData(user.token, finalTrips, pins, folders, badgeSettings).catch((e: any) => showAlert(t('tripEdit.saveFail', '云端保存失败: ') + e.message, '', 'error'));
         }
         closeEditor();
     };
@@ -153,20 +174,23 @@ export const TripEditor: React.FC = () => {
             if (result.error) {
                 setIsRouteSearching(false);
                 if (!isInfinite && result.error.includes("超出最大换乘次数")) {
-                    setTimeout(() => {
-                        const wantRetry = window.confirm(t("tripEdit.autoMaxLimit", "自动规划超出6次换乘限制或无解。\n是否继续无限制深度搜索？(这可能需要较长等待时间)"));
+                    setTimeout(async () => {
+                        const wantRetry = await showConfirm(
+                            t('tripEdit.autoFailTitle', '换乘超限'),
+                            t("tripEdit.autoMaxLimit", "自动规划超出6次换乘限制或无解。\n是否继续无限制深度搜索？(这可能需要较长等待时间)")
+                        );
                         if (wantRetry) {
                             onAutoSearch(true);
                         }
                     }, 100);
                 } else {
                     setTimeout(() => {
-                        alert(`${t("tripEdit.autoFail", "无法规划: ")}${result.error}`);
+                        showAlert(`${t("tripEdit.autoFail", "无法规划: ")}${result.error}`, '', 'error');
                     }, 100);
                 }
             }
             else {
-                if (result.segments.length > 20) { setIsRouteSearching(false); alert(t("tripEdit.pathTooLong", "路径过长")); return; }
+                if (result.segments.length > 20) { setIsRouteSearching(false); showAlert(t("tripEdit.pathTooLong", "路径过长"), '', 'warning'); return; }
                 setForm({ segments: result.segments });
                 setEditorMode(EditorMode.Manual);
                 setTimeout(() => setIsRouteSearching(false), 200);
@@ -192,48 +216,23 @@ export const TripEditor: React.FC = () => {
     const openSelector = (targetType: string, index: number | null = null, allowed: string[] | null = null) => {
         setSelectorTarget({ type: targetType, index: index !== null ? index : undefined });
         setAllowedLines(allowed);
-        setSelectorOpen(true);
+        setStationModalMode('line');
+        setStationModalOpen(true);
     };
 
     const openSearch = (targetType: string, index: number | null = null) => {
         setSelectorTarget({ type: targetType, index: index !== null ? index : undefined });
-        setSearchOpen(true);
+        setStationModalMode('search');
+        setStationModalOpen(true);
     };
 
-    const handleLineSelect = (lineKey: string) => {
-        if (!selectorTarget) return;
-        const { type, index } = selectorTarget;
-
-        if (type === 'segment' && index !== undefined && form.segments) {
-            const newSegs = [...form.segments];
-            const seg = { ...newSegs[index], lineKey, fromId: '', toId: '' };
-            if (index > 0) {
-                const prevSeg = newSegs[index - 1];
-                const prevLineData = railwayData[prevSeg.lineKey];
-                const prevEndSt = prevLineData?.stations.find(s => s.id === prevSeg.toId);
-                if (prevEndSt) {
-                    const newLineData = railwayData[lineKey];
-                    const startSt = newLineData.stations.find(s => s.name_ja === prevEndSt.name_ja);
-                    if (startSt) seg.fromId = startSt.id;
-                }
-            }
-            newSegs[index] = seg;
-            setForm({ segments: newSegs });
-        } else if (type === 'autoStart') {
-            setAutoForm({ ...autoForm, startLine: lineKey, startStation: '' });
-        } else if (type === 'autoEnd') {
-            setAutoForm({ ...autoForm, endLine: lineKey, endStation: '' });
-        }
-    };
-
-    const handleSearchSelect = (lineKey: string, stationId?: string) => {
+    const handleStationLineSelect = (lineKey: string, stationId?: string) => {
         if (!selectorTarget) return;
         const { type, index } = selectorTarget;
 
         if (type === 'segment' && index !== undefined && form.segments) {
             const newSegs = [...form.segments];
             const seg = { ...newSegs[index], lineKey, fromId: stationId || '', toId: '' };
-            // If it's not the first segment and they didn't select a station, try to auto-fill
             if (index > 0 && !stationId) {
                 const prevSeg = newSegs[index - 1];
                 const prevLineData = railwayData[prevSeg.lineKey];
@@ -251,12 +250,35 @@ export const TripEditor: React.FC = () => {
         } else if (type === 'autoEnd') {
             setAutoForm({ ...autoForm, endLine: lineKey, endStation: stationId || '' });
         }
-        setSearchOpen(false);
+        setStationModalOpen(false);
     };
 
     const addSegment = () => {
-        if ((form.segments?.length || 0) >= 10) { alert(t("tripEdit.maxSegment", "最多 10 段")); return; }
-        setForm({ segments: [...(form.segments || []), { id: Date.now().toString(), lineKey: '', fromId: '', toId: '', loopVia: 'auto' }] });
+        if ((form.segments?.length || 0) >= 10) { showAlert(t("tripEdit.maxSegment", "最多 10 段"), '', 'warning'); return; }
+        
+        const currentSegments = form.segments || [];
+        const prevSegment = currentSegments.length > 0 ? currentSegments[currentSegments.length - 1] : null;
+        
+        let currentAllowed: string[] | null = null;
+        if (prevSegment && prevSegment.lineKey && prevSegment.toId) {
+            const prevLineData = railwayData[prevSegment.lineKey];
+            const prevEndSt = prevLineData?.stations.find((s: any) => s.id === prevSegment.toId);
+            if (prevLineData && prevEndSt) {
+                const allKeys = Object.keys(railwayData);
+                currentAllowed = allKeys.filter(lineKey => {
+                    const currentMeta = railwayData[lineKey]?.meta;
+                    if (!currentMeta || !isCompanyCompatible(prevLineData.meta, currentMeta)) return false;
+                    const transferable = getTransferableLines(prevEndSt, prevSegment.lineKey, railwayData, true);
+                    return transferable.includes(lineKey) || lineKey === prevSegment.lineKey;
+                });
+            }
+        }
+
+        const newSegs = [...currentSegments, { id: Date.now().toString(), lineKey: '', fromId: '', toId: '', loopVia: 'auto' }];
+        setForm({ segments: newSegs });
+
+        // Auto open the line selector for the newly added segment
+        openSelector('segment', currentSegments.length, currentAllowed);
     };
 
     const updateSegment = (idx: number, field: string, val: any) => {
@@ -358,7 +380,10 @@ export const TripEditor: React.FC = () => {
                             <button onClick={closeEditor}><X className="text-gray-400 hover:text-gray-600" /></button>
                         </div>
                         <div className="grid grid-cols-2 p-1 bg-gray-200 rounded-lg relative isolate overflow-hidden">
-                            <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white shadow rounded-md transition-all duration-100 ease-out z-0`} style={{ left: editorMode === EditorMode.Manual ? '4px' : 'calc(50% + 0px)' }} />
+                            <div 
+                                className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white shadow rounded-md z-0 transition-transform duration-300 ease-out`} 
+                                style={{ transform: editorMode === EditorMode.Manual ? 'translateX(0)' : 'translateX(100%)', left: '4px' }} 
+                            />
                             <button onClick={() => setEditorMode(EditorMode.Manual)} className={`py-1.5 text-sm font-bold rounded-md z-10 transition-colors duration-300 ${editorMode === EditorMode.Manual ? 'text-gray-800' : 'text-gray-500'}`}>{t('tripEdit.manual', '手动输入')}</button>
                             <button onClick={() => setEditorMode(EditorMode.Auto)} className={`py-1.5 text-sm font-bold rounded-md z-10 transition-colors duration-300 ${editorMode === EditorMode.Auto ? 'text-blue-600' : 'text-slate-500'}`}>{t('tripEdit.auto', '自动规划')}</button>
                         </div>
@@ -377,28 +402,40 @@ export const TripEditor: React.FC = () => {
                                 {form.segments?.map((segment, idx) => {
                                     const prevSegment = idx > 0 ? form.segments![idx - 1] : null;
                                     const prevLineData = prevSegment ? railwayData[prevSegment.lineKey] : null;
-                                    const prevEndStName = prevSegment ? railwayData[prevSegment.lineKey]?.stations.find(s => s.id === prevSegment.toId)?.name_ja : null;
+                                    const prevEndSt = prevLineData ? prevLineData.stations.find(s => s.id === prevSegment!.toId) : null;
+                                    const prevEndStName = prevEndSt?.name_ja;
 
                                     let currentAllowed: string[] | null = null;
                                     let warning: string | null = null;
+                                    let isDisconnected = false;
 
-                                    if (prevLineData && prevEndStName) {
+                                    if (prevLineData && prevEndStName && prevEndSt) {
                                         const allKeys = Object.keys(railwayData);
                                         currentAllowed = allKeys.filter(lineKey => {
                                             if (lineKey === segment.lineKey) return true;
-                                            const currentMeta = railwayData[lineKey].meta;
-                                            if (!isCompanyCompatible(prevLineData.meta, currentMeta)) return false;
-                                            const prevEndSt = prevLineData.stations.find(s => s.id === prevSegment.toId);
-                                            const transferable = getTransferableLines(prevEndSt, prevSegment.lineKey, railwayData, true);
+                                            const currentMeta = railwayData[lineKey]?.meta;
+                                            if (!currentMeta || !isCompanyCompatible(prevLineData.meta, currentMeta)) return false;
+                                            const transferable = getTransferableLines(prevEndSt, prevSegment!.lineKey, railwayData, true);
                                             return transferable.includes(lineKey);
                                         });
                                         if (currentAllowed.length === 0 && !segment.lineKey) warning = t('tripEdit.noTransferWarning', '无可换乘的同公司/JR线路');
+                                        
+                                        if (segment.lineKey && segment.fromId) {
+                                            const currLineData = railwayData[segment.lineKey];
+                                            const currStartSt = currLineData?.stations.find(s => s.id === segment.fromId);
+                                            if (currStartSt) {
+                                                const dist = calcDist(prevEndSt.lat, prevEndSt.lng, currStartSt.lat, currStartSt.lng);
+                                                if (dist > 0.5 && prevEndSt.name_ja !== currStartSt.name_ja) {
+                                                    isDisconnected = true;
+                                                }
+                                            }
+                                        }
                                     }
 
                                     return (
-                                        <div key={segment.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 relative group">
-                                            <div className="absolute -left-3 top-3 w-6 h-6 bg-gray-800 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-sm border-2 border-white">{idx + 1}</div>
-                                            {idx > 0 && <button onClick={() => removeSegment(idx)} className="absolute -right-2 -top-2 p-1 bg-white text-red-500 rounded-full shadow border border-gray-100 hover:bg-red-50"><X size={14} /></button>}
+                                        <div key={segment.id} className={`p-3 rounded-lg border relative group transition-colors duration-300 ${isDisconnected ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
+                                            <div className="absolute -left-3 top-3 w-6 h-6 bg-gray-800 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-sm border-2 border-white z-10">{idx + 1}</div>
+                                            <button onClick={() => removeSegment(idx)} className="absolute -right-2 -top-2 p-1 bg-white text-red-500 rounded-full shadow border border-gray-100 hover:bg-red-50 z-20"><X size={14} /></button>
 
                                             <div className="mb-2 pl-2">
                                                 <div className="flex rounded shadow-sm w-full border bg-white overflow-hidden">
@@ -409,7 +446,7 @@ export const TripEditor: React.FC = () => {
                                                         <span className={segment.lineKey ? "text-gray-800" : "text-gray-400"}>
                                                             {segment.lineKey ? (
                                                                 <span className="flex items-center gap-2">
-                                                                    {railwayData[segment.lineKey]?.meta.icon && <img src={railwayData[segment.lineKey].meta.icon!} className="h-4 w-auto" />}
+                                                                    {railwayData[segment.lineKey]?.meta.icon && <LineLogo src={railwayData[segment.lineKey].meta.icon!} companyIcon={railwayData[segment.lineKey].meta.companyIcon} recolor={railwayData[segment.lineKey]?.meta.recolor} color={railwayData[segment.lineKey]?.meta.color} className="h-4 w-auto" />}
                                                                     {segment.lineKey}
                                                                 </span>
                                                             ) : (idx === 0 ? t('tripEdit.selLine', '选择路线...') : t('tripEdit.selTransfer', '选择换乘路线...'))}
@@ -419,12 +456,13 @@ export const TripEditor: React.FC = () => {
                                                     <button
                                                         onClick={() => openSearch('segment', idx)}
                                                         className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 transition-colors flex items-center justify-center w-10 shrink-0"
-                                                        title="全局搜索"
+                                                        title={t('search.placeholder', '搜索线路或车站...')}
                                                     >
                                                         <Search size={16} />
                                                     </button>
                                                 </div>
-                                                {warning && <div className="text-xs text-red-500 mt-1"><AlertTriangle size={12} className="inline" /> {warning}</div>}
+                                                {warning && <div className="text-xs text-orange-500 mt-1"><AlertTriangle size={12} className="inline" /> {warning}</div>}
+                                                {isDisconnected && <div className="text-xs text-red-500 mt-1 font-bold animate-pulse"><AlertTriangle size={12} className="inline" /> {t('tripEdit.disconnected', '起始站与上一程终点不相连')}</div>}
                                             </div>
 
                                             <div className="grid grid-cols-[1fr,auto,1fr] gap-2 pl-2 items-center">
@@ -551,12 +589,17 @@ export const TripEditor: React.FC = () => {
                             <div className="text-xs text-center text-slate-400">{t('tripEdit.autoWarning', '仅支持同一公司或JR集团内的换乘搜索')}</div>
                         </div>
                     )}
-
                     {editorMode === EditorMode.Manual && <div className="p-4 border-t"><button onClick={onSave} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] active:translate-y-0 transition-all duration-300">{t('tripEdit.save', '保存行程')}</button></div>}
                 </div>
             </div>
-            <LineSelector isOpen={selectorOpen} onClose={() => setSelectorOpen(false)} onSelect={handleLineSelect} allowedLines={allowedLines} />
-            <GlobalSearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} onSelect={handleSearchSelect} />
+
+            <StationLineSearchModal 
+                isOpen={stationModalOpen} 
+                initialMode={stationModalMode} 
+                onClose={() => setStationModalOpen(false)} 
+                onSelect={handleStationLineSelect} 
+                allowedLines={allowedLines} 
+            />
         </>
     );
 };

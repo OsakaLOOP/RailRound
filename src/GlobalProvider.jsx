@@ -1,20 +1,16 @@
 import React, { useEffect, useState, useEffectEvent } from "react";
 import { verCalc, isVerSupported, verCmp } from "./utils/verCalc";
-import changelogData from '../public/changelog.json';
 import { MetaContext, VersionContext } from "./contexts";
-
-const meta = changelogData.meta;
-const logs = changelogData.logs;
 
 export const GlobalProvider = ({ children }) => {
     const [versionInfo, setVersionInfo] = useState({
-        currentVer: meta["currentVersion"],
-        lastModified: meta["lastModified"],
-        lastUpdated: meta["lastUpdated"],
-        minVer: meta["minVer"] || "0.20",
-        rawLogs: logs,
-        ver: verCalc(meta["currentVersion"]),
-        isSupported: isVerSupported(meta["currentVersion"], meta["minVer"] || "0.20"),
+        currentVer: "0.0.0",
+        lastModified: "",
+        lastUpdated: "",
+        minVer: "0.20",
+        rawLogs: [],
+        ver: verCalc("0.0.0"),
+        isSupported: true,
     });
 
     const [hasUpdate, setHasUpdate] = useState(null);
@@ -63,15 +59,18 @@ export const GlobalProvider = ({ children }) => {
     }, []);
 
     const metaContextValue = {
-        ...meta,
+        currentVersion: versionInfo.currentVer,
+        lastModified: versionInfo.lastModified,
+        lastUpdated: versionInfo.lastUpdated,
+        minVer: versionInfo.minVer,
         devMode
     };
 
     return (
-        <VersionContext value={versionInfo}>
-            <MetaContext value={metaContextValue}>
+        <VersionContext.Provider value={versionInfo}>
+            <MetaContext.Provider value={metaContextValue}>
                 {children}
-            </MetaContext>
-        </VersionContext>
+            </MetaContext.Provider>
+        </VersionContext.Provider>
     );
 };

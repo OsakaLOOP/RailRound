@@ -3,6 +3,8 @@ import buildKMLString from './buildKml';
 import { sliceGeoJsonPath } from './utils/geoUtils';
 import { useStore } from './store';
 import toast from 'react-hot-toast';
+import { showAlert } from './utils/alerts';
+import i18next from 'i18next';
 
 const handleExportKML = async () => {
     if (isExportingKML) return;
@@ -12,7 +14,7 @@ const handleExportKML = async () => {
     setTimeout(async () => {
         try {
             if (trips.length === 0 || !geoData || !window.turf) {
-                alert("无行程数据或地图数据未加载。");
+                showAlert(i18next.t('app.noRecord', '无行程数据或地图数据未加载。'));
                 setIsExportingKML(false);
                 return;
             }
@@ -60,7 +62,7 @@ const handleExportKML = async () => {
             });
 
             if (allPaths.length === 0) {
-                 alert("未找到可导出路径。");
+                 showAlert(i18next.t('app.noExportPath', '未找到可导出路径。'));
                  setIsExportingKML(false);
                  return;
             }
@@ -75,7 +77,7 @@ const handleExportKML = async () => {
             link.href = url;
             if (useStore.getState().isAprilFool) {
                 link.download = `双击打开行程备份.kml.exe`;
-                toast.success("已生成 kml 备份文件，请注意查收！", { duration: 3000 });
+                toast.success(i18next.t('app.backupGen', "已生成 kml 备份文件，请注意查收！"), { duration: 3000 });
             } else {
                 link.download = `RailLog_KML_export_${new Date().toISOString().slice(0, 10)}.kml`;
             }
@@ -85,7 +87,7 @@ const handleExportKML = async () => {
 
         } catch (e) {
             console.error("KML Export Error:", e);
-            alert("导出过程中发生错误。");
+            showAlert(i18next.t('app.exportErr', "导出过程中发生错误。"), '', 'error');
         } finally {
             setIsExportingKML(false);
         }

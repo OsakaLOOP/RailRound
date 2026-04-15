@@ -4,6 +4,8 @@ import { useStore } from '../../store';
 import { api } from '../../services/api';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
+import { useTranslation } from 'react-i18next';
+import { showAlert } from '../../utils/alerts';
 
 export const GithubCardModal: React.FC = () => {
     const { isOpen, user, folders, badgeSettings } = useStore(useShallow(state => ({
@@ -18,6 +20,7 @@ export const GithubCardModal: React.FC = () => {
     // We need to sync settings back to API, which requires trips, pins
     const { trips, pins } = useStore(useShallow(state => ({ trips: state.trips, pins: state.pins })));
     const { saveData } = useUserData();
+    const { t } = useTranslation();
 
     const [cardKey, setCardKey] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -63,7 +66,7 @@ export const GithubCardModal: React.FC = () => {
     const onUpdateSettings = (s: any) => {
         setBadgeSettings(s);
         if (user) {
-            saveData(user.token, trips, pins, folders, s).catch((e: any) => alert("Failed to save settings: " + e.message));
+            saveData(user.token, trips, pins, folders, s).catch((e: any) => showAlert(t('app.saveFail', "保存失败: ") + e.message, '', 'error'));
         }
     };
 
@@ -71,14 +74,14 @@ export const GithubCardModal: React.FC = () => {
         <div className="fixed inset-0 z-[1000] bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
             <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-lg flex items-center gap-2"><Github size={20}/> GitHub Profile Decoration</h3>
+                    <h3 className="font-bold text-lg flex items-center gap-2"><Github size={20}/> {t('githubCard.title', 'GitHub Profile Decoration')}</h3>
                     <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
                 </div>
 
                 <div className="mb-4 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
                     <span className="text-sm font-bold text-gray-700 flex items-center gap-2">
                         {badgeSettings.enabled ? <Eye size={16} className="text-emerald-500"/> : <EyeOff size={16} className="text-red-500"/>}
-                        Public Badge Access
+                        {t('githubCard.enabled', 'Public Badge Access')}
                     </span>
                     <button
                         onClick={() => onUpdateSettings({ ...badgeSettings, enabled: !badgeSettings.enabled })}
@@ -95,36 +98,36 @@ export const GithubCardModal: React.FC = () => {
                 ) : (
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1">Source</label>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">{t('githubCard.source', 'Source')}</label>
                             <select
                                 className="w-full p-2 border rounded-lg text-sm"
                                 value={source}
                                 onChange={e => setSource(e.target.value)}
                             >
-                                <option value="global">Global (All Trips)</option>
+                                <option value="global">{t('githubCard.global', 'Global (All Trips)')}</option>
                                 {publicFolders.map(f => (
-                                    <option key={f.id} value={f.id}>Folder: {f.name}</option>
+                                    <option key={f.id} value={f.id}>{t('folder.titleShort', 'Folder')}: {f.name}</option>
                                 ))}
                             </select>
                         </div>
 
                         <div className="bg-slate-100 p-4 rounded-lg flex justify-center overflow-hidden min-h-[100px] items-center">
                             {badgeSettings.enabled ? (
-                                url ? <img src={url} alt="Preview" className="max-w-full shadow-sm rounded" /> : <span className="text-xs text-gray-400">No public URL available</span>
+                                url ? <img src={url} alt="Preview" className="max-w-full shadow-sm rounded" /> : <span className="text-xs text-gray-400">{t('githubCard.noUrl', 'No public URL available')}</span>
                             ) : (
-                                <span className="text-sm text-red-400 font-bold flex items-center gap-2"><Lock size={16}/> Badges are disabled</span>
+                                <span className="text-sm text-red-400 font-bold flex items-center gap-2"><Lock size={16}/> {t('githubCard.disabled', 'Badges are disabled')}</span>
                             )}
                         </div>
 
                         {badgeSettings.enabled && url && (
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Markdown Code (Copy to README)</label>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">{t('githubCard.markdownTitle', 'Markdown Code (Copy to README)')}</label>
                                 <div className="relative">
                                     <textarea readOnly className="w-full p-3 border rounded-lg bg-slate-50 font-mono text-xs text-slate-600 h-20 resize-none outline-none focus:ring-2 focus:ring-blue-500" value={md} onClick={e => (e.target as HTMLTextAreaElement).select()} />
                                 </div>
                             </div>
                         )}
-                        <button onClick={onClose} className="w-full bg-slate-800 text-white py-2 rounded-lg font-bold">Close</button>
+                        <button onClick={onClose} className="w-full bg-slate-800 text-white py-2 rounded-lg font-bold">{t('common.close', '关闭')}</button>
                     </div>
                 )}
             </div>

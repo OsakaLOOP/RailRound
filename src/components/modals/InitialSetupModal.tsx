@@ -3,7 +3,7 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { MapPin, Globe, ChevronRight, Check } from 'lucide-react';
 import { useUserData } from '../../hooks/useUserData';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 
 interface InitialSetupModalProps {
     isOpen: boolean;
@@ -29,239 +29,425 @@ const CITIES = {
     ]
 };
 
-// Intricate SVG for Fixed Interest (Local Discovery / Commute / Monorail emerging from buildings)
+// Intricate SVG for Fixed Interest (City Skyline / Monorail / Vertical Station Sign)
 // Emerald/Teal theme
 const FixedInterestSVG = () => (
     <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-lg overflow-hidden rounded-full">
         <defs>
-            <linearGradient id="gradFixedBg" x1="0%" y1="0%" x2="0%" y2="100%">
+            <linearGradient id="fixBg" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" stopColor="#022c22" />
-                <stop offset="60%" stopColor="#0f766e" />
-                <stop offset="100%" stopColor="#ccfbf1" />
+                <stop offset="50%" stopColor="#064e3b" />
+                <stop offset="100%" stopColor="#0f766e" />
             </linearGradient>
-            <linearGradient id="gradRail" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#34d399" />
-                <stop offset="50%" stopColor="#6ee7b7" />
-                <stop offset="100%" stopColor="#10b981" />
+            <linearGradient id="fixTrainBody" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#10b981" />
+                <stop offset="50%" stopColor="#34d399" />
+                <stop offset="100%" stopColor="#6ee7b7" />
             </linearGradient>
-            <linearGradient id="gradBuilding" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#064e3b" />
+            <linearGradient id="fixBuildingDark" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#0a3d36" />
                 <stop offset="100%" stopColor="#042f2e" />
             </linearGradient>
-            <filter id="glowWindow">
+            <filter id="fixGlow">
                 <feGaussianBlur stdDeviation="2" result="blur" />
-                <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                </feMerge>
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
-            <filter id="headlightGlow">
-                <feGaussianBlur stdDeviation="4" result="blur" />
-                <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                </feMerge>
+            <filter id="fixHeadlight">
+                <feGaussianBlur stdDeviation="5" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+            <filter id="fixStarGlow">
+                <feGaussianBlur stdDeviation="1.5" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
         </defs>
 
-        <circle cx="100" cy="100" r="100" fill="url(#gradFixedBg)" />
+        {/* Night sky background */}
+        <circle cx="100" cy="100" r="100" fill="url(#fixBg)" />
 
-        {/* Far Background Skyline */}
-        <path d="M 0 150 L 20 100 L 40 100 L 40 120 L 70 80 L 100 80 L 100 130 L 140 60 L 170 60 L 170 150 L 200 110 L 200 200 L 0 200 Z" fill="#115e59" opacity="0.5" />
-
-        {/* Midground Silhouette Buildings */}
-        <path d="M 20 200 L 20 90 L 60 90 L 60 200 Z M 130 200 L 130 70 L 180 70 L 180 200 Z" fill="url(#gradBuilding)" />
-
-        {/* Windows - Left Building */}
-        <rect x="30" y="100" width="8" height="15" fill="#6ee7b7" filter="url(#glowWindow)" opacity="0.8" />
-        <rect x="42" y="100" width="8" height="15" fill="#34d399" opacity="0.3" />
-        <rect x="30" y="130" width="8" height="15" fill="#a7f3d0" filter="url(#glowWindow)" />
-        <rect x="42" y="160" width="8" height="15" fill="#34d399" filter="url(#glowWindow)" opacity="0.6" />
-
-        {/* Windows - Right Building */}
-        <rect x="140" y="80" width="12" height="12" fill="#6ee7b7" filter="url(#glowWindow)" opacity="0.9" />
-        <rect x="160" y="80" width="12" height="12" fill="#34d399" opacity="0.2" />
-        <rect x="140" y="110" width="12" height="12" fill="#34d399" opacity="0.4" />
-        <rect x="160" y="110" width="12" height="12" fill="#a7f3d0" filter="url(#glowWindow)" />
-        <rect x="140" y="140" width="12" height="12" fill="#6ee7b7" filter="url(#glowWindow)" opacity="0.7" />
-
-        {/* Rail Infrastructure - Monorail Track */}
-        {/* Shadow under track */}
-        <path d="M 60 130 Q 100 130 130 155 L 130 165 Q 100 140 60 140 Z" fill="#022c22" opacity="0.6" />
-        {/* Track Surface */}
-        <path d="M 60 120 Q 100 120 130 145 L 130 155 Q 100 130 60 130 Z" fill="#0f766e" />
-        {/* Track Rail Highlights */}
-        <path d="M 60 122 Q 100 122 130 147" fill="none" stroke="#5eead4" strokeWidth="1.5" />
-        <path d="M 60 128 Q 100 128 130 153" fill="none" stroke="#5eead4" strokeWidth="1.5" />
-
-        {/* The Train / Light Rail sliding out */}
-        <g transform="translate(-10, 0)" className="animate-pulse">
-            {/* Train Body */}
-            <path d="M 70 100 Q 100 100 115 115 L 115 135 Q 100 120 70 120 Z" fill="url(#gradRail)" />
-            {/* Window Strip */}
-            <path d="M 75 105 Q 100 105 110 115 L 110 122 Q 100 112 75 112 Z" fill="#022c22" />
-            {/* Lit Passenger Windows inside strip */}
-            <path d="M 80 106 Q 90 106 95 111 L 95 118 Q 90 113 80 113 Z" fill="#ccfbf1" filter="url(#glowWindow)" opacity="0.9" />
-            <path d="M 100 108 Q 105 108 108 112 L 108 119 Q 105 115 100 115 Z" fill="#ccfbf1" filter="url(#glowWindow)" opacity="0.7" />
-
-            {/* Front Driver Window */}
-            <path d="M 111 118 L 113 121 L 111 125 L 108 122 Z" fill="#ccfbf1" />
-
-            {/* Glowing Headlights */}
-            <circle cx="113" cy="128" r="2.5" fill="#fff" filter="url(#headlightGlow)" />
-            <circle cx="113" cy="128" r="1" fill="#fff" />
-            {/* Headlight beam */}
-            <path d="M 113 128 L 140 145 L 130 155 Z" fill="#a7f3d0" filter="url(#headlightGlow)" opacity="0.3" />
+        {/* Stars */}
+        <g filter="url(#fixStarGlow)">
+            <circle cx="30" cy="25" r="1" fill="#a7f3d0" opacity="0.6" />
+            <circle cx="85" cy="18" r="0.8" fill="#a7f3d0" opacity="0.4" />
+            <circle cx="145" cy="22" r="1.2" fill="#a7f3d0" opacity="0.5" />
+            <circle cx="170" cy="40" r="0.7" fill="#a7f3d0" opacity="0.3" />
+            <circle cx="55" cy="35" r="0.9" fill="#a7f3d0" opacity="0.5" />
+            <circle cx="120" cy="30" r="0.6" fill="#a7f3d0" opacity="0.4" />
         </g>
+
+        {/* Moon crescent */}
+        <circle cx="160" cy="35" r="12" fill="#a7f3d0" opacity="0.15" />
+        <circle cx="160" cy="35" r="12" fill="none" stroke="#a7f3d0" strokeWidth="0.5" opacity="0.3" />
+        <circle cx="155" cy="32" r="10" fill="url(#fixBg)" /> {/* cuts out crescent */}
+
+        {/* Far Background Skyline - varied shapes */}
+        <path d="M 0 135 L 10 110 L 18 110 L 22 120 L 28 100 L 38 100 L 38 108 L 42 92 L 52 92 L 56 108 L 60 88 L 68 88 L 72 95 L 72 110 L 78 102 L 86 102 L 86 118 L 200 118 L 200 200 L 0 200 Z" fill="#0d6054" opacity="0.35" />
+
+        {/* Building A - Left squat block */}
+        <rect x="8" y="110" width="18" height="90" fill="#0a3d36" />
+        <rect x="11" y="116" width="4" height="5" fill="#6ee7b7" opacity="0.9" filter="url(#fixGlow)" />
+        <rect x="19" y="116" width="4" height="5" fill="#34d399" opacity="0.2" />
+        <rect x="11" y="128" width="4" height="5" fill="#34d399" opacity="0.3" />
+        <rect x="19" y="128" width="4" height="5" fill="#6ee7b7" opacity="0.7" filter="url(#fixGlow)" />
+
+        {/* Building B - Tall narrow tower */}
+        <rect x="30" y="78" width="14" height="122" fill="#064e3b" />
+        <rect x="33" y="84" width="3" height="5" fill="#6ee7b7" opacity="0.8" filter="url(#fixGlow)" />
+        <rect x="39" y="84" width="3" height="5" fill="#34d399" opacity="0.25" />
+        <rect x="33" y="96" width="3" height="5" fill="#a7f3d0" opacity="0.9" filter="url(#fixGlow)" />
+        <rect x="39" y="96" width="3" height="5" fill="#34d399" opacity="0.2" />
+        <rect x="33" y="108" width="3" height="5" fill="#34d399" opacity="0.3" />
+        <rect x="39" y="108" width="3" height="5" fill="#6ee7b7" opacity="0.6" filter="url(#fixGlow)" />
+
+        {/* Building C - Wide mid block */}
+        <rect x="48" y="92" width="22" height="108" fill="url(#fixBuildingDark)" />
+        <rect x="52" y="98" width="5" height="6" fill="#6ee7b7" opacity="0.9" filter="url(#fixGlow)" />
+        <rect x="60" y="98" width="5" height="6" fill="#34d399" opacity="0.2" />
+        <rect x="52" y="112" width="5" height="6" fill="#a7f3d0" opacity="0.8" filter="url(#fixGlow)" />
+        <rect x="60" y="112" width="5" height="6" fill="#6ee7b7" opacity="0.5" filter="url(#fixGlow)" />
+
+        {/* Building D - Right tall tower */}
+        <rect x="130" y="82" width="16" height="118" fill="#064e3b" />
+        <rect x="134" y="88" width="4" height="6" fill="#a7f3d0" opacity="0.9" filter="url(#fixGlow)" />
+        <rect x="140" y="88" width="4" height="6" fill="#34d399" opacity="0.25" />
+        <rect x="134" y="102" width="4" height="6" fill="#34d399" opacity="0.2" />
+        <rect x="140" y="102" width="4" height="6" fill="#6ee7b7" opacity="0.8" filter="url(#fixGlow)" />
+        <rect x="134" y="116" width="4" height="6" fill="#6ee7b7" opacity="0.6" filter="url(#fixGlow)" />
+
+        {/* Building E - Far right squat */}
+        <rect x="150" y="98" width="20" height="102" fill="url(#fixBuildingDark)" />
+        <rect x="154" y="104" width="5" height="6" fill="#6ee7b7" opacity="0.7" filter="url(#fixGlow)" />
+        <rect x="162" y="104" width="5" height="6" fill="#34d399" opacity="0.3" />
+        <rect x="154" y="118" width="5" height="6" fill="#a7f3d0" opacity="0.8" filter="url(#fixGlow)" />
+
+        {/* Elevated Track Structure */}
+        <rect x="0" y="140" width="200" height="6" fill="#0f766e" />
+        <line x1="0" y1="141" x2="200" y2="141" stroke="#5eead4" strokeWidth="1" />
+        <line x1="0" y1="144" x2="200" y2="144" stroke="#5eead4" strokeWidth="1" />
+        {/* Pillars - Highlighting to be more visible */}
+        <rect x="22" y="146" width="6" height="54" fill="#0f766e" />
+        <rect x="22" y="146" width="2" height="54" fill="#14b8a6" opacity="0.3" />
+        <rect x="75" y="146" width="6" height="54" fill="#0f766e" />
+        <rect x="75" y="146" width="2" height="54" fill="#14b8a6" opacity="0.3" />
+        <rect x="125" y="146" width="6" height="54" fill="#0f766e" />
+        <rect x="125" y="146" width="2" height="54" fill="#14b8a6" opacity="0.3" />
+        <rect x="172" y="146" width="6" height="54" fill="#0f766e" />
+        <rect x="172" y="146" width="2" height="54" fill="#14b8a6" opacity="0.3" />
+
+        {/* Japanese Station Name Board (駅名標) - Shifted UPwards with dual posts */}
+        <g transform="translate(74, 55)">
+            {/* Dual Posts extending down to the track (Track is at y=140, so 140-55 = 85. Posts start at y=38, need height 47) */}
+            <rect x="10" y="38" width="2.5" height="47" fill="#0f766e" />
+            <rect x="39.5" y="38" width="2.5" height="47" fill="#0f766e" />
+
+            {/* Board body */}
+            <rect x="0" y="0" width="52" height="38" rx="2" fill="#042f2e" stroke="#14b8a6" strokeWidth="0.8" />
+            {/* Colored stripe top */}
+            <rect x="0" y="0" width="52" height="3" rx="2" fill="#10b981" />
+            {/* Main station name - large */}
+            <text x="26" y="18" fontSize="10" fill="#fff" textAnchor="middle" fontWeight="800">中央駅</text>
+            {/* Romanization */}
+            <text x="26" y="26" fontSize="4" fill="#5eead4" textAnchor="middle" fontWeight="400">Chūō</text>
+            {/* Prev station (left) */}
+            <text x="4" y="34" fontSize="3.5" fill="#a7f3d0" textAnchor="start">◀ 東町</text>
+            {/* Next station (right) */}
+            <text x="48" y="34" fontSize="3.5" fill="#a7f3d0" textAnchor="end">公園 ▶</text>
+        </g>
+
+        {/* Monorail Train with Ultra-Smooth Heavy-Vehicle Animation */}
+        <g>
+            <animateTransform attributeName="transform" type="translate"
+                values="-160,0; 10,0; 10.0,0; 280,0; 280.0,0"
+                keyTimes="0; 0.45; 0.65; 0.98; 1"
+                dur="18s" repeatCount="indefinite"
+                calcMode="spline"
+                keySplines="0.4, 0, 0.2, 1; 0, 0, 1, 1; 0.4, 0, 0.2, 1; 0, 0, 1, 1"
+                additive="replace" fill="freeze" />
+            <rect x="70" y="130" width="45" height="10" rx="3" fill="url(#fixTrainBody)" />
+            <path d="M 115 130 Q 120 135 115 140 Z" fill="#6ee7b7" />
+            <rect x="75" y="132" width="8" height="5" rx="1" fill="#ccfbf1" filter="url(#fixGlow)" opacity="0.9" />
+            <rect x="88" y="132" width="8" height="5" rx="1" fill="#ccfbf1" filter="url(#fixGlow)" opacity="0.7" />
+            <rect x="101" y="132" width="8" height="5" rx="1" fill="#ccfbf1" filter="url(#fixGlow)" opacity="0.8" />
+            <path d="M 116 132 L 120 135 L 116 138 Z" fill="#022c22" />
+            {/* Front Headlight */}
+            <circle cx="118" cy="138" r="2" fill="#fff" filter="url(#fixHeadlight)" />
+            <path d="M 118 138 L 145 130 L 145 145 Z" fill="#a7f3d0" opacity="0.15" filter="url(#fixHeadlight)" />
+            <line x1="70" y1="138" x2="116" y2="138" stroke="#059669" strokeWidth="1" />
+        </g>
+
+        {/* Ground */}
+        <rect x="0" y="180" width="200" height="20" fill="#042f2e" />
+        <line x1="0" y1="185" x2="200" y2="185" stroke="#0a3d36" strokeWidth="0.5" />
+        <line x1="0" y1="195" x2="200" y2="195" stroke="#0a3d36" strokeWidth="0.5" />
     </svg>
 );
 
-// Intricate SVG for Follow Latest (Exploration/Journey / Realistic Compass & Detailed Road)
+// Intricate SVG for Follow Latest (Explore / Realistic Fuji & Curved Rail / Compass)
 // Amber/Orange theme
 const FollowLatestSVG = () => (
     <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-lg rounded-full overflow-hidden">
         <defs>
-            <linearGradient id="gradLatestBg" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#fffbeb" />
-                <stop offset="100%" stopColor="#fef3c7" />
-            </linearGradient>
-            <linearGradient id="gradCompassRing" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#d97706" />
+            <radialGradient id="expBg" cx="50%" cy="50%" r="55%">
+                <stop offset="0%" stopColor="#fef3c7" />
+                <stop offset="100%" stopColor="#fde68a" />
+            </radialGradient>
+            <linearGradient id="expCompassRing" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#b45309" />
                 <stop offset="100%" stopColor="#92400e" />
             </linearGradient>
-            <linearGradient id="gradCompassInner" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#fcd34d" />
-                <stop offset="100%" stopColor="#f59e0b" />
+            <linearGradient id="expTrack" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#78350f" />
+                <stop offset="100%" stopColor="#451a03" />
             </linearGradient>
-            <linearGradient id="gradRoad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#451a03" />
-                <stop offset="100%" stopColor="#78350f" />
+            <linearGradient id="expFuji" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#f5f5f4" stopOpacity="0.8" />
+                <stop offset="40%" stopColor="#a8a29e" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#d6d3d1" stopOpacity="0.15" />
             </linearGradient>
-            <filter id="shadowCompass">
-                <feDropShadow dx="2" dy="4" stdDeviation="4" floodOpacity="0.3" />
+            <filter id="expShadow">
+                <feDropShadow dx="1" dy="2" stdDeviation="2" floodOpacity="0.2" />
             </filter>
-            <filter id="glowPin">
-                <feGaussianBlur stdDeviation="3" result="blur" />
-                <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                </feMerge>
-            </filter>
+            <clipPath id="expClip"><circle cx="100" cy="100" r="100" /></clipPath>
         </defs>
 
-        {/* Soft Background */}
-        <circle cx="100" cy="100" r="100" fill="url(#gradLatestBg)" />
+        <g clipPath="url(#expClip)">
+            <circle cx="100" cy="100" r="100" fill="url(#expBg)" />
 
-        {/* Grid lines / Map texture */}
-        <path d="M 0 50 L 200 50 M 0 100 L 200 100 M 0 150 L 200 150 M 50 0 L 50 200 M 100 0 L 100 200 M 150 0 L 150 200" stroke="#fde68a" strokeWidth="1" opacity="0.6" />
-
-        {/* --- The Compass (Skeuomorphic) --- */}
-        <g transform="translate(100, 100) scale(0.65)" filter="url(#shadowCompass)">
-            {/* Outer metallic ring */}
-            <circle cx="0" cy="0" r="80" fill="url(#gradCompassRing)" />
-            <circle cx="0" cy="0" r="72" fill="#fff" />
-            <circle cx="0" cy="0" r="68" fill="url(#gradCompassInner)" opacity="0.1" />
-
-            {/* Compass markings/ticks */}
-            <g stroke="#92400e" strokeWidth="2">
-                <line x1="0" y1="-68" x2="0" y2="-60" />
-                <line x1="0" y1="68" x2="0" y2="60" />
-                <line x1="-68" y1="0" x2="-60" y2="0" />
-                <line x1="68" y1="0" x2="60" y2="0" />
-            </g>
-            <g stroke="#b45309" strokeWidth="1" transform="rotate(45)">
-                <line x1="0" y1="-68" x2="0" y2="-62" />
-                <line x1="0" y1="68" x2="0" y2="62" />
-                <line x1="-68" y1="0" x2="-62" y2="0" />
-                <line x1="68" y1="0" x2="62" y2="0" />
+            {/* Background Mountain Range / Large abstract Fuji */}
+            <g transform="translate(10, 40)" opacity="0.6">
+                <path d="M 0 100 L 80 15 L 90 15 L 180 100 Z" fill="url(#expFuji)" />
+                {/* Snow cap */}
+                <path d="M 60 36 L 80 15 L 90 15 L 110 36 Q 85 45 60 36 Z" fill="#fff" opacity="0.9" />
             </g>
 
-            {/* Compass Rose Stars */}
-            <path d="M 0 -55 L 12 -12 L 55 0 L 12 12 L 0 55 L -12 12 L -55 0 L -12 -12 Z" fill="#fcd34d" opacity="0.4" />
+            {/* Near hills - Extended Bezier landscape towards top-right */}
+            <path d="M 0 160 C 40 130 110 170 160 130 C 185 110 195 90 200 75 L 200 200 L 0 200 Z" fill="#d97706" opacity="0.12" />
+            <path d="M 0 180 C 60 160 140 190 200 150 L 200 200 L 0 200 Z" fill="#d97706" opacity="0.08" />
 
-            {/* Animated Needle */}
-            <g className="animate-spin-slow" style={{ transformOrigin: 'center' }}>
-                <path d="M -8 0 L 0 -50 L 8 0 Z" fill="#dc2626" /> {/* North pointing red */}
-                <path d="M -8 0 L 0 50 L 8 0 Z" fill="#e5e7eb" /> {/* South pointing white/gray */}
-                <circle cx="0" cy="0" r="6" fill="#92400e" />
-                <circle cx="0" cy="0" r="3" fill="#fcd34d" />
+            {/* Hot Air Balloon - Smooth floating */}
+            <g>
+                <animateTransform attributeName="transform" type="translate" values="0,0.0; 0,-8.5; 0,0.0" dur="8s" repeatCount="indefinite" calcMode="spline" keySplines="0.445 0.05 0.55 0.95; 0.445 0.05 0.55 0.95" />
+                <g transform="translate(140, 30) scale(0.7)">
+                    <path d="M 10 0 C 25 0 25 15 10 25 C -5 15 -5 0 10 0 Z" fill="#ef4444" opacity="0.8" />
+                    <rect x="7" y="27" width="6" height="5" rx="1" fill="#92400e" />
+                    <line x1="8" y1="25" x2="8" y2="27" stroke="#451a03" strokeWidth="0.5" />
+                    <line x1="12" y1="25" x2="12" y2="27" stroke="#451a03" strokeWidth="0.5" />
+                </g>
             </g>
-        </g>
 
-        {/* --- Winding Journey Path (Replacing dashed line) --- */}
-        {/* Solid thick base for road */}
-        <path d="M 30 180 C 60 140, 20 90, 80 50 C 130 10, 160 50, 150 90 C 140 130, 180 120, 180 150" fill="none" stroke="url(#gradRoad)" strokeWidth="10" strokeLinecap="round" filter="url(#shadowCompass)" />
-        {/* Road center line marker (solid highlight) */}
-        <path d="M 30 180 C 60 140, 20 90, 80 50 C 130 10, 160 50, 150 90 C 140 130, 180 120, 180 150" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+            {/* Double Arc Rail Tracks - gentle convex curve shifted right */}
+            <g stroke="url(#expTrack)" strokeWidth="3" fill="none" strokeLinecap="round">
+                <path d="M 5 155 Q 115 185 215 65" />
+                <path d="M 10 165 Q 120 195 220 75" />
+            </g>
 
-        {/* --- Roadside Decorations --- */}
-        {/* Pine Trees */}
-        <g fill="#047857">
-            <path d="M 25 130 L 35 110 L 45 130 Z M 33 130 L 37 130 L 37 135 L 33 135 Z" />
-            <path d="M 45 60 L 52 45 L 59 60 Z M 50 60 L 54 60 L 54 65 L 50 65 Z" transform="scale(0.8) translate(15, 10)" />
-            <path d="M 155 120 L 165 95 L 175 120 Z M 162 120 L 168 120 L 168 126 L 162 126 Z" />
-        </g>
+            {/* Track Sleepers - shifted right to match tracks */}
+            <g stroke="#78350f" strokeWidth="1.8" opacity="0.4">
+                <line x1="27" y1="160" x2="32" y2="170" />
+                <line x1="49" y1="161" x2="54" y2="171" />
+                <line x1="81" y1="158" x2="86" y2="168" />
+                <line x1="113" y1="148" x2="118" y2="158" />
+                <line x1="144" y1="131" x2="149" y2="141" />
+                <line x1="175" y1="107" x2="180" y2="117" />
+                <line x1="195" y1="88" x2="200" y2="98" />
+            </g>
 
-        {/* Rocks / Scenery */}
-        <path d="M 85 140 Q 90 135 95 140 Q 92 145 85 140 Z" fill="#9ca3af" />
-        <path d="M 130 50 Q 135 45 140 50 L 135 52 Z" fill="#6b7280" />
+            {/* Milestone - Moved Right and Down closer to ground */}
+            <g transform="translate(60, 120) scale(1.2)">
+                {/* Shadow base */}
+                <path d="M 2 30 L 2 6 L 6 0 L 10 6 L 10 30 Z" fill="#374151" opacity="0.6" filter="url(#expShadow)" />
+                {/* Base pedestal */}
+                <rect x="0" y="27" width="12" height="4" rx="0.5" fill="#9ca3af" />
+                <rect x="1" y="28" width="10" height="2" fill="#d1d5db" />
+                {/* Obelisk body */}
+                <path d="M 3 27 L 3 7 L 6 1 L 9 7 L 9 27 Z" fill="#d1d5db" />
+                {/* Pointed cap */}
+                <path d="M 4 7 L 6 1 L 8 7 Z" fill="#f3f4f6" />
+                {/* Number */}
+                <text x="6" y="15" fontSize="4.5" fill="#1f2937" textAnchor="middle" fontWeight="900">12</text>
+                <text x="6" y="22" fontSize="3.5" fill="#4b5563" textAnchor="middle" fontWeight="700">km</text>
+            </g>
 
-        {/* --- Map Pin (Current location/Latest) --- */}
-        <g transform="translate(180, 150) scale(1.2)" className="animate-bounce">
-            <path d="M 0 -20 C 8 -20, 12 -12, 12 -6 C 12 4, 0 12, 0 12 C 0 12, -12 4, -12 -6 C -12 -12, -8 -20, 0 -20 Z" fill="#dc2626" filter="url(#glowPin)" />
-            <circle cx="0" cy="-9" r="4" fill="#fff" />
+            {/* Tree cluster */}
+            <g transform="translate(150, 140) scale(1.2)" opacity="0.8">
+                <path d="M 10 20 L 15 5 L 20 20 Z" fill="#059669" />
+                <rect x="14" y="20" width="2" height="4" fill="#78350f" />
+                <path d="M 0 25 L 6 10 L 12 25 Z" fill="#10b981" />
+                <rect x="5" y="25" width="2" height="4" fill="#78350f" />
+            </g>
+
+            {/* Central Compass */}
+            <g transform="translate(100, 100)" filter="url(#expShadow)">
+                <g>
+                    <animateTransform attributeName="transform" type="rotate" values="-2; 2; -2" dur="12s" repeatCount="indefinite" calcMode="spline" keySplines="0.445 0.05 0.55 0.95; 0.445 0.05 0.55 0.95" />
+                    <circle cx="0" cy="0" r="32" fill="url(#expCompassRing)" />
+                    <circle cx="0" cy="0" r="28" fill="#fff" />
+                    <circle cx="0" cy="0" r="25" fill="#fcd34d" opacity="0.1" />
+
+                    {/* Ticks */}
+                    <g stroke="#92400e" strokeWidth="1.2">
+                        <line x1="0" y1="-26" x2="0" y2="-21" />
+                        <line x1="0" y1="26" x2="0" y2="21" />
+                        <line x1="-26" y1="0" x2="-21" y2="0" />
+                        <line x1="26" y1="0" x2="21" y2="0" />
+                    </g>
+                    <g stroke="#b45309" strokeWidth="0.8" transform="rotate(45)">
+                        <line x1="0" y1="-26" x2="0" y2="-23" />
+                        <line x1="0" y1="26" x2="0" y2="23" />
+                        <line x1="-26" y1="0" x2="-23" y2="0" />
+                        <line x1="26" y1="0" x2="23" y2="0" />
+                    </g>
+
+                    {/* Letters */}
+                    <text x="0" y="-12" fontSize="5" fill="#92400e" textAnchor="middle" fontWeight="800">N</text>
+                    <text x="0" y="16" fontSize="4" fill="#b45309" textAnchor="middle" fontWeight="700">S</text>
+                    <text x="-12" y="1.5" fontSize="4" fill="#b45309" textAnchor="middle" fontWeight="700">E</text>
+                    <text x="12" y="1.5" fontSize="4" fill="#b45309" textAnchor="middle" fontWeight="700">W</text>
+
+                    {/* Needle - Damped Magnetic Snap Animation */}
+                    <g>
+                        <animateTransform attributeName="transform" type="rotate"
+                            values="0; 12; -6; 3; 0"
+                            keyTimes="0; 0.2; 0.5; 0.8; 1"
+                            dur="5s" repeatCount="indefinite"
+                            calcMode="spline"
+                            keySplines="0.175, 0.885, 0.32, 1.275; 0.445, 0.05, 0.55, 0.95; 0.445, 0.05, 0.55, 0.95; 0.445, 0.05, 0.55, 0.95" />
+                        <path d="M -3 0 L 0 -20 L 3 0 Z" fill="#dc2626" />
+                        <path d="M -3 0 L 0 20 L 3 0 Z" fill="#d1d5db" />
+                        <circle cx="0" cy="0" r="3.5" fill="#92400e" />
+                        <circle cx="0" cy="0" r="1.5" fill="#fcd34d" />
+                    </g>
+                </g>
+            </g>
         </g>
     </svg>
 );
 
 
-// Language SVG - Blue/Indigo theme
+// Language SVG - 3D Globe with orbiting characters
+// Blue/Indigo theme
 const LanguageSVG = () => (
-    <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-lg">
+    <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-lg overflow-hidden rounded-full">
         <defs>
-            <linearGradient id="gradLang" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#3b82f6" />
-                <stop offset="100%" stopColor="#4338ca" />
+            <radialGradient id="langBg" cx="50%" cy="45%" r="55%">
+                <stop offset="0%" stopColor="#4f46e5" />
+                <stop offset="100%" stopColor="#1e1b4b" />
+            </radialGradient>
+            <radialGradient id="earthGrad" cx="40%" cy="35%" r="60%">
+                <stop offset="0%" stopColor="#60a5fa" />
+                <stop offset="40%" stopColor="#3b82f6" />
+                <stop offset="100%" stopColor="#1e40af" />
+            </radialGradient>
+            <radialGradient id="earthHighlight" cx="30%" cy="25%" r="50%">
+                <stop offset="0%" stopColor="#93c5fd" stopOpacity="0.6" />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+            </radialGradient>
+            <linearGradient id="landGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="100%" stopColor="#059669" />
             </linearGradient>
-            <linearGradient id="gradLangLight" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#93c5fd" />
-                <stop offset="100%" stopColor="#60a5fa" />
-            </linearGradient>
-            <filter id="glowLang">
-                <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-                <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
-                </feMerge>
+            <filter id="textGlow">
+                <feGaussianBlur stdDeviation="2" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
+            <clipPath id="earthClip">
+                <circle cx="100" cy="100" r="48" />
+            </clipPath>
         </defs>
-        {/* Background ambient ring */}
-        <circle cx="100" cy="100" r="85" fill="none" stroke="url(#gradLangLight)" strokeWidth="2" opacity="0.4" strokeDasharray="4 8" className="animate-spin-slow" style={{ transformOrigin: 'center' }} />
 
-        {/* Outer orbital path */}
-        <circle cx="100" cy="100" r="65" fill="url(#gradLang)" opacity="0.05" />
-        <path d="M35 100 A 65 65 0 0 1 165 100 A 65 65 0 0 1 35 100" fill="none" stroke="url(#gradLang)" strokeWidth="6" opacity="0.3" />
+        {/* Background */}
+        <circle cx="100" cy="100" r="100" fill="url(#langBg)" />
 
-        {/* Animated connection line simulating communication */}
-        <path d="M 60 120 Q 100 160 140 80" fill="none" stroke="url(#gradLangLight)" strokeWidth="3" filter="url(#glowLang)" strokeDasharray="100" strokeDashoffset="0">
-            <animate attributeName="stroke-dashoffset" values="100;0;100" dur="4s" repeatCount="indefinite" />
-        </path>
+        {/* Subtle star dots */}
+        <circle cx="25" cy="30" r="1" fill="#c7d2fe" opacity="0.5" />
+        <circle cx="170" cy="25" r="1.2" fill="#c7d2fe" opacity="0.4" />
+        <circle cx="45" cy="165" r="0.8" fill="#c7d2fe" opacity="0.6" />
+        <circle cx="160" cy="170" r="1" fill="#c7d2fe" opacity="0.3" />
+        <circle cx="15" cy="90" r="0.8" fill="#c7d2fe" opacity="0.4" />
+        <circle cx="185" cy="85" r="1" fill="#c7d2fe" opacity="0.5" />
+        <circle cx="80" cy="15" r="0.9" fill="#c7d2fe" opacity="0.3" />
+        <circle cx="130" cy="185" r="0.7" fill="#c7d2fe" opacity="0.4" />
 
-        {/* Left Speech Bubble - Translation/Dialogue */}
-        <g transform="translate(45, 60)">
-            <path d="M0 20 C0 8.954 8.954 0 20 0 L40 0 C51.046 0 60 8.954 60 20 C60 31.046 51.046 40 40 40 L15 40 L0 50 Z" fill="url(#gradLang)" filter="url(#glowLang)" opacity="0.9" />
-            <text x="30" y="26" fontSize="20" fill="white" textAnchor="middle" fontWeight="800">あ</text>
+        {/* Signal waves rings */}
+        <circle cx="100" cy="100" r="60" fill="none" stroke="#818cf8" strokeWidth="0.8" opacity="0.25">
+            <animate attributeName="r" values="55;70;55" dur="4s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.25;0.05;0.25" dur="4s" repeatCount="indefinite" />
+        </circle>
+        <circle cx="100" cy="100" r="72" fill="none" stroke="#818cf8" strokeWidth="0.6" opacity="0.15">
+            <animate attributeName="r" values="68;85;68" dur="5s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.15;0.03;0.15" dur="5s" repeatCount="indefinite" />
+        </circle>
+
+        {/* 3D Globe */}
+        <g>
+            <circle cx="100" cy="100" r="48" fill="url(#earthGrad)" />
+
+            {/* Continents */}
+            <g clipPath="url(#earthClip)" fill="url(#landGrad)" opacity="0.85">
+                <path d="M115,78 L122,75 L128,78 L130,85 L126,92 L128,98 L124,105 L118,108 L112,105 L108,98 L105,90 L108,82 Z" />
+                <path d="M132,80 L134,76 L136,78 L135,84 L133,88 L131,86 Z" />
+                <path d="M134,88 L136,86 L137,90 L135,93 Z" />
+                <path d="M118,112 L122,110 L125,114 L120,118 L116,116 Z" />
+                <path d="M102,95 L106,92 L108,98 L105,106 L100,108 L98,102 Z" />
+                <path d="M82,72 L88,68 L92,70 L94,76 L90,80 L84,78 Z" />
+                <path d="M88,88 L94,85 L96,92 L94,100 L90,108 L86,112 L82,108 L80,98 L82,92 Z" />
+                <path d="M128,120 L136,118 L140,122 L138,128 L132,128 L128,125 Z" />
+            </g>
+
+            {/* Grid Lines */}
+            <g clipPath="url(#earthClip)" fill="none" stroke="#bfdbfe" strokeWidth="0.4" opacity="0.3">
+                <ellipse cx="100" cy="100" rx="48" ry="3" />
+                <ellipse cx="100" cy="86" rx="44" ry="3" />
+                <ellipse cx="100" cy="114" rx="44" ry="3" />
+                <ellipse cx="100" cy="100" rx="3" ry="48" />
+                <ellipse cx="100" cy="100" rx="20" ry="48" />
+                <ellipse cx="100" cy="100" rx="36" ry="48" />
+            </g>
+
+            {/* 3D Highlight & Atmosphere */}
+            <circle cx="100" cy="100" r="48" fill="url(#earthHighlight)">
+                <animate attributeName="opacity" values="0.6; 1; 0.6" dur="4s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0.05 0.55 0.95; 0.45 0.05 0.55 0.95" />
+            </circle>
+            <circle cx="100" cy="100" r="48" fill="none" stroke="#93c5fd" strokeWidth="1.5" opacity="0.4">
+                <animate attributeName="opacity" values="0.3; 0.7; 0.3" dur="4s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0.05 0.55 0.95; 0.45 0.05 0.55 0.95" />
+            </circle>
         </g>
 
-        {/* Right Speech Bubble - Translation/Dialogue */}
-        <g transform="translate(105, 95)">
-            <path d="M0 20 C0 8.954 8.954 0 20 0 L40 0 C51.046 0 60 8.954 60 20 C60 31.046 51.046 40 40 40 L50 50 L45 40 C54.341 38.384 60 30.046 60 20 Z" fill="url(#gradLangLight)" opacity="0.95" />
-            <text x="30" y="27" fontSize="22" fill="#1e3a8a" textAnchor="middle" fontWeight="bold">A</text>
+        {/* Orbiting Language Characters - Enhanced sub-pixel smoothness */}
+        <g transform="translate(38, 42)" filter="url(#textGlow)">
+            <g>
+                <animateTransform attributeName="transform" type="translate" values="0,0.0; 0,-6.5; 0,0.0" dur="4s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0.05 0.55 0.95; 0.45 0.05 0.55 0.95" />
+                <circle cx="0" cy="0" r="14" fill="#4338ca" opacity="0.8" />
+                <text x="0" y="5" fontSize="14" fill="#e0e7ff" textAnchor="middle" fontWeight="700">文</text>
+            </g>
+        </g>
+        <g transform="translate(162, 48)" filter="url(#textGlow)">
+            <g>
+                <animateTransform attributeName="transform" type="translate" values="0,0.0; 0,-6.5; 0,0.0" dur="4.8s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0.05 0.55 0.95; 0.45 0.05 0.55 0.95" />
+                <circle cx="0" cy="0" r="13" fill="#6366f1" opacity="0.75" />
+                <text x="0" y="5" fontSize="15" fill="#e0e7ff" textAnchor="middle" fontWeight="800">A</text>
+            </g>
+        </g>
+        <g transform="translate(42, 158)" filter="url(#textGlow)">
+            <g>
+                <animateTransform attributeName="transform" type="translate" values="0,0.0; 0,-5.5; 0,0.0" dur="4.2s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0.05 0.55 0.95; 0.45 0.05 0.55 0.95" />
+                <circle cx="0" cy="0" r="14" fill="#4338ca" opacity="0.8" />
+                <text x="0" y="5" fontSize="13" fill="#e0e7ff" textAnchor="middle" fontWeight="700">あ</text>
+            </g>
+        </g>
+        <g transform="translate(155, 155)" filter="url(#textGlow)">
+            <g>
+                <animateTransform attributeName="transform" type="translate" values="0,0.0; 0,-5.5; 0,0.0" dur="5s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0.05 0.55 0.95; 0.45 0.05 0.55 0.95" />
+                <circle cx="0" cy="0" r="13" fill="#6366f1" opacity="0.7" />
+                <text x="0" y="5" fontSize="13" fill="#e0e7ff" textAnchor="middle" fontWeight="700">繁</text>
+            </g>
         </g>
 
-        {/* Communication Nodes */}
-        <circle cx="60" cy="115" r="4" fill="#3b82f6" />
-        <circle cx="140" cy="85" r="6" fill="#4338ca" />
+        {/* Connection arcs from character bubbles to globe surface */}
+        <path d="M49 53 Q72 72 80 85" fill="none" stroke="#818cf8" strokeWidth="1" opacity="0.4" />
+        <path d="M150 52 Q130 68 120 82" fill="none" stroke="#818cf8" strokeWidth="1" opacity="0.4" />
+        <path d="M50 150 Q70 138 82 120" fill="none" stroke="#818cf8" strokeWidth="1" opacity="0.4" />
+        <path d="M143 148 Q128 135 118 120" fill="none" stroke="#818cf8" strokeWidth="1" opacity="0.4" />
     </svg>
 );
 
@@ -287,7 +473,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
     // City state
     const [mode, setMode] = useState<'fixed' | 'latest' | null>(null);
     const [selectedCountry, setSelectedCountry] = useState<keyof typeof CITIES | null>(null);
-    const [selectedCity, setSelectedCity] = useState<{name: string, lat: number, lng: number} | null>({ name: '東京', lat: 35.6812, lng: 139.7671 });
+    const [selectedCity, setSelectedCity] = useState<{ name: string, lat: number, lng: number } | null>({ name: '東京', lat: 35.6812, lng: 139.7671 });
 
     if (!isOpen) return null;
 
@@ -324,129 +510,157 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-scale-up relative">
 
                 <div className={`absolute inset-0 flex flex-col transition-transform duration-500 ease-in-out ${step === 1 ? 'translate-x-0' : '-translate-x-full'} ${step === 1 ? 'opacity-100 relative' : 'opacity-0 absolute pointer-events-none'}`}>
-                        <div className="p-8 pb-4 text-center">
-                            <h2 className="text-3xl font-bold text-gray-800 mb-2">{t('setup.langTitle', 'Language / 语言')}</h2>
-                            <p className="text-gray-500">{t('setup.langDesc', 'Choose your preferred language / 选择你的偏好语言')}</p>
+                    <div className="p-8 pb-4 text-center">
+                        <h2 className="text-3xl font-bold text-gray-800 mb-2">{t('setup.langTitle', 'Language / 语言')}</h2>
+                        <p className="text-gray-500">{t('setup.langDesc', 'Choose your preferred language / 选择你的偏好语言')}</p>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-8 pt-4 flex flex-col items-center">
+                        <div className="w-40 h-40 mb-8">
+                            <LanguageSVG />
                         </div>
-                        <div className="flex-1 overflow-y-auto p-8 pt-4 flex flex-col items-center">
-                             <div className="w-40 h-40 mb-8">
-                                <LanguageSVG />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 w-full max-w-md">
-                                {languages.map(lang => (
-                                    <button
-                                        key={lang.id}
-                                        onClick={() => setSelectedLanguage(lang.id)}
-                                        className={`p-4 rounded-xl border-2 flex items-center justify-center font-bold transition-all ${selectedLanguage === lang.id ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md' : 'border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50/50'}`}
-                                    >
-                                        <Globe size={18} className="mr-2 opacity-70" /> {lang.label}
-                                    </button>
-                                ))}
-                            </div>
+                        <div className="grid grid-cols-2 gap-4 w-full max-w-md">
+                            {languages.map(lang => (
+                                <button
+                                    key={lang.id}
+                                    onClick={() => setSelectedLanguage(lang.id)}
+                                    className={`p-4 rounded-xl border-2 flex items-center justify-center font-bold transition-all ${selectedLanguage === lang.id ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md' : 'border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50/50'}`}
+                                >
+                                    <Globe size={18} className="mr-2 opacity-70" /> {lang.label}
+                                </button>
+                            ))}
                         </div>
-                        <div className="p-6 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
-                             <button onClick={() => setStep(2)} className="px-6 py-2.5 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 transition-all flex items-center gap-2">
-                                Next <ChevronRight size={16} />
-                            </button>
-                        </div>
+                    </div>
+                    <div className="p-6 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+                        <button onClick={() => setStep(2)} className="px-6 py-2.5 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 transition-all flex items-center gap-2">
+                            Next <ChevronRight size={16} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className={`absolute inset-0 flex flex-col transition-transform duration-500 ease-in-out ${step === 2 ? 'translate-x-0' : 'translate-x-full'} ${step === 2 ? 'opacity-100 relative' : 'opacity-0 absolute pointer-events-none'}`}>
-                        <div className="p-8 pb-4 text-center">
-                            <h2 className="text-3xl font-bold text-gray-800 mb-2">{t('setup.startTitle', '你的探索起点')}</h2>
-                            <p className="text-gray-500">{t('setup.startDesc', '每次打开地图时，你希望从哪里开始你的旅程？')}</p>
-                        </div>
+                    <div className="p-8 pb-4 text-center">
+                        <h2 className="text-3xl font-bold text-gray-800 mb-2">{t('setup.startTitle', '你的探索起点')}</h2>
+                        <p className="text-gray-500">{t('setup.startDesc', '每次打开地图时，你希望从哪里开始你的旅程？')}</p>
+                    </div>
 
-                        <div className="flex-1 overflow-y-auto p-8 pt-4">
-                            {!mode ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <button
-                                        onClick={() => setMode('fixed')}
-                                        className="group relative flex flex-col items-center p-6 bg-gray-50 rounded-2xl border-2 border-transparent hover:border-emerald-500 hover:bg-emerald-50 transition-all duration-300"
-                                    >
-                                        <div className="w-40 h-40 mb-4 group-hover:scale-105 transition-transform duration-500">
-                                            <FixedInterestSVG />
-                                        </div>
-                                        <h3 className="text-xl font-bold text-gray-800 mb-2">{t('setup.fixedInterest', '固定兴趣')}</h3>
-                                        <p className="text-sm text-gray-500 text-center">{t('setup.fixedInterestDesc', '选择一个心仪的城市<br/>作为每次探索的默认大本营')}</p>
-                                    </button>
-
-                                    <button
-                                        onClick={() => {
-                                            setMode('latest');
-                                            handleSave('latest'); // Fast path
-                                        }}
-                                        className="group relative flex flex-col items-center p-6 bg-gray-50 rounded-2xl border-2 border-transparent hover:border-amber-500 hover:bg-amber-50 transition-all duration-300"
-                                    >
-                                        <div className="w-40 h-40 mb-4 group-hover:scale-105 transition-transform duration-500">
-                                            <FollowLatestSVG />
-                                        </div>
-                                        <h3 className="text-xl font-bold text-gray-800 mb-2">{t('setup.followLatest', '跟随最新')}</h3>
-                                        <p className="text-sm text-gray-500 text-center">{t('setup.followLatestDesc', '总是从上一次旅行的终点<br/>继续你的未竟之旅')}</p>
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="animate-fade-in">
-                                    <div className="flex items-center gap-2 mb-6 text-sm text-gray-500 cursor-pointer w-fit hover:text-gray-800 transition-colors" onClick={() => {setMode(null); setSelectedCountry(null);}}>
-                                        <ChevronRight className="rotate-180" size={16} /> {t('setup.backToMode', '返回选择模式')}
+                    <div className="flex-1 overflow-y-auto p-8 pt-4">
+                        {!mode ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <button
+                                    onClick={() => setMode('fixed')}
+                                    className="group relative flex flex-col items-center p-6 bg-gray-50 rounded-2xl border-2 border-transparent hover:border-emerald-500 hover:bg-emerald-50 transition-all duration-300"
+                                >
+                                    <div className="w-40 h-40 mb-4 group-hover:scale-105 transition-transform duration-500">
+                                        <FixedInterestSVG />
                                     </div>
+                                    <h3 className="text-xl font-bold text-gray-800 mb-2">{t('setup.fixedInterest', '固定兴趣')}</h3>
+                                    <p className="text-sm text-gray-500 text-center">
+                                        <Trans i18nKey="setup.fixedInterestDesc">
+                                            选择一个心仪的城市<br />作为每次探索的默认大本营
+                                        </Trans>
+                                    </p>
+                                </button>
 
-                                    {!selectedCountry ? (
-                                        <div className="space-y-4">
-                                            <h3 className="text-lg font-bold text-gray-800 mb-4">{t('setup.chooseCountry', '选择国家或地区')}</h3>
-                                            {(Object.keys(CITIES) as Array<keyof typeof CITIES>).map(country => (
-                                                <button
-                                                    key={country}
-                                                    onClick={() => setSelectedCountry(country)}
-                                                    className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 rounded-xl transition-colors group"
-                                                >
-                                                    <span className="font-bold text-gray-700 group-hover:text-emerald-700">{country === 'China' ? t('setup.china', '中国') : t('setup.japan', '日本')}</span>
-                                                    <ChevronRight className="text-gray-400 group-hover:text-emerald-500" />
-                                                </button>
-                                            ))}
+                                <button
+                                    onClick={() => {
+                                        setMode('latest');
+                                        handleSave('latest'); // Fast path
+                                    }}
+                                    className="group relative flex flex-col items-center p-6 bg-gray-50 rounded-2xl border-2 border-transparent hover:border-amber-500 hover:bg-amber-50 transition-all duration-300"
+                                >
+                                    <div className="w-40 h-40 mb-4 group-hover:scale-105 transition-transform duration-500">
+                                        <FollowLatestSVG />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-gray-800 mb-2">{t('setup.followLatest', '跟随最新')}</h3>
+                                    <p className="text-sm text-gray-500 text-center">
+                                        <Trans i18nKey="setup.followLatestDesc">
+                                            总是从上一次旅行的终点<br />继续你的未竟之旅
+                                        </Trans>
+                                    </p>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="animate-fade-in">
+                                <div className="flex items-center gap-2 mb-6 text-sm text-gray-500 cursor-pointer w-fit hover:text-gray-800 transition-colors" onClick={() => { setMode(null); setSelectedCountry(null); }}>
+                                    <ChevronRight className="rotate-180" size={16} /> {t('setup.backToMode', '返回选择模式')}
+                                </div>
+
+                                {!selectedCountry ? (
+                                    <div className="space-y-4">
+                                        <h3 className="text-lg font-bold text-gray-800 mb-4">{t('setup.chooseCountry', '选择国家或地区')}</h3>
+                                        {(Object.keys(CITIES) as Array<keyof typeof CITIES>).map(country => (
+                                            <button
+                                                key={country}
+                                                onClick={() => setSelectedCountry(country)}
+                                                className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 rounded-xl transition-colors group"
+                                            >
+                                                <span className="font-bold text-gray-700 group-hover:text-emerald-700">{country === 'China' ? t('setup.china', '中国') : t('setup.japan', '日本')}</span>
+                                                <ChevronRight className="text-gray-400 group-hover:text-emerald-500" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 mb-4 text-sm text-gray-500 cursor-pointer w-fit hover:text-gray-800 transition-colors" onClick={() => setSelectedCountry(null)}>
+                                            <ChevronRight className="rotate-180" size={16} /> {t('setup.backToCountry', '返回选择国家')}
                                         </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-2 mb-4 text-sm text-gray-500 cursor-pointer w-fit hover:text-gray-800 transition-colors" onClick={() => setSelectedCountry(null)}>
-                                                <ChevronRight className="rotate-180" size={16} /> {t('setup.backToCountry', '返回选择国家')}
-                                            </div>
-                                            <h3 className="text-lg font-bold text-gray-800 mb-4">{t('setup.chooseBase', '选择你的默认大本营')}</h3>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {CITIES[selectedCountry].map(city => (
+                                        <h3 className="text-lg font-bold text-gray-800 mb-4">{t('setup.chooseBase', '选择你的默认大本营')}</h3>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {CITIES[selectedCountry].map(city => {
+                                                const isAvailable = selectedCountry === 'Japan' || city.name === '北京' || city.name === '南京';
+                                                return (
                                                     <button
                                                         key={city.name}
-                                                        onClick={() => setSelectedCity(city)}
-                                                        className={`p-3 rounded-xl border flex items-center justify-between transition-all ${selectedCity?.name === city.name ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-300 hover:bg-emerald-50/50'}`}
+                                                        onClick={() => isAvailable && setSelectedCity(city)}
+                                                        className={`p-3 rounded-xl border flex items-center justify-between transition-all ${isAvailable
+                                                            ? selectedCity?.name === city.name
+                                                                ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
+                                                                : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-300 hover:bg-emerald-50/50'
+                                                            : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-60'
+                                                            }`}
+                                                        disabled={!isAvailable}
                                                     >
                                                         <div className="flex items-center gap-2">
-                                                            <MapPin size={16} className={selectedCity?.name === city.name ? 'text-emerald-500' : 'text-gray-400'} />
-                                                            <span className="font-bold">{city.name}</span>
+                                                            <MapPin size={16} className={selectedCity?.name === city.name && isAvailable ? 'text-emerald-500' : 'text-gray-400'} />
+                                                            <span className="font-bold">
+                                                                {city.name}
+                                                                {!isAvailable && (
+                                                                    <span className="ml-1.5 text-[10px] font-normal px-1 px-1 py-0.5 rounded bg-gray-200 text-gray-400 align-middle">
+                                                                        {t('common.comingSoon', 'TODO')}
+                                                                    </span>
+                                                                )}
+                                                            </span>
                                                         </div>
-                                                        {selectedCity?.name === city.name && <Check size={16} className="text-emerald-600" />}
+                                                        {selectedCity?.name === city.name && isAvailable ? (
+                                                            <Check size={16} className="text-emerald-600" />
+                                                        ) : !isAvailable && (
+                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gray-200 text-gray-500 rounded">{t('common.comingSoon', 'TODO')}</span>
+                                                        )}
                                                     </button>
-                                                ))}
-                                            </div>
+                                                );
+                                            })}
                                         </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="p-6 bg-gray-50 flex justify-between items-center border-t border-gray-100">
-                            <button onClick={() => setStep(1)} className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors flex items-center gap-2">
-                                <ChevronRight size={16} className="rotate-180" /> Back
-                            </button>
-                            <div className="flex gap-3">
-                                <button onClick={onComplete} className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors">
-                                    跳过
-                                </button>
-                                {(mode === 'fixed' && selectedCity) && (
-                                    <button onClick={() => handleSave()} className="px-6 py-2.5 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 transition-all">
-                                        {t('setup.confirm', '确定设置')}
-                                    </button>
+                                    </div>
                                 )}
                             </div>
+                        )}
+                    </div>
+
+                    <div className="p-6 bg-gray-50 flex justify-between items-center border-t border-gray-100">
+                        <button onClick={() => setStep(1)} className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors flex items-center gap-2">
+                            <ChevronRight size={16} className="rotate-180" /> Back
+                        </button>
+                        <div className="flex gap-3">
+                            <button onClick={onComplete} className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors">
+                                跳过
+                            </button>
+                            {(mode === 'fixed' && selectedCity) && (
+                                <button onClick={() => handleSave()} className="px-6 py-2.5 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 transition-all">
+                                    {t('setup.confirm', '确定设置')}
+                                </button>
+                            )}
                         </div>
+                    </div>
                 </div>
 
             </div>

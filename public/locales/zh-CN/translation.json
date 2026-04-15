@@ -12,6 +12,58 @@
     "tabRecords": {
       "title": "行程记录",
       "content": "这个标签页是你的旅程控制中心. 你可以在这里查看、添加和管理所有的铁路旅行记录, 或者添加到收藏"
+    },
+    "addTrip": {
+      "title": "初次记录",
+      "content": "点击下方悬浮的“新旅程”按钮打开编辑菜单"
+    },
+    "editorModes": {
+      "title": "编辑模式",
+      "content": "你可以选择“手动录入”以致敬旧时代的工匠精神，或者尝试“自动规划”, 将命运交给无限非概率驱动"
+    },
+    "autoPlanningView": {
+      "title": "自动规划",
+      "content": "在这里选择起点和终点，系统会自动为你规划一条基于新干线优先的路线。完成后，我们继续。"
+    },
+    "closeEditor": {
+      "title": "关闭编辑器",
+      "content": "先关掉它. 继续参观飞船的其他部分，别让编辑器挡住了视线. "
+    },
+    "importExport": {
+      "title": "Escape Pods",
+      "content": "我们坚信数据归你自己所有, 前提是你得学会备份. 在这里你可以将行程导出为 KML/JSON. "
+    },
+    "tabMap": {
+      "title": "地图模式",
+      "content": "切换并查看铁路网络. 灰色的是未乘区段, 而已乘线路将以对应的颜色高亮显示. 底图包含来自 OpenRailwayMap 的配线详情. 新版本不再渲染已乘区间的svg图形, 而丰富了站点交互. 你可以长按站点并拖动连接, 以自动规划。"
+    },
+    "mapPins": {
+      "title": "安放地图图钉",
+      "content": "在这里把照片或评论钉在地图上, 大概率比某个名叫 Jesus Christ 男人的十字架更牢固. "
+    },
+    "closePinEditor": {
+      "title": "关闭图钉模式",
+      "content": "图钉编辑器会出现在底部。你可以点击编辑器右上角的 'X' 按钮，或再次点击地图上的图钉按钮来关闭它。"
+    },
+    "mapLayers": {
+      "title": "切换底图风格",
+      "content": "无论是为了省电还是为了配合夜宵，这里可以在深色和浅色地图风格间切换. "
+    },
+    "tabStats": {
+      "title": "Aftermath",
+      "content": "点击这里查看统计。看看你在这个星球的铁轨上究竟烧掉了多少钱，以及产生了多少碳排放(已加入todo)."
+    },
+    "statsContent": {
+      "title": "铁道迷的勋章",
+      "content": "这里展示你的总里程、消费和最常访问的线路. "
+    },
+    "finishLogin": {
+      "title": "RailLOOP, 轻而易举啊",
+      "content": "引导结束。现在我们将打开登录界面，建议你绑定 GitHub 账号，这能让你生成酷炫的 SVG 卡片去主页显摆."
+    },
+    "loginGuide": {
+      "title": "阅读协议",
+      "content": "在开始之前，请务必阅读这份实则是免责声明的用户指南. 如果你们当中有宇宙人、未来人、超能力者, 请忽略其中的物理限制条款。"
     }
   },
   "loginModal": {
@@ -64,12 +116,14 @@
     "importSuica": "导入 Suica CSV",
     "deleteConfirm": "确认删除?",
     "parseSuccess": "成功解析 {count} 条新行程。是否导入？{{skipMsg}}\n(按 F12 打开控制台查看详细匹配日志)",
+    "parseSuccessTitle": "解析成功",
     "skipMsg": "\n(已跳过 {{count}} 条重复记录)",
     "importSuccess": "导入了 {count} 条行程！{{skipMsg}}",
     "skipMsgShort": " (跳过 {{count}} 重复)",
     "allExist": "解析完成，但所有记录（{{count}}条）已存在，无需重复导入。",
     "noImport": "未找到可导入的行程，或者解析失败。",
-    "readError": "读取或解析文件出错。"
+    "readError": "读取或解析文件出错。",
+    "parsingSuica": "解析 Suica CSV 数据..."
   },
   "search": {
     "close": "关闭",
@@ -105,7 +159,7 @@
     "startTitle": "你的探索起点",
     "startDesc": "每次打开地图时，你希望从哪里开始你的旅程？",
     "fixedInterest": "固定兴趣",
-    "fixedInterestDesc": "选择一个心仪的城市<br/>作为每次探索的默认大本营",
+    "fixedInterestDesc": "选择一个心仪的 city<br/>作为每次探索的默认大本营",
     "followLatest": "跟随最新",
     "followLatestDesc": "总是从上一次旅行的终点<br/>继续你的未竟之旅",
     "backToMode": "返回选择模式",
@@ -119,12 +173,13 @@
   },
   "lineSel": {
     "title": "选择线路",
-    "jr": "JR 集団",
+    "jr": "JR 集团",
     "private": "私铁・第三部门",
     "subway": "地下铁・新交通",
     "allRegions": "全部地域",
     "noRegion": "无地域分类",
-    "noResult": "无符合条件的线路"
+    "noResult": "无符合条件的线路",
+    "cnMainlandEnt": "中国大陆入口"
   },
   "githubReg": {
     "title": "完成注册",
@@ -136,7 +191,30 @@
   "folder": {
     "saveFail": "保存失败: ",
     "title": "收藏夹",
-    "placeholder": "名称..."
+    "titleShort": "收藏夹",
+    "placeholder": "名称...",
+    "deleteConfirm": "确认删除文件夹？",
+    "noFolders": "暂无收藏夹",
+    "noFoldersShort": "暂无收藏夹。请前往统计页面创建。",
+    "tripCount": "{{count}} 条行程",
+    "addToTitle": "添加到收藏夹"
+  },
+  "pin": {
+    "titleSnap": "吸附: {{line}}",
+    "titleFree": "自由位置",
+    "placeholderMemo": "备注...",
+    "placeholderUrl": "图片URL...",
+    "btnCreate": "添加",
+    "btnUpdate": "更新"
+  },
+  "githubCard": {
+    "title": "GitHub 个人资料装饰",
+    "enabled": "开启公开挂件访问",
+    "source": "数据来源",
+    "global": "全局 (所有行程)",
+    "noUrl": "没有可用的公开 URL",
+    "disabled": "挂件已禁用",
+    "markdownTitle": "Markdown 代码 (复制到 README)"
   },
   "tripEdit": {
     "editTitle": "编辑行程",
@@ -167,7 +245,12 @@
     "fillInfo": "请完善信息",
     "autoMaxLimit": "自动规划超出6次换乘限制或无解。\n是否继续无限制深度搜索？(这可能需要较长等待时间)",
     "autoFail": "无法规划: ",
-    "pathTooLong": "路径过长"
+    "autoFailTitle": "换乘超限",
+    "pathTooLong": "路径过长",
+    "saveFail": "云端保存失败: ",
+    "disconnected": "起始站与上一程终点不相连",
+    "disconnectTitle": "行程断连提示",
+    "disconnectMsg": "检测到中间存在不相连的独立行程段，强行保存可能会破坏结构。确定要保存吗？"
   },
   "app": {
     "fetchRemote": "正在获取远端数据... (10%)",
@@ -193,12 +276,75 @@
     "exportErr": "导出过程中发生错误。",
     "invalidBackup": "无效的备份文件",
     "missLine": "检测到缺少以下线路的基础数据，可能会导致显示异常：\n\n{{lines}}\n\n建议先去地图页面上传对应的 GeoJSON 文件。是否继续导入？",
+    "missLineTitle": "缺少数据",
     "importSuccess": "数据导入完成！\n\n行程: 新增 {{newT}} 条 (跳过重复/无效 {{skipT}} 条)\n图钉: 新增 {{newP}} 个 (跳过重复/无效 {{skipP}} 个)",
     "fileParseErr": "文件解析失败",
     "companyUpdated": "公司数据库已更新",
     "parseFail": "解析失败",
     "fileSkip": "文件 {{name}} 解析失败，已跳过",
     "importCount": "成功导入 {{count}} 个文件！",
-    "fileProcErr": "文件处理过程中发生未知错误"
+    "fileProcErr": "文件处理过程中发生未知错误",
+    "unknown": "未知",
+    "uploadedData": "上传数据",
+    "systemBackupGen": "已生成系统备份文件，请注意查收！",
+    "saveFail": "保存失败: ",
+    "syncFail": "云端同步失败",
+    "mergeConfirm": "检测到本地有数据或个人配置，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)",
+    "mergeConfirmTitle": "数据冲突"
+  },
+  "header": {
+    "welcome": "欢迎, {{name}}",
+    "loginRegister": "登录 / 注册",
+    "logout": "退出",
+    "exportKML": "导出 KML",
+    "data": "数据库",
+    "mapData": "上传地图"
+  },
+  "common": {
+    "deleteConfirm": "确认删除?",
+    "syncFail": "云端同步失败",
+    "saveFail": "保存失败: ",
+    "error": "错误",
+    "ok": "确定",
+    "confirm": "确定",
+    "cancel": "取消",
+    "create": "创建",
+    "close": "关闭",
+    "search": "搜索",
+    "comingSoon": "敬请期待"
+  },
+  "map": {
+    "loadFail": "地图加载失败 ({{domain}})\n请检查网络或切换 VPN 节点",
+    "rubberBandBreak": "哎呀！橡皮筋拉断了，弹到手了！💥",
+    "geoNotSupported": "浏览器不支持地理定位",
+    "geoDenied": "位置访问被拒绝。",
+    "geoFail": "获取位置失败。",
+    "geoTimeout": "获取位置超时。",
+    "geoUnavailable": "位置信息不可用。"
+  },
+  "chest": {
+    "searchingRoute": "正在寻找路径...",
+    "routeFound": "找到路径",
+    "routeNotFound": "未找到路径",
+    "inventory": "物品栏",
+    "slots": "{{count}} 个格子",
+    "empty": "物品栏为空",
+    "origin": "起点",
+    "dest": "终点",
+    "memorial": "乘车纪念",
+    "used": "使用済",
+    "autoGenerated": "自动规划路线"
+  },
+  "regions": {
+    "北海道・東北": "北海道・東北",
+    "関東": "関東",
+    "中部": "中部",
+    "近畿": "近畿",
+    "中国地方": "中国地方",
+    "四国": "四国",
+    "九州・沖縄": "九州・沖縄",
+    "其他": "その他",
+    "未知": "未知",
+    "中国大陆": "中国大陆"
   }
 }

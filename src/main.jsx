@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import './i18n';
 import { GlobalProvider } from './GlobalProvider';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import { AppLayout } from './AppLayout'; // Ensure it points to AppLayout
 import { isMobile } from 'react-device-detect';
 
@@ -29,7 +31,14 @@ root.render(
               </div>
           </div>
       }>
-        <AppLayout />
+        <HelmetProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/:lang/*" element={<AppLayout />} />
+            <Route path="/*" element={<AppLayout />} />
+          </Routes>
+        </BrowserRouter>
+      </HelmetProvider>
       </React.Suspense>
     </GlobalProvider>
   </React.StrictMode>

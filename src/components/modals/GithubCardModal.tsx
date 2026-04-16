@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Github, Eye, EyeOff, Lock, Loader2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { api } from '../../services/api';
@@ -8,6 +9,9 @@ import { useTranslation } from 'react-i18next';
 import { showAlert } from '../../utils/alerts';
 
 export const GithubCardModal: React.FC = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
+
     const { isOpen, user, folders, badgeSettings } = useStore(useShallow(state => ({
         isOpen: !!state.modals.cardModalUser,
         user: state.modals.cardModalUser,
@@ -64,9 +68,19 @@ export const GithubCardModal: React.FC = () => {
     const publicFolders = folders.filter(f => f.is_public && f.hash);
 
     const onUpdateSettings = (s: any) => {
+        const langChanged = s.language && s.language !== badgeSettings.language;
         setBadgeSettings(s);
         if (user) {
             saveData(user.token, trips, pins, folders, s).catch((e: any) => showAlert(t('app.saveFail', "保存失败: ") + e.message, '', 'error'));
+        }
+        if (langChanged) {
+            const parts = location.pathname.split('/');
+            if (parts.length > 1 && ['zh-cn', 'en', 'ja-jp', 'zh-tw'].includes(parts[1].toLowerCase())) {
+                parts[1] = s.language.toLowerCase();
+            } else {
+                parts.splice(1, 0, s.language.toLowerCase());
+            }
+            navigate(parts.join('/') + location.search, { replace: true });
         }
     };
 

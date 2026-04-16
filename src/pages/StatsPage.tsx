@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Github, Folder, TrendingUp, Move, MapPin, Map as MapIcon, Globe } from 'lucide-react';
 import { useStore } from '../store';
 import { calcDist } from '../core/tripCalculator';
@@ -27,6 +28,9 @@ const CITIES = {
 };
 
 export const StatsPage: React.FC = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
+
     const {
         trips, railwayData, geoData, user, userProfile, segmentGeometries, companyDB, badgeSettings, setBadgeSettings, pins, folders
     } = useStore(useShallow(state => ({
@@ -183,9 +187,19 @@ export const StatsPage: React.FC = () => {
                                     className="bg-transparent text-gray-700 text-sm font-bold w-full outline-none cursor-pointer"
                                     value={badgeSettings.language || 'zh-CN'}
                                     onChange={(e) => {
-                                        const newSettings = { ...badgeSettings, language: e.target.value };
+                                        const newLang = e.target.value;
+                                        const newSettings = { ...badgeSettings, language: newLang };
                                         setBadgeSettings(newSettings);
                                         if (user) saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
+
+                                        // Update URL to match new language while preserving current path (excluding old lang prefix)
+                                        const parts = location.pathname.split('/');
+                                        if (parts.length > 1 && ['zh-cn', 'en', 'ja-jp', 'zh-tw'].includes(parts[1].toLowerCase())) {
+                                            parts[1] = newLang.toLowerCase();
+                                        } else {
+                                            parts.splice(1, 0, newLang.toLowerCase());
+                                        }
+                                        navigate(parts.join('/') + location.search, { replace: true });
                                     }}
                                 >
                                     <option value="zh-CN">简体中文</option>

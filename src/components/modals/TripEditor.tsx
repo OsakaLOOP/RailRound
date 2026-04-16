@@ -10,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
 import { showAlert, showConfirm } from '../../utils/alerts';
+import { trackEvent, AnalyticsEvents } from '../../utils/analytics';
 
 export const TripEditor: React.FC = () => {
     const {
@@ -47,6 +48,7 @@ export const TripEditor: React.FC = () => {
     const [allowedLines, setAllowedLines] = useState<string[] | null>(null);
 
     const onSave = async () => {
+        trackEvent({ category: AnalyticsEvents.TRIP_ACTION, action: isEditing ? 'Edit_Trip' : 'Add_Trip' });
         // Validation logic
         const validSegments = form.segments?.filter(s => s.fromId !== s.toId) || [];
         if (validSegments.length === 0) { showAlert(t("tripEdit.atLeastOne", "至少包含一段有效行程")); return; }
@@ -148,6 +150,7 @@ export const TripEditor: React.FC = () => {
     }, [autoRouteEasterEggType, isOpen, autoForm, form.date]);
 
     const onAutoSearch = (retryWithInfiniteSearch = false) => {
+        trackEvent({ category: AnalyticsEvents.TRIP_ACTION, action: 'Auto_Route_Search' });
         const isInfinite = retryWithInfiniteSearch === true;
         const { startLine, startStation, endLine, endStation } = autoForm;
         if (!startLine || !startStation || !endLine || !endStation) return;

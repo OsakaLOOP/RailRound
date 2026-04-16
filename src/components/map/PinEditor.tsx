@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
 import { showConfirm } from '../../utils/alerts';
+import { trackEvent, AnalyticsEvents } from '../../utils/analytics';
 
 const COLOR_PALETTE = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#64748b'];
 
@@ -26,6 +27,7 @@ export const PinEditor: React.FC = () => {
 
     const savePin = () => {
         if (!editingPin) return;
+        trackEvent({ category: AnalyticsEvents.USER_ACTION, action: editingPin.isTemp ? 'Add_Pin' : 'Edit_Pin' });
         const newPin = { ...editingPin, id: editingPin.isTemp ? Date.now() : editingPin.id };
         delete newPin.isTemp;
 

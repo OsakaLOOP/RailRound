@@ -195,6 +195,7 @@ const renderMarkdown = (text) => {
   return elements;
 };
 
+import { trackEvent, AnalyticsEvents } from "../utils/analytics";
 export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
@@ -245,7 +246,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
       } else {
         result = await api.login(username, password);
       }
-      onLoginSuccess(result);
+      trackEvent({category: AnalyticsEvents.USER_ACTION, action: "Login_Success"}); onLoginSuccess(result);
       onClose();
     } catch (err) {
       setError(err.message);

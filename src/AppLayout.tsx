@@ -16,6 +16,7 @@ import { FabButton } from './components/map/FabButton';
 import { LocateButton } from './components/map/LocateButton';
 import { Header } from './components/layout/Header';
 import { BottomNav } from './components/layout/BottomNav';
+import { trackEvent, AnalyticsEvents } from './utils/analytics';
 import { TripsPage } from './pages/TripsPage';
 import { StatsPage } from './pages/StatsPage';
 import { useStore } from './store';
@@ -933,6 +934,7 @@ export const AppLayout: React.FC = () => {
 
     // --- 4. File Handlers ---
     const handleExportKML = async () => {
+        trackEvent({ category: AnalyticsEvents.USER_ACTION, action: 'Export_KML' });
         if (isExportingKML) return;
         setIsExportingKML(true);
         setTimeout(async () => {
@@ -977,6 +979,7 @@ export const AppLayout: React.FC = () => {
     };
 
     const handleExportUserData = () => {
+        trackEvent({ category: AnalyticsEvents.USER_ACTION, action: 'Export_JSON_Backup' });
         const linesUsed = new Set();
         const companiesUsed = new Set();
         trips.forEach(trip => { (trip.segments || []).forEach((s: any) => { if (s.lineKey) { linesUsed.add(s.lineKey); const meta = railwayData[s.lineKey]?.meta; if (meta && meta.company) companiesUsed.add(meta.company); } }); });
@@ -987,6 +990,7 @@ export const AppLayout: React.FC = () => {
     };
 
     const handleImportUserData = (event: any) => {
+        trackEvent({ category: AnalyticsEvents.USER_ACTION, action: 'Import_JSON_Backup' });
         const file = event.target.files[0];
         if (!file) return;
         const reader = new FileReader();

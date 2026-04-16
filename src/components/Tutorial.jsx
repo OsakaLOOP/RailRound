@@ -7,10 +7,10 @@ import { useTranslation } from 'react-i18next';
 
 const getSteps = (t) => [
     {
-        id: 'welcome',
+        id: 'start-tutorial',
         target: '#header-title', // Center modal
-        title: t('tutorial.welcome.title', '欢迎来到 RailLOOP'),
-        content: t('tutorial.welcome.content', 'RailLOOP 是一个个人向旅铁手账, 旨在帮助你追踪和管理你的铁路旅程, 直观可感地展示旅行足迹.'),
+        title: t('tutorial.start.title', '是否查看教程?'),
+        content: t('tutorial.start.content', '这里是一个简短的指南，带你了解基本功能。'),
         position: 'center',
         action: 'next'
     },
@@ -72,8 +72,9 @@ const getSteps = (t) => [
         title: t('tutorial.tabMap.title', '地图模式'),
         content: t('tutorial.tabMap.content', '切换并查看铁路网络. 灰色的是未乘区段, 而已乘线路将以对应的颜色高亮显示. 底图包含来自 OpenRailwayMap 的配线详情. 新版本不再渲染已乘区间的svg图形, 而丰富了站点交互. 你可以长按站点并拖动连接, 以自动规划。'),
         position: 'top',
-        action: 'switch-tab',
-        tab: 'map'
+        action: 'wait-click-tab',
+        tab: 'map',
+        check: ({ activeTab }) => activeTab === 'map'
     },
     {
         id: 'map-pins',
@@ -178,13 +179,8 @@ const Tutorial = ({
             setIsLoginOpen(true);
             setTimeout(() => setStep(s => s + 1), 200);
         } else if (step >= STEPS.length - 1) {
-            // End -> Show City Selector if not done
-            const setupDone = localStorage.getItem('rail_setup_done');
-            if (setupDone === 'true' || devMode) {
-                setStep(-2);
-            } else {
-                setStep(-3);
-            }
+            // End
+            setStep(-2);
             setIsVisible(false);
         } else {
             setStep(s => s + 1);
@@ -195,13 +191,8 @@ const Tutorial = ({
         if (dontShowAgain) {
             localStorage.setItem('rail_tutorial_skipped', 'true');
         }
-        // Skip -> Show City Selector if not done
-        const setupDone = localStorage.getItem('rail_setup_done');
-        if (setupDone === 'true' || devMode) {
-            setStep(-2);
-        } else {
-            setStep(-3);
-        }
+        // Skip tutorial
+        setStep(-2);
         setIsVisible(false);
     }, [setStep, setIsVisible, devMode]);
 
@@ -229,16 +220,16 @@ const Tutorial = ({
         const skipped = localStorage.getItem('rail_tutorial_skipped');
         const setupDone = localStorage.getItem('rail_setup_done');
 
-        // Priority 1: Tutorial
-        if (!devMode && skipped !== 'true' && !user) {
-            setStep(0);
-            setIsVisible(true);
+        // Priority 1: Initial Setup
+        if (!devMode && setupDone !== 'true') {
+            setStep(-3);
             return;
         }
 
-        // Priority 2: Initial Setup
-        if (!devMode && setupDone !== 'true') {
-            setStep(-3);
+        // Priority 2: Tutorial
+        if (!devMode && skipped !== 'true' && !user) {
+            setStep(0);
+            setIsVisible(true);
             return;
         }
 
@@ -248,8 +239,15 @@ const Tutorial = ({
 
     const handleCitySelectorComplete = useCallback(() => {
         localStorage.setItem('rail_setup_done', 'true');
-        setStep(-2); // Finish onboarding flow
-    }, [setStep]);
+
+        const skipped = localStorage.getItem('rail_tutorial_skipped');
+        if (!devMode && skipped !== 'true' && !user) {
+            setStep(0);
+            setIsVisible(true);
+        } else {
+            setStep(-2); // Finish onboarding flow
+        }
+    }, [setStep, devMode, user]);
 
     // Step Transition Logic & Rect Calculation
     useEffect(() => {

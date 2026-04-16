@@ -554,8 +554,19 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
 
                 <div className={`absolute inset-0 flex flex-col transition-transform duration-500 ease-in-out ${step === 2 ? 'translate-x-0' : 'translate-x-full'} ${step === 2 ? 'opacity-100 relative' : 'opacity-0 absolute pointer-events-none'}`}>
                     <div className="p-8 pb-4 text-center">
-                        <h2 className="text-3xl font-bold text-gray-800 mb-2">{t('setup.startTitle', '你的探索起点')}</h2>
-                        <p className="text-gray-500">{t('setup.startDesc', '每次打开地图时，你希望从哪里开始你的旅程？')}</p>
+                        {!mode ? (
+                            <>
+                                <h2 className="text-3xl font-bold text-gray-800 mb-2">{t('tutorial.welcome.title', '欢迎来到 RailLOOP')}</h2>
+                                <p className="text-gray-500 max-w-lg mx-auto mb-4">{t('tutorial.welcome.content', 'RailLOOP 是一个个人向旅铁手账, 旨在帮助你追踪和管理你的铁路旅程, 直观可感地展示旅行足迹.')}</p>
+                                <h3 className="text-xl font-bold text-gray-700">{t('setup.startTitle', '你的探索起点')}</h3>
+                                <p className="text-gray-500 text-sm mt-1">{t('setup.startDesc', '每次打开地图时，你希望从哪里开始你的旅程？')}</p>
+                            </>
+                        ) : (
+                            <>
+                                <h2 className="text-3xl font-bold text-gray-800 mb-2">{t('setup.startTitle', '你的探索起点')}</h2>
+                                <p className="text-gray-500">{t('setup.startDesc', '每次打开地图时，你希望从哪里开始你的旅程？')}</p>
+                            </>
+                        )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-8 pt-4">

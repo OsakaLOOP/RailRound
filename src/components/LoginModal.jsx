@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { X, LogIn, UserPlus, Github, Mail } from 'lucide-react';
 import { api } from '../services/api';
 import { useStore } from '../store';
+import { useUserData } from '../hooks/useUserData';
+import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
 
 
@@ -196,6 +199,12 @@ const renderMarkdown = (text) => {
 };
 
 export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { saveData } = useUserData();
+  const { trips, pins, folders } = useStore(useShallow(state => ({ trips: state.trips, pins: state.pins, folders: state.folders })));
+
+
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -362,7 +371,20 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
                     {['zh-CN', 'en', 'ja-JP', 'zh-TW'].map(l => (
                         <button
                             key={l}
-                            onClick={() => setBadgeSettings({ ...badgeSettings, language: l })}
+                            onClick={() => {
+                                const newSettings = { ...badgeSettings, language: l };
+                                setBadgeSettings(newSettings);
+                                if (user) {
+                                  saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
+                                }
+                                const parts = location.pathname.split('/');
+                                if (parts.length > 1 && ['zh-cn', 'en', 'ja-jp', 'zh-tw'].includes(parts[1].toLowerCase())) {
+                                    parts[1] = l.toLowerCase();
+                                } else {
+                                    parts.splice(1, 0, l.toLowerCase());
+                                }
+                                navigate(parts.join('/') + location.search, { replace: true });
+                            }}
                             className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${lang === l ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
                         >
                             {l.toUpperCase()}

@@ -37,10 +37,17 @@ import { useMeta } from './contexts';
 import { useTranslation } from 'react-i18next';
 import { showAlert, showConfirm } from './utils/alerts';
 import i18next from 'i18next';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
+
 
 const CURRENT_VERSION = meta["currentVersion"];
 
 export const AppLayout: React.FC = () => {
+    const { lang } = useParams();
+    const navigate = useNavigate();
+    const location = useLocation();
+
     const {
         activeTab, user, setModalState, setCompanyDB, setRailwayData, setGeoData,
         trips, pins, railwayData, geoData, companyDB, setTrips, setPins, folders, badgeSettings,
@@ -79,12 +86,27 @@ export const AppLayout: React.FC = () => {
     const { i18n, t } = useTranslation();
 
     useEffect(() => {
-        // Only apply language change if store has hydrated and language is different.
-        // This prevents default 'zh-CN' from overriding detected language before hydration.
-        if (isHydrated && badgeSettings.language && badgeSettings.language !== i18n.language) {
-            i18n.changeLanguage(badgeSettings.language);
+        const supportedLangs = ['zh-cn', 'en', 'ja-jp', 'zh-tw'];
+        if (isHydrated) {
+            if (!lang || !supportedLangs.includes(lang.toLowerCase())) {
+                const defaultLang = badgeSettings.language ? badgeSettings.language.toLowerCase() : 'zh-cn';
+                navigate(`/${defaultLang}${location.pathname}${location.search}`, { replace: true });
+            } else {
+                let targetLang = lang;
+                if (targetLang.toLowerCase() === 'zh-cn') targetLang = 'zh-CN';
+                if (targetLang.toLowerCase() === 'zh-tw') targetLang = 'zh-TW';
+                if (targetLang.toLowerCase() === 'ja-jp') targetLang = 'ja-JP';
+                if (targetLang.toLowerCase() === 'en') targetLang = 'en';
+
+                if (i18n.language !== targetLang) {
+                    i18n.changeLanguage(targetLang);
+                }
+
+                // Do not auto-update badgeSettings here, to decouple context from IDB.
+                // Only manual clicks will trigger saveData and update IDB.
+            }
         }
-    }, [badgeSettings.language, i18n, isHydrated]);
+    }, [lang, i18n, isHydrated, badgeSettings.language, navigate, location]);
     const { devMode } = useMeta() as any;
     const isDraggingRef = useRef(false);
     const workerRef = useRef<Worker | null>(null);
@@ -1113,6 +1135,10 @@ export const AppLayout: React.FC = () => {
 
     return (
         <DragProvider>
+                <Helmet>
+                    <html lang={i18n.language} />
+                </Helmet>
+
             <div className="flex flex-col h-[100dvh] bg-slate-100 font-sans text-slate-800 overflow-visible">
                 <Toaster position="top-center" />
                 <Header

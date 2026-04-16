@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/postbuild.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -26,7 +26,7 @@
     "react-hot-toast": "^2.6.0",
     "react-i18next": "^17.0.2",
     "react-markdown": "^10.1.0",
-    "react-router-dom": "^7.13.0",
+    "react-router-dom": "^7.14.1",
     "remark-gfm": "^4.0.1",
     "sweetalert2": "^11.26.24",
     "typescript": "^5.9.3",

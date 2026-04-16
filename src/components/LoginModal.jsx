@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { X, LogIn, UserPlus, Github, Mail } from 'lucide-react';
 import { api } from '../services/api';
 import { useStore } from '../store';
@@ -362,7 +363,17 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
                     {['zh-CN', 'en', 'ja-JP', 'zh-TW'].map(l => (
                         <button
                             key={l}
-                            onClick={() => setBadgeSettings({ ...badgeSettings, language: l })}
+                            onClick={() => {
+                                const newSettings = { ...badgeSettings, language: l };
+                                setBadgeSettings(newSettings);
+                                const parts = location.pathname.split('/');
+                                if (parts.length > 1 && ['zh-cn', 'en', 'ja-jp', 'zh-tw'].includes(parts[1].toLowerCase())) {
+                                    parts[1] = l.toLowerCase();
+                                } else {
+                                    parts.splice(1, 0, l.toLowerCase());
+                                }
+                                navigate(parts.join('/') + location.search, { replace: true });
+                            }}
                             className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${lang === l ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
                         >
                             {l.toUpperCase()}

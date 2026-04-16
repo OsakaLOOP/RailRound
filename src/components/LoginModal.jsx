@@ -197,6 +197,9 @@ const renderMarkdown = (text) => {
 };
 
 export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

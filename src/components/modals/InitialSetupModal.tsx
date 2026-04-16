@@ -453,6 +453,9 @@ const LanguageSVG = () => (
 );
 
 export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, onComplete }) => {
+    const navigate = useNavigate();
+    const location = useLocation();
+
     const { badgeSettings, setBadgeSettings, user, trips, pins, folders } = useStore(useShallow(state => ({
         badgeSettings: state.badgeSettings,
         setBadgeSettings: state.setBadgeSettings,

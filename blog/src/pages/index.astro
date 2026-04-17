@@ -63,9 +63,10 @@ for (const cat of categories.slice(1)) {
 			<ul class="post-list">
 				{allPosts.map(post => {
 					const { category, tags, version } = post.data;
+					const slug = version ? `v${version}` : post.id;
 					return (
 						<li>
-							<a href={`/blog/${category}/${post.id}/`} class="post-card">
+							<a href={`/blog/${category}/${slug}/`} class="post-card">
 								<div class="card-meta">
 									<span class={`cat-badge cat-${category}`}>{category}</span>
 									{version && <span class="ver-badge">v{version}</span>}

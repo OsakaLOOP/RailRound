@@ -6,10 +6,14 @@ export async function getStaticPaths() {
 	const posts = await getCollection('blog', ({ data }) => {
 		return data.category === 'dev';
 	});
-	return posts.map((post) => ({
-		params: { slug: post.id },
-		props: post,
-	}));
+	return posts.map((post) => {
+		// Astro 5+ content layer collections might have ids like 'v0.50',
+		// we just ensure it maps to the exact slug you want (like 'v0.50')
+		return {
+			params: { slug: post.data.version ? `v${post.data.version}` : post.id },
+			props: post,
+		};
+	});
 }
 type Props = CollectionEntry<'blog'>;
 

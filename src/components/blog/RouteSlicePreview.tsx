@@ -80,31 +80,33 @@ export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endS
     }
 
     return (
-        <div className="my-6 border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm font-sans not-prose">
-            <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+        <div className="my-8 border border-slate-200/60 rounded-2xl overflow-hidden bg-white shadow-lg shadow-slate-200/20 font-sans not-prose transition-all hover:shadow-xl">
+            <div className="bg-slate-50/80 backdrop-blur p-4 border-b border-slate-100 flex justify-between items-center">
                 <div className="flex flex-col">
-                    <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase mb-1">Route Slice Preview</span>
+                    <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase mb-1.5 flex items-center gap-1">
+                        <MapPin size={10} className="text-[#39C5BB]"/> Route Slice Preview
+                    </span>
                     <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-slate-800 bg-white px-2 py-0.5 rounded border shadow-sm">
+                        <span className="text-sm font-bold text-slate-700 bg-white px-2.5 py-0.5 rounded-md border border-slate-200 shadow-sm">
                             {lineKey.split(':')[1] || lineKey}
                         </span>
-                        <span className="text-xs text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                            {startStation} <ArrowRight size={12} className="inline mx-0.5" /> {endStation}
+                        <span className="text-xs text-slate-500 font-medium bg-slate-100/80 px-2.5 py-0.5 rounded-md border border-slate-200/80 flex items-center">
+                            {startStation} <ArrowRight size={12} className="mx-1 text-slate-400" /> {endStation}
                         </span>
                     </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                    <span className="text-xs font-bold text-[#39C5BB] bg-[#39C5BB]/10 px-2 py-0.5 rounded">
+                <div className="flex flex-col items-end gap-1.5">
+                    <span className="text-xs font-bold text-[#39C5BB] bg-[#39C5BB]/10 border border-[#39C5BB]/20 px-2.5 py-0.5 rounded-md shadow-sm">
                         {data.distance} km
                     </span>
-                    <span className="text-[10px] font-medium text-slate-400">
-                        EST. {data.time} MIN
+                    <span className="text-[9px] font-bold text-slate-400 tracking-wide uppercase">
+                        Est. {data.time} min
                     </span>
                 </div>
             </div>
 
-            <div className="p-6 overflow-x-auto relative" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                <div className="flex items-center min-w-max pb-4 px-2">
+            <div className="p-8 overflow-x-auto relative bg-gradient-to-b from-white to-slate-50/30" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <div className="flex items-center min-w-max pb-6 px-4">
                     {data.stations.map((st, idx) => (
                         <div key={idx} className="flex items-center relative group cursor-default">
                             {/* Station Node */}

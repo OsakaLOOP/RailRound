@@ -65,7 +65,7 @@ for (const cat of categories.slice(1)) {
 					const { category, tags, version } = post.data;
 					return (
 						<li>
-							<a href={`/blog/blog/${post.id}/`} class="post-card">
+							<a href={`/blog/${category}/${post.id}/`} class="post-card">
 								<div class="card-meta">
 									<span class={`cat-badge cat-${category}`}>{category}</span>
 									{version && <span class="ver-badge">v{version}</span>}

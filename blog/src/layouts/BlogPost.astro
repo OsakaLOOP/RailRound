@@ -1,0 +1,334 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import FormattedDate from '../components/FormattedDate.astro';
+import TableOfContents from '../components/TableOfContents.astro';
+
+type Props = CollectionEntry<'blog'>['data'] & {
+  headings?: Array<{ depth: number; slug: string; text: string }>;
+};
+
+const { title, description, pubDate, updatedDate, category, tags, version, headings = [] } = Astro.props;
+
+const categoryColors: Record<string, string> = {
+  dev: 'cat-dev',
+  docs: 'cat-docs',
+  guide: 'cat-guide',
+  release: 'cat-release',
+};
+const catClass = categoryColors[category] ?? 'cat-dev';
+---
+
+<html lang="zh-CN">
+  <head>
+    <BaseHead title={title} description={description} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+
+  <body>
+    <Header />
+    <div class="page-layout">
+      <!-- 左侧目录栏 -->
+      <aside class="sidebar">
+        <TableOfContents headings={headings} />
+      </aside>
+
+      <!-- 主内容区 -->
+      <main class="post-main">
+        <article>
+          <header class="post-header">
+            <!-- 元信息行 -->
+            <div class="post-meta">
+              <span class={`category-badge ${catClass}`}>{category}</span>
+              {version && (
+                <span class="version-badge">v{version}</span>
+              )}
+              <span class="post-date">
+                <FormattedDate date={pubDate} />
+              </span>
+              {updatedDate && (
+                <span class="updated-date">· 更新于 <FormattedDate date={updatedDate} /></span>
+              )}
+            </div>
+            <h1 class="post-title">{title}</h1>
+            <p class="post-description">{description}</p>
+            {tags.length > 0 && (
+              <div class="tags">
+                {tags.map(tag => (
+                  <a href={`/blog/tags/${tag}/`} class="tag">#{tag}</a>
+                ))}
+              </div>
+            )}
+            <hr class="divider" />
+          </header>
+
+          <div class="prose">
+            <slot />
+          </div>
+        </article>
+      </main>
+    </div>
+    <Footer />
+  </body>
+</html>
+
+<style>
+  :root {
+    --accent: #39C5BB;
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --border: rgba(255,255,255,0.08);
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --font: 'Inter', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
+  .page-layout {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 2.5rem;
+    align-items: start;
+  }
+
+  @media (max-width: 780px) {
+    .page-layout {
+      grid-template-columns: 1fr;
+    }
+    .sidebar {
+      display: none;
+    }
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 68px;
+  }
+
+  .post-main {
+    min-width: 0;
+  }
+
+  /* Post header */
+  .post-header {
+    margin-bottom: 2rem;
+  }
+
+  .post-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    font-size: 0.8rem;
+  }
+
+  .category-badge {
+    padding: 0.15rem 0.6rem;
+    border-radius: 99px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .cat-dev    { background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
+  .cat-docs   { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+  .cat-guide  { background: rgba(34,197,94,0.15);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+  .cat-release{ background: rgba(57,197,187,0.15); color: #39C5BB; border: 1px solid rgba(57,197,187,0.3); }
+
+  .version-badge {
+    background: rgba(57,197,187,0.12);
+    color: #39C5BB;
+    border: 1px solid rgba(57,197,187,0.25);
+    padding: 0.15rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .post-date, .updated-date {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+  }
+
+  .post-title {
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #f8fafc;
+    line-height: 1.25;
+    margin: 0 0 0.75rem 0;
+  }
+
+  .post-description {
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    margin: 0 0 1rem 0;
+    line-height: 1.6;
+  }
+
+  .tags {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+  }
+
+  .tag {
+    color: #64748b;
+    font-size: 0.78rem;
+    text-decoration: none;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .tag:hover {
+    color: var(--accent);
+    background: rgba(57,197,187,0.08);
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0;
+  }
+
+  /* Prose styles */
+  .prose {
+    padding-top: 1.75rem;
+  }
+
+  .prose :global(h2) {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin: 2.5rem 0 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: -0.02em;
+    scroll-margin-top: 70px;
+  }
+
+  .prose :global(h3) {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin: 1.75rem 0 0.5rem;
+    scroll-margin-top: 70px;
+  }
+
+  .prose :global(p) {
+    color: #cbd5e1;
+    margin: 0.75rem 0;
+  }
+
+  .prose :global(a) {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(57,197,187,0.3);
+    transition: border-color 0.15s;
+  }
+  .prose :global(a:hover) {
+    border-bottom-color: var(--accent);
+  }
+
+  .prose :global(code) {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid var(--border);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    font-size: 0.875em;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    color: #93c5fd;
+  }
+
+  .prose :global(pre) {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    overflow-x: auto;
+    margin: 1.25rem 0;
+    font-size: 0.875rem;
+  }
+  .prose :global(pre code) {
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+  }
+
+  .prose :global(ul), .prose :global(ol) {
+    padding-left: 1.5rem;
+    color: #cbd5e1;
+    margin: 0.75rem 0;
+  }
+
+  .prose :global(li) {
+    margin: 0.35rem 0;
+  }
+
+  .prose :global(blockquote) {
+    border-left: 3px solid var(--accent);
+    margin: 1.25rem 0;
+    padding: 0.5rem 1rem;
+    background: rgba(57,197,187,0.05);
+    border-radius: 0 6px 6px 0;
+  }
+
+  .prose :global(blockquote p) {
+    margin: 0;
+    color: #94a3b8;
+    font-style: italic;
+  }
+
+  .prose :global(img) {
+    border-radius: 10px;
+    max-width: 100%;
+    border: 1px solid var(--border);
+  }
+
+  .prose :global(hr) {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+  }
+
+  .prose :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    margin: 1.25rem 0;
+  }
+  .prose :global(th) {
+    background: rgba(255,255,255,0.05);
+    padding: 0.6rem 1rem;
+    text-align: left;
+    color: #f1f5f9;
+    border-bottom: 1px solid var(--border);
+  }
+  .prose :global(td) {
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--border);
+    color: #cbd5e1;
+  }
+</style>

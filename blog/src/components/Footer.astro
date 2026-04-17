@@ -1,0 +1,43 @@
+---
+import { APP_URL, SITE_TITLE } from '../consts';
+---
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span>{SITE_TITLE} &copy; {new Date().getFullYear()}</span>
+    <div class="footer-links">
+      <a href={APP_URL}>返回应用</a>
+      <a href="/blog/">日志</a>
+      <a href="/blog/about/">关于</a>
+      <a href="/blog/rss.xml">RSS</a>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    border-top: 1px solid rgba(255,255,255,0.06);
+    margin-top: 4rem;
+    padding: 1.5rem;
+    font-size: 0.8rem;
+    color: #475569;
+  }
+  .footer-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .footer-links {
+    display: flex;
+    gap: 1rem;
+  }
+  .footer-links a {
+    color: #475569;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .footer-links a:hover { color: #39C5BB; }
+</style>

@@ -37,7 +37,7 @@ import { useMeta } from './contexts';
 import { useTranslation } from 'react-i18next';
 import { showAlert, showConfirm } from './utils/alerts';
 import i18next from 'i18next';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 
 
@@ -129,6 +129,17 @@ export const AppLayout: React.FC = () => {
             setStationMenu(null);
         }
     }, [activeTab]);
+
+    // --- Sync URL pathname → activeTab (兼容层) ---
+    useEffect(() => {
+        const parts = location.pathname.split('/').filter(Boolean);
+        const seg = parts[parts.length - 1] as 'records' | 'map' | 'stats';
+        if (['records', 'map', 'stats'].includes(seg)) {
+            if (useStore.getState().activeTab !== seg) {
+                useStore.getState().setActiveTab(seg);
+            }
+        }
+    }, [location.pathname]);
 
     // --- Standalone April Fool's Fake Loading Effect ---
     useEffect(() => {
@@ -1150,9 +1161,16 @@ export const AppLayout: React.FC = () => {
                 />
 
                 <div className="flex-1 relative overflow-hidden flex flex-col">
-                    {activeTab === 'records' && <TripsPage />}
-                    {activeTab === 'stats' && <StatsPage />}
+                    {/* 路由驱动的页面茶层（records / stats） */}
+                    <div className={`flex-1 overflow-hidden flex flex-col ${activeTab !== 'map' ? 'block' : 'hidden'}`}>
+                        <Routes>
+                            <Route path="records" element={<TripsPage />} />
+                            <Route path="stats" element={<StatsPage />} />
+                            <Route index element={<Navigate to="records" replace />} />
+                        </Routes>
+                    </div>
 
+                    {/* MapContainer 永不卸载，仅通过 CSS 控制显隐 */}
                     <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
                         <MapContainer setStationMenu={setStationMenu} isDraggingRef={isDraggingRef} />
                         <FabButton />

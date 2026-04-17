@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Clock, GitCommit, Loader2, AlertCircle, MapPin, ChevronDown } from 'lucide-react';
+import { Bell, Clock, GitCommit, Loader2, AlertCircle, MapPin, ChevronDown, ExternalLink } from 'lucide-react';
 
 const VersionBadge = ({ version: currentVersion }) => {
     const [isHovered, setIsHovered] = useState(false);
@@ -89,12 +89,16 @@ const VersionBadge = ({ version: currentVersion }) => {
             onMouseLeave={close}
         >
             {/* Badge Trigger */}
-            <span className="cursor-help bg-[#39C5BB] hover:bg-teal-500 transition-colors text-white rounded px-1.5 py-0.5 text-[10px] font-bold ml-2 shadow-sm flex items-center gap-1 relative">
-                v{currentVersion}
+            <a 
+                href="/blog"
+                className="cursor-pointer group/badge bg-[#39C5BB] hover:bg-teal-500 transition-colors text-white rounded px-1.5 py-0.5 text-[10px] font-bold ml-2 shadow-sm flex items-center gap-1 relative"
+            >
+                <span className="group-hover/badge:hidden">v{currentVersion}</span>
+                <span className="hidden group-hover/badge:flex items-center gap-1">Blog <ExternalLink size={10}/></span>
                 {showDot && (
-                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse absolute -top-1 -right-1 border border-slate-900 shadow-sm pointer-events-none"></span>
+                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse absolute -top-1 -right-1 border border-slate-900 shadow-sm pointer-events-none group-hover/badge:hidden"></span>
                 )}
-            </span>
+            </a>
 
             {/* Popover Modal */}
             {show && (
@@ -167,10 +171,15 @@ const VersionBadge = ({ version: currentVersion }) => {
                                                 </div>
 
                                                 <div className="flex-1 pt-0.5">
-                                                    <div className="text-xs text-gray-700 leading-relaxed font-medium group-hover:text-black transition-colors whitespace-pre-line">
+                                                    <div className="text-xs text-gray-700 leading-relaxed font-medium group-hover:text-black transition-colors whitespace-pre-line pr-4">
                                                         {log.content}
                                                     </div>
-                                                    <div className="text-[10px] text-gray-300 mt-1">{log.date}</div>
+                                                    <div className="flex items-center justify-between mt-1">
+                                                        <span className="text-[10px] text-gray-300">{log.date}</span>
+                                                        <a href={`/blog/dev/${log.version}`} className="invisible group-hover:visible text-[10px] font-bold text-[#39C5BB] hover:text-teal-600 flex items-center gap-1 transition-colors">
+                                                            Detail <ExternalLink size={10}/>
+                                                        </a>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </React.Fragment>

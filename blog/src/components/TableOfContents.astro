@@ -1,0 +1,75 @@
+---
+// TOC 组件: 从 headings slot 数据提取目录
+export interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  headings: Heading[];
+}
+
+const { headings } = Astro.props;
+const filtered = headings.filter(h => h.depth >= 2 && h.depth <= 3);
+---
+
+{filtered.length > 1 && (
+  <nav class="toc" aria-label="Table of contents">
+    <h4 class="toc-title">目录</h4>
+    <ol class="toc-list">
+      {filtered.map(h => (
+        <li class={`toc-item depth-${h.depth}`}>
+          <a href={`#${h.slug}`} class="toc-link">{h.text}</a>
+        </li>
+      ))}
+    </ol>
+  </nav>
+)}
+
+<style>
+  .toc {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.82rem;
+  }
+
+  .toc-title {
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 0 0 0.6rem 0;
+  }
+
+  .toc-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .toc-item {
+    line-height: 1.4;
+  }
+  .toc-item.depth-3 {
+    padding-left: 0.85rem;
+  }
+
+  .toc-link {
+    color: #64748b;
+    text-decoration: none;
+    transition: color 0.15s;
+    display: block;
+    padding: 0.15rem 0;
+  }
+  .toc-link:hover {
+    color: #39C5BB;
+  }
+</style>

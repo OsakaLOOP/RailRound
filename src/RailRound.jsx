@@ -26,6 +26,8 @@ import Tutorial from './components/Tutorial';
 import { api } from './services/api';
 import { db } from './utils/db';
 import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './core/tripCalculator';
+import { getStationById } from './core/railwayRouting';
+import { getStationById } from './core/railwayRouting';
 import { VersionBadge } from './components/VersionBadge';
 import manifest from '../public/geojson_manifest.json';
 
@@ -384,9 +386,14 @@ const LineSelector = ({ isOpen, onClose, onSelect, railwayData, allowedLines }) 
             groups[category][normRegion][compKey].lines.push({ key, icon });
         });
 
-        Object.values(groups).forEach(regionGroup => {
-            Object.values(regionGroup).forEach(companyGroup => {
-                Object.values(companyGroup).forEach(companyData => {
+
+        for (const catKey in groups) {
+            const regionGroup = groups[catKey];
+            for (const regionKey in regionGroup) {
+                const companyGroup = regionGroup[regionKey];
+                for (const compKey in companyGroup) {
+                    const companyData = companyGroup[compKey];
+
                     // 辅助：判断线路是否有自身的线路 logo（而非仅为公司 logo）
                     const hasLineLogo = (lineKey) => {
                         const meta = railwayData[lineKey]?.meta || {};
@@ -512,9 +519,10 @@ const LineSelector = ({ isOpen, onClose, onSelect, railwayData, allowedLines }) 
                         }
 
                         return result;
-                    });
-                });
-            });
+
+                }
+            }
+        }
         });
 
         return { groups };
@@ -1267,12 +1275,11 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
                 if (isWalk) {
                     let startName = t.fromId || '';
                     let endName = t.toId || '';
-                    Object.values(railwayData).forEach(line => {
-                        const s = line.stations.find(st => st.id === t.fromId);
-                        if (s) startName = s.name_ja;
-                        const e = line.stations.find(st => st.id === t.toId);
-                        if (e) endName = e.name_ja;
-                    });
+
+                    const s = getStationById(railwayData, t.fromId);
+                    if (s) startName = s.name_ja;
+                    const e = getStationById(railwayData, t.toId);
+                    if (e) endName = e.name_ja;
 
                     const isTree = t.walkType === 'tree';
                     const cls = {
@@ -1462,9 +1469,16 @@ const StatsView = ({ trips, railwayData, geoData, user, userProfile, segmentGeom
                     let count = 0;
                     if (railwayData) {
                         const uniqueStations = new Set();
-                        Object.values(railwayData).forEach(line => {
-                            if (line.stations) line.stations.forEach(s => uniqueStations.add(s.id));
-                        });
+
+                        for (const lineKey in railwayData) {
+                            if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+                            const line = railwayData[lineKey];
+                            if (line.stations) {
+                                for (let i = 0; i < line.stations.length; i++) {
+                                    uniqueStations.add(line.stations[i].id);
+                                }
+                            }
+                        }
                         count = uniqueStations.size;
                     }
                     return count;

@@ -1,0 +1,32 @@
+---
+title: 'v0.50 版前端 SEO 架構重構及靜態博客發布'
+description: '項目迎來關鍵架構升級，引入 Astro 雙軌引擎以優化 SEO 表現，並提供了更好的查閱與搜索體驗。'
+pubDate: '2026-04-17'
+category: 'dev'
+tags: ['seo', 'astro', 'react', 'architecture']
+version: '0.50'
+---
+
+## 🚀 核心架構升級
+
+在這一版本中，RailRound 徹底改變了原有的重度 SPA (Single Page Application) 單點路由模式，引入了 **雙軌架構體系**，以完美解決搜索引擎無法抓取頁面內容的劣勢。
+
+1. **SPA 狀態級聯解耦**: 全局 `activeTab` 現在將自發偵聽 Address Bar（URL）進行聯動，真正實現前進/後退/外鏈跳轉邏輯的解耦。
+2. **WebGL 零重載**: 對於最吃性能與狀態同步的地圖區（Leaflet），我們通過智能 CSS 層級與顯隱控制，保證無論如何切換路由頁面，地圖實例絕不銷毀。
+3. **引入靜態博客層 (Astro)**: 我們引入了業界最前沿的 Astro 純靜態引擎並將其橋接在 `/blog/` 路由下。
+
+## 🚀 JSX 組件嵌入演示
+
+我們利用雙軌融合的優勢，現在可以直接在 Markdown (MDX) 文檔中直接嵌入基於 React 和內部算法模塊的獨立組件！
+
+import { RouteSlicePreview } from '../../../../../src/components/blog/RouteSlicePreview';
+
+<RouteSlicePreview client:only="react" lineKey="JR:东海道本线" startStation="東京" endStation="品川" />
+
+## 🛠️ 下一步開發計劃
+
+- [x] 繼續完善 Astro 與主應用 IndexedDB 的無縫橋接
+- [x] 開發可交互式路線卡片 `<RouteSlicePreview />` (MDX 組件注入)
+- [ ] 針對 `TripsPage` 的首屏 SSR 探索
+
+> 感謝關注 RailRound 的成長！

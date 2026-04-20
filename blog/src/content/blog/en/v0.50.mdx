@@ -1,0 +1,32 @@
+---
+title: 'v0.50 Frontend SEO Architecture Refactor and Static Blog Launch'
+description: 'The project undergoes a critical architectural upgrade, introducing the Astro dual-track engine to optimize SEO performance and provide a better browsing and search experience.'
+pubDate: '2026-04-17'
+category: 'dev'
+tags: ['seo', 'astro', 'react', 'architecture']
+version: '0.50'
+---
+
+## 🚀 Core Architecture Upgrade
+
+In this version, RailRound has completely transformed its original heavy SPA (Single Page Application) single-point routing model, introducing a **dual-track architecture** to perfectly solve the disadvantage of search engines being unable to crawl page content.
+
+1. **SPA State Cascade Decoupling**: The global `activeTab` now spontaneously listens to the Address Bar (URL) for linkage, truly decoupling the forward/back/external link jump logic.
+2. **Zero-Reload WebGL**: For the map area (Leaflet) that consumes the most performance and state synchronization, we ensure that the map instance is never destroyed through intelligent CSS hierarchy and visibility control, no matter how the routing page is switched.
+3. **Introduction of Static Blog Layer (Astro)**: We introduced the industry's most advanced Astro pure static engine and bridged it under the `/blog/` route.
+
+## 🚀 JSX Component Embedding Demo
+
+We leverage the advantages of dual-track fusion to directly embed independent components based on React and internal algorithm modules into Markdown (MDX) documents!
+
+import { RouteSlicePreview } from '../../../../../src/components/blog/RouteSlicePreview';
+
+<RouteSlicePreview client:only="react" lineKey="JR:东海道本线" startStation="東京" endStation="品川" />
+
+## 🛠️ Next Development Plans
+
+- [x] Continue to improve the seamless bridging of Astro and the main application IndexedDB.
+- [x] Develop interactive route cards `<RouteSlicePreview />` (MDX component injection).
+- [ ] SSR exploration for `TripsPage` first screen.
+
+> Thanks for following the growth of RailRound!

@@ -3,8 +3,8 @@ import { type CollectionEntry, getCollection, render } from 'astro:content';
 import BlogPost from '../../layouts/BlogPost.astro';
 
 export async function getStaticPaths() {
-	const posts = await getCollection('blog', ({ data }) => {
-		return data.category === 'dev';
+	const posts = await getCollection('blog', ({ id, data }) => {
+		return id.startsWith('zh-cn/') && data.category === 'dev';
 	});
 	return posts.map((post) => {
 		// Astro 5+ content layer collections might have ids like 'v0.50',

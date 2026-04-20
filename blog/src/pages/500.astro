@@ -1,0 +1,128 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE_TITLE } from '../consts';
+
+interface Props {
+    error: unknown;
+}
+
+const { error } = Astro.props;
+const errorMessage = error instanceof Error ? error.message : 'Unknown internal server error';
+const lang = Astro.currentLocale || 'zh-cn';
+
+// Simple translation for the error page
+const t = {
+    'zh-cn': { title: '内部服务器错误', back: '返回首页', desc: '很抱歉，服务器在处理您的请求时遇到了意外情况。' },
+    'en': { title: 'Internal Server Error', back: 'Back to Home', desc: 'Sorry, the server encountered an unexpected condition while processing your request.' },
+    'ja-jp': { title: '内部サーバーエラー', back: 'ホームに戻る', desc: '申し訳ありませんが、リクエストの処理中にサーバーで予期しない状況が発生しました。' },
+    'zh-tw': { title: '內部伺服器錯誤', back: '返回首頁', desc: '很抱歉，伺服器在處理您的請求時遇到了意外情況。' }
+}[lang] || { title: 'Internal Server Error', back: 'Back to Home', desc: 'Internal error occurred.' };
+---
+
+<!doctype html>
+<html lang={lang}>
+	<head>
+		<BaseHead title={`${t.title} - ${SITE_TITLE}`} description={t.desc} />
+	</head>
+	<body>
+		<Header />
+		<main class="error-container">
+            <div class="error-card">
+                <div class="icon-circle">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500">
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>
+                    </svg>
+                </div>
+                <h1>{t.title}</h1>
+                <p class="description">{t.desc}</p>
+                
+                <div class="log-box">
+                    <code>{errorMessage}</code>
+                </div>
+
+                <a href={lang === 'zh-cn' ? '/blog/' : `/blog/${lang}/`} class="btn-primary">
+                    {t.back}
+                </a>
+            </div>
+		</main>
+		<Footer />
+        <style>
+            .error-container {
+                max-width: 1100px;
+                margin: 0 auto;
+                padding: 5rem 1.5rem;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 60vh;
+            }
+            .error-card {
+                background: rgba(255, 255, 255, 0.02);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                padding: 3rem;
+                border-radius: 2rem;
+                text-align: center;
+                max-width: 500px;
+                width: 100%;
+                backdrop-blur: 10px;
+                box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+            }
+            .icon-circle {
+                width: 80px;
+                height: 80px;
+                background: rgba(239, 68, 68, 0.1);
+                border-radius: 50%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                margin: 0 auto 1.5rem;
+            }
+            h1 {
+                font-size: 1.75rem;
+                font-weight: 800;
+                color: #f8fafc;
+                margin-bottom: 0.75rem;
+                letter-spacing: -0.02em;
+            }
+            .description {
+                color: #94a3b8;
+                font-size: 0.95rem;
+                margin-bottom: 1.5rem;
+                line-height: 1.6;
+            }
+            .log-box {
+                background: #0d1117;
+                padding: 1rem;
+                border-radius: 0.75rem;
+                margin-bottom: 2rem;
+                text-align: left;
+                border: 1px solid rgba(255,255,255,0.05);
+                max-height: 150px;
+                overflow-y: auto;
+            }
+            code {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.75rem;
+                color: #f472b6;
+                word-break: break-all;
+            }
+            .btn-primary {
+                display: inline-block;
+                background: #39C5BB;
+                color: #0f172a;
+                padding: 0.75rem 2rem;
+                border-radius: 1rem;
+                font-weight: 700;
+                text-decoration: none;
+                transition: all 0.2s;
+                box-shadow: 0 10px 20px rgba(57, 197, 187, 0.2);
+            }
+            .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 12px 24px rgba(57, 197, 187, 0.3);
+            }
+        </style>
+	</body>
+</html>

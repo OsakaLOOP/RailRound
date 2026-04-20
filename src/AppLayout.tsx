@@ -88,6 +88,24 @@ export const AppLayout: React.FC = () => {
     useEffect(() => {
         const supportedLangs = ['zh-cn', 'en', 'ja-jp', 'zh-tw'];
         if (isHydrated) {
+            const isBlog = location.pathname.startsWith('/blog');
+            
+            if (isBlog) {
+                // Sync logic: if at /blog or /blog/, and app is NOT in default lang (zh-cn),
+                // redirect to localized blog path.
+                const currentAppLang = i18n.language.toLowerCase();
+                const isRootBlog = location.pathname === '/blog' || location.pathname === '/blog/';
+                if (isRootBlog && currentAppLang !== 'zh-cn' && currentAppLang !== 'zh-CN') {
+                    // Normalize lang for blog path (zh-cn, en, ja-jp, zh-tw)
+                    let blogLang = currentAppLang;
+                    if (blogLang === 'zh-cn') blogLang = 'zh-cn';
+                    // Redirect browser to separate Astro mount
+                    window.location.href = `/blog/${blogLang}/`;
+                    return;
+                }
+                return; // Skip standard app localization for blog paths
+            }
+
             if (!lang || !supportedLangs.includes(lang.toLowerCase())) {
                 const defaultLang = badgeSettings.language ? badgeSettings.language.toLowerCase() : 'zh-cn';
                 navigate(`/${defaultLang}${location.pathname}${location.search}`, { replace: true });
@@ -101,9 +119,6 @@ export const AppLayout: React.FC = () => {
                 if (i18n.language !== targetLang) {
                     i18n.changeLanguage(targetLang);
                 }
-
-                // Do not auto-update badgeSettings here, to decouple context from IDB.
-                // Only manual clicks will trigger saveData and update IDB.
             }
         }
     }, [lang, i18n, isHydrated, badgeSettings.language, navigate, location]);

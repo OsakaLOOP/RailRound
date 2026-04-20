@@ -1,11 +1,20 @@
 import { getCollection } from 'astro:content';
 import rss from '@astrojs/rss';
-import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+import { SITE_DESCRIPTION, SITE_TITLE } from '../../consts';
+
+export async function getStaticPaths() {
+	return [
+		{ params: { lang: 'en' } },
+		{ params: { lang: 'ja-jp' } },
+		{ params: { lang: 'zh-tw' } },
+	];
+}
 
 export async function GET(context) {
-	const posts = await getCollection('blog', ({ id }) => id.startsWith('zh-cn/'));
+    const { lang } = context.params;
+	const posts = await getCollection('blog', ({ id }) => id.startsWith(`${lang}/`));
 	return rss({
-		title: SITE_TITLE,
+		title: `${SITE_TITLE} (${lang})`,
 		description: SITE_DESCRIPTION,
 		site: context.site,
 		items: posts
@@ -18,7 +27,7 @@ export async function GET(context) {
                     title: post.data.title,
                     pubDate: post.data.pubDate,
                     description: post.data.description,
-                    link: `/blog/${category}/${slug}/`,
+                    link: `/blog/${lang}/${category}/${slug}/`,
                     categories: [category, ...post.data.tags],
                 };
             }),

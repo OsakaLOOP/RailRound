@@ -10,6 +10,13 @@ export default defineConfig({
     site: 'https://rail.s3xyseia.xyz',
     base: '/blog',
     integrations: [mdx(), sitemap(), react()],
+    i18n: {
+        defaultLocale: 'zh-cn',
+        locales: ['zh-cn', 'en', 'ja-jp', 'zh-tw'],
+        routing: {
+            prefixDefaultLocale: false,
+        },
+    },
     markdown: {
         shikiConfig: {
             theme: 'github-dark',

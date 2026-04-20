@@ -1,0 +1,70 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import Header from '../../components/Header.astro';
+import { APP_URL, SITE_TITLE } from '../../consts';
+
+export async function getStaticPaths() {
+	return [
+		{ params: { lang: 'en' } },
+		{ params: { lang: 'ja-jp' } },
+		{ params: { lang: 'zh-tw' } },
+	];
+}
+
+const { lang } = Astro.params;
+
+const labels: Record<string, any> = {
+    'en': { title: 'About RailRound', sub: 'Personal railway trip tracker, visualizer, and analyzer.', features: 'Features', back: 'Back to App' },
+    'ja-jp': { title: 'RailRound について', sub: '個人鉄道旅行の追跡、視覚化、分析ツール。', features: '機能', back: 'アプリに戻る' },
+    'zh-tw': { title: '關於 RailRound', sub: '個人鐵路行程記錄、可視化與分析工具。', features: '功能簡介', back: '返回應用' }
+};
+const t = labels[lang] || labels['en'];
+---
+<!doctype html>
+<html lang={lang}>
+<head>
+  <BaseHead title={`${t.title} — ${SITE_TITLE}`} description={t.sub} />
+</head>
+<body>
+  <Header />
+  <main style="max-width:720px;margin:3rem auto;padding:0 1.5rem 4rem;font-family:'Inter',system-ui,sans-serif;color:#cbd5e1">
+    <h1 style="color:#f8fafc;font-size:1.8rem;letter-spacing:-0.03em;margin-bottom:0.5rem">{t.title}</h1>
+    <p style="color:#64748b;margin:0 0 2rem">{t.sub}</p>
+
+    <h2 style="color:#f1f5f9;font-size:1.1rem;margin-top:2rem">{t.features}</h2>
+    <ul style="padding-left:1.5rem;line-height:2">
+      {lang === 'en' ? (
+          <>
+            <li>History of trips and management of routes</li>
+            <li>Interactive map visualization based on Leaflet</li>
+            <li>Trip statistics and mileage data panel</li>
+            <li>Suica IC card data import and analysis</li>
+            <li>Multi-language support</li>
+          </>
+      ) : lang === 'ja-jp' ? (
+          <>
+            <li>路線の旅行履歴と管理</li>
+            <li>Leafletに基づいたインタラクティブなマップ視覚化</li>
+            <li>旅行統計と走行距離パネル</li>
+            <li>Suica ICカードデータのインポートと分析</li>
+            <li>多言語サポート</li>
+          </>
+      ) : (
+          <>
+             <li>各條路線的歷史出行記錄與行程管理</li>
+             <li>基於 Leaflet 的交互式地圖可視化</li>
+             <li>行程統計與里程數據面板</li>
+             <li>Suica IC 卡數據導入解析</li>
+             <li>多語言支持（中文 / 日文 / 英文）</li>
+          </>
+      )}
+    </ul>
+
+    <div style="margin-top:3rem;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,0.08)">
+      <a href={APP_URL} style="color:#39C5BB;font-weight:600;display:inline-flex;align-items:center;gap:0.4rem">
+        ← {t.back}
+      </a>
+    </div>
+  </main>
+</body>
+</html>

@@ -10,12 +10,12 @@ import { APP_URL, SITE_TITLE } from '../consts';
 </head>
 <body>
   <Header />
-  <main style="max-width:720px;margin:3rem auto;padding:0 1.5rem 4rem;font-family:'Inter',system-ui,sans-serif;color:#cbd5e1">
-    <h1 style="color:#f8fafc;font-size:1.8rem;letter-spacing:-0.03em;margin-bottom:0.5rem">关于 RailRound</h1>
-    <p style="color:#64748b;margin:0 0 2rem">个人铁路出行记录、可视化与分析工具。</p>
+  <main style="max-width:720px;margin:3rem auto;padding:0 1.5rem 4rem">
+    <h1 style="font-size:1.8rem;letter-spacing:-0.03em;margin-bottom:0.5rem">关于 RailRound</h1>
+    <p style="color:var(--text-muted);margin:0 0 2rem">个人铁路出行记录、可视化与分析工具。</p>
 
-    <h2 style="color:#f1f5f9;font-size:1.1rem;margin-top:2rem">功能简介</h2>
-    <ul style="padding-left:1.5rem;line-height:2">
+    <h2 style="font-size:1.1rem;margin-top:2rem">功能简介</h2>
+    <ul style="padding-left:1.5rem;line-height:2;color:var(--text)">
       <li>各条路线的历史出行记录与行程管理</li>
       <li>基于 Leaflet 的交互式地图可视化</li>
       <li>行程统计与里程数据面板</li>
@@ -23,11 +23,11 @@ import { APP_URL, SITE_TITLE } from '../consts';
       <li>多语言支持（中文 / 日文 / 英文）</li>
     </ul>
 
-    <h2 style="color:#f1f5f9;font-size:1.1rem;margin-top:2rem">当前版本</h2>
-    <p>请查看 <a href="/blog/blog/" style="color:#39C5BB">开发日志</a> 了解最新更新动态。</p>
+    <h2 style="font-size:1.1rem;margin-top:2rem">当前版本</h2>
+    <p>请查看 <a href="/blog/blog/" style="color:var(--accent)">开发日志</a> 了解最新更新动态。</p>
 
-    <div style="margin-top:3rem;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,0.08)">
-      <a href={APP_URL} style="color:#39C5BB;font-weight:600;display:inline-flex;align-items:center;gap:0.4rem">
+    <div style="margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border)">
+      <a href={APP_URL} style="color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:0.4rem">
         ← 返回应用
       </a>
     </div>

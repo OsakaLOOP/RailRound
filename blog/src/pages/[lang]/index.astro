@@ -1,11 +1,21 @@
 ---
 import { getCollection } from 'astro:content';
-import BaseHead from '../components/BaseHead.astro';
-import Header from '../components/Header.astro';
-import FormattedDate from '../components/FormattedDate.astro';
-import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+import BaseHead from '../../components/BaseHead.astro';
+import Header from '../../components/Header.astro';
+import FormattedDate from '../../components/FormattedDate.astro';
+import { SITE_DESCRIPTION, SITE_TITLE } from '../../consts';
 
-const allPosts = (await getCollection('blog', ({ id }) => id.startsWith('zh-cn/'))).sort(
+export async function getStaticPaths() {
+	return [
+		{ params: { lang: 'en' } },
+		{ params: { lang: 'ja-jp' } },
+		{ params: { lang: 'zh-tw' } },
+	];
+}
+
+const { lang } = Astro.params;
+
+const allPosts = (await getCollection('blog', ({ id }) => id.startsWith(`${lang}/`))).sort(
 	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
 );
 
@@ -16,12 +26,20 @@ const grouped: Record<string, typeof allPosts> = { all: allPosts };
 for (const cat of categories.slice(1)) {
 	grouped[cat] = allPosts.filter(p => p.data.category === cat);
 }
+
+// Simple label mapping for languages
+const labels: Record<string, any> = {
+    'en': { all: 'All', dev: 'Dev', docs: 'Docs', title: 'Dev Log', sub: 'Dev records, updates and docs.' },
+    'ja-jp': { all: '全部', dev: '開発', docs: 'ドキュメント', title: '開発ログ', sub: '開発プロセス、バージョン更新、技術ドキュメント' },
+    'zh-tw': { all: '全部', dev: '開發', docs: '文檔', title: '開發日誌', sub: '記錄 RailRound 的開發歷程、版本更新與技術文檔。' }
+};
+const t = labels[lang] || labels['en'];
 ---
 
 <!doctype html>
-<html lang="zh-CN">
+<html lang={lang}>
 <head>
-	<BaseHead title={`日志目录 — ${SITE_TITLE}`} description={SITE_DESCRIPTION} />
+	<BaseHead title={`${t.title} — ${SITE_TITLE}`} description={SITE_DESCRIPTION} />
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
@@ -30,13 +48,13 @@ for (const cat of categories.slice(1)) {
 	<div class="page-layout">
 		<aside class="sidebar">
 			<nav>
-				<h4 class="sidebar-title">分类</h4>
+				<h4 class="sidebar-title">Categories</h4>
 				<ul class="sidebar-list">
 					{categories.map(cat => (
 						<li>
-							<a href={cat === 'all' ? '/blog/' : `/blog/?cat=${cat}`}
+							<a href={cat === 'all' ? `/blog/${lang}/` : `/blog/${lang}/?cat=${cat}`}
 							   class="sidebar-link">
-								{cat === 'all' ? '全部' : Object.keys(grouped).includes(cat) ? cat : cat}
+								{cat === 'all' ? t.all : cat}
 								<span class="count">{grouped[cat]?.length ?? 0}</span>
 							</a>
 						</li>
@@ -45,10 +63,10 @@ for (const cat of categories.slice(1)) {
 
 				{allTags.length > 0 && (
 					<>
-						<h4 class="sidebar-title" style="margin-top:1.5rem">标签</h4>
+						<h4 class="sidebar-title" style="margin-top:1.5rem">Tags</h4>
 						<div class="tag-cloud">
 							{allTags.map(tag => (
-								<a href={`/blog/tags/${tag}/`} class="tag">#{tag}</a>
+								<a href={`/blog/${lang}/tags/${tag}/`} class="tag">#{tag}</a>
 							))}
 						</div>
 					</>
@@ -57,16 +75,18 @@ for (const cat of categories.slice(1)) {
 		</aside>
 
 		<main>
-			<h1 class="page-title">开发日志</h1>
-			<p class="page-sub">记录 RailRound 的开发历程、版本更新与技术文档。</p>
+			<h1 class="page-title">{t.title}</h1>
+			<p class="page-sub">{t.sub}</p>
 
 			<ul class="post-list">
 				{allPosts.map(post => {
 					const { category, tags, version } = post.data;
-					const slug = version ? `v${version}` : post.id;
+                    // For localized posts, the ID is "lang/slug", we need to extract just "slug" for the link
+                    const slugPart = post.id.split('/').pop();
+					const slug = version ? `v${version}` : slugPart;
 					return (
 						<li>
-							<a href={`/blog/${category}/${slug}/`} class="post-card">
+							<a href={`/blog/${lang}/${category}/${slug}/`} class="post-card">
 								<div class="card-meta">
 									<span class={`cat-badge cat-${category}`}>{category}</span>
 									{version && <span class="ver-badge">v{version}</span>}
@@ -90,7 +110,22 @@ for (const cat of categories.slice(1)) {
 </html>
 
 <style>
+	:root {
+		--accent: #39C5BB;
+		--bg: #0f172a;
+		--surface: #1e293b;
+		--border: rgba(255,255,255,0.08);
+		--text: #e2e8f0;
+		--text-muted: #94a3b8;
+		--font: 'Inter', system-ui, sans-serif;
+	}
 	* { box-sizing: border-box; }
+	html, body {
+		margin: 0; padding: 0;
+		background: var(--bg);
+		color: var(--text);
+		font-family: var(--font);
+	}
 	.page-layout {
 		max-width: 1100px;
 		margin: 0 auto;

@@ -20,4 +20,24 @@ export default defineConfig({
   resolve: {
     dedupe: ['react', 'react-dom'],
   },
+  server: {
+    proxy: {
+      // 1. 转发博客页面请求
+      '/blog': {
+        target: 'http://localhost:4321',
+        changeOrigin: true,
+      },
+      // 2. 转发 Astro 开发环境特有的内部资源请求 (带 @ 符号的路径)
+      '^/@(id|fs|vite|astro|astro-dev-toolbar)': {
+        target: 'http://localhost:4321',
+        changeOrigin: true,
+        ws: true
+      },
+      // 3. 转发来自博客组件的样式请求 (由于主应用不使用 .astro，这里可以安全转发)
+      '^/src/.*\\.astro': {
+        target: 'http://localhost:4321',
+        changeOrigin: true
+      }
+    }
+  }
 })

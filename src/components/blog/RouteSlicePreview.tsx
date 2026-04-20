@@ -4,6 +4,7 @@ import { fetchAndParseData } from '../../utils/fetchAndParseData';
 import { findRoute } from '../../core/railwayRouting';
 import { calcDist } from '../../core/tripCalculator';
 import { MapPin, ArrowRight } from 'lucide-react';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 
 interface Props {
     lineKey: string;
@@ -80,69 +81,71 @@ export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endS
     }
 
     return (
-        <div className="my-8 border border-slate-200/60 rounded-2xl overflow-hidden bg-white shadow-lg shadow-slate-200/20 font-sans not-prose transition-all hover:shadow-xl">
-            <div className="bg-slate-50/80 backdrop-blur p-4 border-b border-slate-100 flex justify-between items-center">
-                <div className="flex flex-col">
-                    <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase mb-1.5 flex items-center gap-1">
-                        <MapPin size={10} className="text-[#39C5BB]"/> Route Slice Preview
-                    </span>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-slate-700 bg-white px-2.5 py-0.5 rounded-md border border-slate-200 shadow-sm">
-                            {lineKey.split(':')[1] || lineKey}
+        <ErrorBoundary>
+            <div className="my-8 border border-slate-200/60 rounded-2xl overflow-hidden bg-white shadow-lg shadow-slate-200/20 font-sans not-prose transition-all hover:shadow-xl">
+                <div className="bg-slate-50/80 backdrop-blur p-4 border-b border-slate-100 flex justify-between items-center">
+                    <div className="flex flex-col">
+                        <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase mb-1.5 flex items-center gap-1">
+                            <MapPin size={10} className="text-[#39C5BB]"/> Route Slice Preview
                         </span>
-                        <span className="text-xs text-slate-500 font-medium bg-slate-100/80 px-2.5 py-0.5 rounded-md border border-slate-200/80 flex items-center">
-                            {startStation} <ArrowRight size={12} className="mx-1 text-slate-400" /> {endStation}
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-700 bg-white px-2.5 py-0.5 rounded-md border border-slate-200 shadow-sm">
+                                {lineKey.split(':')[1] || lineKey}
+                            </span>
+                            <span className="text-xs text-slate-500 font-medium bg-slate-100/80 px-2.5 py-0.5 rounded-md border border-slate-200/80 flex items-center">
+                                {startStation} <ArrowRight size={12} className="mx-1 text-slate-400" /> {endStation}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5">
+                        <span className="text-xs font-bold text-[#39C5BB] bg-[#39C5BB]/10 border border-[#39C5BB]/20 px-2.5 py-0.5 rounded-md shadow-sm">
+                            {data.distance} km
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-400 tracking-wide uppercase">
+                            Est. {data.time} min
                         </span>
                     </div>
                 </div>
-                <div className="flex flex-col items-end gap-1.5">
-                    <span className="text-xs font-bold text-[#39C5BB] bg-[#39C5BB]/10 border border-[#39C5BB]/20 px-2.5 py-0.5 rounded-md shadow-sm">
-                        {data.distance} km
-                    </span>
-                    <span className="text-[9px] font-bold text-slate-400 tracking-wide uppercase">
-                        Est. {data.time} min
-                    </span>
-                </div>
-            </div>
 
-            <div className="p-8 overflow-x-auto relative bg-gradient-to-b from-white to-slate-50/30" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                <div className="flex items-center min-w-max pb-6 px-4">
-                    {data.stations.map((st, idx) => (
-                        <div key={idx} className="flex items-center relative group cursor-default">
-                            {/* Station Node */}
-                            <div className="flex flex-col items-center relative z-10 w-8">
-                                <div className={`w-3.5 h-3.5 rounded-full border-[3px] transition-all duration-300 relative z-20 bg-white
-                                    ${(idx === 0 || idx === data.stations.length - 1)
-                                        ? 'border-[#39C5BB] scale-125 shadow-sm'
-                                        : 'border-slate-300 group-hover:border-[#39C5BB] group-hover:scale-110'}`}
-                                />
+                <div className="p-8 overflow-x-auto relative bg-gradient-to-b from-white to-slate-50/30" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    <div className="flex items-center min-w-max pb-6 px-4">
+                        {data.stations.map((st, idx) => (
+                            <div key={idx} className="flex items-center relative group cursor-default">
+                                {/* Station Node */}
+                                <div className="flex flex-col items-center relative z-10 w-8">
+                                    <div className={`w-3.5 h-3.5 rounded-full border-[3px] transition-all duration-300 relative z-20 bg-white
+                                        ${(idx === 0 || idx === data.stations.length - 1)
+                                            ? 'border-[#39C5BB] scale-125 shadow-sm'
+                                            : 'border-slate-300 group-hover:border-[#39C5BB] group-hover:scale-110'}`}
+                                    />
 
-                                {/* Hover Tooltip for Mobile/Desktop */}
-                                <div className="absolute top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-30">
-                                    <div className="bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap shadow-lg">
-                                        {st.name_ja}
+                                    {/* Hover Tooltip for Mobile/Desktop */}
+                                    <div className="absolute top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-30">
+                                        <div className="bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap shadow-lg">
+                                            {st.name_ja}
+                                        </div>
+                                        <div className="w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-slate-800 absolute -top-1 left-1/2 -translate-x-1/2"></div>
                                     </div>
-                                    <div className="w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-slate-800 absolute -top-1 left-1/2 -translate-x-1/2"></div>
+
+                                    <span className={`absolute -top-6 text-[11px] whitespace-nowrap -rotate-45 origin-bottom-left transition-colors
+                                        ${(idx === 0 || idx === data.stations.length - 1)
+                                            ? 'font-bold text-slate-800'
+                                            : 'text-slate-400 group-hover:text-slate-700'}`}>
+                                        {st.name_ja}
+                                    </span>
                                 </div>
 
-                                <span className={`absolute -top-6 text-[11px] whitespace-nowrap -rotate-45 origin-bottom-left transition-colors
-                                    ${(idx === 0 || idx === data.stations.length - 1)
-                                        ? 'font-bold text-slate-800'
-                                        : 'text-slate-400 group-hover:text-slate-700'}`}>
-                                    {st.name_ja}
-                                </span>
+                                {/* Connecting Line */}
+                                {idx < data.stations.length - 1 && (
+                                    <div className="w-12 h-1.5 bg-slate-100 mx-0.5 relative overflow-hidden rounded-full">
+                                        <div className="absolute inset-0 bg-gradient-to-r from-[#39C5BB] to-[#2dd4bf] opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                    </div>
+                                )}
                             </div>
-
-                            {/* Connecting Line */}
-                            {idx < data.stations.length - 1 && (
-                                <div className="w-12 h-1.5 bg-slate-100 mx-0.5 relative overflow-hidden rounded-full">
-                                    <div className="absolute inset-0 bg-gradient-to-r from-[#39C5BB] to-[#2dd4bf] opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             </div>
-        </div>
+        </ErrorBoundary>
     );
 };

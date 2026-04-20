@@ -89,7 +89,7 @@ export const AppLayout: React.FC = () => {
         const supportedLangs = ['zh-cn', 'en', 'ja-jp', 'zh-tw'];
         if (isHydrated) {
             const isBlog = location.pathname.startsWith('/blog');
-            
+
             if (isBlog) {
                 // Sync logic: if at /blog or /blog/, and app is NOT in default lang (zh-cn),
                 // redirect to localized blog path.
@@ -1161,9 +1161,9 @@ export const AppLayout: React.FC = () => {
 
     return (
         <DragProvider>
-                <Helmet>
-                    <html lang={i18n.language} />
-                </Helmet>
+            <Helmet>
+                <html lang={i18n.language} />
+            </Helmet>
 
             <div className="flex flex-col h-[100dvh] bg-slate-100 font-sans text-slate-800 overflow-visible">
                 <Toaster position="top-center" />
@@ -1176,8 +1176,8 @@ export const AppLayout: React.FC = () => {
                 />
 
                 <div className="flex-1 relative overflow-hidden flex flex-col">
-                    {/* 路由驱动的页面茶层（records / stats） */}
-                    <div className={`z-20 relative bg-slate-100 flex-1 overflow-y-auto ${activeTab === 'map' ? 'hidden' : 'block'}`}>
+                    {/* 路由驱动的页面层（records / stats） */}
+                    <div className={`flex-1 overflow-hidden flex flex-col ${activeTab !== 'map' ? 'block' : 'hidden'}`}>
                         <Routes>
                             <Route path="records" element={<TripsPage />} />
                             <Route path="stats" element={<StatsPage />} />
@@ -1186,7 +1186,7 @@ export const AppLayout: React.FC = () => {
                     </div>
 
                     {/* MapContainer 永不卸载，仅通过 CSS 控制显隐 */}
-                    <div className={`flex-1 relative ${activeTab === 'map' ? 'visible z-10' : 'invisible -z-50 opacity-0 pointer-events-none absolute inset-0'}`}>
+                    <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
                         <MapContainer setStationMenu={setStationMenu} isDraggingRef={isDraggingRef} />
                         <FabButton />
                         <LocateButton />

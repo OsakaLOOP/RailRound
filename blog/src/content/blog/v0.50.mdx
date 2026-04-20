@@ -1,0 +1,59 @@
+---
+title: 'v0.50 版前端 SEO 架构重构及静态博客发布'
+description: '项目迎来关键架构升级，引入 Astro 双轨引擎以优化 SEO 表现，并提供了更好的查阅与搜索体验。'
+pubDate: '2026-04-17'
+category: 'dev'
+tags: ['seo', 'astro', 'react', 'architecture']
+version: '0.50'
+---
+
+## 🚀 核心架构升级
+
+在这一版本中，RailRound 彻底改变了原有的重度 SPA (Single Page Application) 单点路由模式，引入了 **双轨架构体系**，以完美解决搜索引擎无法抓取页面内容的劣势。
+
+1. **SPA 状态级联解耦**: 全局 `activeTab` 现在将自发侦听 Address Bar（URL）进行联动，真正实现前进/后退/外链跳转逻辑的解耦。
+2. **WebGL 零重载**: 对于最吃性能与状态同步的地图区（Leaflet），我们通过智能 CSS 层级与显隐控制，保证无论如何切换路由页面，地图实例绝不销毁。
+3. **引入静态博客层 (Astro)**: 我们引入了业界最前沿的 Astro 纯静态引擎并将其桥接在 `/blog/` 路由下。它将承担：
+   - 更新日志展示（彻底释放 SPA 中冗长且影响 Bundle Size 的描述内容）
+   - 技术文档指引
+   - API 文档管理
+
+## 🚀 JSX 组件嵌入演示
+
+我们利用双轨融合的优势，现在可以直接在 Markdown (MDX) 文档中直接嵌入基于 React 和内部算法模块的独立组件！
+
+这允许我们在编写官方指南、更新日志、以及经典路线推荐时，提供像 App 内部一样的沉浸式体验。
+
+### `RouteSlicePreview` API 文档
+
+此组件专门设计用于在非应用上下文中（例如博客阅读页），无需加载整个 3D 地图，而是直接通过同源 `IndexedDB` 极速拉取并计算显示线路切片。如果用户是首次纯净访问此页面，组件将会执行 Fallback 静默拉取原始数据并在本地解析。
+
+**属性 (Props)：**
+
+| 属性名称 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `lineKey` | `string` | 指定需要渲染的线路唯一键值，例如 `JR:东海道本线`。 |
+| `startStation` | `string` | 切片的起点站名称（需支持日文或英文）。 |
+| `endStation` | `string` | 切片的终点站名称。 |
+
+*注意: 只需要提供起点和终点，底层 `findRoute` 算法模块会自动处理中间连接路径并完成去重合并计算。*
+
+### 实时效果演示
+
+下面是一个实时挂载的组件，展示了 **JR:东海道本线** 从 **东京** 到 **品川** 之间的切片，你可以把鼠标放上各个站点来查看详情：
+
+import { RouteSlicePreview } from '../../../../src/components/blog/RouteSlicePreview';
+
+<RouteSlicePreview client:only="react" lineKey="JR:东海道本线" startStation="東京" endStation="品川" />
+
+
+## 🛠️ 下一步开发计划
+
+- [x] 继续完善 Astro 与主应用 IndexedDB 的无缝桥接
+- [x] 开发可交互式路线卡片 `<RouteSlicePreview />` (MDX 组件注入)
+- [ ] 针对 `TripsPage` 的首屏 SSR 探索
+
+## 🐛 Bug Fixes
+- 修复了 `StationMenu` 切换页面时不会自动关闭层级导致事件穿透的问题。
+
+> 感谢关注 RailRound 的成长！

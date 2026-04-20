@@ -1162,7 +1162,7 @@ export const AppLayout: React.FC = () => {
 
                 <div className="flex-1 relative overflow-hidden flex flex-col">
                     {/* 路由驱动的页面茶层（records / stats） */}
-                    <div className={`flex-1 overflow-hidden flex flex-col ${activeTab !== 'map' ? 'block' : 'hidden'}`}>
+                    <div className={`z-20 relative bg-slate-100 flex-1 overflow-y-auto ${activeTab === 'map' ? 'hidden' : 'block'}`}>
                         <Routes>
                             <Route path="records" element={<TripsPage />} />
                             <Route path="stats" element={<StatsPage />} />
@@ -1171,7 +1171,7 @@ export const AppLayout: React.FC = () => {
                     </div>
 
                     {/* MapContainer 永不卸载，仅通过 CSS 控制显隐 */}
-                    <div className={`flex-1 relative ${activeTab === 'map' ? 'block' : 'hidden'}`}>
+                    <div className={`flex-1 relative ${activeTab === 'map' ? 'visible z-10' : 'invisible -z-50 opacity-0 pointer-events-none absolute inset-0'}`}>
                         <MapContainer setStationMenu={setStationMenu} isDraggingRef={isDraggingRef} />
                         <FabButton />
                         <LocateButton />

@@ -5,7 +5,7 @@ import { APP_URL, SITE_TITLE } from '../consts';
   <div class="footer-inner">
     <span>{SITE_TITLE} &copy; {new Date().getFullYear()}</span>
     <div class="footer-links">
-      <a href={APP_URL}>返回应用</a>
+      <a href={APP_URL} class="app-return-link">返回应用</a>
       <a href="/blog/">日志</a>
       <a href="/blog/about/">关于</a>
       <a href="/blog/rss.xml">RSS</a>
@@ -41,3 +41,18 @@ import { APP_URL, SITE_TITLE } from '../consts';
   }
   .footer-links a:hover { color: #39C5BB; }
 </style>
+
+
+<script>
+  document.addEventListener('click', function(e) {
+    var target = e.target.closest('a.app-return-link');
+    if (target) {
+      e.preventDefault();
+      if (window.opener && !window.opener.closed) {
+        window.close();
+      } else {
+        window.location.href = target.href;
+      }
+    }
+  });
+</script>

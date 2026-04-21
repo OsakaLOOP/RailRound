@@ -57,7 +57,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
               <a 
                 href="/blog/"
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="opener"
                 className="flex items-center gap-2 px-5 py-2 bg-white text-slate-600 text-xs font-bold rounded-xl border border-slate-200 transition-all hover:bg-slate-50 active:scale-95 shadow-sm"
               >
                 <Home size={14} /> 返回索引

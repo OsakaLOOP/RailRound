@@ -99,9 +99,8 @@ export const AppLayout: React.FC = () => {
                     // Normalize lang for blog path (zh-cn, en, ja-jp, zh-tw)
                     let blogLang = currentAppLang;
                     if (blogLang === 'zh-cn') blogLang = 'zh-cn';
-                    // Open in new tab and redirect current tab back to root to avoid empty page
-                    window.open(`/blog/${blogLang}/`, '_blank');
-                    window.location.replace('/');
+                    // Redirect browser to separate Astro mount
+                    window.location.href = `/blog/${blogLang}/`;
                     return;
                 }
                 return; // Skip standard app localization for blog paths

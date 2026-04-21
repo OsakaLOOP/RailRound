@@ -91,6 +91,8 @@ const VersionBadge = ({ version: currentVersion }) => {
             {/* Badge Trigger */}
             <a 
                 href="/blog/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="cursor-pointer group/badge bg-[#39C5BB] hover:bg-teal-500 transition-colors text-white rounded px-1.5 py-0.5 text-[10px] font-bold ml-2 shadow-sm flex items-center gap-1 relative"
             >
                 <span className="group-hover/badge:hidden">v{currentVersion}</span>
@@ -176,7 +178,7 @@ const VersionBadge = ({ version: currentVersion }) => {
                                                     </div>
                                                     <div className="flex items-center justify-between mt-1">
                                                         <span className="text-[10px] text-gray-300">{log.date}</span>
-                                                        <a href={`/blog/dev/v${log.version}/`} className="invisible group-hover:visible text-[10px] font-bold text-[#39C5BB] hover:text-teal-600 flex items-center gap-1 transition-colors">
+                                                        <a href={`/blog/dev/v${log.version}/`} target="_blank" rel="noopener noreferrer" className="invisible group-hover:visible text-[10px] font-bold text-[#39C5BB] hover:text-teal-600 flex items-center gap-1 transition-colors">
                                                             Detail <ExternalLink size={10}/>
                                                         </a>
                                                     </div>

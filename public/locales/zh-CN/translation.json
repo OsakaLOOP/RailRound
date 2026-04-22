@@ -351,5 +351,10 @@
   "versionBadge": {
     "blog": "日志",
     "detail": "详情"
-  }
+  },
+  "routeNotFound": "无法找到可达路线: {{key}}",
+  "routeSlicePreview": "路线预览切片",
+  "loadingRoute": "加载路线数据中: {{key}} ({{start}} - {{end}})...",
+  "parseFail": "渲染路线切片失败",
+  "resetView": "返回初始"
 }

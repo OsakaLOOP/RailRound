@@ -351,5 +351,10 @@
   "versionBadge": {
     "blog": "Blog",
     "detail": "Detail"
-  }
+  },
+  "routeNotFound": "Unable to find route: {{key}}",
+  "routeSlicePreview": "Route Slice Preview",
+  "loadingRoute": "Loading route data: {{key}} ({{start}} - {{end}})...",
+  "parseFail": "Failed to render route slice",
+  "resetView": "Reset View"
 }

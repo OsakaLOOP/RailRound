@@ -1,10 +1,14 @@
 import * as React from 'react';
-const { useEffect, useState, useMemo } = React;
+const { useEffect, useState, useRef } = React;
+import * as L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { fetchAndParseData } from '../../utils/fetchAndParseData';
 import { findRoute } from '../../core/railwayRouting';
 import { calcDist } from '../../core/tripCalculator';
-import { MapPin, ArrowRight } from 'lucide-react';
+import { MapPin, ArrowRight, RotateCcw } from 'lucide-react';
 import { ErrorBoundary } from '../common/ErrorBoundary';
+import { cachedTileLayer } from '../../utils/CachedTileLayer';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
     lineKey: string;
@@ -13,9 +17,15 @@ interface Props {
 }
 
 export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endStation }) => {
+    const { t } = useTranslation();
     const [data, setData] = useState<{ stations: any[], distance: string, time: string } | null>(null);
+    const mapBounds = useRef<L.LatLngBounds | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const mapRef = useRef<HTMLDivElement>(null);
+    const mapInstance = useRef<L.Map | null>(null);
+    const routeLayer = useRef<L.LayerGroup | null>(null);
 
     useEffect(() => {
         let mounted = true;
@@ -25,7 +35,7 @@ export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endS
                 if (!mounted) return;
 
                 if (!railwayData || !railwayData[lineKey]) {
-                    throw new Error(`无法找到线路数据: ${lineKey}`);
+                    throw new Error(t('routeNotFound', { key: lineKey }));
                 }
 
                 const line = railwayData[lineKey];
@@ -33,12 +43,12 @@ export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endS
                 const endNode = line.stations.find((s: any) => s.name_ja === endStation || s.name_en === endStation);
 
                 if (!startNode || !endNode) {
-                    throw new Error(`无法匹配起始或终点站: ${startStation} -> ${endStation}`);
+                    throw new Error(t('routeNotFound', { key: `${startStation} -> ${endStation}` }));
                 }
 
                 const result = findRoute(lineKey, startNode.id, lineKey, endNode.id, railwayData, 0);
                 if (!result || result.error || !result.segments) {
-                    throw new Error(`无法找到可达路线: ${result?.error || 'Unknown'}`);
+                    throw new Error(result?.error || t('routeNotFound'));
                 }
 
                 const routeSegments = result.segments;
@@ -46,7 +56,7 @@ export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endS
                 const stationSequence = routeSegments.flatMap((seg: any) => seg.path.map((p: any) => p.station));
 
                 // Deduplicate consecutive stations
-                const uniqueSequence = stationSequence.filter((st, i, arr) => i === 0 || st.id !== arr[i-1].id);
+                const uniqueSequence = stationSequence.filter((st: any, i: number, arr: any[]) => i === 0 || st.id !== arr[i-1].id);
 
                 let totalDist = 0;
                 for (let i = 0; i < uniqueSequence.length - 1; i++) {
@@ -59,7 +69,8 @@ export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endS
                 setData({
                     stations: uniqueSequence,
                     distance: totalDist.toFixed(1),
-                    time: estimatedTime.toFixed(0)
+                    time: estimatedTime.toFixed(0),
+
                 });
             } catch (e: any) {
                 if (mounted) setError(e.message);
@@ -69,24 +80,103 @@ export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endS
         };
 
         load();
-        return () => { mounted = false; };
-    }, [lineKey, startStation, endStation]);
+        return () => {
+            mounted = false;
+        };
+    }, [lineKey, startStation, endStation, t]);
+
+    useEffect(() => {
+        if (!data || loading || error || !mapRef.current) return;
+
+        // Init Map
+        if (!mapInstance.current) {
+            mapInstance.current = L.map(mapRef.current, {
+                zoomControl: false,
+                attributionControl: false,
+                scrollWheelZoom: false, // Better for embedded preview
+            });
+
+            cachedTileLayer(
+                'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+                {
+                    subdomains: 'abcd',
+                    maxZoom: 20
+                }
+            ).addTo(mapInstance.current);
+
+            routeLayer.current = L.layerGroup().addTo(mapInstance.current);
+        }
+
+        if (routeLayer.current) {
+            routeLayer.current.clearLayers();
+
+            let bounds = L.latLngBounds([]);
+
+            const latLngs = data.stations.map((st: any) => [st.lat, st.lng] as [number, number]);
+            const polyline = L.polyline(latLngs, { color: '#39C5BB', weight: 4, opacity: 0.8 }).addTo(routeLayer.current);
+            bounds.extend(polyline.getBounds());
+
+            // Draw markers for stations
+            data.stations.forEach((st: any, idx: number) => {
+                const isStartEnd = idx === 0 || idx === data.stations.length - 1;
+                const marker = L.circleMarker([st.lat, st.lng], {
+                    radius: isStartEnd ? 6 : 4,
+                    fillColor: '#ffffff',
+                    color: isStartEnd ? '#39C5BB' : '#94a3b8',
+                    weight: 2,
+                    fillOpacity: 1
+                });
+
+                marker.bindTooltip(st.name_ja, {
+                    permanent: true,
+                    direction: 'top',
+                    offset: [0, -4],
+                    className: 'text-[10px] font-bold bg-white/80 backdrop-blur border border-slate-200/50 text-slate-700 shadow-sm px-1.5 py-0.5 rounded-md',
+                    opacity: 0.9
+                });
+
+                marker.addTo(routeLayer.current!);
+            });
+
+            if (mapInstance.current && bounds.isValid()) {
+                mapInstance.current.fitBounds(bounds, { padding: [30, 30] });
+                mapBounds.current = bounds;
+
+            }
+        }
+    }, [data, loading, error]);
+
+    useEffect(() => {
+        return () => {
+            if (mapInstance.current) {
+                mapInstance.current.remove();
+                mapInstance.current = null;
+                routeLayer.current = null;
+            }
+        };
+    }, []);
+
+    const handleResetView = () => {
+        if (mapInstance.current && mapBounds.current) {
+            if (mapBounds.current) { mapInstance.current.fitBounds(mapBounds.current, { padding: [30, 30] }); }
+        }
+    };
 
     if (loading) {
-        return <div className="p-4 border rounded-xl bg-slate-50 text-slate-500 animate-pulse text-sm">加载路线数据中: {lineKey} ({startStation} - {endStation})...</div>;
+        return <div className="p-4 border rounded-xl bg-slate-50 text-slate-500 animate-pulse text-sm">{t('loadingRoute', { key: lineKey, start: startStation, end: endStation })}</div>;
     }
 
     if (error || !data) {
-        return <div className="p-4 border border-red-200 bg-red-50 rounded-xl text-red-500 text-sm">渲染路线切片失败: {error}</div>;
+        return <div className="p-4 border border-red-200 bg-red-50 rounded-xl text-red-500 text-sm">{t('parseFail')} {error}</div>;
     }
 
     return (
         <ErrorBoundary>
-            <div className="my-8 border border-slate-200/60 rounded-2xl overflow-hidden bg-white shadow-lg shadow-slate-200/20 font-sans not-prose transition-all hover:shadow-xl">
-                <div className="bg-slate-50/80 backdrop-blur p-4 border-b border-slate-100 flex justify-between items-center">
+            <div className="my-8 border border-slate-200/60 rounded-2xl overflow-hidden bg-white shadow-lg shadow-slate-200/20 font-sans not-prose transition-all hover:shadow-xl flex flex-col h-[400px]">
+                <div className="bg-slate-50/90 backdrop-blur-md p-4 border-b border-slate-200/80 flex justify-between items-center z-[1000] relative">
                     <div className="flex flex-col">
                         <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase mb-1.5 flex items-center gap-1">
-                            <MapPin size={10} className="text-[#39C5BB]"/> Route Slice Preview
+                            <MapPin size={10} className="text-[#39C5BB]"/> {t('routeSlicePreview')}
                         </span>
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-bold text-slate-700 bg-white px-2.5 py-0.5 rounded-md border border-slate-200 shadow-sm">
@@ -97,53 +187,27 @@ export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endS
                             </span>
                         </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1.5">
-                        <span className="text-xs font-bold text-[#39C5BB] bg-[#39C5BB]/10 border border-[#39C5BB]/20 px-2.5 py-0.5 rounded-md shadow-sm">
-                            {data.distance} km
-                        </span>
-                        <span className="text-[9px] font-bold text-slate-400 tracking-wide uppercase">
-                            Est. {data.time} min
-                        </span>
+                    <div className="flex items-center gap-3">
+                        <div className="flex flex-col items-end gap-1.5">
+                            <span className="text-xs font-bold text-[#39C5BB] bg-[#39C5BB]/10 border border-[#39C5BB]/20 px-2.5 py-0.5 rounded-md shadow-sm">
+                                {data.distance} km
+                            </span>
+                            <span className="text-[9px] font-bold text-slate-400 tracking-wide uppercase">
+                                Est. {data.time} min
+                            </span>
+                        </div>
+                        <button
+                            onClick={handleResetView}
+                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                            title={t('resetView')}
+                        >
+                            <RotateCcw size={16} />
+                        </button>
                     </div>
                 </div>
 
-                <div className="p-8 overflow-x-auto relative bg-gradient-to-b from-white to-slate-50/30" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                    <div className="flex items-center min-w-max pb-6 px-4">
-                        {data.stations.map((st, idx) => (
-                            <div key={idx} className="flex items-center relative group cursor-default">
-                                {/* Station Node */}
-                                <div className="flex flex-col items-center relative z-10 w-8">
-                                    <div className={`w-3.5 h-3.5 rounded-full border-[3px] transition-all duration-300 relative z-20 bg-white
-                                        ${(idx === 0 || idx === data.stations.length - 1)
-                                            ? 'border-[#39C5BB] scale-125 shadow-sm'
-                                            : 'border-slate-300 group-hover:border-[#39C5BB] group-hover:scale-110'}`}
-                                    />
-
-                                    {/* Hover Tooltip for Mobile/Desktop */}
-                                    <div className="absolute top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-30">
-                                        <div className="bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap shadow-lg">
-                                            {st.name_ja}
-                                        </div>
-                                        <div className="w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-slate-800 absolute -top-1 left-1/2 -translate-x-1/2"></div>
-                                    </div>
-
-                                    <span className={`absolute -top-6 text-[11px] whitespace-nowrap -rotate-45 origin-bottom-left transition-colors
-                                        ${(idx === 0 || idx === data.stations.length - 1)
-                                            ? 'font-bold text-slate-800'
-                                            : 'text-slate-400 group-hover:text-slate-700'}`}>
-                                        {st.name_ja}
-                                    </span>
-                                </div>
-
-                                {/* Connecting Line */}
-                                {idx < data.stations.length - 1 && (
-                                    <div className="w-12 h-1.5 bg-slate-100 mx-0.5 relative overflow-hidden rounded-full">
-                                        <div className="absolute inset-0 bg-gradient-to-r from-[#39C5BB] to-[#2dd4bf] opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
+                <div className="flex-1 relative bg-slate-50">
+                    <div ref={mapRef} className="absolute inset-0 z-0"></div>
                 </div>
             </div>
         </ErrorBoundary>

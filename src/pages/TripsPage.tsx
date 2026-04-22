@@ -3,7 +3,7 @@ import { Train, Edit2, Trash2, Star, Plus, MapPin, Upload } from 'lucide-react';
 import { useStore } from '../store';
 import { DropZone } from '../components/DragContext';
 import { getRouteVisualData } from '../core/tripCalculator';
-import { computeLoopVia, getLandmarks } from '../core/railwayRouting';
+import { computeLoopVia, getLandmarks, getStationById } from '../core/railwayRouting';
 import { isMobile } from 'react-device-detect';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';

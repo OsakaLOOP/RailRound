@@ -5,6 +5,34 @@ import { calcDist } from '../core/tripCalculator'; // Ensure calcDist is exporte
 let stationNameIndexCache: Map<string, {lineKey: string, stationIndex: number}[]> | null = null;
 let lastRailwayDataRef: RailwayMap | null = null;
 
+let stationIdIndexCache: Map<string, Station> | null = null;
+let lastRailwayDataRefId: RailwayMap | null = null;
+
+/**
+ * Returns a station by its ID using an O(1) Map cache, replacing expensive O(N) linear scans.
+ * It tracks the reference of `railwayData` to invalidate the cache when data changes.
+ */
+export const getStationById = (railwayData: RailwayMap, id: string): Station | null => {
+    if (stationIdIndexCache && lastRailwayDataRefId === railwayData) {
+        return stationIdIndexCache.get(id) || null;
+    }
+
+    const index = new Map<string, Station>();
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        const line = railwayData[lineKey];
+        if (!line.stations) continue;
+        for (let i = 0; i < line.stations.length; i++) {
+            index.set(line.stations[i].id, line.stations[i]);
+        }
+    }
+
+    stationIdIndexCache = index;
+    lastRailwayDataRefId = railwayData;
+
+    return index.get(id) || null;
+};
+
 export const isCompanyCompatible = (meta1: CompanyMeta | undefined, meta2: CompanyMeta | undefined) => {
   if (!meta1 || !meta2) return false;
   if (meta1.company === meta2.company && meta1.company !== "上传数据" && meta1.company !== "未知") return true;

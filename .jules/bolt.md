@@ -5,3 +5,7 @@
 ## 2024-04-15 - [Avoid O(N log N) Sorting on Massive Geographical Collections]
 **Learning:** In spatial queries like `findNearbyStations` where we scan `railwayData` containing thousands of stations to find the top K nearest points, allocating all elements to an array and running `Array.prototype.sort()` results in massive temporary object allocation and $O(N \log N)$ execution time (taking ~8.5ms in benchmarks).
 **Action:** Replace full array sorts with a bounded Top-K array using a simple $O(K)$ insertion sort during the $O(N)$ iteration phase. This brings the time complexity effectively down to $O(N)$, speeding up operations by ~36x (taking ~0.24ms). Remember to apply a final sort if total elements found are less than $K$.
+
+## 2024-05-18 - [O(1) Caching for Station Lookups]
+**Learning:** `Object.values(railwayData).forEach(...)` inside loops to find a single station by ID across a large set of lines scales at O(N) where N is all stations in all lines, which degrades UI interaction heavily (taking >800ms for 1000 lookups).
+**Action:** Always maintain an O(1) referential cached index (`getStationById`) keyed by station ID using a `Map` bound to `railwayData` reference identity to eliminate nested loops in React view rendering flows.

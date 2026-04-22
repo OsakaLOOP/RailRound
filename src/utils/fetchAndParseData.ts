@@ -16,7 +16,7 @@ export const fetchAndParseData = async () => {
     }
 
     try {
-        const dbReq = indexedDB.open('RailRoundDataDB', 1);
+        const dbReq = indexedDB.open('RailLOOPDB', 1);
         const db = await new Promise((resolve, reject) => {
             dbReq.onsuccess = () => resolve(dbReq.result);
             dbReq.onerror = () => reject(dbReq.error);

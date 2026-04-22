@@ -2,10 +2,16 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import Sitemap from 'vite-plugin-sitemap'
+import { fileURLToPath } from 'url'
+import path from 'path'
+import sirv from 'sirv'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(),
+  plugins: [
+    react(),
     tailwindcss(),
     Sitemap({
       hostname: 'https://rail.s3xyseia.xyz',
@@ -16,28 +22,32 @@ export default defineConfig({
         '/ja-jp'
       ]
     }),
+    {
+      name: 'serve-static-blog',
+      configureServer(server) {
+        const blogDistPath = path.resolve(__dirname, 'blog/dist');
+        const serve = sirv(blogDistPath, { dev: true, single: false, etag: true });
+        
+        server.middlewares.use((req, res, next) => {
+          if (req.url && req.url.startsWith('/blog')) {
+            // 将 /blog 前缀去除后传给 sirv，使其在 blog/dist 中查找
+            const url = req.url.replace(/^\/blog/, '') || '/';
+            // 如果去掉前缀后变为空，强制设为 / 
+            req.url = url === '' ? '/' : url;
+            
+            serve(req, res, next);
+          } else {
+            next();
+          }
+        });
+      }
+    }
   ],
   resolve: {
     dedupe: ['react', 'react-dom'],
   },
   server: {
-    proxy: {
-      // 1. 转发博客页面请求
-      '/blog': {
-        target: 'http://localhost:4321',
-        changeOrigin: true,
-      },
-      // 2. 转发 Astro 开发环境特有的内部资源请求 (带 @ 符号的路径)
-      '^/@(id|fs|vite|astro|astro-dev-toolbar)': {
-        target: 'http://localhost:4321',
-        changeOrigin: true,
-        ws: true
-      },
-      // 3. 转发来自博客组件的样式请求 (由于主应用不使用 .astro，这里可以安全转发)
-      '^/src/.*\\.astro': {
-        target: 'http://localhost:4321',
-        changeOrigin: true
-      }
-    }
+    // 移除所有 Astro 代理规则，统一由 serve-static-blog 处理
+    proxy: {}
   }
 })

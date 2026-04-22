@@ -41,18 +41,3 @@ import { APP_URL, SITE_TITLE } from '../consts';
   }
   .footer-links a:hover { color: #39C5BB; }
 </style>
-
-
-<script>
-  document.addEventListener('click', function(e) {
-    var target = e.target.closest('a.app-return-link');
-    if (target) {
-      e.preventDefault();
-      if (window.opener && !window.opener.closed) {
-        window.close();
-      } else {
-        window.location.href = target.href;
-      }
-    }
-  });
-</script>

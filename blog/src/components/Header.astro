@@ -120,3 +120,17 @@ const base = lang === 'zh-cn' ? '/blog/' : `/blog/${lang}/`;
     background: rgba(249, 115, 22, 0.1);
   }
 </style>
+
+<script>
+  document.addEventListener('click', function(e) {
+    var target = e.target.closest('a.app-return-link');
+    if (target) {
+      e.preventDefault();
+      if (window.opener && !window.opener.closed) {
+        window.close();
+      } else {
+        window.location.href = target.href;
+      }
+    }
+  });
+</script>

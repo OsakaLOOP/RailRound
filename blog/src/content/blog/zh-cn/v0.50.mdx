@@ -32,7 +32,7 @@ version: '0.50'
 
 | 属性名称 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| `lineKey` | `string` | 指定需要渲染的线路唯一键值，例如 `JR:东海道本线`。 |
+| `lineKey` | `string` | 指定需要渲染的线路唯一键值，例如 `東日本旅客鉄道:東海道線 (JR東日本)`。 |
 | `startStation` | `string` | 切片的起点站名称（需支持日文或英文）。 |
 | `endStation` | `string` | 切片的终点站名称。 |
 
@@ -40,11 +40,11 @@ version: '0.50'
 
 ### 实时效果演示
 
-下面是一个实时挂载的组件，展示了 **JR:东海道本线** 从 **东京** 到 **品川** 之间的切片，你可以把鼠标放上各个站点来查看详情：
+下面是一个实时挂载的组件，展示了 **東日本旅客鉄道:東海道線 (JR東日本)** 从 **东京** 到 **品川** 之间的切片，你可以把鼠标放上各个站点来查看详情：
 
-import { RouteSlicePreview } from '../../../../../src/components/blog/RouteSlicePreview';
+import { RouteSlicePreview } from './../../../components/mdx/RouteSlicePreview';
 
-<RouteSlicePreview client:only="react" lineKey="JR:东海道本线" startStation="東京" endStation="品川" />
+<RouteSlicePreview client:only="react" lineKey="東日本旅客鉄道:東海道線 (JR東日本)" startStation="東京" endStation="品川" />
 
 
 ## 🛠️ 下一步开发计划

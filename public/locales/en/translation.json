@@ -347,5 +347,9 @@
     "其他": "Other",
     "未知": "Unknown",
     "中国大陆": "Mainland China"
+  },
+  "versionBadge": {
+    "blog": "Blog",
+    "detail": "Detail"
   }
 }

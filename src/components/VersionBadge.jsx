@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Clock, GitCommit, Loader2, AlertCircle, MapPin, ChevronDown, ExternalLink } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+
+const getBlogBase = (langRaw) => {
+    const lang = (langRaw || 'zh-CN').toLowerCase();
+    return lang === 'zh-cn' ? '/blog/' : `/blog/${lang}/`;
+};
 
 const VersionBadge = ({ version: currentVersion }) => {
+    const { t, i18n } = useTranslation();
+    const blogBase = getBlogBase(i18n.language);
     const [isHovered, setIsHovered] = useState(false);
     const [showDot, setShowDot] = useState(false);
     const [show, setShow] = useState(false);
@@ -89,14 +97,14 @@ const VersionBadge = ({ version: currentVersion }) => {
             onMouseLeave={close}
         >
             {/* Badge Trigger */}
-            <a 
-                href="/blog/"
+            <a
+                href={blogBase}
                 target="_blank"
                 rel="opener"
                 className="cursor-pointer group/badge bg-[#39C5BB] hover:bg-teal-500 transition-colors text-white rounded px-1.5 py-0.5 text-[10px] font-bold ml-2 shadow-sm flex items-center gap-1 relative"
             >
                 <span className="group-hover/badge:hidden">v{currentVersion}</span>
-                <span className="hidden group-hover/badge:flex items-center gap-1">Blog <ExternalLink size={10}/></span>
+                <span className="hidden group-hover/badge:flex items-center gap-1">{t('versionBadge.blog')} <ExternalLink size={10}/></span>
                 {showDot && (
                     <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse absolute -top-1 -right-1 border border-slate-900 shadow-sm pointer-events-none group-hover/badge:hidden"></span>
                 )}
@@ -178,8 +186,8 @@ const VersionBadge = ({ version: currentVersion }) => {
                                                     </div>
                                                     <div className="flex items-center justify-between mt-1">
                                                         <span className="text-[10px] text-gray-300">{log.date}</span>
-                                                        <a href={`/blog/dev/v${log.version}/`} target="_blank" rel="opener" className="invisible group-hover:visible text-[10px] font-bold text-[#39C5BB] hover:text-teal-600 flex items-center gap-1 transition-colors">
-                                                            Detail <ExternalLink size={10}/>
+                                                        <a href={`${blogBase}dev/v${log.version}/`} target="_blank" rel="opener" className="invisible group-hover:visible text-[10px] font-bold text-[#39C5BB] hover:text-teal-600 flex items-center gap-1 transition-colors">
+                                                            {t('versionBadge.detail')} <ExternalLink size={10}/>
                                                         </a>
                                                     </div>
                                                 </div>

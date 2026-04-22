@@ -1,0 +1,183 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE_TITLE } from '../consts';
+---
+
+<!doctype html>
+<html lang="zh-cn">
+	<head>
+		<BaseHead title={`404 — ${SITE_TITLE}`} description="Page not found" />
+	</head>
+	<body>
+		<Header />
+		<main class="error-container">
+			<div class="error-card">
+				<div class="code">404</div>
+				<h1 data-i18n="title">页面未找到</h1>
+				<p class="description" data-i18n="desc">你访问的页面不存在、已被移动或从未存在过。</p>
+
+				<div class="path-box">
+					<span class="label" data-i18n="path">请求路径</span>
+					<code id="req-path"></code>
+				</div>
+
+				<div class="actions">
+					<button type="button" class="btn btn-ghost" id="back-btn" data-i18n="back">返回上一页</button>
+					<a id="home-link" href="/blog/" class="btn btn-primary" data-i18n="home">Blog 首页</a>
+					<a href="/" class="btn btn-ghost app-return-link" data-i18n="app">返回应用</a>
+				</div>
+			</div>
+		</main>
+		<Footer />
+
+		<style>
+			.error-container {
+				max-width: 1100px;
+				margin: 0 auto;
+				padding: 5rem 1.5rem;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				min-height: 60vh;
+			}
+			.error-card {
+				background: rgba(255, 255, 255, 0.02);
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				padding: 3rem;
+				border-radius: 2rem;
+				text-align: center;
+				max-width: 520px;
+				width: 100%;
+				box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+			}
+			.code {
+				font-family: 'JetBrains Mono', ui-monospace, monospace;
+				font-size: 4.5rem;
+				font-weight: 800;
+				line-height: 1;
+				letter-spacing: -0.04em;
+				background: linear-gradient(135deg, #39C5BB 0%, #7dd3fc 100%);
+				-webkit-background-clip: text;
+				background-clip: text;
+				color: transparent;
+				margin-bottom: 1rem;
+			}
+			h1 {
+				font-size: 1.6rem;
+				font-weight: 800;
+				color: #f8fafc;
+				margin: 0 0 0.6rem;
+				letter-spacing: -0.02em;
+			}
+			.description {
+				color: #94a3b8;
+				font-size: 0.95rem;
+				margin: 0 0 1.5rem;
+				line-height: 1.6;
+			}
+			.path-box {
+				background: #0d1117;
+				padding: 0.75rem 1rem;
+				border-radius: 0.75rem;
+				margin-bottom: 2rem;
+				text-align: left;
+				border: 1px solid rgba(255,255,255,0.05);
+				display: flex;
+				flex-direction: column;
+				gap: 0.25rem;
+			}
+			.label {
+				color: #64748b;
+				font-size: 0.7rem;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				font-weight: 700;
+			}
+			code {
+				font-family: 'JetBrains Mono', ui-monospace, monospace;
+				font-size: 0.8rem;
+				color: #f472b6;
+				word-break: break-all;
+			}
+			.actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.6rem;
+				justify-content: center;
+			}
+			.btn {
+				display: inline-block;
+				padding: 0.7rem 1.4rem;
+				border-radius: 0.9rem;
+				font-weight: 700;
+				font-size: 0.88rem;
+				text-decoration: none;
+				border: none;
+				cursor: pointer;
+				transition: all 0.2s;
+				font-family: inherit;
+			}
+			.btn-primary {
+				background: #39C5BB;
+				color: #0f172a;
+				box-shadow: 0 10px 20px rgba(57, 197, 187, 0.2);
+			}
+			.btn-primary:hover {
+				transform: translateY(-2px);
+				box-shadow: 0 12px 24px rgba(57, 197, 187, 0.3);
+			}
+			.btn-ghost {
+				background: rgba(255,255,255,0.04);
+				color: #cbd5e1;
+				border: 1px solid rgba(255,255,255,0.08);
+			}
+			.btn-ghost:hover {
+				background: rgba(255,255,255,0.08);
+				color: #f1f5f9;
+			}
+		</style>
+
+		<script>
+			(function() {
+				const strings = {
+					'zh-cn': { title: '页面未找到', desc: '你访问的页面不存在、已被移动或从未存在过。', path: '请求路径', back: '返回上一页', home: 'Blog 首页', app: '返回应用' },
+					'en':    { title: 'Page Not Found', desc: 'The page you requested does not exist or has been moved.', path: 'Requested path', back: 'Go Back', home: 'Blog Home', app: 'Back to App' },
+					'ja-jp': { title: 'ページが見つかりません', desc: 'お探しのページは存在しないか、移動された可能性があります。', path: 'リクエストパス', back: '前のページへ', home: 'Blog ホーム', app: 'アプリに戻る' },
+					'zh-tw': { title: '頁面未找到', desc: '你訪問的頁面不存在、已被移動或從未存在過。', path: '請求路徑', back: '返回上一頁', home: 'Blog 首頁', app: '返回應用' },
+				};
+
+				const path = location.pathname;
+				const m = path.match(/^\/blog\/(en|ja-jp|zh-tw)(\/|$)/);
+				const lang = m ? m[1] : 'zh-cn';
+				const t = strings[lang] || strings['zh-cn'];
+
+				document.documentElement.lang = lang;
+
+				document.querySelectorAll('[data-i18n]').forEach(function(el) {
+					const k = el.getAttribute('data-i18n');
+					if (k && t[k]) el.textContent = t[k];
+				});
+
+				const reqEl = document.getElementById('req-path');
+				if (reqEl) reqEl.textContent = path + location.search;
+
+				const home = document.getElementById('home-link');
+				if (home && lang !== 'zh-cn') home.setAttribute('href', '/blog/' + lang + '/');
+
+				const backBtn = document.getElementById('back-btn');
+				if (backBtn) {
+					backBtn.addEventListener('click', function() {
+						const fallback = lang === 'zh-cn' ? '/blog/' : '/blog/' + lang + '/';
+						if (history.length > 1 && document.referrer && document.referrer !== location.href) {
+							history.back();
+						} else {
+							location.href = fallback;
+						}
+					});
+				}
+			})();
+		</script>
+	</body>
+</html>

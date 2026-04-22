@@ -19,9 +19,9 @@ version: '0.50'
 
 デュアルトラック融合の利点を活かし、Reactと内部アルゴリズムモジュールに基づいた独立したコンポーネントをMarkdown（MDX）ドキュメントに直接埋め込むことができるようになりました！
 
-import { RouteSlicePreview } from '../../../../../src/components/blog/RouteSlicePreview';
+import { RouteSlicePreview } from './../../../components/mdx/RouteSlicePreview';
 
-<RouteSlicePreview client:only="react" lineKey="JR:东海道本线" startStation="東京" endStation="品川" />
+<RouteSlicePreview client:only="react" lineKey="東日本旅客鉄道:東海道線 (JR東日本)" startStation="東京" endStation="品川" />
 
 ## 🛠️ 次のロードマップ
 
@@ -30,3 +30,4 @@ import { RouteSlicePreview } from '../../../../../src/components/blog/RouteSlice
 - [ ] `TripsPage` の初回スクリーンSSRの探索
 
 > RailRoundの成長を見守っていただきありがとうございます！
+    

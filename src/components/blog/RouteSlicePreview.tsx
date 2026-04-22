@@ -1,7 +1,7 @@
 import * as React from 'react';
 const { useEffect, useState, useRef } = React;
-import * as L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+
+
 import { fetchAndParseData } from '../../utils/fetchAndParseData';
 import { findRoute } from '../../core/railwayRouting';
 import { calcDist } from '../../core/tripCalculator';
@@ -19,13 +19,13 @@ interface Props {
 export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endStation }) => {
     const { t } = useTranslation();
     const [data, setData] = useState<{ stations: any[], distance: string, time: string } | null>(null);
-    const mapBounds = useRef<L.LatLngBounds | null>(null);
+    const mapBounds = useRef<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const mapRef = useRef<HTMLDivElement>(null);
-    const mapInstance = useRef<L.Map | null>(null);
-    const routeLayer = useRef<L.LayerGroup | null>(null);
+    const mapInstance = useRef<any>(null);
+    const routeLayer = useRef<any>(null);
 
     useEffect(() => {
         let mounted = true;
@@ -88,62 +88,67 @@ export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endS
     useEffect(() => {
         if (!data || loading || error || !mapRef.current) return;
 
+
         // Init Map
         if (!mapInstance.current) {
-            mapInstance.current = L.map(mapRef.current, {
-                zoomControl: false,
-                attributionControl: false,
-                scrollWheelZoom: false, // Better for embedded preview
-            });
+            import('leaflet').then((L) => {
+                import('leaflet/dist/leaflet.css');
+                mapInstance.current = L.map(mapRef.current, {
+                    zoomControl: false,
+                    attributionControl: false,
+                    scrollWheelZoom: false, // Better for embedded preview
+                });
 
-            cachedTileLayer(
-                'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                {
-                    subdomains: 'abcd',
-                    maxZoom: 20
+                cachedTileLayer(
+                    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+                    {
+                        subdomains: 'abcd',
+                        maxZoom: 20
+                    }
+                ).addTo(mapInstance.current);
+
+                routeLayer.current = L.layerGroup().addTo(mapInstance.current);
+
+                if (routeLayer.current) {
+                    routeLayer.current.clearLayers();
+
+                    let bounds = L.latLngBounds([]);
+
+                    const latLngs = data.stations.map((st: any) => [st.lat, st.lng] as [number, number]);
+                    const polyline = L.polyline(latLngs, { color: '#39C5BB', weight: 4, opacity: 0.8 }).addTo(routeLayer.current);
+                    bounds.extend(polyline.getBounds());
+
+                    // Draw markers for stations
+                    data.stations.forEach((st: any, idx: number) => {
+                        const isStartEnd = idx === 0 || idx === data.stations.length - 1;
+                        const marker = L.circleMarker([st.lat, st.lng], {
+                            radius: isStartEnd ? 6 : 4,
+                            fillColor: '#ffffff',
+                            color: isStartEnd ? '#39C5BB' : '#94a3b8',
+                            weight: 2,
+                            fillOpacity: 1
+                        });
+
+                        marker.bindTooltip(st.name_ja, {
+                            permanent: true,
+                            direction: 'top',
+                            offset: [0, -4],
+                            className: 'text-[10px] font-bold bg-white/80 backdrop-blur border border-slate-200/50 text-slate-700 shadow-sm px-1.5 py-0.5 rounded-md',
+                            opacity: 0.9
+                        });
+
+                        marker.addTo(routeLayer.current!);
+                    });
+
+                    if (mapInstance.current && bounds.isValid()) {
+                        mapInstance.current.fitBounds(bounds, { padding: [30, 30] });
+                        mapBounds.current = bounds;
+
+                    }
                 }
-            ).addTo(mapInstance.current);
-
-            routeLayer.current = L.layerGroup().addTo(mapInstance.current);
-        }
-
-        if (routeLayer.current) {
-            routeLayer.current.clearLayers();
-
-            let bounds = L.latLngBounds([]);
-
-            const latLngs = data.stations.map((st: any) => [st.lat, st.lng] as [number, number]);
-            const polyline = L.polyline(latLngs, { color: '#39C5BB', weight: 4, opacity: 0.8 }).addTo(routeLayer.current);
-            bounds.extend(polyline.getBounds());
-
-            // Draw markers for stations
-            data.stations.forEach((st: any, idx: number) => {
-                const isStartEnd = idx === 0 || idx === data.stations.length - 1;
-                const marker = L.circleMarker([st.lat, st.lng], {
-                    radius: isStartEnd ? 6 : 4,
-                    fillColor: '#ffffff',
-                    color: isStartEnd ? '#39C5BB' : '#94a3b8',
-                    weight: 2,
-                    fillOpacity: 1
-                });
-
-                marker.bindTooltip(st.name_ja, {
-                    permanent: true,
-                    direction: 'top',
-                    offset: [0, -4],
-                    className: 'text-[10px] font-bold bg-white/80 backdrop-blur border border-slate-200/50 text-slate-700 shadow-sm px-1.5 py-0.5 rounded-md',
-                    opacity: 0.9
-                });
-
-                marker.addTo(routeLayer.current!);
             });
-
-            if (mapInstance.current && bounds.isValid()) {
-                mapInstance.current.fitBounds(bounds, { padding: [30, 30] });
-                mapBounds.current = bounds;
-
-            }
         }
+
     }, [data, loading, error]);
 
     useEffect(() => {
@@ -162,13 +167,7 @@ export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endS
         }
     };
 
-    if (loading) {
-        return <div className="p-4 border rounded-xl bg-slate-50 text-slate-500 animate-pulse text-sm">{t('loadingRoute', { key: lineKey, start: startStation, end: endStation })}</div>;
-    }
 
-    if (error || !data) {
-        return <div className="p-4 border border-red-200 bg-red-50 rounded-xl text-red-500 text-sm">{t('parseFail')} {error}</div>;
-    }
 
     return (
         <ErrorBoundary>
@@ -206,9 +205,27 @@ export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endS
                     </div>
                 </div>
 
+
                 <div className="flex-1 relative bg-slate-50">
                     <div ref={mapRef} className="absolute inset-0 z-0"></div>
+
+                    {loading && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+                            <div className="p-4 border border-slate-200 rounded-xl bg-white text-slate-500 shadow-sm animate-pulse text-sm">
+                                {t('loadingRoute', { key: lineKey, start: startStation, end: endStation })}
+                            </div>
+                        </div>
+                    )}
+
+                    {(error || (!loading && !data)) && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+                            <div className="p-4 border border-red-200 bg-red-50 rounded-xl text-red-500 text-sm shadow-sm max-w-md text-center">
+                                {t('parseFail')} {error}
+                            </div>
+                        </div>
+                    )}
                 </div>
+
             </div>
         </ErrorBoundary>
     );

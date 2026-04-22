@@ -7,7 +7,6 @@ import { findRoute } from '../../../../src/core/railwayRouting';
 import { calcDist } from '../../../../src/core/tripCalculator';
 import { MapPin, ArrowRight, RotateCcw } from 'lucide-react';
 import { ErrorBoundary } from '../../../../src/components/common/ErrorBoundary';
-import { cachedTileLayer } from '../../../../src/utils/CachedTileLayer';
 import { useTranslation } from 'react-i18next';
 
 interface Props {
@@ -91,8 +90,16 @@ export const RouteSlicePreview: React.FC<Props> = ({ lineKey, startStation, endS
 
         // Init Map
         if (!mapInstance.current) {
-            import('leaflet').then((L) => {
-                import('leaflet/dist/leaflet.css');
+            Promise.all([
+                import('leaflet'),
+                import('leaflet/dist/leaflet.css'),
+                import('../../../../src/utils/CachedTileLayer')
+            ]).then(([LModule, _css, CachedLayerModule]) => {
+                const L = LModule.default || LModule;
+                const { cachedTileLayer } = CachedLayerModule;
+
+                if (!mapRef.current) return;
+
                 mapInstance.current = L.map(mapRef.current, {
                     zoomControl: false,
                     attributionControl: false,

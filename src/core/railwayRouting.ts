@@ -34,33 +34,47 @@ export const buildStationIndex = (railwayData: RailwayMap) => {
     return index;
 };
 
-export const getTransferableLines = (station: Station | undefined, currentLineKey: string, railwayData: RailwayMap, strictMode = true) => {
+export const getTransferableLines = (
+    station: Station | undefined,
+    currentLineKey: string,
+    railwayData: RailwayMap,
+    strictMode = true,
+    optionalStationIndex?: Map<string, { lineKey: string; stationIndex: number }[]>
+) => {
     if (!station) return [];
     const currentMeta = railwayData[currentLineKey]?.meta;
     if (!currentMeta) return [];
     const validLines = new Set<string>();
 
     if (station.transfers && Array.isArray(station.transfers)) {
-        station.transfers.forEach(lineKey => {
+        station.transfers.forEach((lineKey) => {
             if (railwayData[lineKey]) {
-                const nextMeta = railwayData[lineKey].meta;
                 validLines.add(lineKey);
-                
             }
         });
     }
 
-    for (const lineKey in railwayData) {
-        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+    // Optimization: Use prebuilt index if provided, or rely on the internally memoized buildStationIndex.
+    // The index effectively eliminates the O(N x M) global search loop across all lines and stations.
+    const stationIndexMap = optionalStationIndex || buildStationIndex(railwayData);
+    const sameNameNodes = stationIndexMap.get(station.name_ja) || [];
+
+    for (let i = 0; i < sameNameNodes.length; i++) {
+        const tNode = sameNameNodes[i];
+        const lineKey = tNode.lineKey;
         if (lineKey === currentLineKey) continue;
         if (validLines.has(lineKey)) continue;
-        const nextMeta = railwayData[lineKey].meta;
-        const sameNameStation = railwayData[lineKey].stations.find(s => s.name_ja === station.name_ja);
+
+        const nextLine = railwayData[lineKey];
+        if (!nextLine || !nextLine.stations) continue;
+
+        const sameNameStation = nextLine.stations[tNode.stationIndex];
         if (sameNameStation) {
             const dist = calcDist(station.lat, station.lng, sameNameStation.lat, sameNameStation.lng);
             if (dist < 0.5) validLines.add(lineKey);
         }
     }
+
     return Array.from(validLines);
 };
 

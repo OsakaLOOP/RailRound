@@ -4,7 +4,7 @@ import { useStore, EditorMode } from '../../store';
 import { DropZone } from '../DragContext';
 import { StationLineSearchModal, SearchModalMode } from './StationSearchModal';
 import { LineLogo } from '../LineLogo';
-import { isCompanyCompatible, getTransferableLines, findRoute, computeLoopVia, getLandmarks } from '../../core/railwayRouting'; // Will need to ensure these are typed
+import { isCompanyCompatible, getTransferableLines, findRoute, computeLoopVia, getLandmarks, buildStationIndex } from '../../core/railwayRouting'; // Will need to ensure these are typed
 import { calcDist } from '../../core/tripCalculator';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
@@ -264,11 +264,12 @@ export const TripEditor: React.FC = () => {
             const prevLineData = railwayData[prevSegment.lineKey];
             const prevEndSt = prevLineData?.stations.find((s: any) => s.id === prevSegment.toId);
             if (prevLineData && prevEndSt) {
+                const stationIndex = buildStationIndex(railwayData);
+                const transferable = getTransferableLines(prevEndSt, prevSegment.lineKey, railwayData, true, stationIndex);
                 const allKeys = Object.keys(railwayData);
                 currentAllowed = allKeys.filter(lineKey => {
                     const currentMeta = railwayData[lineKey]?.meta;
                     if (!currentMeta || !isCompanyCompatible(prevLineData.meta, currentMeta)) return false;
-                    const transferable = getTransferableLines(prevEndSt, prevSegment.lineKey, railwayData, true);
                     return transferable.includes(lineKey) || lineKey === prevSegment.lineKey;
                 });
             }
@@ -410,12 +411,13 @@ export const TripEditor: React.FC = () => {
                                     let isDisconnected = false;
 
                                     if (prevLineData && prevEndStName && prevEndSt) {
+                                        const stationIndex = buildStationIndex(railwayData);
+                                        const transferable = getTransferableLines(prevEndSt, prevSegment!.lineKey, railwayData, true, stationIndex);
                                         const allKeys = Object.keys(railwayData);
                                         currentAllowed = allKeys.filter(lineKey => {
                                             if (lineKey === segment.lineKey) return true;
                                             const currentMeta = railwayData[lineKey]?.meta;
                                             if (!currentMeta || !isCompanyCompatible(prevLineData.meta, currentMeta)) return false;
-                                            const transferable = getTransferableLines(prevEndSt, prevSegment!.lineKey, railwayData, true);
                                             return transferable.includes(lineKey);
                                         });
                                         if (currentAllowed.length === 0 && !segment.lineKey) warning = t('tripEdit.noTransferWarning', '无可换乘的同公司/JR线路');

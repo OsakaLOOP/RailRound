@@ -82,12 +82,24 @@ export const WalkTripEditor: React.FC = () => {
             // Find coordinates for the Bezier curve
             let startCoords = null;
             let endCoords = null;
-            Object.values(railwayData).forEach(line => {
-                const s = line.stations.find(st => st.id === form.fromId);
-                if (s) startCoords = [s.lng, s.lat];
-                const e = line.stations.find(st => st.id === form.toId);
-                if (e) endCoords = [e.lng, e.lat];
-            });
+            // ⚡ Bolt Optimization: Use for...in with early break to avoid iterating over all lines
+            // once both start and end coordinates are found, and avoid creating temporary Object.values arrays.
+            for (const lineKey in railwayData) {
+                if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+                const line = railwayData[lineKey];
+
+                if (!startCoords) {
+                    const s = line.stations.find(st => st.id === form.fromId);
+                    if (s) startCoords = [s.lng, s.lat];
+                }
+
+                if (!endCoords) {
+                    const e = line.stations.find(st => st.id === form.toId);
+                    if (e) endCoords = [e.lng, e.lat];
+                }
+
+                if (startCoords && endCoords) break;
+            }
 
             if (startCoords && endCoords) {
                 walkPath = generateBezierPath(startCoords as [number, number], endCoords as [number, number]);
@@ -130,12 +142,34 @@ export const WalkTripEditor: React.FC = () => {
     // Resolving station names for read-only display
     let startName = t('walk.unknownStart', "未知起点");
     let endName = t('walk.unknownEnd', "未知终点");
-    Object.values(railwayData).forEach(line => {
-        const s = line.stations.find(st => st.id === form.fromId);
-        if (s) startName = s.name_ja;
-        const e = line.stations.find(st => st.id === form.toId);
-        if (e) endName = e.name_ja;
-    });
+
+    let startFound = false;
+    let endFound = false;
+
+    // ⚡ Bolt Optimization: Use for...in with early break to avoid iterating over all lines
+    // once both start and end station names are resolved, and avoid creating temporary Object.values arrays.
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        const line = railwayData[lineKey];
+
+        if (!startFound) {
+            const s = line.stations.find(st => st.id === form.fromId);
+            if (s) {
+                startName = s.name_ja;
+                startFound = true;
+            }
+        }
+
+        if (!endFound) {
+            const e = line.stations.find(st => st.id === form.toId);
+            if (e) {
+                endName = e.name_ja;
+                endFound = true;
+            }
+        }
+
+        if (startFound && endFound) break;
+    }
 
     const isTree = form.walkType === 'tree';
 

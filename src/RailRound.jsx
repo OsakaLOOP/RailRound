@@ -26,6 +26,7 @@ import Tutorial from './components/Tutorial';
 import { api } from './services/api';
 import { db } from './utils/db';
 import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './core/tripCalculator';
+import { buildStationIndex } from './core/railwayRouting';
 import { VersionBadge } from './components/VersionBadge';
 import manifest from '../public/geojson_manifest.json';
 
@@ -256,17 +257,27 @@ const getTransferableLines = (station, currentLineKey, railwayData, strictMode =
         });
     }
 
-    Object.keys(railwayData).forEach(lineKey => {
-        if (lineKey === currentLineKey) return;
-        if (validLines.has(lineKey)) return;
-        const nextMeta = railwayData[lineKey].meta;
-        if (strictMode && !isCompanyCompatible(currentMeta, nextMeta)) return;
-        const sameNameStation = railwayData[lineKey].stations.find(s => s.name_ja === station.name_ja);
+    const stationIndexMap = buildStationIndex(railwayData);
+    const sameNameNodes = stationIndexMap.get(station.name_ja) || [];
+
+    for (let i = 0; i < sameNameNodes.length; i++) {
+        const tNode = sameNameNodes[i];
+        const lineKey = tNode.lineKey;
+        if (lineKey === currentLineKey) continue;
+        if (validLines.has(lineKey)) continue;
+
+        const nextLine = railwayData[lineKey];
+        if (!nextLine || !nextLine.stations) continue;
+
+        const nextMeta = nextLine.meta;
+        if (strictMode && !isCompanyCompatible(currentMeta, nextMeta)) continue;
+
+        const sameNameStation = nextLine.stations[tNode.stationIndex];
         if (sameNameStation) {
             const dist = calcDist(station.lat, station.lng, sameNameStation.lat, sameNameStation.lng);
             if (dist < 2.0) validLines.add(lineKey);
         }
-    });
+    }
     return Array.from(validLines);
 };
 
@@ -743,14 +754,15 @@ const TripEditor = ({
                                     let warning = null;
 
                                     if (prevLineData && prevEndStName) {
+                                        const prevEndSt = prevLineData.stations.find(s => s.id === prevSegment.toId);
+
+                                        const transferable = getTransferableLines(prevEndSt, prevSegment.lineKey, railwayData, true);
                                         const allKeys = Object.keys(railwayData);
                                         currentAllowed = allKeys.filter(lineKey => {
                                             // FIX: 必须包含已选
                                             if (lineKey === segment.lineKey) return true;
                                             const currentMeta = railwayData[lineKey].meta;
                                             if (!isCompanyCompatible(prevLineData.meta, currentMeta)) return false;
-                                            const prevEndSt = prevLineData.stations.find(s => s.id === prevSegment.toId);
-                                            const transferable = getTransferableLines(prevEndSt, prevSegment.lineKey, railwayData, true);
                                             return transferable.includes(lineKey);
                                         });
                                         if (currentAllowed.length === 0 && !segment.lineKey) warning = "无可换乘的同公司/JR线路";

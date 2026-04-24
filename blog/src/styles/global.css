@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /*
   全局基础样式，覆盖 Astro 默认设计令牌为 RailRound 黑暗风格。
 */

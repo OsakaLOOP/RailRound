@@ -1,0 +1,24 @@
+/* Leaflet CSS overrides — fixes conflicts with Tailwind prose & global styles.
+   Imported once as a side-effect; never duplicated per instance. */
+
+.leaflet-container img {
+  border-radius: 0 !important;
+  max-width: none !important;
+}
+
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-tile-container,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+  position: absolute !important;
+  left: 0;
+  top: 0;
+}
+
+.leaflet-tooltip-pane {
+  z-index: 1000 !important;
+}

@@ -153,7 +153,8 @@ export const findRoute = (startLineKey: string, startStId: string, endLineKey: s
             break;
         }
 
-        if (MAX_TRANSFERS >= 0 && current.transfers >= MAX_TRANSFERS) continue;
+        if (MAX_TRANSFERS >= 0 && current.transfers > MAX_TRANSFERS) continue;
+
 
         // 1. Move Forward / Backward on the CURRENT line
         const speed = getSpeed(current.lineKey);

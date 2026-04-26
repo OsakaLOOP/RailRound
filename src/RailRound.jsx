@@ -26,6 +26,7 @@ import Tutorial from './components/Tutorial';
 import { api } from './services/api';
 import { db } from './utils/db';
 import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './core/tripCalculator';
+import { getStationById } from './core/railwayRouting';
 import { VersionBadge } from './components/VersionBadge';
 import manifest from '../public/geojson_manifest.json';
 
@@ -1267,12 +1268,11 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
                 if (isWalk) {
                     let startName = t.fromId || '';
                     let endName = t.toId || '';
-                    Object.values(railwayData).forEach(line => {
-                        const s = line.stations.find(st => st.id === t.fromId);
-                        if (s) startName = s.name_ja;
-                        const e = line.stations.find(st => st.id === t.toId);
-                        if (e) endName = e.name_ja;
-                    });
+
+                    const startSt = getStationById(railwayData, t.fromId);
+                    if (startSt) startName = startSt.name_ja;
+                    const endSt = getStationById(railwayData, t.toId);
+                    if (endSt) endName = endSt.name_ja;
 
                     const isTree = t.walkType === 'tree';
                     const cls = {

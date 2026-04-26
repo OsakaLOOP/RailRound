@@ -12,7 +12,9 @@ interface LineLogoProps {
 const getSafeColor = (color: string | null): string | null => {
   if (!color) return null;
 
-  let r = 255, g = 255, b = 255;
+  let r = 255,
+    g = 255,
+    b = 255;
   const hex = color.replace("#", "");
 
   if (hex.length === 3) {
@@ -39,7 +41,6 @@ const getSafeColor = (color: string | null): string | null => {
 
   return color;
 };
-
 export const LineLogo: React.FC<LineLogoProps> = ({
   src,
   companyIcon,
@@ -48,13 +49,20 @@ export const LineLogo: React.FC<LineLogoProps> = ({
   className = "",
   alt = "",
 }) => {
-  const iconSrc = src || companyIcon || "";
+  const iconSrc = companyIcon || src;
   const safeColor = getSafeColor(color);
   const shouldRecolor = !!recolor && !!safeColor;
-  const stableClassName = `${className} max-w-none shrink-0 block`.trim();
+  const stableClassName = `${className} shrink-0 block`.trim();
 
   if (!shouldRecolor) {
-    return <img src={iconSrc} className={stableClassName} alt={alt} draggable={false} />;
+    return (
+      <img
+        src={iconSrc}
+        className={stableClassName}
+        alt={alt}
+        draggable={false}
+      />
+    );
   }
 
   return (
@@ -75,7 +83,7 @@ export const LineLogo: React.FC<LineLogoProps> = ({
       <img
         src={iconSrc}
         alt={alt}
-        className="h-full w-auto max-w-none opacity-0 pointer-events-none block"
+        className="h-full w-auto opacity-0 pointer-events-none block"
         draggable={false}
       />
       <div

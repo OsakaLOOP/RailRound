@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface LineLogoProps {
   src: string;
@@ -15,11 +15,13 @@ interface LineLogoProps {
  */
 const getSafeColor = (color: string | null): string | null => {
   if (!color) return null;
-  
+
   // Simple hex parser (supports #RGB and #RRGGBB)
-  let r = 255, g = 255, b = 255;
-  const hex = color.replace('#', '');
-  
+  let r = 255,
+    g = 255,
+    b = 255;
+  const hex = color.replace("#", "");
+
   if (hex.length === 3) {
     r = Math.min(255, parseInt(hex[0] + hex[0], 16));
     g = Math.min(255, parseInt(hex[1] + hex[1], 16));
@@ -29,7 +31,7 @@ const getSafeColor = (color: string | null): string | null => {
     g = Math.min(255, parseInt(hex.substring(2, 4), 16));
     b = Math.min(255, parseInt(hex.substring(4, 6), 16));
   } else {
-    return color; 
+    return color;
   }
 
   // Calculate relative luminance (Standard formula)
@@ -49,7 +51,7 @@ const getSafeColor = (color: string | null): string | null => {
 
 /**
  * Line icon component with optional dynamic recoloring.
- * 
+ *
  * Logic to fulfill specific requirements:
  * 1. "Strict Lighten Mode": We mix a colored backdrop with a grayscaled icon using 'mix-blend-mode: lighten'.
  *    - Black icon + Color Backdrop = Color icon.
@@ -57,62 +59,76 @@ const getSafeColor = (color: string | null): string | null => {
  * 2. "Transparency Preservation": The entire stack is clipped by a mask using the icon's alpha channel.
  * 3. "No Gray Leak": By using separate layers, 'filter: grayscale(1)' only affects the icon, not the color.
  */
-export const LineLogo: React.FC<LineLogoProps> = ({ src, companyIcon, recolor, color, className = "", alt = "" }) => {
+export const LineLogo: React.FC<LineLogoProps> = ({
+  src,
+  companyIcon,
+  recolor,
+  color,
+  className = "",
+  alt = "",
+}) => {
   const iconSrc = companyIcon || src;
   const safeColor = getSafeColor(color);
   const shouldRecolor = !!recolor && !!safeColor;
-  const stableClassName = `${className} max-w-none shrink-0 block`.trim();
+  const stableClassName = `${className} shrink-0 block`.trim();
 
   if (!shouldRecolor) {
-    return <img src={iconSrc} className={stableClassName} alt={alt} draggable={false} />;
+    return (
+      <img
+        src={iconSrc}
+        className={stableClassName}
+        alt={alt}
+        draggable={false}
+      />
+    );
   }
 
   return (
-    <div 
-      className={`relative block ${stableClassName}`} 
-      style={{ 
+    <div
+      className={`relative block ${stableClassName}`}
+      style={{
         lineHeight: 0,
         WebkitMaskImage: `url("${iconSrc}")`,
-        WebkitMaskSize: 'contain',
-        WebkitMaskRepeat: 'no-repeat',
-        WebkitMaskPosition: 'center',
+        WebkitMaskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
         maskImage: `url("${iconSrc}")`,
-        maskSize: 'contain',
-        maskRepeat: 'no-repeat',
-        maskPosition: 'center'
+        maskSize: "contain",
+        maskRepeat: "no-repeat",
+        maskPosition: "center",
       }}
     >
       {/* 
         Shim image: Sets the parent container's dimensions based on icon aspect ratio.
         It is invisible but maintains layout.
       */}
-      <img 
-        src={iconSrc} 
-        alt={alt} 
-        className="h-full w-auto max-w-none opacity-0 pointer-events-none block" 
-        draggable={false} 
+      <img
+        src={iconSrc}
+        alt={alt}
+        className="h-full w-auto opacity-0 pointer-events-none block"
+        draggable={false}
       />
-      
+
       {/* 
         Recoloring Stack:
         1. Color base (the target color)
         2. Icon layer (grayscaled) blended via 'lighten'
         The entire container is masked by the alpha channel of 'iconSrc'.
       */}
-      <div 
+      <div
         className="absolute inset-0"
         style={{ backgroundColor: safeColor }}
       />
-      
+
       <div
         className="absolute inset-0"
         style={{
           backgroundImage: `url("${iconSrc}")`,
-          backgroundSize: 'contain',
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'center',
-          filter: 'grayscale(1)',
-          mixBlendMode: 'lighten'
+          backgroundSize: "contain",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center",
+          filter: "grayscale(1)",
+          mixBlendMode: "lighten",
         }}
       />
     </div>

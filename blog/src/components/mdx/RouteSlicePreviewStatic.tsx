@@ -177,8 +177,10 @@ export const RouteSlicePreview: React.FC<Props> = ({
             <div className="flex flex-col gap-1.5">
               {renderPaths.map((path, idx) => {
                 const pathStart = path.stations[0]?.name_ja ?? "";
-                const pathEnd = path.stations[path.stations.length - 1]?.name_ja ?? "";
-                const lineName = path.meta?.lineName || path.meta?.lineKey || "";
+                const pathEnd =
+                  path.stations[path.stations.length - 1]?.name_ja ?? "";
+                const lineName =
+                  path.meta?.lineName || path.meta?.lineKey || "";
 
                 return (
                   <div
@@ -191,7 +193,7 @@ export const RouteSlicePreview: React.FC<Props> = ({
                         companyIcon={path.meta.companyIcon}
                         recolor={path.meta.recolor}
                         color={path.meta.color}
-                        className="max-h-[50px] w-auto max-w-[140px]"
+                        className="max-h-[50px] w-auto object-contain."
                       />
                     ) : path.meta?.logo ? (
                       <img

@@ -3,7 +3,6 @@ import {
   json,
   getKV,
   putFeedbackObject,
-  getEnv,
   getUsernameFromAuthHeader,
   clipText,
   getMimeExtension,
@@ -33,16 +32,9 @@ async function updateHookStatus(DB, feedbackId, statusPatch) {
 }
 
 async function createGitHubIssue(record) {
-  const token =
-    getEnv("GITHUB_FEEDBACK_TOKEN") ||
-    getEnv("GITHUB_TOKEN") ||
-    getEnv("GH_TOKEN");
-  const owner =
-    getEnv("GITHUB_FEEDBACK_OWNER") ||
-    getEnv("GITHUB_OWNER");
-  const repo =
-    getEnv("GITHUB_FEEDBACK_REPO") ||
-    getEnv("GITHUB_REPO");
+  const token = typeof event === "undefined" || !event.env ? "" : String(event.env.GITHUB_FEEDBACK_TOKEN || "");
+  const owner = typeof event === "undefined" || !event.env ? "" : String(event.env.GITHUB_FEEDBACK_OWNER || "");
+  const repo = typeof event === "undefined" || !event.env ? "" : String(event.env.GITHUB_FEEDBACK_REPO || "");
   if (!token || !owner || !repo) {
     throw new Error("GitHub feedback hook not configured");
   }

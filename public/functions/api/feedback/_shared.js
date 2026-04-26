@@ -20,102 +20,19 @@ export function getKV() {
 }
 
 export function getFeedbackBucket() {
-  return globalThis.RAILROUND_FEEDBACK_R2 || globalThis.FEEDBACK_R2 || null;
+  return event.env.RAILROUND_FEEDBACK_R2 || null;
 }
 
-function getEnvValue(key, runtimeEnv = null) {
-  const eventEnv =
-    runtimeEnv &&
-    typeof runtimeEnv === "object" &&
-    runtimeEnv.env &&
-    typeof runtimeEnv.env === "object"
-      ? runtimeEnv.env
-      : null;
-  if (eventEnv && eventEnv[key] !== undefined) return eventEnv[key];
+function getR2S3Config() {
+  if (typeof event === "undefined" || !event) return null;
 
-  const directEnv =
-    runtimeEnv && typeof runtimeEnv === "object" ? runtimeEnv : null;
-  if (directEnv && directEnv[key] !== undefined) return directEnv[key];
+  const endpoint = String(event.env.FEEDBACK_R2_S3_ENDPOINT || "");
+  const accessKeyId = String(event.env.FEEDBACK_R2_ACCESS_KEY_ID || "");
+  const secretAccessKey = String(event.env.FEEDBACK_R2_SECRET_ACCESS_KEY || "");
+  const region = String(event.env.FEEDBACK_R2_REGION || "");
+  const bucket = String(event.env.FEEDBACK_R2_BUCKET || "");
 
-  const contextEnv =
-    runtimeEnv &&
-    typeof runtimeEnv === "object" &&
-    runtimeEnv.context &&
-    typeof runtimeEnv.context === "object" &&
-    runtimeEnv.context.env &&
-    typeof runtimeEnv.context.env === "object"
-      ? runtimeEnv.context.env
-      : null;
-  if (contextEnv && contextEnv[key] !== undefined) return contextEnv[key];
-
-  const importMetaEnv =
-    typeof import.meta !== "undefined" &&
-    import.meta &&
-    import.meta.env &&
-    typeof import.meta.env === "object"
-      ? import.meta.env
-      : null;
-  if (importMetaEnv && importMetaEnv[key] !== undefined) return importMetaEnv[key];
-
-  const processEnv =
-    typeof process !== "undefined" &&
-    process &&
-    process.env &&
-    typeof process.env === "object"
-      ? process.env
-      : null;
-  if (processEnv && processEnv[key] !== undefined) return processEnv[key];
-
-  const globalEnv =
-    typeof globalThis !== "undefined" &&
-    globalThis &&
-    globalThis.EDGEONE_RUNTIME_ENV &&
-    typeof globalThis.EDGEONE_RUNTIME_ENV === "object"
-      ? globalThis.EDGEONE_RUNTIME_ENV
-      : null;
-  if (globalEnv && globalEnv[key] !== undefined) return globalEnv[key];
-
-  const globalEnvObject =
-    typeof globalThis !== "undefined" &&
-    globalThis &&
-    globalThis.env &&
-    typeof globalThis.env === "object"
-      ? globalThis.env
-      : null;
-  if (globalEnvObject && globalEnvObject[key] !== undefined) return globalEnvObject[key];
-
-  const bareEnv =
-    typeof env !== "undefined" && env && typeof env === "object"
-      ? env
-      : null;
-  if (bareEnv && bareEnv[key] !== undefined) return bareEnv[key];
-
-  return undefined;
-}
-
-function getR2S3Config(runtimeEnv = null) {
-  const endpoint =
-    getEnvValue("FEEDBACK_R2_S3_ENDPOINT", runtimeEnv) ||
-    getEnvValue("R2_S3_ENDPOINT", runtimeEnv) ||
-    "";
-  const accessKeyId =
-    getEnvValue("FEEDBACK_R2_ACCESS_KEY_ID", runtimeEnv) ||
-    getEnvValue("R2_S3_ACCESS_KEY_ID", runtimeEnv) ||
-    "";
-  const secretAccessKey =
-    getEnvValue("FEEDBACK_R2_SECRET_ACCESS_KEY", runtimeEnv) ||
-    getEnvValue("R2_S3_SECRET_ACCESS_KEY", runtimeEnv) ||
-    "";
-  const region =
-    getEnvValue("FEEDBACK_R2_REGION", runtimeEnv) ||
-    getEnvValue("R2_S3_REGION", runtimeEnv) ||
-    "auto";
-  let bucket =
-    getEnvValue("FEEDBACK_R2_BUCKET", runtimeEnv) ||
-    getEnvValue("R2_S3_BUCKET", runtimeEnv) ||
-    "";
-
-  if (!endpoint || !accessKeyId || !secretAccessKey) return null;
+  if (!endpoint || !accessKeyId || !secretAccessKey || !region || !bucket) return null;
 
   let endpointUrl;
   try {
@@ -125,13 +42,6 @@ function getR2S3Config(runtimeEnv = null) {
   }
 
   const segments = endpointUrl.pathname.split("/").filter(Boolean);
-  if (!bucket) {
-    if (segments.length === 0) return null;
-    bucket = segments.pop();
-  } else if (segments.length > 0 && segments[segments.length - 1] === bucket) {
-    segments.pop();
-  }
-
   const basePath = segments.length ? `/${segments.join("/")}` : "";
 
   return {
@@ -219,8 +129,8 @@ function buildCanonicalUri(basePath, bucket, objectKey) {
   return `/${fullSegments.join("/")}`;
 }
 
-async function signedS3Request(method, objectKey, options = {}, runtimeEnv = null) {
-  const cfg = getR2S3Config(runtimeEnv);
+async function signedS3Request(method, objectKey, options = {}) {
+  const cfg = getR2S3Config();
   if (!cfg) {
     throw new Error("R2 S3 config missing");
   }
@@ -286,21 +196,21 @@ async function signedS3Request(method, objectKey, options = {}, runtimeEnv = nul
   return await fetch(targetUrl, requestInit);
 }
 
-export async function putFeedbackObject(objectKey, body, contentType, runtimeEnv = null) {
+export async function putFeedbackObject(objectKey, body, contentType) {
   const bucket = getFeedbackBucket();
   if (bucket) {
     await bucket.put(objectKey, body, { httpMetadata: { contentType } });
     return;
   }
 
-  const res = await signedS3Request("PUT", objectKey, { body, contentType }, runtimeEnv);
+  const res = await signedS3Request("PUT", objectKey, { body, contentType });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     throw new Error(`R2 PUT failed: ${res.status} ${clipText(txt, 400)}`);
   }
 }
 
-export async function getFeedbackObject(objectKey, runtimeEnv = null) {
+export async function getFeedbackObject(objectKey) {
   const bucket = getFeedbackBucket();
   if (bucket) {
     const object = await bucket.get(objectKey);
@@ -312,7 +222,7 @@ export async function getFeedbackObject(objectKey, runtimeEnv = null) {
     };
   }
 
-  const res = await signedS3Request("GET", objectKey, {}, runtimeEnv);
+  const res = await signedS3Request("GET", objectKey, {});
   if (res.status === 404) return null;
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
@@ -335,17 +245,9 @@ export function secureCompareHex(a, b) {
   return result === 0;
 }
 
-export function getImageSigningSecret(runtimeEnv = null) {
-  return (
-    getEnvValue("FEEDBACK_IMAGE_SIGNING_SECRET", runtimeEnv) ||
-    getEnvValue("GITHUB_FEEDBACK_TOKEN", runtimeEnv) ||
-    getEnvValue("CLIENT_SECRET", runtimeEnv) ||
-    ""
-  );
-}
-
-export function getEnv(key, runtimeEnv = null) {
-  return getEnvValue(key, runtimeEnv);
+export function getImageSigningSecret() {
+  if (typeof event === "undefined" || !event.env) return "";
+  return String(event.env.FEEDBACK_IMAGE_SIGNING_SECRET || "");
 }
 
 export function clipText(input, maxLen) {

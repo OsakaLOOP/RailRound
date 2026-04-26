@@ -7,6 +7,7 @@ import { computeLoopVia, getLandmarks } from '../core/railwayRouting';
 import { isMobile } from 'react-device-detect';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
+import { getStationById } from '../core/railwayRouting';
 import { LineLogo } from '../components/LineLogo';
 
 const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
@@ -172,12 +173,16 @@ export const TripsPage: React.FC = () => {
                         if (isWalk) {
                             let startName = trip.fromId || '';
                             let endName = trip.toId || '';
-                            Object.values(railwayData).forEach(line => {
-                                const s = line.stations.find(st => st.id === trip.fromId);
-                                if (s) startName = s.name_ja;
-                                const e = line.stations.find(st => st.id === trip.toId);
-                                if (e) endName = e.name_ja;
-                            });
+                            if (railwayData) {
+                                if (trip.fromId) {
+                                    const startSt = getStationById(railwayData, trip.fromId);
+                                    if (startSt) startName = startSt.station.name_ja;
+                                }
+                                if (trip.toId) {
+                                    const endSt = getStationById(railwayData, trip.toId);
+                                    if (endSt) endName = endSt.station.name_ja;
+                                }
+                            }
 
                             const isTree = trip.walkType === 'tree';
                             const cls = {

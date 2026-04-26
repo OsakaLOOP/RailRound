@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import * as turf from '@turf/turf';
 import { useTranslation } from 'react-i18next';
+import { getStationById } from '../../core/railwayRouting';
 import { showAlert, showConfirm } from '../../utils/alerts';
 
 export const WalkTripEditor: React.FC = () => {
@@ -82,12 +83,16 @@ export const WalkTripEditor: React.FC = () => {
             // Find coordinates for the Bezier curve
             let startCoords = null;
             let endCoords = null;
-            Object.values(railwayData).forEach(line => {
-                const s = line.stations.find(st => st.id === form.fromId);
-                if (s) startCoords = [s.lng, s.lat];
-                const e = line.stations.find(st => st.id === form.toId);
-                if (e) endCoords = [e.lng, e.lat];
-            });
+            if (railwayData) {
+                if (form.fromId) {
+                    const startSt = getStationById(railwayData, form.fromId);
+                    if (startSt) startCoords = [startSt.station.lng, startSt.station.lat];
+                }
+                if (form.toId) {
+                    const endSt = getStationById(railwayData, form.toId);
+                    if (endSt) endCoords = [endSt.station.lng, endSt.station.lat];
+                }
+            }
 
             if (startCoords && endCoords) {
                 walkPath = generateBezierPath(startCoords as [number, number], endCoords as [number, number]);
@@ -130,12 +135,16 @@ export const WalkTripEditor: React.FC = () => {
     // Resolving station names for read-only display
     let startName = t('walk.unknownStart', "未知起点");
     let endName = t('walk.unknownEnd', "未知终点");
-    Object.values(railwayData).forEach(line => {
-        const s = line.stations.find(st => st.id === form.fromId);
-        if (s) startName = s.name_ja;
-        const e = line.stations.find(st => st.id === form.toId);
-        if (e) endName = e.name_ja;
-    });
+    if (railwayData) {
+        if (form.fromId) {
+            const startSt = getStationById(railwayData, form.fromId);
+            if (startSt) startName = startSt.station.name_ja;
+        }
+        if (form.toId) {
+            const endSt = getStationById(railwayData, form.toId);
+            if (endSt) endName = endSt.station.name_ja;
+        }
+    }
 
     const isTree = form.walkType === 'tree';
 

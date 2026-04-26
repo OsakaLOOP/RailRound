@@ -5,6 +5,9 @@ import { calcDist } from '../core/tripCalculator'; // Ensure calcDist is exporte
 let stationNameIndexCache: Map<string, {lineKey: string, stationIndex: number}[]> | null = null;
 let lastRailwayDataRef: RailwayMap | null = null;
 
+let stationIdIndexCache: Map<string, { station: Station, lineKey: string }> | null = null;
+let lastRailwayDataForIdRef: RailwayMap | null = null;
+
 export const isCompanyCompatible = (meta1: CompanyMeta | undefined, meta2: CompanyMeta | undefined) => {
   if (!meta1 || !meta2) return false;
   if (meta1.company === meta2.company && meta1.company !== "上传数据" && meta1.company !== "未知") return true;
@@ -33,6 +36,37 @@ export const buildStationIndex = (railwayData: RailwayMap) => {
     lastRailwayDataRef = railwayData;
     return index;
 };
+
+/**
+ * O(1) Station lookup by ID.
+ * Caches the mapping of station IDs to their objects to prevent O(N*M) nested loops
+ * across rendering cycles. Automatically invalidates if the railwayData reference changes.
+ * ⚡ Performance Boost: Reduces component re-render time drastically for list items.
+ */
+export const getStationById = (railwayData: RailwayMap, stationId: string): { station: Station, lineKey: string } | null => {
+    if (stationIdIndexCache && lastRailwayDataForIdRef === railwayData) {
+        return stationIdIndexCache.get(stationId) || null;
+    }
+
+    const index = new Map<string, { station: Station, lineKey: string }>();
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        const line = railwayData[lineKey];
+        if (!line.stations) continue;
+        for (let i = 0; i < line.stations.length; i++) {
+            const st = line.stations[i];
+            if (!index.has(st.id)) {
+                index.set(st.id, { station: st, lineKey });
+            }
+        }
+    }
+
+    stationIdIndexCache = index;
+    lastRailwayDataForIdRef = railwayData;
+
+    return stationIdIndexCache.get(stationId) || null;
+};
+
 
 export const getTransferableLines = (station: Station | undefined, currentLineKey: string, railwayData: RailwayMap, strictMode = true) => {
     if (!station) return [];

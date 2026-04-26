@@ -3,7 +3,7 @@ import { Train, Edit2, Trash2, Star, Plus, MapPin, Upload } from 'lucide-react';
 import { useStore } from '../store';
 import { DropZone } from '../components/DragContext';
 import { getRouteVisualData } from '../core/tripCalculator';
-import { computeLoopVia, getLandmarks } from '../core/railwayRouting';
+import { computeLoopVia, getLandmarks, getStationById } from '../core/railwayRouting';
 import { isMobile } from 'react-device-detect';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
@@ -172,12 +172,11 @@ export const TripsPage: React.FC = () => {
                         if (isWalk) {
                             let startName = trip.fromId || '';
                             let endName = trip.toId || '';
-                            Object.values(railwayData).forEach(line => {
-                                const s = line.stations.find(st => st.id === trip.fromId);
-                                if (s) startName = s.name_ja;
-                                const e = line.stations.find(st => st.id === trip.toId);
-                                if (e) endName = e.name_ja;
-                            });
+
+                            const s = getStationById(railwayData, trip.fromId);
+                            if (s) startName = s.name_ja;
+                            const e = getStationById(railwayData, trip.toId);
+                            if (e) endName = e.name_ja;
 
                             const isTree = trip.walkType === 'tree';
                             const cls = {

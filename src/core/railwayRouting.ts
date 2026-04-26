@@ -12,6 +12,39 @@ export const isCompanyCompatible = (meta1: CompanyMeta | undefined, meta2: Compa
   return false;
 };
 
+
+// 预构建的站点ID索引缓存
+let stationIdIndexCache: Map<string, {lineKey: string, stationIndex: number}> | null = null;
+let lastRailwayDataRefForId: RailwayMap | null = null;
+
+export const buildStationIdIndex = (railwayData: RailwayMap) => {
+    if (stationIdIndexCache && lastRailwayDataRefForId === railwayData) {
+        return stationIdIndexCache;
+    }
+
+    const index = new Map<string, {lineKey: string, stationIndex: number}>();
+    for (const lineKey in railwayData) {
+        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+        const line = railwayData[lineKey];
+        if (!line.stations) continue;
+        for (let i = 0; i < line.stations.length; i++) {
+            index.set(line.stations[i].id, { lineKey, stationIndex: i });
+        }
+    }
+
+    stationIdIndexCache = index;
+    lastRailwayDataRefForId = railwayData;
+    return index;
+};
+
+export const getStationById = (railwayData: RailwayMap, stationId: string): Station | undefined => {
+    if (!stationId) return undefined;
+    const index = buildStationIdIndex(railwayData);
+    const entry = index.get(stationId);
+    if (!entry) return undefined;
+    return railwayData[entry.lineKey].stations[entry.stationIndex];
+};
+
 export const buildStationIndex = (railwayData: RailwayMap) => {
     if (stationNameIndexCache && lastRailwayDataRef === railwayData) {
         return stationNameIndexCache;

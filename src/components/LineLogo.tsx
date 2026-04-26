@@ -61,7 +61,7 @@ export const LineLogo: React.FC<LineLogoProps> = ({ src, companyIcon, recolor, c
   const iconSrc = companyIcon || src;
   const safeColor = getSafeColor(color);
   const shouldRecolor = !!recolor && !!safeColor;
-  const stableClassName = `${className} shrink-0 inline-block align-middle overflow-hidden`.trim();
+  const stableClassName = `${className} max-w-none shrink-0 block`.trim();
 
   if (!shouldRecolor) {
     return <img src={iconSrc} className={stableClassName} alt={alt} draggable={false} />;
@@ -69,7 +69,7 @@ export const LineLogo: React.FC<LineLogoProps> = ({ src, companyIcon, recolor, c
 
   return (
     <div 
-      className={`relative ${stableClassName}`} 
+      className={`relative block ${stableClassName}`} 
       style={{ 
         lineHeight: 0,
         WebkitMaskImage: `url("${iconSrc}")`,
@@ -89,8 +89,7 @@ export const LineLogo: React.FC<LineLogoProps> = ({ src, companyIcon, recolor, c
       <img 
         src={iconSrc} 
         alt={alt} 
-        className="h-auto w-auto max-h-full opacity-0 pointer-events-none block"
-        style={{ maxHeight: 'inherit' }}
+        className="h-full w-auto max-w-none opacity-0 pointer-events-none block" 
         draggable={false} 
       />
       

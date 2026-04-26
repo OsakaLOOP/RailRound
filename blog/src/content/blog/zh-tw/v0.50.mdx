@@ -21,7 +21,23 @@ version: '0.50'
 
 import { RouteSlicePreview } from './../../../components/mdx/RouteSlicePreview';
 
-<RouteSlicePreview client:only="react" lineKey="東日本旅客鉄道:東海道線 (JR東日本)" startStation="東京" endStation="品川" />
+export const tokyoShinagawaManual = [
+  {
+    lineKey: "東日本旅客鉄道:東海道線 (JR東日本)",
+    fromStation: "東京",
+    toStation: "品川",
+  },
+];
+
+<RouteSlicePreview
+  client:only="react"
+  lineKey="東日本旅客鉄道:東海道線 (JR東日本)"
+  startStation="東京"
+  endStation="品川"
+  manualSegments={tokyoShinagawaManual}
+  mode="manual"
+  enableModeSwitch={true}
+/>
 
 ## 🛠️ 下一步開發計劃
 

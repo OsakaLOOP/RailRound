@@ -29,12 +29,12 @@ export default defineConfig({
         const serve = sirv(blogDistPath, { dev: true, single: false, etag: true });
         
         server.middlewares.use((req, res, next) => {
-          if (req.url && req.url.startsWith('/blog')) {
+          if (req.url && req.url.startsWith('/blog') && !req.url.startsWith('/blog/src/') && !req.url.startsWith('/blog/node_modules/')) {
             // 将 /blog 前缀去除后传给 sirv，使其在 blog/dist 中查找
             const url = req.url.replace(/^\/blog/, '') || '/';
-            // 如果去掉前缀后变为空，强制设为 / 
+            // 如果去掉前缀后变为空，强制设为 /
             req.url = url === '' ? '/' : url;
-            
+
             serve(req, res, next);
           } else {
             next();
@@ -45,6 +45,9 @@ export default defineConfig({
   ],
   resolve: {
     dedupe: ['react', 'react-dom'],
+    alias: {
+      '@blog-src': path.resolve(__dirname, 'blog/src'),
+    },
   },
   server: {
     // 移除所有 Astro 代理规则，统一由 serve-static-blog 处理

@@ -33,6 +33,10 @@
       "title": "Escape Pods",
       "content": "We believe your data belongs to you—provided you know how to back it up. Export your trips to KML/JSON here.　Please bring your own heat shield for atmospheric re-entry."
     },
+    "exportMdx": {
+      "title": "Embed in Your Blog",
+      "content": "You can export any journey as a standalone MDX component and embed it in blogs like Astro, Docusaurus or Next.js. Look for the <> icon on trip cards in the Records tab, or use the export button in your folders."
+    },
     "tabMap": {
       "title": "Map Mode",
       "content": "Toggle to view the railway network. Grey segments are unridden, while ridden ones are highlighted. The base map features detailed alignment from OpenRailwayMap. In this version, we introduce you to richer station interactions: long-press and drag between stations to auto-plan."
@@ -356,5 +360,25 @@
   "routeSlicePreview": "Route Slice Preview",
   "loadingRoute": "Loading route data: {{key}} ({{start}} - {{end}})...",
   "parseFail": "Failed to render route slice",
-  "resetView": "Reset View"
+  "resetView": "Reset View",
+  "exportRoute": {
+    "title": "Export Route Preview",
+    "preview": "Preview",
+    "loading": "Computing route data...",
+    "options": "Options",
+    "language": "Language",
+    "height": "Height",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "package": "Package",
+    "packageNpm": "npm (@railloop)",
+    "packageCdn": "CDN",
+    "promo": "Promo",
+    "promoShow": "Show promo banner",
+    "code": "Generated Code",
+    "download": "Download .mdx",
+    "copy": "Copy Code",
+    "copied": "Copied!"
+  }
 }

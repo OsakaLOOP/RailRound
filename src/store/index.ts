@@ -298,6 +298,8 @@ export interface GlobalStore {
     folderManagerOpen: boolean;
     addToFolderModalOpen: boolean;
     currentTripForFolder: Trip | null;
+    exportRouteModalOpen: boolean;
+    currentTripForExport: Trip | null;
     githubRegToken: string | null;
   };
   setModalState: (updates: Partial<GlobalStore['modals']>) => void;
@@ -434,6 +436,8 @@ export const useStore = create<GlobalStore>()(
         folderManagerOpen: false,
         addToFolderModalOpen: false,
         currentTripForFolder: null,
+        exportRouteModalOpen: false,
+        currentTripForExport: null,
         githubRegToken: null,
       },
       setModalState: (updates) => set((state) => ({ modals: { ...state.modals, ...updates } })),

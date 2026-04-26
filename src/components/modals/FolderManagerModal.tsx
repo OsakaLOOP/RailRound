@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Folder, Globe, Trash2 } from 'lucide-react';
+import { X, Folder, Globe, Trash2, Code } from 'lucide-react';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
@@ -109,6 +109,17 @@ export const FolderManagerModal: React.FC = () => {
                                     title={f.is_public ? "Public" : "Private"}
                                 >
                                     <Globe size={16} />
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const firstTripId = f.trip_ids?.[0];
+                                        const trip = trips.find((t: any) => t.id === firstTripId);
+                                        if (trip) setModalState({ exportRouteModalOpen: true, currentTripForExport: trip });
+                                    }}
+                                    className="p-1.5 rounded-md text-gray-400 hover:bg-green-50 hover:text-green-500"
+                                    title="Export MDX"
+                                >
+                                    <Code size={16} />
                                 </button>
                                 <button onClick={() => handleDelete(f.id)} className="p-1.5 rounded-md text-red-400 hover:bg-red-50 hover:text-red-500"><Trash2 size={16} /></button>
                             </div>

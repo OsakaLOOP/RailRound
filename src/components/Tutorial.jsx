@@ -67,6 +67,14 @@ const getSteps = (t) => [
         action: 'next'
     },
     {
+        id: 'export-mdx-component',
+        target: null,
+        title: t('tutorial.exportMdx.title', '嵌入你的博客'),
+        content: t('tutorial.exportMdx.content', '你可以将任意旅程导出为一个独立的 MDX 组件，直接嵌入 Astro/Docusaurus 等博客。在行程列表点击 <> 图标或收藏夹内的导出按钮即可。'),
+        position: 'center',
+        action: 'next'
+    },
+    {
         id: 'tab-map',
         target: '#tab-btn-map',
         title: t('tutorial.tabMap.title', '地图模式'),

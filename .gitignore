@@ -41,3 +41,10 @@ public/assets/company_logos/*
 public/assets/geojson_logos/*
 *.py
 *.bak
+
+# Package generated sources
+packages/route-slice-preview/src/*
+!packages/route-slice-preview/src/index.ts
+
+# CDN bundle
+public/bundle/

@@ -33,6 +33,10 @@
       "title": "Escape Pods",
       "content": "我們堅信數據歸你自己所有, 前提是你得學會備份. 在這裡你可以將行程導出為 KML/JSON. "
     },
+    "exportMdx": {
+      "title": "嵌入你的部落格",
+      "content": "你可以將任意旅程匯出為一個獨立的 MDX 元件，直接嵌入 Astro/Docusaurus 等部落格。在行程列表頁點擊 <> 圖示或收藏夾內的匯出按鈕即可。"
+    },
     "tabMap": {
       "title": "地圖模式",
       "content": "切換並查看鐵路網絡. 灰色的是未乘區段, 而已乘線路將以對應的顏色高亮顯示. \n底圖包含來自 OpenRailwayMap 的配線詳情. 新版豐富了站點交互. 你可以長按站點並拖動連接, 以自動規劃。"
@@ -350,5 +354,25 @@
   "versionBadge": {
     "blog": "日誌",
     "detail": "詳情"
+  },
+  "exportRoute": {
+    "title": "匯出路線預覽",
+    "preview": "預覽",
+    "loading": "正在計算路線數據...",
+    "options": "選項",
+    "language": "語言",
+    "height": "高度",
+    "theme": "主題",
+    "themeLight": "淺色",
+    "themeDark": "深色",
+    "package": "套件來源",
+    "packageNpm": "npm (@railloop)",
+    "packageCdn": "CDN",
+    "promo": "宣傳",
+    "promoShow": "顯示宣傳橫幅",
+    "code": "生成的代碼",
+    "download": "下載 .mdx",
+    "copy": "複製代碼",
+    "copied": "已複製！"
   }
 }

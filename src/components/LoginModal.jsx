@@ -220,7 +220,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
 
   useEffect(() => {
     if (isOpen) {
-      fetch(`/readme/${lang}.md?t=${new Date().getTime()}`)// CDN cache buster
+      fetch(`/readme/${lang.toLowerCase()}.md?t=${new Date().getTime()}`)// CDN cache buster
         .then(res => res.text())
         .then(text => setReadmeContent(text))
         .catch(err => setReadmeContent('# Error loading guide'));

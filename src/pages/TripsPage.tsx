@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { Train, Edit2, Trash2, Star, Plus, MapPin, Upload } from 'lucide-react';
+import { Train, Edit2, Trash2, Star, Code, Plus, MapPin, Upload } from 'lucide-react';
 import { useStore } from '../store';
 import { DropZone } from '../components/DragContext';
 import { getRouteVisualData } from '../core/tripCalculator';
@@ -229,6 +229,7 @@ export const TripsPage: React.FC = () => {
                                     <div className="flex items-center gap-2">
                                         {(trip.cost || 0) > 0 && <span className="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">¥{trip.cost}</span>}
                                         <button onClick={() => setModalState({ addToFolderModalOpen: true, currentTripForFolder: trip })} className="text-gray-400 hover:text-yellow-500"><Star size={14} /></button>
+                                        <button onClick={() => setModalState({ exportRouteModalOpen: true, currentTripForExport: trip })} className="text-gray-400 hover:text-green-500"><Code size={14} /></button>
                                         <button onClick={() => startEditingTrip(trip)} className="text-gray-400 hover:text-blue-500"><Edit2 size={14} /></button>
                                         <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
                                     </div>

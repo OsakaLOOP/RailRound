@@ -758,8 +758,6 @@ export const MapContainer: React.FC<Props> = ({
             `${snapProps.company}:${snapProps.line}:${snapProps.name}`;
 
           const {
-            setEditorMode,
-            setAutoForm,
             startEditingTrip,
             isAprilFool,
             setAutoRouteEasterEggType,
@@ -767,13 +765,12 @@ export const MapContainer: React.FC<Props> = ({
           } = useStore.getState();
 
           // --- April Fool's Map Auto-Plan Hijack ---
-          setEditorMode("auto");
-          setAutoForm({
+          const nextAutoForm = {
             startLine: startLineKey,
             startStation: startStationId,
             endLine: snapLineKey,
             endStation: endStationId,
-          });
+          };
 
           const rand = Math.random();
           if (isAprilFool && rand < 1 / 3) {
@@ -781,9 +778,9 @@ export const MapContainer: React.FC<Props> = ({
             // Open the TripEditor normally, but force it into an immediate Easter Egg searching state
             setAutoRouteEasterEggType(type);
             setIsRouteSearching(true);
-            startEditingTrip();
+            startEditingTrip(null, "auto", nextAutoForm);
           } else {
-            startEditingTrip();
+            startEditingTrip(null, "auto", nextAutoForm);
           }
 
           if (rubberBandLayerRef.current)

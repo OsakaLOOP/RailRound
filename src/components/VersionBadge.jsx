@@ -115,10 +115,15 @@ const VersionBadge = ({ version: currentVersion }) => {
                 <div className="absolute top-full left-0 mt-3 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 p-0 overflow-hidden animate-fade-in origin-top-left">
                     
                     {/* Header */}
-                    <div className="bg-slate-50 p-3 border-b border-gray-100 flex justify-between items-center relative z-20">
-                        <div className="flex items-center gap-2 text-slate-700 font-bold text-xs">
-                            <Bell size={14} className="text-[#39C5BB]" />
-                            <span>更新日志</span>
+                    <div className="bg-slate-50 p-3 border-b border-gray-100 flex justify-between items-start relative z-20 gap-2">
+                        <div className="flex flex-col gap-1 min-w-0">
+                            <div className="flex items-center gap-2 text-slate-700 font-bold text-xs">
+                                <Bell size={14} className="text-[#39C5BB]" />
+                                <span>更新日志</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-normal leading-tight">
+                                点击版本徽章即可进入 RailLOOP Blog；<br/>也可悬浮每条日志右下角, 查看详情链接。
+                            </span>
                         </div>
                         {data?.meta?.lastUpdated && (
                             <span className="text-[10px] text-gray-400 font-mono bg-white px-1.5 py-0.5 rounded border">

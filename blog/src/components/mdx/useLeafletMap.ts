@@ -7,9 +7,11 @@ import "leaflet/dist/leaflet.css";
 
 interface UseLeafletMapOptions {
   containerRef: React.RefObject<HTMLDivElement | null>;
+  /** Use dark theme tiles, default false */
+  dark?: boolean;
 }
 
-export function useLeafletMap({ containerRef }: UseLeafletMapOptions) {
+export function useLeafletMap({ containerRef, dark }: UseLeafletMapOptions) {
   const mapInstanceRef = useRef<L.Map | null>(null);
   const routeLayerRef = useRef<L.LayerGroup | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -41,10 +43,11 @@ export function useLeafletMap({ containerRef }: UseLeafletMapOptions) {
         scrollWheelZoom: false,
       });
 
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-        { subdomains: "abcd", maxZoom: 20 },
-      ).addTo(map);
+      const tileUrl = dark
+        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+
+      L.tileLayer(tileUrl, { subdomains: "abcd", maxZoom: 20 }).addTo(map);
 
       const routeLayer = L.layerGroup().addTo(map);
 

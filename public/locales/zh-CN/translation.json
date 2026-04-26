@@ -33,6 +33,10 @@
       "title": "小绿人逃生舱",
       "content": "我们坚信数据归你自己所有, 前提是你得学会备份, 并且自备隔热罩与降落伞. 在这里你可以将行程导出为 KML/JSON. "
     },
+    "exportMdx": {
+      "title": "嵌入你的博客",
+      "content": "你可以将任意旅程导出为一个独立的 MDX 组件，直接嵌入 Astro/Docusaurus 等博客。在行程列表页点击 <> 图标或收藏夹内的导出按钮即可。"
+    },
     "tabMap": {
       "title": "地图模式",
       "content": "切换并查看铁路网络. 灰色的是未乘区段, 而已乘线路将以对应的颜色高亮显示. \n底图包含来自 OpenRailwayMap 的配线详情. 新版本丰富了站点交互. 你可以长按站点并拖动连接, 以自动规划。"
@@ -356,5 +360,25 @@
   "routeSlicePreview": "路线预览切片",
   "loadingRoute": "加载路线数据中: {{key}} ({{start}} - {{end}})...",
   "parseFail": "渲染路线切片失败",
-  "resetView": "返回初始"
+  "resetView": "返回初始",
+  "exportRoute": {
+    "title": "导出路线预览",
+    "preview": "预览",
+    "loading": "正在计算路线数据...",
+    "options": "选项",
+    "language": "语言",
+    "height": "高度",
+    "theme": "主题",
+    "themeLight": "浅色",
+    "themeDark": "深色",
+    "package": "包来源",
+    "packageNpm": "npm (@railloop)",
+    "packageCdn": "CDN",
+    "promo": "宣传",
+    "promoShow": "显示宣传横幅",
+    "code": "生成的代码",
+    "download": "下载 .mdx",
+    "copy": "复制代码",
+    "copied": "已复制！"
+  }
 }

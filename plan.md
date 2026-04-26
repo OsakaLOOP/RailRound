@@ -9,7 +9,7 @@
 **计算前置到导出时，而非渲染时。** 用户在主应用完成旅程后，所有中间结果（路线坐标、距离、线路 meta）已确定，直接序列化进 MDX。外部博客只需一个"纯渲染"的轻量组件。
 
 ```
-用户旅程（主应用 RailleRound）
+用户旅程（主应用 RailLOOP）
         │
         ▼
   [点击"导出为 MDX 组件"]（两处入口：FolderManagerModal / 单条 Trip 操作菜单）
@@ -327,7 +327,7 @@ export interface RouteSliceData {
 | --- | -------------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
 | 1   | `components/mdx/types.ts`                    | **新增** | `RouteSliceData`、`StationData`、`RouteSliceMeta` 类型                                  |
 | 2   | `components/mdx/RouteSlicePreviewStatic.tsx` | **新增** | **纯静态渲染组件**（供分发），只接受 `data` prop，无数据加载。这是 npm/CDN 包的入口组件 |
-| 3   | `components/mdx/PromoBanner.tsx`             | **新增** | 宣传条组件："由 RailleRound 生成 · 想在你的博客中嵌入路线图？"                          |
+| 3   | `components/mdx/PromoBanner.tsx`             | **新增** | 宣传条组件："由 RailLOOP 生成 · 想在你的博客中嵌入路线图？"                          |
 | 4   | `components/mdx/i18n.ts`                     | **新增** | 轻量翻译表（en/ja/zh-cn/zh-tw），`useT(locale, labels?)` 函数，替代 react-i18next       |
 | 5   | `components/mdx/LineLogo.tsx`                | **新增** | 从 `src/components/LineLogo.tsx` 复制，已支持 data URI 作为 src                         |
 | 6   | `components/mdx/ExportRouteModal.tsx`        | **新增** | 导出弹窗：参数选择 + 实时预览 + 复制/下载                                               |
@@ -583,7 +583,7 @@ const translations: Record<string, Record<string, string>> = {
     loadingRoute: "Loading route...",
     parseFail: "Failed to load",
     resetView: "Reset view",
-    promoText: "Powered by RailleRound",
+    promoText: "Powered by RailLOOP",
     promoCTA: "Embed this in your blog →",
     // ...
   },

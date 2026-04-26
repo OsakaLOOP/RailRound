@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { isMobile } from 'react-device-detect';
 import railBg from './../assets/rail_bg.png'
@@ -143,16 +143,16 @@ if (!window.__dropZoneRegistry) window.__dropZoneRegistry = {};
 export const DropZone = ({ onDrop, children, className = "", activeClassName = "dropzone-glow" }) => {
     const { isDragging, setDropZone } = useDrag();
     const [isOver, setIsOver] = useState(false);
-    const idRef = useRef(Math.random().toString(36).substr(2, 9));
+    const dropZoneId = useId();
 
     useEffect(() => {
-        window.__dropZoneRegistry[idRef.current] = onDrop;
-        return () => { delete window.__dropZoneRegistry[idRef.current]; };
-    }, [onDrop]);
+        window.__dropZoneRegistry[dropZoneId] = onDrop;
+        return () => { delete window.__dropZoneRegistry[dropZoneId]; };
+    }, [onDrop, dropZoneId]);
 
     return (
         <div
-            data-dropzone-id={idRef.current}
+            data-dropzone-id={dropZoneId}
             className={`${className} ${isDragging && isOver ? activeClassName : ''}`}
             onMouseEnter={() => { if(isDragging) { setIsOver(true); setDropZone({ onDrop }); } }}
             onMouseLeave={() => { if(isDragging) { setIsOver(false); setDropZone(null); } }}

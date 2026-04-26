@@ -198,6 +198,7 @@ const renderMarkdown = (text) => {
   return elements;
 };
 
+import { trackEvent, AnalyticsEvents } from "../utils/analytics";
 export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -254,7 +255,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
       } else {
         result = await api.login(username, password);
       }
-      onLoginSuccess(result);
+      trackEvent({category: AnalyticsEvents.USER_ACTION, action: "Login_Success"}); onLoginSuccess(result);
       onClose();
     } catch (err) {
       setError(err.message);

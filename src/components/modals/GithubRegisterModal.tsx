@@ -6,6 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
 
+import { trackEvent, AnalyticsEvents } from "../utils/analytics";
 export const GithubRegisterModal: React.FC = () => {
     const { isOpen, regToken } = useStore(useShallow(state => ({
         isOpen: state.modals.isGithubRegOpen,

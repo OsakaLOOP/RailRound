@@ -11,6 +11,42 @@
   <meta name="description"
     content="RailLOOP 是一个个人向旅铁手账应用, 旨在帮助追踪和管理你的铁路旅程, 直观可感地展示旅行足迹. 加载了 177 家公司, 629 条线路, 10909 个站点." />
   <title>RailLOOP</title>
+
+  <!-- Analytics Anchors -->
+  <!-- Google Analytics 4 (Handled by react-ga4 in JS, but tag manager can go here) -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+  </script>
+
+  <!-- Baidu Tongji -->
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var baiduId = "%VITE_BAIDU_TONGJI_ID%"; // Replaced via Vite env or left empty
+      if(baiduId && !baiduId.startsWith("%")) {
+        var hm = document.createElement("script");
+        hm.src = "https://hm.baidu.com/hm.js?" + baiduId;
+        var s = document.getElementsByTagName("script")[0];
+        s.parentNode.insertBefore(hm, s);
+      }
+    })();
+  </script>
+
+  <!-- Bing UET -->
+  <script>
+    (function(w,d,t,r,u) {
+      var bingId = "%VITE_BING_UET_ID%";
+      if(bingId && !bingId.startsWith("%")) {
+        var f,n,i;
+        w[u]=w[u]||[],f=function(){var o={ti:bingId, enableAutoSpaTracking: true};o.q=w[u],w[u]=new UET(o),w[u].push("pageLoad")},
+        n=d.createElement(t),n.src=r,n.async=1,n.onload=n.onreadystatechange=function(){var s=this.readyState;s&&s!=="loaded"&&s!=="complete"||(f(),n.onload=n.onreadystatechange=null)},
+        i=d.getElementsByTagName(t)[0],i.parentNode.insertBefore(n,i)
+      }
+    })(window,document,"script","//bat.bing.com/bat.js","uetq");
+  </script>
+
 </head>
 
 <body translate="no">

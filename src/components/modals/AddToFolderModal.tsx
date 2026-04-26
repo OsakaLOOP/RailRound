@@ -6,6 +6,7 @@ import { useUserData } from '../../hooks/useUserData';
 import { calculateLatestStats } from '../../core/tripCalculator';
 import { useTranslation } from 'react-i18next';
 import { showAlert } from '../../utils/alerts';
+import { trackEvent, AnalyticsEvents } from '../../utils/analytics';
 
 export const AddToFolderModal: React.FC = () => {
     const { isOpen, trip, folders, user, trips, pins, badgeSettings, segmentGeometries, railwayData, geoData } = useStore(useShallow(state => ({
@@ -44,8 +45,10 @@ export const AddToFolderModal: React.FC = () => {
                 const currentIds = new Set(f.trip_ids || []);
                 if (currentIds.has(trip.id)) {
                     currentIds.delete(trip.id);
+                    trackEvent({ category: AnalyticsEvents.USER_ACTION, action: 'Remove_From_Folder' });
                 } else {
                     currentIds.add(trip.id);
+                    trackEvent({ category: AnalyticsEvents.USER_ACTION, action: 'Add_To_Folder' });
                 }
                 return { ...f, trip_ids: Array.from(currentIds) };
             }

@@ -5,7 +5,7 @@ import { DEFAULT_BLOG_LANG, getPostSlug } from '../../utils/blogRouting';
 
 export async function getStaticPaths() {
   const posts = await getCollection('blog', ({ id, data }) => {
-    return id.startsWith(`${DEFAULT_BLOG_LANG}/`) && data.category === 'dev';
+    return id.startsWith(`${DEFAULT_BLOG_LANG}/`) && data.category === 'docs';
   });
 
   return [
@@ -17,8 +17,8 @@ export async function getStaticPaths() {
 }
 
 const to = Astro.params.slug
-  ? `/blog/${DEFAULT_BLOG_LANG}/dev/${Astro.params.slug}/`
-  : `/blog/${DEFAULT_BLOG_LANG}/dev/`;
+  ? `/blog/${DEFAULT_BLOG_LANG}/doc/${Astro.params.slug}/`
+  : `/blog/${DEFAULT_BLOG_LANG}/doc/`;
 ---
 
 <RedirectPage to={to} message="Redirecting..." />

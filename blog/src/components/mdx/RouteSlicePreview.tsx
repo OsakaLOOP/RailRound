@@ -262,13 +262,13 @@ export const RouteSlicePreview: React.FC<Props> = ({
                           companyIcon={path.meta.companyIcon}
                           recolor={path.meta.recolor}
                           color={path.meta.color}
-                          className="h-7 w-auto max-w-[140px]"
+                          className="max-h-[50px] w-auto max-w-[140px]"
                         />
                       ) : path.meta?.logo ? (
                         <img
                           src={path.meta.logo}
                           alt=""
-                          className="h-7 w-auto max-w-[140px] object-contain opacity-70 grayscale block"
+                          className="max-h-[50px] w-auto max-w-[140px] object-contain opacity-70 grayscale block"
                           draggable={false}
                         />
                       ) : (

@@ -21,6 +21,24 @@ if (isMobile) {
 
 const root = createRoot(document.getElementById('root'));
 
+function BlogPathRedirect() {
+  React.useEffect(() => {
+    const { pathname, search, hash } = window.location;
+    // Keep "/blog/*" completely outside the app SPA router.
+    if (pathname.startsWith('/blog')) {
+      let targetPath = pathname;
+      if (pathname === '/blog' || pathname === '/blog/') {
+        targetPath = '/blog/zh-cn/';
+      } else if (!pathname.endsWith('/') && !/\.[^/]+$/.test(pathname)) {
+        targetPath = `${pathname}/`;
+      }
+      const target = `${targetPath}${search || ''}${hash || ''}`;
+      window.location.replace(target);
+    }
+  }, []);
+  return null;
+}
+
 root.render(
   <React.StrictMode>
     <GlobalProvider>
@@ -34,6 +52,7 @@ root.render(
         <HelmetProvider>
         <BrowserRouter>
           <Routes>
+            <Route path="/blog/*" element={<BlogPathRedirect />} />
             <Route path="/:lang/*" element={<AppLayout />} />
             <Route path="/*" element={<AppLayout />} />
           </Routes>

@@ -1,0 +1,65 @@
+---
+import { getCollection } from 'astro:content';
+import BaseHead from '../../../components/BaseHead.astro';
+import Header from '../../../components/Header.astro';
+import PostArchive from '../../../components/PostArchive.astro';
+import { SITE_TITLE } from '../../../consts';
+import { BLOG_LANGS, DEFAULT_BLOG_LANG, isBlogLang } from '../../../utils/blogRouting';
+
+export async function getStaticPaths() {
+  return BLOG_LANGS.map((lang) => ({ params: { lang } }));
+}
+
+const langParam = Astro.params.lang;
+if (!isBlogLang(langParam)) {
+  return Astro.redirect(`/blog/${DEFAULT_BLOG_LANG}/dev/`, 302);
+}
+const lang = langParam;
+
+const allPosts = (await getCollection('blog', ({ id }) => id.startsWith(`${lang}/`))).sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+);
+const posts = allPosts.filter((post) => post.data.category === 'dev');
+
+const I18N: Record<string, { title: string; subtitle: string; description: string }> = {
+  'zh-cn': {
+    title: '分类: 开发',
+    subtitle: '这里展示开发类文章。',
+    description: '开发分类文章列表。',
+  },
+  en: {
+    title: 'Category: Dev',
+    subtitle: 'Posts under the dev category.',
+    description: 'Posts in dev category.',
+  },
+  'ja-jp': {
+    title: 'カテゴリ: 開発',
+    subtitle: '開発カテゴリの記事一覧です。',
+    description: '開発カテゴリの記事一覧。',
+  },
+  'zh-tw': {
+    title: '分類: 開發',
+    subtitle: '這裡展示開發分類文章。',
+    description: '開發分類文章列表。',
+  },
+};
+const t = I18N[lang] || I18N.en;
+---
+
+<!doctype html>
+<html lang={lang}>
+<head>
+  <BaseHead title={`${t.title} | ${SITE_TITLE}`} description={t.description} />
+</head>
+<body>
+  <Header />
+  <PostArchive
+    lang={lang}
+    allPosts={allPosts}
+    posts={posts}
+    selectedCategory="dev"
+    title={t.title}
+    subtitle={t.subtitle}
+  />
+</body>
+</html>

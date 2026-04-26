@@ -1,0 +1,356 @@
+---
+import FormattedDate from './FormattedDate.astro';
+import { getPostSlug, toUrlCategory } from '../utils/blogRouting';
+
+interface ArchivePost {
+  id: string;
+  data: {
+    title: string;
+    description: string;
+    pubDate: Date;
+    category: string;
+    tags: string[];
+    version?: string;
+  };
+}
+
+interface Props {
+  lang: string;
+  allPosts: ArchivePost[];
+  posts: ArchivePost[];
+  title: string;
+  subtitle: string;
+  selectedCategory?: 'all' | 'dev' | 'docs';
+  selectedTag?: string;
+}
+
+const {
+  lang,
+  allPosts,
+  posts,
+  title,
+  subtitle,
+  selectedCategory = 'all',
+  selectedTag,
+} = Astro.props;
+
+const I18N: Record<
+  string,
+  {
+    categories: string;
+    tags: string;
+    all: string;
+    dev: string;
+    doc: string;
+    empty: string;
+    backToAll: string;
+  }
+> = {
+  'zh-cn': {
+    categories: '分类',
+    tags: '标签',
+    all: '全部',
+    dev: '开发',
+    doc: '文档',
+    empty: '没有匹配当前筛选条件的文章。',
+    backToAll: '返回全部文章',
+  },
+  en: {
+    categories: 'Categories',
+    tags: 'Tags',
+    all: 'All',
+    dev: 'Dev',
+    doc: 'Doc',
+    empty: 'No posts matched this filter.',
+    backToAll: 'Back to all posts',
+  },
+  'ja-jp': {
+    categories: 'カテゴリ',
+    tags: 'タグ',
+    all: 'すべて',
+    dev: '開発',
+    doc: 'ドキュメント',
+    empty: '条件に一致する記事はありません。',
+    backToAll: 'すべての記事へ戻る',
+  },
+  'zh-tw': {
+    categories: '分類',
+    tags: '標籤',
+    all: '全部',
+    dev: '開發',
+    doc: '文件',
+    empty: '沒有符合目前篩選條件的文章。',
+    backToAll: '返回全部文章',
+  },
+};
+
+const t = I18N[lang] || I18N.en;
+
+const allTags = [...new Set(allPosts.flatMap((post) => post.data.tags))].sort();
+const grouped = {
+  all: allPosts.length,
+  dev: allPosts.filter((post) => post.data.category === 'dev').length,
+  docs: allPosts.filter((post) => post.data.category === 'docs').length,
+};
+
+const categoryLinks = [
+  { key: 'all', label: t.all, href: `/blog/${lang}/` },
+  { key: 'dev', label: t.dev, href: `/blog/${lang}/dev/` },
+  { key: 'docs', label: t.doc, href: `/blog/${lang}/doc/` },
+] as const;
+---
+
+<div class="page-layout">
+  <aside class="sidebar">
+    <nav>
+      <h4 class="sidebar-title">{t.categories}</h4>
+      <ul class="sidebar-list">
+        {categoryLinks.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              class={`sidebar-link${selectedCategory === item.key ? ' active' : ''}`}
+            >
+              <span>{item.label}</span>
+              <span class="count">{grouped[item.key]}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+
+      {allTags.length > 0 && (
+        <>
+          <h4 class="sidebar-title" style="margin-top:1.5rem">{t.tags}</h4>
+          <div class="tag-cloud">
+            {allTags.map((tag) => (
+              <a
+                href={`/blog/${lang}/tag/${encodeURIComponent(tag)}/`}
+                class={`tag${selectedTag === tag ? ' active' : ''}`}
+              >
+                #{tag}
+              </a>
+            ))}
+          </div>
+        </>
+      )}
+    </nav>
+  </aside>
+
+  <main>
+    <h1 class="page-title">{title}</h1>
+    <p class="page-sub">{subtitle}</p>
+
+    {posts.length === 0 ? (
+      <div class="empty-state">
+        <p>{t.empty}</p>
+        <a href={`/blog/${lang}/`} class="empty-link">{t.backToAll}</a>
+      </div>
+    ) : (
+      <ul class="post-list">
+        {posts.map((post) => {
+          const { category, tags, version } = post.data;
+          const categorySegment = toUrlCategory(category);
+          const slug = getPostSlug(post.id, version);
+          const postHref = `/blog/${lang}/${categorySegment}/${slug}/`;
+          const categoryHref = `/blog/${lang}/${categorySegment}/`;
+          const categoryLabel =
+            category === 'dev' ? t.dev : category === 'docs' ? t.doc : categorySegment;
+          return (
+            <li class="post-card">
+              <div class="card-meta">
+                <a href={categoryHref} class={`cat-badge cat-${category}`}>{categoryLabel}</a>
+                {version && <span class="ver-badge">v{version}</span>}
+                <span class="date"><FormattedDate date={post.data.pubDate} /></span>
+              </div>
+              <h2 class="card-title">
+                <a href={postHref} class="post-link">{post.data.title}</a>
+              </h2>
+              <p class="card-desc">{post.data.description}</p>
+              {tags.length > 0 && (
+                <div class="card-tags">
+                  {tags.map((tag) => (
+                    <a href={`/blog/${lang}/tag/${encodeURIComponent(tag)}/`} class="tag">#{tag}</a>
+                  ))}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    )}
+  </main>
+</div>
+
+<style>
+  * { box-sizing: border-box; }
+  .page-layout {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 2.5rem;
+    align-items: start;
+  }
+  @media (max-width: 720px) {
+    .page-layout { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+  }
+  .sidebar { position: sticky; top: 68px; font-size: 0.82rem; }
+  .sidebar-title {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 0.5rem;
+  }
+  .sidebar-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+  .sidebar-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    color: #64748b;
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+  .sidebar-link:hover,
+  .sidebar-link.active {
+    color: var(--text);
+    background: rgba(255,255,255,0.05);
+  }
+  .count {
+    background: rgba(255,255,255,0.07);
+    color: #64748b;
+    padding: 0.05rem 0.4rem;
+    border-radius: 99px;
+    font-size: 0.7rem;
+  }
+  .tag-cloud { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .tag {
+    color: #64748b;
+    text-decoration: none;
+    font-size: 0.75rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: all 0.15s;
+  }
+  .tag:hover,
+  .tag.active {
+    color: var(--accent);
+    border-color: rgba(57,197,187,0.3);
+    background: rgba(57,197,187,0.08);
+  }
+  .page-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #f8fafc;
+    margin: 0 0 0.4rem;
+  }
+  .page-sub { color: var(--text-muted); margin: 0 0 2rem; font-size: 0.95rem; }
+  .post-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .post-card {
+    padding: 1.25rem 1.5rem;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: all 0.2s;
+  }
+  .post-card:hover {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(57,197,187,0.25);
+    transform: translateY(-1px);
+  }
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.78rem;
+    flex-wrap: wrap;
+  }
+  .cat-badge {
+    padding: 0.1rem 0.5rem;
+    border-radius: 99px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+  }
+  .cat-dev { background: rgba(139,92,246,0.15); color: #a78bfa; }
+  .cat-docs { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .ver-badge {
+    background: rgba(57,197,187,0.1);
+    color: #39c5bb;
+    padding: 0.1rem 0.45rem;
+    border-radius: 5px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    font-family: monospace;
+  }
+  .date { color: var(--text-muted); }
+  .card-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0 0 0.35rem;
+    letter-spacing: -0.01em;
+  }
+  .post-link {
+    color: #f1f5f9;
+    text-decoration: none;
+  }
+  .post-link:hover {
+    color: #39c5bb;
+  }
+  .card-desc {
+    color: #64748b;
+    font-size: 0.875rem;
+    margin: 0 0 0.6rem;
+    line-height: 1.55;
+  }
+  .card-tags {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+  }
+  .card-tags .tag {
+    font-size: 0.72rem;
+    padding: 0;
+    border: none;
+    color: #64748b;
+    background: none;
+  }
+  .card-tags .tag:hover {
+    color: var(--accent);
+  }
+  .empty-state {
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-muted);
+  }
+  .empty-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+</style>

@@ -1,0 +1,16 @@
+---
+import { getCollection } from 'astro:content';
+import RedirectPage from '../../components/RedirectPage.astro';
+import { DEFAULT_BLOG_LANG } from '../../utils/blogRouting';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog', ({ id }) => id.startsWith(`${DEFAULT_BLOG_LANG}/`));
+  const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort();
+  return tags.map((tag) => ({ params: { tag } }));
+}
+
+const tag = decodeURIComponent(Astro.params.tag || '');
+const to = `/blog/${DEFAULT_BLOG_LANG}/tag/${encodeURIComponent(tag)}/`;
+---
+
+<RedirectPage to={to} message="Redirecting..." />

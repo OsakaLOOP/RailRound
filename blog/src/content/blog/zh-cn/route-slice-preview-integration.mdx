@@ -1,0 +1,101 @@
+---
+title: '外站接入 RouteSlicePreview：npm 与 CDN 指南'
+description: '面向外站项目的接入说明，提供 @railloop/route-slice-preview 的 npm 与 CDN 两种集成方式。'
+pubDate: '2026-04-26'
+category: 'docs'
+tags: ['docs', 'mdx', 'npm', 'cdn', 'integration']
+---
+
+`@railloop/route-slice-preview` 是一个轻量的 React 路线预览组件，适合在博客、文档站或运营页面中展示轨道线路切片。
+
+## 方式一：npm 接入（推荐）
+
+### 1. 安装依赖
+
+```bash
+npm install @railloop/route-slice-preview react react-dom leaflet lucide-react
+```
+
+### 2. 引入组件与样式
+
+```tsx
+import { RouteSlicePreview } from "@railloop/route-slice-preview";
+import "@railloop/route-slice-preview/styles.css";
+```
+
+### 3. 最小可用示例
+
+```tsx
+import { RouteSlicePreview } from "@railloop/route-slice-preview";
+import "@railloop/route-slice-preview/styles.css";
+
+const sampleData = {
+  stations: [
+    { id: "L1:A", name_ja: "A", lat: 35.0, lng: 139.0 },
+    { id: "L1:B", name_ja: "B", lat: 35.01, lng: 139.02 },
+  ],
+  routeCoords: [
+    [35.0, 139.0],
+    [35.01, 139.02],
+  ],
+  distance: "2.4",
+  time: "5",
+  color: "#39C5BB",
+  meta: {
+    lineKey: "Demo:L1",
+    lineName: "L1",
+  },
+};
+
+export default function Demo() {
+  return (
+    <RouteSlicePreview
+      data={sampleData}
+      locale="zh-cn"
+      height="360px"
+      theme="light"
+      showPromo={false}
+    />
+  );
+}
+```
+
+## 方式二：CDN 接入
+
+适合不走 npm 构建流程、只希望快速嵌入的场景。
+
+```html
+<link rel="stylesheet" href="https://rail.s3xyseia.xyz/bundle/route-slice-preview.css" />
+```
+
+```tsx
+import { RouteSlicePreview } from "https://rail.s3xyseia.xyz/bundle/route-slice-preview.js";
+```
+
+其余 props 与 npm 方式一致。
+
+## 数据结构说明
+
+组件核心需要一个 `data` 对象，关键字段：
+
+- `stations`: 站点数组（包含坐标与名称）。
+- `routeCoords`: 路径坐标数组。
+- `distance` / `time`: 展示文本。
+- `color`: 线路主色。
+- `meta`: 线路基础信息（如 `lineKey`、`lineName`）。
+
+如果你在服务端生成数据，建议保持字段稳定，并固定输出 `id`，避免前端渲染抖动。
+
+## 常见问题
+
+### 样式没生效
+
+确认已引入 `styles.css`（npm）或 `<link>`（CDN）。
+
+### 地图空白
+
+优先检查容器高度（如 `height="360px"`）是否设置；其次确认页面未拦截第三方地图瓦片请求。
+
+### SSR 报错
+
+在 SSR/MDX 环境建议使用仅客户端挂载策略（例如 `client:only="react"`），避免服务端执行浏览器 API。

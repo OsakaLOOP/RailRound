@@ -1,0 +1,69 @@
+---
+import { getCollection } from 'astro:content';
+import BaseHead from '../../../components/BaseHead.astro';
+import Header from '../../../components/Header.astro';
+import PostArchive from '../../../components/PostArchive.astro';
+import { SITE_TITLE } from '../../../consts';
+import { BLOG_LANGS, DEFAULT_BLOG_LANG, isBlogLang } from '../../../utils/blogRouting';
+
+export async function getStaticPaths() {
+  const paths = [];
+
+  for (const lang of BLOG_LANGS) {
+    const posts = await getCollection('blog', ({ id }) => id.startsWith(`${lang}/`));
+    const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort();
+    for (const tag of tags) {
+      paths.push({
+        params: {
+          lang,
+          tag,
+        },
+      });
+    }
+  }
+
+  return paths;
+}
+
+const langParam = Astro.params.lang;
+if (!isBlogLang(langParam)) {
+  return Astro.redirect(`/blog/${DEFAULT_BLOG_LANG}/`, 302);
+}
+const lang = langParam;
+
+const tagParam = Astro.params.tag || '';
+const decodedTag = decodeURIComponent(tagParam);
+
+const allPosts = (await getCollection('blog', ({ id }) => id.startsWith(`${lang}/`))).sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+);
+const posts = allPosts.filter((post) => post.data.tags.includes(decodedTag));
+
+const I18N: Record<string, { titlePrefix: string; subtitlePrefix: string }> = {
+  'zh-cn': { titlePrefix: '标签', subtitlePrefix: '以下文章包含标签' },
+  en: { titlePrefix: 'Tag', subtitlePrefix: 'Posts tagged with' },
+  'ja-jp': { titlePrefix: 'タグ', subtitlePrefix: '次のタグが付いた記事' },
+  'zh-tw': { titlePrefix: '標籤', subtitlePrefix: '以下文章包含標籤' },
+};
+const t = I18N[lang] || I18N.en;
+const pageTitle = `${t.titlePrefix}: #${decodedTag}`;
+const pageSubtitle = `${t.subtitlePrefix} #${decodedTag}。`;
+---
+
+<!doctype html>
+<html lang={lang}>
+<head>
+  <BaseHead title={`${pageTitle} | ${SITE_TITLE}`} description={pageSubtitle} />
+</head>
+<body>
+  <Header />
+  <PostArchive
+    lang={lang}
+    allPosts={allPosts}
+    posts={posts}
+    selectedTag={decodedTag}
+    title={pageTitle}
+    subtitle={pageSubtitle}
+  />
+</body>
+</html>

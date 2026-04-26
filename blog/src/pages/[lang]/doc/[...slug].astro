@@ -8,7 +8,7 @@ export async function getStaticPaths() {
 
   for (const lang of BLOG_LANGS) {
     const posts = await getCollection('blog', ({ id, data }) => {
-      return id.startsWith(`${lang}/`) && data.category === 'dev';
+      return id.startsWith(`${lang}/`) && data.category === 'docs';
     });
 
     for (const post of posts) {

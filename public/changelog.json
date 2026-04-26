@@ -1,13 +1,19 @@
 {
   "meta": {
-    "lastUpdated": "2026-04-15",
-    "currentVersion": "0.50",
+    "lastUpdated": "2026-04-26",
+    "currentVersion": "0.51",
     "appName": "RailLOOP",
     "author": "@OsakaLOOP",
     "minVer": "0.20",
     "forceDataReload": true
   },
   "logs": [
+    {
+      "version": "0.51",
+      "date": "2026-04-26",
+      "type": "feat",
+      "content": "新增版本内容发布流程补强：\n1) 补充 v0.51 版本日志与详情页映射。\n2) 新增 docs 分类文章，提供外站接入 @railloop/route-slice-preview 的 npm / CDN 用法。\n3) 为 blog 增加非 dev 分类详情路由，避免 docs/release 文章链接 404。"
+    },
     {
       "version": "0.50",
       "date": "2026-04-15",

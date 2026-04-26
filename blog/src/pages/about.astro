@@ -1,36 +1,8 @@
 ---
-import BaseHead from '../components/BaseHead.astro';
-import Header from '../components/Header.astro';
-import { APP_URL, SITE_TITLE } from '../consts';
+import RedirectPage from '../components/RedirectPage.astro';
+import { DEFAULT_BLOG_LANG } from '../utils/blogRouting';
+
+const to = `/blog/${DEFAULT_BLOG_LANG}/about/`;
 ---
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <BaseHead title={`关于 — ${SITE_TITLE}`} description="RailRound 是一个个人铁路行程记录与可视化工具。" />
-</head>
-<body>
-  <Header />
-  <main style="max-width:720px;margin:3rem auto;padding:0 1.5rem 4rem">
-    <h1 style="font-size:1.8rem;letter-spacing:-0.03em;margin-bottom:0.5rem">关于 RailRound</h1>
-    <p style="color:var(--text-muted);margin:0 0 2rem">个人铁路出行记录、可视化与分析工具。</p>
 
-    <h2 style="font-size:1.1rem;margin-top:2rem">功能简介</h2>
-    <ul style="padding-left:1.5rem;line-height:2;color:var(--text)">
-      <li>各条路线的历史出行记录与行程管理</li>
-      <li>基于 Leaflet 的交互式地图可视化</li>
-      <li>行程统计与里程数据面板</li>
-      <li>Suica IC 卡数据导入解析</li>
-      <li>多语言支持（中文 / 日文 / 英文）</li>
-    </ul>
-
-    <h2 style="font-size:1.1rem;margin-top:2rem">当前版本</h2>
-    <p>请查看 <a href="/blog/blog/" style="color:var(--accent)">开发日志</a> 了解最新更新动态。</p>
-
-    <div style="margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border)">
-      <a href={APP_URL} class="app-return-link" style="color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:0.4rem">
-        ← 返回应用
-      </a>
-    </div>
-  </main>
-</body>
-</html>
+<RedirectPage to={to} message="Redirecting..." />

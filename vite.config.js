@@ -5,6 +5,7 @@ import Sitemap from 'vite-plugin-sitemap'
 import { fileURLToPath } from 'url'
 import path from 'path'
 import sirv from 'sirv'
+import fs from 'fs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -25,21 +26,59 @@ export default defineConfig({
     {
       name: 'serve-static-blog',
       configureServer(server) {
-        const blogDistPath = path.resolve(__dirname, 'blog/dist');
-        const serve = sirv(blogDistPath, { dev: true, single: false, etag: true });
-        
-        server.middlewares.use((req, res, next) => {
-          if (req.url && req.url.startsWith('/blog') && !req.url.startsWith('/blog/src/') && !req.url.startsWith('/blog/node_modules/')) {
-            // 将 /blog 前缀去除后传给 sirv，使其在 blog/dist 中查找
-            const url = req.url.replace(/^\/blog/, '') || '/';
-            // 如果去掉前缀后变为空，强制设为 /
-            req.url = url === '' ? '/' : url;
+        const blogDistPath = path.resolve(__dirname, 'blog/dist')
+        const serve = sirv(blogDistPath, {
+          dev: true,
+          single: '404.html',
+          etag: true
+        })
+        const blog404Path = path.join(blogDistPath, '404.html')
+        const blog404Html = fs.existsSync(blog404Path) ? fs.readFileSync(blog404Path, 'utf8') : null
 
-            serve(req, res, next);
-          } else {
-            next();
+        server.middlewares.use((req, res, next) => {
+          const originalUrl = req.url || ''
+          if (
+            !originalUrl.startsWith('/blog') ||
+            originalUrl.startsWith('/blog/src/') ||
+            originalUrl.startsWith('/blog/node_modules/')
+          ) {
+            next()
+            return
           }
-        });
+
+          const queryIndex = originalUrl.indexOf('?')
+          const pathname = queryIndex >= 0 ? originalUrl.slice(0, queryIndex) : originalUrl
+          const search = queryIndex >= 0 ? originalUrl.slice(queryIndex) : ''
+
+          // Normalize directory-like blog paths to trailing slash so Astro static
+          // output under <dir>/index.html resolves correctly.
+          if (pathname === '/blog' || pathname === '/blog/') {
+            res.statusCode = 302
+            res.setHeader('Location', `/blog/zh-cn/${search}`)
+            res.end()
+            return
+          }
+          if (!pathname.endsWith('/') && !path.posix.extname(pathname)) {
+            res.statusCode = 302
+            res.setHeader('Location', `${pathname}/${search}`)
+            res.end()
+            return
+          }
+
+          req.url = `${pathname.replace(/^\/blog/, '') || '/'}${search}`
+          serve(req, res, () => {
+            // Keep unmatched /blog/* inside blog space instead of falling through
+            // to app SPA routes.
+            if (blog404Html) {
+              res.statusCode = 404
+              res.setHeader('Content-Type', 'text/html; charset=utf-8')
+              res.end(blog404Html)
+              return
+            }
+            req.url = originalUrl
+            next()
+          })
+        })
       }
     }
   ],
@@ -50,7 +89,6 @@ export default defineConfig({
     },
   },
   server: {
-    // 移除所有 Astro 代理规则，统一由 serve-static-blog 处理
     proxy: {}
   }
 })

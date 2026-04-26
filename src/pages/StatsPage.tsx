@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Github, Folder, TrendingUp, Move, MapPin, Map as MapIcon, Globe } from 'lucide-react';
+import { Github, Folder, TrendingUp, Move, MapPin, Map as MapIcon, Globe, MessageSquare, Shield } from 'lucide-react';
 import { useStore } from '../store';
 import { calcDist } from '../core/tripCalculator';
 import * as turf from '@turf/turf';
@@ -126,6 +126,23 @@ export const StatsPage: React.FC = () => {
 
     return (
         <div id="stats-view-content" className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex items-center justify-end gap-2">
+                {user?.username === 'admin' && (
+                    <button
+                        onClick={() => setModalState({ feedbackAdminModalOpen: true })}
+                        className="px-3 py-2 text-xs font-bold rounded-lg border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors flex items-center gap-1"
+                    >
+                        <Shield size={14} /> {t('feedback.adminEntry', '反馈管理')}
+                    </button>
+                )}
+                <button
+                    onClick={() => setModalState({ feedbackModalOpen: true })}
+                    className="px-3 py-2 text-xs font-bold rounded-lg border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 transition-colors flex items-center gap-1"
+                >
+                    <MessageSquare size={14} /> {t('feedback.entry', '反馈')}
+                </button>
+            </div>
+
             {user && (
                 <div className="bg-white p-4 rounded-xl shadow-sm border relative">
                     <div className="flex items-center gap-4">

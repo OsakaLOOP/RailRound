@@ -9,6 +9,8 @@ import { GithubCardModal } from './components/modals/GithubCardModal';
 import { FolderManagerModal } from './components/modals/FolderManagerModal';
 import { AddToFolderModal } from './components/modals/AddToFolderModal';
 import { ExportRouteModal } from './components/modals/ExportRouteModal';
+import { FeedbackModal } from './components/modals/FeedbackModal';
+import { FeedbackAdminModal } from './components/modals/FeedbackAdminModal';
 import { TripEditor } from './components/modals/TripEditor';
 import { WalkTripEditor } from './components/modals/WalkTripEditor';
 import { MapContainer } from './components/map/MapContainer';
@@ -1203,6 +1205,8 @@ export const AppLayout: React.FC = () => {
                 <GithubRegisterModal />
                 <GithubCardModal />
                 <FolderManagerModal />
+                <FeedbackModal />
+                <FeedbackAdminModal />
                 <AddToFolderModal />
                 <ExportRouteModal />
 

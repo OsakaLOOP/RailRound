@@ -296,6 +296,8 @@ export interface GlobalStore {
     isGithubRegOpen: boolean;
     cardModalUser: any | null;
     folderManagerOpen: boolean;
+    feedbackModalOpen: boolean;
+    feedbackAdminModalOpen: boolean;
     addToFolderModalOpen: boolean;
     currentTripForFolder: Trip | null;
     exportRouteModalOpen: boolean;
@@ -434,6 +436,8 @@ export const useStore = create<GlobalStore>()(
         isGithubRegOpen: false,
         cardModalUser: null,
         folderManagerOpen: false,
+        feedbackModalOpen: false,
+        feedbackAdminModalOpen: false,
         addToFolderModalOpen: false,
         currentTripForFolder: null,
         exportRouteModalOpen: false,

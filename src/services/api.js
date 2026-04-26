@@ -83,5 +83,50 @@ export const api = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to get card key');
     return data.key;
+  },
+
+  async submitFeedback(formData, token = null) {
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/feedback/submit`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to submit feedback');
+    return data;
+  },
+
+  async getFeedbackAdminList(params = {}, token) {
+    const search = new URLSearchParams();
+    if (params.cursor) search.set('cursor', params.cursor);
+    if (params.limit) search.set('limit', String(params.limit));
+    if (params.category) search.set('category', params.category);
+    if (params.status) search.set('status', params.status);
+
+    const query = search.toString();
+    const res = await fetch(`${API_BASE}/feedback/admin/list${query ? `?${query}` : ''}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch feedback list');
+    return data;
+  },
+
+  async getFeedbackAdminItem(id, token) {
+    const search = new URLSearchParams({ id });
+    const res = await fetch(`${API_BASE}/feedback/admin/item?${search.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch feedback item');
+    return data;
   }
 };

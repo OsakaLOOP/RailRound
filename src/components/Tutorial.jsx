@@ -70,7 +70,7 @@ const getSteps = (t) => [
         id: 'tab-map',
         target: '#tab-btn-map',
         title: t('tutorial.tabMap.title', '地图模式'),
-        content: t('tutorial.tabMap.content', '切换并查看铁路网络. 灰色的是未乘区段, 而已乘线路将以对应的颜色高亮显示. 底图包含来自 OpenRailwayMap 的配线详情. 新版本不再渲染已乘区间的svg图形, 而丰富了站点交互. 你可以长按站点并拖动连接, 以自动规划。'),
+        content: t('tutorial.tabMap.content', '点击切换并查看铁路网络. 灰色的是未乘区段, 而已乘线路将以对应的颜色高亮显示. 底图包含来自 OpenRailwayMap 的配线详情. 新版本不再渲染已乘区间的svg图形, 而丰富了站点交互. 你可以长按站点并拖动连接, 以自动规划。'),
         position: 'top',
         action: 'wait-click-tab',
         tab: 'map',

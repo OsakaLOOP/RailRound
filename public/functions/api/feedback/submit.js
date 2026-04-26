@@ -31,10 +31,10 @@ async function updateHookStatus(DB, feedbackId, statusPatch) {
   await DB.put(key, JSON.stringify(next));
 }
 
-async function createGitHubIssue(record) {
-  const token = typeof event === "undefined" || !event.env ? "" : String(event.env.GITHUB_FEEDBACK_TOKEN || "");
-  const owner = typeof event === "undefined" || !event.env ? "" : String(event.env.GITHUB_FEEDBACK_OWNER || "");
-  const repo = typeof event === "undefined" || !event.env ? "" : String(event.env.GITHUB_FEEDBACK_REPO || "");
+async function createGitHubIssue(record, env) {
+  const token = String(env?.GITHUB_FEEDBACK_TOKEN || "");
+  const owner = String(env?.GITHUB_FEEDBACK_OWNER || "");
+  const repo = String(env?.GITHUB_FEEDBACK_REPO || "");
   if (!token || !owner || !repo) {
     throw new Error("GitHub feedback hook not configured");
   }
@@ -85,12 +85,12 @@ async function createGitHubIssue(record) {
   }
 }
 
-async function runGitHubHook(DB, feedbackId) {
+async function runGitHubHook(DB, feedbackId, env) {
   try {
     const raw = await DB.get(`feedback:${feedbackId}`);
     if (!raw) return;
     const record = typeof raw === "string" ? JSON.parse(raw) : raw;
-    const issue = await createGitHubIssue(record);
+    const issue = await createGitHubIssue(record, env);
     await updateHookStatus(DB, feedbackId, {
       provider: "github_issue",
       status: "success",
@@ -162,7 +162,7 @@ export async function onRequest(event) {
       const ext = getMimeExtension(mime);
       const r2Key = `feedback/${yyyy}/${mm}/${feedbackId}.${ext}`;
       const body = await maybeScreenshot.arrayBuffer();
-      await putFeedbackObject(r2Key, body, mime);
+      await putFeedbackObject(r2Key, body, mime, event.env);
 
       const createdAt = now.toISOString();
       const record = {
@@ -186,7 +186,7 @@ export async function onRequest(event) {
       };
 
       await DB.put(`feedback:${feedbackId}`, JSON.stringify(record));
-      const hookPromise = runGitHubHook(DB, feedbackId);
+      const hookPromise = runGitHubHook(DB, feedbackId, event.env);
       if (typeof event.waitUntil === "function") {
         event.waitUntil(hookPromise);
       } else {
@@ -219,7 +219,7 @@ export async function onRequest(event) {
     };
 
     await DB.put(`feedback:${feedbackId}`, JSON.stringify(record));
-    const hookPromise = runGitHubHook(DB, feedbackId);
+    const hookPromise = runGitHubHook(DB, feedbackId, event.env);
     if (typeof event.waitUntil === "function") {
       event.waitUntil(hookPromise);
     } else {

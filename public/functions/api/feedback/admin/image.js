@@ -35,7 +35,7 @@ export async function onRequest(event) {
       return json({ error: "Signed URL expired" }, 403, headers);
     }
 
-    const secret = getImageSigningSecret();
+    const secret = getImageSigningSecret(event.env);
     if (!secret) return json({ error: "Image signing secret is not configured" }, 500, headers);
 
     const expectedSig = await hmacHex(secret, `${key}|${expiresRaw}|${id}`);
@@ -50,7 +50,7 @@ export async function onRequest(event) {
       return json({ error: "Screenshot mismatch" }, 403, headers);
     }
 
-    const object = await getFeedbackObject(key);
+    const object = await getFeedbackObject(key, event.env);
     if (!object) return json({ error: "Image not found" }, 404, headers);
 
     const responseHeaders = new Headers();

@@ -36,7 +36,7 @@ export async function onRequest(event) {
     let screenshotUrl = null;
     const r2Key = item?.screenshot?.r2_key;
     if (r2Key) {
-      const secret = getImageSigningSecret();
+      const secret = getImageSigningSecret(event.env);
       if (secret) {
         const expires = Date.now() + IMAGE_TTL_MS;
         const message = `${r2Key}|${expires}|${id}`;

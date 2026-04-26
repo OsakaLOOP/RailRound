@@ -19,18 +19,19 @@ export function getKV() {
   return globalThis.RAILROUND_KV;
 }
 
-export function getFeedbackBucket() {
-  return event.env.RAILROUND_FEEDBACK_R2 || null;
+export function getFeedbackBucket(env) {
+  if (!env) return null;
+  return env.RAILROUND_FEEDBACK_R2 || null;
 }
 
-function getR2S3Config() {
-  if (typeof event === "undefined" || !event) return null;
+function getR2S3Config(env) {
+  if (!env) return null;
 
-  const endpoint = String(event.env.FEEDBACK_R2_S3_ENDPOINT || "");
-  const accessKeyId = String(event.env.FEEDBACK_R2_ACCESS_KEY_ID || "");
-  const secretAccessKey = String(event.env.FEEDBACK_R2_SECRET_ACCESS_KEY || "");
-  const region = String(event.env.FEEDBACK_R2_REGION || "");
-  const bucket = String(event.env.FEEDBACK_R2_BUCKET || "");
+  const endpoint = String(env.FEEDBACK_R2_S3_ENDPOINT || "");
+  const accessKeyId = String(env.FEEDBACK_R2_ACCESS_KEY_ID || "");
+  const secretAccessKey = String(env.FEEDBACK_R2_SECRET_ACCESS_KEY || "");
+  const region = String(env.FEEDBACK_R2_REGION || "");
+  const bucket = String(env.FEEDBACK_R2_BUCKET || "");
 
   if (!endpoint || !accessKeyId || !secretAccessKey || !region || !bucket) return null;
 
@@ -129,8 +130,8 @@ function buildCanonicalUri(basePath, bucket, objectKey) {
   return `/${fullSegments.join("/")}`;
 }
 
-async function signedS3Request(method, objectKey, options = {}) {
-  const cfg = getR2S3Config();
+async function signedS3Request(method, objectKey, options = {}, env) {
+  const cfg = getR2S3Config(env);
   if (!cfg) {
     throw new Error("R2 S3 config missing");
   }
@@ -196,22 +197,22 @@ async function signedS3Request(method, objectKey, options = {}) {
   return await fetch(targetUrl, requestInit);
 }
 
-export async function putFeedbackObject(objectKey, body, contentType) {
-  const bucket = getFeedbackBucket();
+export async function putFeedbackObject(objectKey, body, contentType, env) {
+  const bucket = getFeedbackBucket(env);
   if (bucket) {
     await bucket.put(objectKey, body, { httpMetadata: { contentType } });
     return;
   }
 
-  const res = await signedS3Request("PUT", objectKey, { body, contentType });
+  const res = await signedS3Request("PUT", objectKey, { body, contentType }, env);
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     throw new Error(`R2 PUT failed: ${res.status} ${clipText(txt, 400)}`);
   }
 }
 
-export async function getFeedbackObject(objectKey) {
-  const bucket = getFeedbackBucket();
+export async function getFeedbackObject(objectKey, env) {
+  const bucket = getFeedbackBucket(env);
   if (bucket) {
     const object = await bucket.get(objectKey);
     if (!object) return null;
@@ -222,7 +223,7 @@ export async function getFeedbackObject(objectKey) {
     };
   }
 
-  const res = await signedS3Request("GET", objectKey, {});
+  const res = await signedS3Request("GET", objectKey, {}, env);
   if (res.status === 404) return null;
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
@@ -245,9 +246,9 @@ export function secureCompareHex(a, b) {
   return result === 0;
 }
 
-export function getImageSigningSecret() {
-  if (typeof event === "undefined" || !event.env) return "";
-  return String(event.env.FEEDBACK_IMAGE_SIGNING_SECRET || "");
+export function getImageSigningSecret(env) {
+  if (!env) return "";
+  return String(env.FEEDBACK_IMAGE_SIGNING_SECRET || "");
 }
 
 export function clipText(input, maxLen) {

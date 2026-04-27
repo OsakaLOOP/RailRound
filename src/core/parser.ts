@@ -1,18 +1,59 @@
-import type { RailwayMap, CompanyMeta, Station, RailwayLineMeta } from '../store';
+import type { Station, RailwayLineMeta } from '../store';
 
+const mergeBucket = (current: any, incoming: any) => {
+    const base = (current && typeof current === 'object') ? current : {};
+    const next = (incoming && typeof incoming === 'object') ? incoming : {};
+    return {
+        ...base,
+        ...next,
+        ...(Array.isArray(next.subSegments) ? { subSegments: next.subSegments } : {}),
+        ...(Array.isArray(next.events) ? { events: next.events } : {}),
+        ...(Array.isArray(next.systems) ? { systems: next.systems } : {})
+    };
+};
+
+const mergeNetworkMeta = (existingMeta: any, incomingMeta: any, direction?: string) => {
+    if (!incomingMeta || typeof incomingMeta !== 'object') return existingMeta;
+    const existing = (existingMeta && typeof existingMeta === 'object') ? existingMeta : {};
+    const normalizedDirection = direction === 'up' || direction === 'down' ? direction : undefined;
+    const hasStructuredMeta = !!incomingMeta.byDirection || !!incomingMeta.common;
+
+    if (normalizedDirection && !hasStructuredMeta) {
+        return {
+            ...existing,
+            byDirection: {
+                ...(existing.byDirection || {}),
+                [normalizedDirection]: mergeBucket(existing.byDirection?.[normalizedDirection], incomingMeta)
+            }
+        };
+    }
+
+    return {
+        ...existing,
+        ...incomingMeta,
+        ...(incomingMeta.common ? { common: mergeBucket(existing.common, incomingMeta.common) } : {}),
+        ...(incomingMeta.byDirection
+            ? {
+                byDirection: {
+                    ...(existing.byDirection || {}),
+                    ...(incomingMeta.byDirection.up
+                        ? { up: mergeBucket(existing.byDirection?.up, incomingMeta.byDirection.up) }
+                        : {}),
+                    ...(incomingMeta.byDirection.down
+                        ? { down: mergeBucket(existing.byDirection?.down, incomingMeta.byDirection.down) }
+                        : {})
+                }
+            }
+            : {})
+    };
+};
 
 /**
- * A standalone, environment-agnostic pure function to parse GeoJSON features
- * and build the `railwayData` mapping and flattened `geoData`.
- *
- * @param items Array of objects { json: { features: [...] }, company: string }
- * @param companyData The loaded company metadata mapping
- * @returns { newFeatures: any[], railwayUpdates: any }
+ * Parse GeoJSON features and build railwayData + flattened geoData features.
  */
 export const parseGeoJsonBatch = (items: { json: any; company?: string }[], companyData: any = {}) => {
     const newFeatures: any[] = [];
-    const railwayUpdates: Record<string, { meta: RailwayLineMeta, stations: Station[] }> = {};
-
+    const railwayUpdates: Record<string, { meta: RailwayLineMeta; stations: Station[] }> = {};
 
     items.forEach(({ json, company: defaultCompany }) => {
         if (!json || !json.features || !Array.isArray(json.features)) return;
@@ -21,7 +62,7 @@ export const parseGeoJsonBatch = (items: { json: any; company?: string }[], comp
             ...f,
             properties: {
                 ...f.properties,
-                company: f.properties.company || f.properties.operator || defaultCompany || "上传数据"
+                company: f.properties.company || f.properties.operator || defaultCompany || '未知公司'
             }
         }));
 
@@ -39,16 +80,18 @@ export const parseGeoJsonBatch = (items: { json: any; company?: string }[], comp
                     const color = props.stroke || props.color || props.lineColor || null;
                     railwayUpdates[lineKey] = {
                         meta: {
-                            region: info.region || "未知",
-                            type: info.type || "未知",
+                            region: info.region || '未知',
+                            type: info.type || '未知',
                             company: comp,
                             logo: info.logo,
                             icon,
                             companyIcon: info.icon || null,
                             color,
                             recolor: info.recolor === true,
-                            // 任何同名 line feature 只要带 isLoop 即为环线
-                            isLoop: props.isLoop === true || props.isLoop === 'true'
+                            isLoop: props.isLoop === true || props.isLoop === 'true',
+                            ...(props.networkMeta
+                                ? { networkMeta: mergeNetworkMeta(undefined, props.networkMeta, props.direction) }
+                                : {})
                         },
                         stations: []
                     };
@@ -62,18 +105,23 @@ export const parseGeoJsonBatch = (items: { json: any; company?: string }[], comp
                     if (props.isLoop === true || props.isLoop === 'true') {
                         railwayUpdates[lineKey].meta.isLoop = true;
                     }
+                    if (props.networkMeta) {
+                        railwayUpdates[lineKey].meta.networkMeta = mergeNetworkMeta(
+                            railwayUpdates[lineKey].meta.networkMeta,
+                            props.networkMeta,
+                            props.direction
+                        );
+                    }
                 }
                 return lineKey;
             };
 
             if (p.type === 'line' && p.name) {
-                // direction 子 feature（up/down）仍然注册 lineKey，供 geoData 查询使用
                 ensureLineInTemp(p.name, p);
             } else if (p.type === 'station' && p.line && p.name && f.geometry?.coordinates) {
                 const lineKey = ensureLineInTemp(p.line, p);
                 const stations = railwayUpdates[lineKey].stations;
 
-                // Add station if it doesn't already exist in this temp batch
                 if (!stations.find((s: any) => s.name_ja === p.name)) {
                     const stationId = p.id || `${comp}:${p.line}:${p.name}`;
                     stations.push({
@@ -89,7 +137,6 @@ export const parseGeoJsonBatch = (items: { json: any; company?: string }[], comp
         });
     });
 
-    // 环线站序规范化: index 0 不变, 其余反转 (GeoJSON 原始顺序为外回り, 转为内回り使 index 递增 = up)
     for (const lineKey in railwayUpdates) {
         const entry = railwayUpdates[lineKey];
         if (entry.meta.isLoop && entry.stations.length > 2) {

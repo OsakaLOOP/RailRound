@@ -45,7 +45,16 @@ export async function onRequest(event) {
       }
     }
 
-    return json({ item: { ...item, screenshot_url: screenshotUrl } }, 200, headers);
+    const normalizedItem = {
+      ...item,
+      hook: {
+        ...(item?.hook || {}),
+        issue_match_mode: item?.hook?.issue_match_mode || null
+      },
+      screenshot_url: screenshotUrl
+    };
+
+    return json({ item: normalizedItem }, 200, headers);
   } catch (err) {
     return json({ error: err?.message || "Failed to fetch feedback item" }, 500, headers);
   }

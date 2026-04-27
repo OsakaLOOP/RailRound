@@ -40,8 +40,8 @@ export async function onRequest(event) {
       rounds += 1;
       const page = await DB.list({
         prefix: "feedback:",
-        cursor: listCursor,
-        limit: Math.min(100, limit * 4)
+        limit: Math.min(100, limit * 4),
+        ...(listCursor ? { cursor: listCursor } : {})
       });
       listCursor = page.cursor;
       listComplete = Boolean(page.list_complete);
@@ -68,10 +68,18 @@ export async function onRequest(event) {
           id: row.id,
           created_at: row.created_at,
           category: row.category,
+          error_module: row.error_module || null,
           content_preview: clipText(row.content || "", 160),
           reporter: row.reporter || { type: "unknown" },
           hook: {
             status: rowStatus,
+            issue_match_mode: row.hook?.issue_match_mode || null,
+            issue_number: Number.isFinite(Number(row.hook?.issue_number)) ? Number(row.hook.issue_number) : null,
+            issue_state: row.hook?.issue_state || null,
+            issue_title: row.hook?.issue_title || null,
+            issue_labels: Array.isArray(row.hook?.issue_labels) ? row.hook.issue_labels : [],
+            issue_updated_at: row.hook?.issue_updated_at || null,
+            last_comment: row.hook?.last_comment || null,
             issue_url: row.hook?.issue_url || null
           },
           has_screenshot: Boolean(row.screenshot?.r2_key)

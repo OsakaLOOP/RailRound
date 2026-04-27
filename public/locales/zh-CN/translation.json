@@ -405,6 +405,9 @@
     "removeScreenshot": "移除截图",
     "includeIdentity": "提交时附带我的用户名",
     "loginRequired": "(登录后可选)",
+    "githubIssueTitle": "想自己创建 Issue？",
+    "githubIssueDesc": "你也可以直接前往 GitHub Issue 页面提交。通过该页面提交时，Issue 会以你的 GitHub 账号名义创建。",
+    "githubIssueLink": "前往 GitHub Issue 页面",
     "submit": "提交反馈",
     "adminLoadListFail": "加载反馈列表失败",
     "adminLoadItemFail": "加载反馈详情失败",
@@ -421,6 +424,32 @@
     "noDetail": "详情为空",
     "createdAt": "提交时间",
     "clientMeta": "客户端信息",
-    "openImage": "在新窗口打开"
+    "openImage": "在新窗口打开",
+    "errorModule": "错误模块",
+    "errorModuleOptions": {
+      "routing": "路由",
+      "map": "地图",
+      "auth": "认证",
+      "sync": "同步",
+      "i18n": "多语言",
+      "ui": "界面",
+      "performance": "性能",
+      "other": "其他"
+    },
+    "submitAsGithubIdentity": "??? GitHub ????",
+    "submitAsGithubIdentityDesc": "???? ticket + GitHub ???? + ???????",
+    "githubBindRequired": "????? GitHub ??",
+    "githubManualJumpTip": "??? GitHub ?????????????????",
+    "callbackTitle": "GitHub ????",
+    "callbackChecking": "???? Issue ??...",
+    "callbackSuccess": "Issue ????????????",
+    "callbackOpenIssue": "????? Issue",
+    "callbackFailed": "????",
+    "callbackRetryHint": "?? GitHub ??????????????",
+    "callbackBackApp": "????",
+    "callbackClose": "????",
+    "callbackMissingTicket": "?? ticket ??",
+    "callbackConfirmFailed": "?? GitHub Issue ??",
+    "callbackToastSuccess": "?? Issue ??????????"
   }
 }

@@ -6,6 +6,7 @@ import { GlobalProvider } from './GlobalProvider';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { AppLayout } from './AppLayout'; // Ensure it points to AppLayout
+import { FeedbackGithubCallbackPage } from './pages/FeedbackGithubCallbackPage';
 import { isMobile } from 'react-device-detect';
 
 // Suppress console logs in production
@@ -53,6 +54,7 @@ root.render(
         <BrowserRouter>
           <Routes>
             <Route path="/blog/*" element={<BlogPathRedirect />} />
+            <Route path="/:lang/feedback/github/callback" element={<FeedbackGithubCallbackPage />} />
             <Route path="/:lang/*" element={<AppLayout />} />
             <Route path="/*" element={<AppLayout />} />
           </Routes>

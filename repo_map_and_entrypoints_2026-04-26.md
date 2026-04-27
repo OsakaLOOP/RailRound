@@ -1,0 +1,99 @@
+﻿# RailRound Repo Map & Co-Change Entry Points (2026-04-26)
+
+## 1) Functional blocks
+
+- src/: 主应用（React + Vite）
+  - app shell: src/main.jsx, src/RailRound.jsx, src/AppLayout.tsx
+  - i18n: src/i18n.ts + public/locales/\*/translation.json
+  - UI components: src/components/\*\*
+  - business core: src/core/\*\*
+  - state/services: src/store/index.ts, src/services/api.js
+  - data/utils: src/utils/\*\*
+- blog/: Astro 博客子项目（独立构建/测试）
+  - content: blog/src/content/blog/{zh-cn,en,ja-jp,zh-tw}/\*.mdx
+  - routes/pages: blog/src/pages/\*\*
+  - mdx interactive components: blog/src/components/mdx/\*\*
+- public/: 运行时静态与 API
+  - locales: public/locales/\*/translation.json
+  - release metadata: public/changelog.json
+  - rail data: public/geojson/\*\*, public/geojson_manifest.json, public/company_data.json
+  - edge functions: public/functions/api/\*\*
+- scripts/: 发布与构建协同脚本（尤其 release 校验）
+- packages/route-slice-preview/: 可复用包（与 blog 组件联动）
+- docs/: 方案、审计与发布流程文档
+
+## 2) High-frequency co-change entry points
+
+### A. UI text / interaction change (main app)
+
+- primary:
+  - src/components/\*\* (具体交互与文案)
+  - src/i18n.ts (i18next 配置)
+  - public/locales/en/translation.json
+  - public/locales/ja-JP/translation.json
+  - public/locales/zh-CN/translation.json
+  - public/locales/zh-TW/translation.json
+- often together:
+  - src/store/index.ts (语言初始值 i18nextLng)
+  - src/utils/alerts.ts (直接 i18next.t)
+
+### B. Version/changelog/release surface
+
+- primary:
+  - public/changelog.json
+  - src/components/VersionBadge.jsx
+  - src/utils/fetchAndParseData.ts (读取 changelog.meta.currentVersion)
+- required companion:
+  - blog/src/content/blog/<locale>/v{version}.mdx
+  - scripts/validate-release-content.mjs
+  - docs/next-minor-release-task-plan.md
+- build coupling:
+  - package.json (root build 会串联 blog build + merge)
+  - scripts/merge-blog-dist.js
+
+### C. Blog i18n and release pages
+
+- primary:
+  - blog/astro.config.mjs (locales)
+  - blog/src/content/blog/{zh-cn,en,ja-jp,zh-tw}/
+  - blog/src/components/mdx/i18n.ts
+  - blog/src/utils/blogRouting.ts (version->slug)
+
+### D. Rail data ingestion / map data update
+
+- primary:
+  - public/geojson/\*\*
+  - public/geojson_manifest.json
+  - public/company_data.json
+- companion:
+  - src/utils/fetchAndParseData.ts
+  - src/core/bot/botDataBuilder.ts
+  - docs/api/bot-integration-guide.md
+
+### E. API contract related updates
+
+- primary:
+  - src/services/api.js
+  - public/functions/api/user/data.js
+  - public/functions/api/feedback/\*\*
+- companion:
+  - src/hooks/useUserData.ts
+  - src/store/index.ts
+
+## 3) Practical edit bundles (quick checklist)
+
+- 修改主应用 UI 文案:
+  - src/components/_ + public/locales/_/translation.json + key 对齐检查
+- 发布新版本:
+  - public/changelog.json + blog 各语言 vX.mdx + scripts/validate-release-content.mjs 校验通过
+- 改后端交互字段:
+  - src/services/api.js + public/functions/api/\*\* + store/hook 消费点
+- 改轨道数据源:
+  - public/geojson\* + company_data + fetchAndParseData + bot builder
+
+## 4) Naming/entry mismatch notes
+
+- "版本更新" 实际入口并非仅 changelog：UI 显示在 src/components/VersionBadge.jsx，数据源在 public/changelog.json，发布详情在 blog/src/content/blog/_/v_.mdx。
+- "本地化" 在主应用与 blog 存在双入口：
+  - app: i18next + public/locales/\*/translation.json
+  - blog: astro i18n + blog/src/components/mdx/i18n.ts + 按语言内容目录

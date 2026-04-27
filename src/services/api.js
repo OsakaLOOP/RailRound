@@ -98,6 +98,19 @@ export const api = {
     return data;
   },
 
+  async confirmFeedbackIssue(ticket, token = null) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/feedback/issue/confirm`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ticket })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to confirm feedback issue');
+    return data;
+  },
+
   async getFeedbackAdminList(params = {}, token) {
     const search = new URLSearchParams();
     if (params.cursor) search.set('cursor', params.cursor);
@@ -127,6 +140,18 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to fetch feedback item');
+    return data;
+  },
+
+  async syncFeedbackGithub(token) {
+    const res = await fetch(`${API_BASE}/feedback/admin/sync_github`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to sync feedback github state');
     return data;
   }
 };

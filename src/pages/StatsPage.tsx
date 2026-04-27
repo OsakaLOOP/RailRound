@@ -7,6 +7,7 @@ import * as turf from '@turf/turf';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
+import { LineLogo } from '../components/LineLogo';
 
 const CITIES = {
     China: [ // Translations are handled below in rendering
@@ -298,12 +299,13 @@ export const StatsPage: React.FC = () => {
             </div>
             <div className="bg-white rounded-xl border overflow-hidden"><div className="p-3 border-b bg-slate-50 font-bold text-sm text-slate-600">{t('statsPage.topLines', '常乘路线排行')}</div>
                 {rankedSegments.map(([line, count]: [string, any], idx) => {
-                    const icon = railwayData[line]?.meta?.icon;
+                    const lineMeta = railwayData[line]?.meta;
+                    const icon = lineMeta?.icon;
                     return (
                         <div key={line} className="p-3 border-b last:border-0 flex justify-between items-center hover:bg-slate-50 transition-colors duration-200">
                             <div className="flex items-center gap-3">
                                 <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{idx + 1}</span>
-                                {icon && <img src={icon} alt="" className="line-icon" />}
+                                {icon && <LineLogo src={icon} companyIcon={lineMeta?.companyIcon} recolor={lineMeta?.recolor} color={lineMeta?.color} className="line-icon" />}
                                 <span>{line}</span>
                             </div>
                             <span className="font-bold text-slate-400 text-sm">{count}</span>

@@ -5,6 +5,7 @@ interface Props {
 }
 
 const { to, message = 'Redirecting...' } = Astro.props;
+const canonicalURL = new URL(to, Astro.site);
 ---
 
 <!doctype html>
@@ -12,9 +13,10 @@ const { to, message = 'Redirecting...' } = Astro.props;
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,follow" />
   <meta http-equiv="refresh" content={`0;url=${to}`} />
   <title>{message}</title>
-  <link rel="canonical" href={to} />
+  <link rel="canonical" href={canonicalURL} />
 </head>
 <body>
   <p>{message}</p>

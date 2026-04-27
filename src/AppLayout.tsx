@@ -42,6 +42,20 @@ import { showAlert, showConfirm } from './utils/alerts';
 import i18next from 'i18next';
 import { useParams, useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import {
+    APP_LANG_TO_HREFLANG,
+    APP_LANG_TO_HTML,
+    APP_LANGS,
+    DEFAULT_APP_TAB,
+    SITE_ORIGIN,
+    buildAppPath,
+    getAppSeo,
+    getCanonicalAppPath,
+    getPreferredAppLang,
+    getRouteInfoFromPath,
+    normalizeAppLang,
+    toI18nLang
+} from './utils/routes';
 
 
 const CURRENT_VERSION = meta["currentVersion"];
@@ -89,42 +103,21 @@ export const AppLayout: React.FC = () => {
     const { i18n, t } = useTranslation();
 
     useEffect(() => {
-        const supportedLangs = ['zh-cn', 'en', 'ja-jp', 'zh-tw'];
-        if (isHydrated) {
-            const isBlog = location.pathname.startsWith('/blog');
+        if (!isHydrated || location.pathname.startsWith('/blog')) return;
 
-            if (isBlog) {
-                // Sync logic: if at /blog or /blog/, and app is NOT in default lang (zh-cn),
-                // redirect to localized blog path.
-                const currentAppLang = i18n.language.toLowerCase();
-                const isRootBlog = location.pathname === '/blog' || location.pathname === '/blog/';
-                if (isRootBlog && currentAppLang !== 'zh-cn' && currentAppLang !== 'zh-CN') {
-                    // Normalize lang for blog path (zh-cn, en, ja-jp, zh-tw)
-                    let blogLang = currentAppLang;
-                    if (blogLang === 'zh-cn') blogLang = 'zh-cn';
-                    // Redirect browser to separate Astro mount
-                    window.location.href = `/blog/${blogLang}/`;
-                    return;
-                }
-                return; // Skip standard app localization for blog paths
-            }
-
-            if (!lang || !supportedLangs.includes(lang.toLowerCase())) {
-                const defaultLang = badgeSettings.language ? badgeSettings.language.toLowerCase() : 'zh-cn';
-                navigate(`/${defaultLang}${location.pathname}${location.search}`, { replace: true });
-            } else {
-                let targetLang = lang;
-                if (targetLang.toLowerCase() === 'zh-cn') targetLang = 'zh-CN';
-                if (targetLang.toLowerCase() === 'zh-tw') targetLang = 'zh-TW';
-                if (targetLang.toLowerCase() === 'ja-jp') targetLang = 'ja-JP';
-                if (targetLang.toLowerCase() === 'en') targetLang = 'en';
-
-                if (i18n.language !== targetLang) {
-                    i18n.changeLanguage(targetLang);
-                }
-            }
+        const preferredLang = getPreferredAppLang(badgeSettings.language, i18n.language);
+        const canonicalPath = getCanonicalAppPath(location.pathname, preferredLang);
+        if (canonicalPath && canonicalPath !== location.pathname) {
+            navigate(`${canonicalPath}${location.search}${location.hash}`, { replace: true });
+            return;
         }
-    }, [lang, i18n, isHydrated, badgeSettings.language, navigate, location]);
+
+        const routeInfo = getRouteInfoFromPath(canonicalPath || location.pathname);
+        const targetLang = toI18nLang(routeInfo?.lang || lang || preferredLang);
+        if (i18n.language !== targetLang) {
+            i18n.changeLanguage(targetLang);
+        }
+    }, [lang, i18n, isHydrated, badgeSettings.language, navigate, location.pathname, location.search, location.hash]);
     const { devMode } = useMeta() as any;
     const isDraggingRef = useRef(false);
     const workerRef = useRef<Worker | null>(null);
@@ -150,11 +143,11 @@ export const AppLayout: React.FC = () => {
 
     // --- Sync URL pathname → activeTab (兼容层) ---
     useEffect(() => {
-        const parts = location.pathname.split('/').filter(Boolean);
-        const seg = parts[parts.length - 1] as 'records' | 'map' | 'stats';
-        if (['records', 'map', 'stats'].includes(seg)) {
-            if (useStore.getState().activeTab !== seg) {
-                useStore.getState().setActiveTab(seg);
+        const routeInfo = getRouteInfoFromPath(location.pathname);
+        const tab = routeInfo?.tab as 'records' | 'map' | 'stats' | undefined;
+        if (tab) {
+            if (useStore.getState().activeTab !== tab) {
+                useStore.getState().setActiveTab(tab);
             }
         }
     }, [location.pathname]);
@@ -1162,10 +1155,37 @@ export const AppLayout: React.FC = () => {
         finally { event.target.value = ''; }
     };
 
+    const currentRoute = getRouteInfoFromPath(location.pathname);
+    const seoLang = normalizeAppLang(currentRoute?.lang || lang || badgeSettings.language);
+    const seoTab = currentRoute?.tab || DEFAULT_APP_TAB;
+    const seo = getAppSeo(seoLang, seoTab);
+    const canonicalPath = buildAppPath(seoLang, seoTab);
+    const canonicalUrl = `${SITE_ORIGIN}${canonicalPath}`;
+
     return (
         <DragProvider>
             <Helmet>
-                <html lang={i18n.language} />
+                <html lang={APP_LANG_TO_HTML[seoLang]} />
+                <title>{seo.title}</title>
+                <meta name="description" content={seo.description} />
+                <link rel="canonical" href={canonicalUrl} />
+                {APP_LANGS.map((alternateLang) => (
+                    <link
+                        key={alternateLang}
+                        rel="alternate"
+                        hrefLang={APP_LANG_TO_HREFLANG[alternateLang]}
+                        href={`${SITE_ORIGIN}${buildAppPath(alternateLang, seoTab)}`}
+                    />
+                ))}
+                <link rel="alternate" hrefLang="x-default" href={`${SITE_ORIGIN}/zh-cn/records`} />
+                <meta property="og:type" content="website" />
+                <meta property="og:url" content={canonicalUrl} />
+                <meta property="og:title" content={seo.title} />
+                <meta property="og:description" content={seo.description} />
+                <meta name="twitter:card" content="summary" />
+                <meta name="twitter:url" content={canonicalUrl} />
+                <meta name="twitter:title" content={seo.title} />
+                <meta name="twitter:description" content={seo.description} />
             </Helmet>
 
             <div className="flex flex-col h-[100dvh] bg-slate-100 font-sans text-slate-800 overflow-visible">

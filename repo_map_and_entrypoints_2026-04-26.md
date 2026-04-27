@@ -22,6 +22,26 @@
 - packages/route-slice-preview/: 可复用包（与 blog 组件联动）
 - docs/: 方案、审计与发布流程文档
 
+### Routing / SEO / EdgeOne entry points
+
+- Canonical app route helper: src/utils/routes.js
+  - canonical app pages: /:lang/records, /:lang/map, /:lang/stats
+  - supported lang: zh-cn, en, ja-jp, zh-tw
+  - shared builders for app tabs, blog base, feedback GitHub callback, title/description metadata
+- App route consumers:
+  - src/AppLayout.tsx (language/tab canonical replace, active tab sync, runtime Helmet SEO)
+  - src/components/layout/BottomNav.tsx (tab navigation)
+  - src/components/VersionBadge.jsx and src/components/common/ErrorBoundary.tsx (blog links)
+  - src/components/modals/FeedbackModal.tsx and src/pages/FeedbackGithubCallbackPage.tsx (feedback callback)
+- Static app SEO output:
+  - scripts/postbuild.js generates dist/:lang/:tab/index.html, dist/:lang/feedback/github/callback/index.html, compatibility noindex entries, app-sitemap.xml, root sitemap.xml, robots.txt, and dist/edgeone.json.
+- Blog routing/SEO:
+  - blog/src/utils/blogRouting.ts (blog canonical/hreflang helpers)
+  - blog/src/components/BaseHead.astro (canonical, hreflang, OG/Twitter)
+  - blog/src/components/RedirectPage.astro (compat redirect noindex + canonical target)
+- EdgeOne Pages config:
+  - edgeone.json and public/edgeone.json intentionally contain headers only; SPA rewrites are not used.
+
 ## 2) High-frequency co-change entry points
 
 ### A. UI text / interaction change (main app)
@@ -58,6 +78,8 @@
   - blog/src/content/blog/{zh-cn,en,ja-jp,zh-tw}/
   - blog/src/components/mdx/i18n.ts
   - blog/src/utils/blogRouting.ts (version->slug)
+  - blog/src/components/BaseHead.astro (canonical/hreflang SEO for /blog/:lang/...)
+  - blog/src/components/RedirectPage.astro (noindex redirects for compatibility paths)
 
 ### D. Rail data ingestion / map data update
 

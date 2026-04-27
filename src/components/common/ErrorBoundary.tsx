@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { AlertCircle, RotateCcw, Home } from 'lucide-react';
 import i18next from 'i18next';
+import { getCanonicalBlogBase } from '../../utils/routes';
 
 interface Props {
   children: React.ReactNode;
@@ -11,11 +12,6 @@ interface State {
   hasError: boolean;
   error: Error | null;
 }
-
-const blogBaseFromLang = (langRaw: string | undefined) => {
-  const lang = (langRaw || 'zh-CN').toLowerCase();
-  return lang === 'zh-cn' ? '/blog/' : `/blog/${lang}/`;
-};
 
 export class ErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
@@ -61,7 +57,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 <RotateCcw size={14} /> 刷新页面
               </button>
               <a
-                href={blogBaseFromLang(i18next.language)}
+                href={getCanonicalBlogBase(i18next.language)}
                 target="_blank"
                 rel="opener"
                 className="flex items-center gap-2 px-5 py-2 bg-white text-slate-600 text-xs font-bold rounded-xl border border-slate-200 transition-all hover:bg-slate-50 active:scale-95 shadow-sm"

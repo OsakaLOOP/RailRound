@@ -27,6 +27,8 @@ dist-ssr
 *.json
 !package.json
 !tsconfig.json
+!edgeone.json
+!public/edgeone.json
 !public/changelog.json
 !public/company_data.json
 !public/locales/**/*.json

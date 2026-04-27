@@ -77,7 +77,7 @@ export interface CompanyMeta {
   logo: URLString | null;
   icon?: URLString | null;
   color?: string | null;
-  recolor?: boolean; // 是否对line icon按lineColor上色
+  recolor?: boolean; // 譏ｯ蜷ｦ蟇ｹline icon謖瑛ineColor荳願牡
 }
 
 export interface Station {
@@ -87,14 +87,15 @@ export interface Station {
   lng: number;
   transfers: LineKey[];
   distToNext?: number;
-  landmark?: boolean; // 环线地标站
+  landmark?: boolean; // 邇ｯ郤ｿ蝨ｰ譬・ｫ・
 }
 
 export interface RailwayLineMeta extends CompanyMeta {
   company: string;
   icon?: URLString | null;
-  companyIcon?: URLString | null; // 显式引用 company 范畴的小图标
-  isLoop?: boolean; // 环状线路标记
+  companyIcon?: URLString | null; // 譏ｾ蠑丞ｼ慕畑 company 闌・紛逧・ｰ丞崟譬・
+  isLoop?: boolean; // 邇ｯ迥ｶ郤ｿ霍ｯ譬・ｮｰ
+  networkMeta?: any;
 }
 
 export interface RailwayLine {

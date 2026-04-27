@@ -127,7 +127,21 @@
     "allExist": "Parsing complete, but all records ({{count}}) already exist. No need to import.",
     "noImport": "No importable trips found, or parsing failed.",
     "readError": "Error reading or parsing file.",
-    "parsingSuica": "Parsing Suica CSV data..."
+    "parsingSuica": "Parsing Suica CSV data...",
+    "destination": "Destination",
+    "event": {
+      "transfer": {
+        "alight": "Alight and transfer",
+        "through": "Through service (no alight)",
+        "required": "Transfer required",
+        "notRequired": "No transfer required"
+      },
+      "reverse_operation": "Reverse operation",
+      "formation_operation": "Formation operation",
+      "service_class_switch": "Service class/destination switch",
+      "other": "Operational event",
+      "autoCompleted": "Auto-completed event"
+    }
   },
   "search": {
     "close": "Close",
@@ -184,7 +198,8 @@
     "allRegions": "All Regions",
     "noRegion": "No Region",
     "noResult": "No matching lines",
-    "cnMainlandEnt": "Mainland China Portal"
+    "cnMainlandEnt": "Mainland China Portal",
+    "systemsLabel": "Systems"
   },
   "githubReg": {
     "title": "Complete Registration",
@@ -255,7 +270,8 @@
     "saveFail": "Cloud save failed: ",
     "disconnected": "Start station is not connected to the previous end station",
     "disconnectTitle": "Disconnection Warning",
-    "disconnectMsg": "Disconnected segments detected. Saving anyway may break the structure. Save anyway?"
+    "disconnectMsg": "Disconnected segments detected. Saving anyway may break the structure. Save anyway?",
+    "autoTransferFilled": "Auto-completed transfer events: {{count}}"
   },
   "app": {
     "fetchRemote": "Fetching remote data... (10%)",

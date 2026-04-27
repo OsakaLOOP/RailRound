@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { Train, Edit2, Trash2, Star, Code, Plus, MapPin, Upload } from 'lucide-react';
+import { Train, Edit2, Trash2, Star, Code, Plus, MapPin, Upload, ArrowRightLeft, GitMerge, Split, Repeat } from 'lucide-react';
 import { useStore } from '../store';
 import { DropZone } from '../components/DragContext';
 import { getRouteVisualData } from '../core/tripCalculator';
@@ -8,6 +8,7 @@ import { isMobile } from 'react-device-detect';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
 import { LineLogo } from '../components/LineLogo';
+import { buildNetworkDisplayModel, NetworkMetaEvent } from '../utils/networkDisplay';
 
 const RouteSlice = React.memo(({ segments }: { segments: any[] }) => {
     const { t } = useTranslation();
@@ -155,6 +156,27 @@ export const TripsPage: React.FC = () => {
         }
     };
 
+    const getEventLabel = (event: NetworkMetaEvent) => {
+        if (event.displayLabel) return event.displayLabel;
+        if (event.type === 'transfer') {
+            return event.transferMode === 'alight_transfer'
+                ? t('tripsPage.event.transfer.alight', '下车换乘')
+                : t('tripsPage.event.transfer.through', '不下车接续');
+        }
+        if (event.type === 'reverse_operation') return t('tripsPage.event.reverse_operation', '换向作业');
+        if (event.type === 'formation_operation') return t('tripsPage.event.formation_operation', '编组作业');
+        if (event.type === 'service_class_switch') return t('tripsPage.event.service_class_switch', '车种行先切换');
+        return t('tripsPage.event.other', '运行事件');
+    };
+
+    const renderEventIcon = (event: NetworkMetaEvent) => {
+        if (event.type === 'transfer') return <ArrowRightLeft size={12} className="text-amber-500" />;
+        if (event.type === 'reverse_operation') return <Repeat size={12} className="text-sky-500" />;
+        if (event.type === 'formation_operation') return <GitMerge size={12} className="text-violet-500" />;
+        if (event.type === 'service_class_switch') return <Split size={12} className="text-cyan-600" />;
+        return <ArrowRightLeft size={12} className="text-gray-400" />;
+    };
+
     return (
         <div className="relative h-full w-full flex flex-col overflow-hidden">
             <div id="trips-scroll-container" className="flex-1 flex flex-col overflow-y-auto p-4 space-y-3 pb-4">
@@ -241,14 +263,64 @@ export const TripsPage: React.FC = () => {
                                             const line = railwayData[seg.lineKey];
                                             const icon = line?.meta?.icon;
                                             const getSt = (id: string) => line?.stations.find(s => s.id === id)?.name_ja || id;
+                                            const displayModel = buildNetworkDisplayModel(seg, railwayData);
+                                            const displaySegments = displayModel?.segments || [];
+                                            const boundaries = displayModel?.boundaries || [];
+
                                             return (
-                                                <div key={idx} className="relative z-10 flex flex-col text-sm">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-white shadow-sm shrink-0"></div>
-                                                        {icon && <LineLogo src={icon} companyIcon={line?.meta?.companyIcon} recolor={line?.meta?.recolor} color={line?.meta?.color} className="line-icon" />}
-                                                        <span className="font-bold text-emerald-700 text-xs">{seg.lineKey}</span>
-                                                    </div>
-                                                    <div className="pl-5 font-medium text-gray-700">{getSt(seg.fromId)} <span className="text-gray-300 mx-1">→</span> {getSt(seg.toId)}</div>
+                                                <div key={idx} className="relative z-10 flex flex-col text-sm gap-1">
+                                                    {!displaySegments.length ? (
+                                                        <>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-white shadow-sm shrink-0"></div>
+                                                                {icon && <LineLogo src={icon} companyIcon={line?.meta?.companyIcon} recolor={line?.meta?.recolor} color={line?.meta?.color} className="line-icon" />}
+                                                                <span className="font-bold text-emerald-700 text-xs">{seg.lineKey}</span>
+                                                            </div>
+                                                            <div className="pl-5 font-medium text-gray-700">{getSt(seg.fromId)} <span className="text-gray-300 mx-1">→</span> {getSt(seg.toId)}</div>
+                                                        </>
+                                                    ) : (
+                                                        displaySegments.map((displaySeg, displayIdx) => {
+                                                            const boundary = boundaries[displayIdx];
+                                                            return (
+                                                                <React.Fragment key={`${displaySeg.id}_${displayIdx}`}>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-white shadow-sm shrink-0"></div>
+                                                                        {icon && <LineLogo src={icon} companyIcon={line?.meta?.companyIcon} recolor={line?.meta?.recolor} color={line?.meta?.color} className="line-icon" />}
+                                                                        <span className="font-bold text-emerald-700 text-xs">{displaySeg.title}</span>
+                                                                    </div>
+                                                                    {!!displaySeg.destination && (
+                                                                        <div className="pl-5 text-[11px] text-blue-600">
+                                                                            {t('tripsPage.destination', '行先')} {displaySeg.destination}
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="pl-5 font-medium text-gray-700">
+                                                                        {displaySeg.stationNames[0]} <span className="text-gray-300 mx-1">→</span> {displaySeg.stationNames[displaySeg.stationNames.length - 1]}
+                                                                    </div>
+                                                                    <div className="pl-5 text-[11px] text-gray-500">{displaySeg.stationNames.join(' · ')}</div>
+                                                                    {boundary && (
+                                                                        <div className="pl-5 py-1 flex flex-col gap-1">
+                                                                            {boundary.events.map((event, eventIdx) => (
+                                                                                <div key={`${boundary.leftSegmentId}_${boundary.rightSegmentId}_${event.id || eventIdx}`} className="inline-flex items-center gap-1.5 text-[11px] text-gray-600 bg-amber-50 border border-amber-100 rounded px-2 py-1 w-fit">
+                                                                                    {renderEventIcon(event)}
+                                                                                    <span>{getEventLabel(event)}</span>
+                                                                                    {typeof event.requiresTransfer === 'boolean' && (
+                                                                                        <span className={`text-[10px] font-semibold ${event.requiresTransfer ? 'text-red-500' : 'text-emerald-600'}`}>
+                                                                                            {event.requiresTransfer
+                                                                                                ? t('tripsPage.event.transfer.required', '需换乘')
+                                                                                                : t('tripsPage.event.transfer.notRequired', '无需换乘')}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {(event as any).isAutoGenerated && (
+                                                                                        <span className="text-[10px] text-orange-600">{t('tripsPage.event.autoCompleted', '自动补全事件')}</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </React.Fragment>
+                                                            );
+                                                        })
+                                                    )}
                                                     {(() => {
                                                         const isLoop = !!(line?.meta?.isLoop);
                                                         if (!isLoop) return null;
@@ -258,10 +330,7 @@ export const TripsPage: React.FC = () => {
                                                         }
                                                         const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realVia}`;
                                                         const cachedLm = segmentGeometries.get(key)?.landmarks;
-
-                                                        // 回退方案：实时计算地标
                                                         const lm = cachedLm || getLandmarks(line, seg.fromId, seg.toId, seg.loopVia);
-
                                                         return lm?.length > 0 ? (
                                                             <div className="pl-5 text-[11px] text-gray-400">{t('tripsPage.via', '经由 ')}{lm.join('、')}</div>
                                                         ) : null;

@@ -21,6 +21,7 @@
 - scripts/: 发布与构建协同脚本（尤其 release 校验）
 - packages/route-slice-preview/: 可复用包（与 blog 组件联动）
 - docs/: 方案、审计与发布流程文档
+  - geo worker 字段契约: docs/geo_worker_geojson_contract_2026-04-27.md
 
 ## 2) High-frequency co-change entry points
 

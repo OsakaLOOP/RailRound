@@ -175,6 +175,16 @@ export const LineSelector: React.FC<Props> = ({ isOpen, onClose, onSelect, allow
                                                 </button>
                                             ))}
                                         </div>
+                                        {!!company.systems?.length && (
+                                            <div className="px-3 py-2 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center gap-1.5">
+                                                <span className="text-[10px] font-semibold text-gray-500">{t('lineSel.systemsLabel', 'Systems')}</span>
+                                                {company.systems.map((systemName) => (
+                                                    <span key={`${company.name}_${systemName}`} className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-gray-200 text-gray-600">
+                                                        {systemName}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>

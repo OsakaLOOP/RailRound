@@ -4,6 +4,7 @@ import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import { useStore } from '../store';
+import { buildAppPath, normalizeAppLang } from '../utils/routes';
 
 type ConfirmState = 'loading' | 'success' | 'failed';
 
@@ -110,7 +111,7 @@ export const FeedbackGithubCallbackPage: React.FC = () => {
 
         <div className="mt-6 flex justify-end gap-2">
           <button
-            onClick={() => navigate(`/${lang || 'zh-CN'}/stats`)}
+            onClick={() => navigate(buildAppPath(normalizeAppLang(lang), 'stats'))}
             className="px-3 py-2 rounded-lg border text-sm hover:bg-gray-50"
           >
             {t('feedback.callbackBackApp')}

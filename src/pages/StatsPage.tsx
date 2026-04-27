@@ -8,6 +8,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
 import { LineLogo } from '../components/LineLogo';
+import { buildAppPathForLanguage, normalizeAppLang } from '../utils/routes';
 
 const CITIES = {
     China: [ // Translations are handled below in rendering
@@ -210,14 +211,7 @@ export const StatsPage: React.FC = () => {
                                         setBadgeSettings(newSettings);
                                         if (user) saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
 
-                                        // Update URL to match new language while preserving current path (excluding old lang prefix)
-                                        const parts = location.pathname.split('/');
-                                        if (parts.length > 1 && ['zh-cn', 'en', 'ja-jp', 'zh-tw'].includes(parts[1].toLowerCase())) {
-                                            parts[1] = newLang.toLowerCase();
-                                        } else {
-                                            parts.splice(1, 0, newLang.toLowerCase());
-                                        }
-                                        navigate(parts.join('/') + location.search, { replace: true });
+                                        navigate(buildAppPathForLanguage(location.pathname, normalizeAppLang(newLang)) + location.search, { replace: true });
                                     }}
                                 >
                                     <option value="zh-CN">简体中文</option>

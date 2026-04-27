@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { api } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+import { buildFeedbackCallbackPath, normalizeAppLang } from '../../utils/routes';
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_CONTENT_LENGTH = 2000;
@@ -233,7 +234,8 @@ export const FeedbackModal: React.FC = () => {
 
       const submitRes = await api.submitFeedback(formData, user?.token || null);
       if (submitAsGithubIdentity) {
-        const callbackUrl = `${window.location.origin}/${(i18n.language || 'zh-CN').toLowerCase()}/feedback/github/callback?ticket=${encodeURIComponent(String(submitRes.ticket || ''))}`;
+        const callbackPath = buildFeedbackCallbackPath(normalizeAppLang(i18n.language));
+        const callbackUrl = `${window.location.origin}${callbackPath}?ticket=${encodeURIComponent(String(submitRes.ticket || ''))}`;
         if (submitRes?.ticket) {
           try {
             sessionStorage.setItem(

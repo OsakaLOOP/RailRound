@@ -1,17 +1,18 @@
 ---
-import { APP_URL, SITE_TITLE } from '../consts';
+import { SITE_TITLE } from '../consts';
 import { DEFAULT_BLOG_LANG, isBlogLang } from '../utils/blogRouting';
 
 const firstSegment = Astro.url.pathname.replace(/^\/blog\/?/, '').split('/').filter(Boolean)[0];
 const lang = isBlogLang(firstSegment) ? firstSegment : DEFAULT_BLOG_LANG;
 const base = `/blog/${lang}/`;
+const appUrl = `/${lang}/records`;
 ---
 
 <footer class="site-footer">
   <div class="footer-inner">
     <span>{SITE_TITLE} &copy; {new Date().getFullYear()}</span>
     <div class="footer-links">
-      <a href={APP_URL} class="app-return-link">返回主应用</a>
+      <a href={appUrl} class="app-return-link">返回主应用</a>
       <a href={base}>首页</a>
       <a href={`${base}about/`}>关于</a>
       <a href={`${base}rss.xml`}>RSS</a>

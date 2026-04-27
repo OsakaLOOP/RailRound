@@ -6,6 +6,7 @@ import { useStore } from '../store';
 import { useUserData } from '../hooks/useUserData';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
+import { buildAppPathForLanguage, normalizeAppLang } from '../utils/routes';
 
 
 
@@ -377,13 +378,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
                                 if (user) {
                                   saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
                                 }
-                                const parts = location.pathname.split('/');
-                                if (parts.length > 1 && ['zh-cn', 'en', 'ja-jp', 'zh-tw'].includes(parts[1].toLowerCase())) {
-                                    parts[1] = l.toLowerCase();
-                                } else {
-                                    parts.splice(1, 0, l.toLowerCase());
-                                }
-                                navigate(parts.join('/') + location.search, { replace: true });
+                                navigate(buildAppPathForLanguage(location.pathname, normalizeAppLang(l)) + location.search, { replace: true });
                             }}
                             className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${lang === l ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
                         >

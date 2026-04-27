@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
 import { showAlert } from '../../utils/alerts';
+import { buildAppPathForLanguage, normalizeAppLang } from '../../utils/routes';
 
 export const GithubCardModal: React.FC = () => {
     const navigate = useNavigate();
@@ -74,13 +75,7 @@ export const GithubCardModal: React.FC = () => {
             saveData(user.token, trips, pins, folders, s).catch((e: any) => showAlert(t('app.saveFail', "保存失败: ") + e.message, '', 'error'));
         }
         if (langChanged) {
-            const parts = location.pathname.split('/');
-            if (parts.length > 1 && ['zh-cn', 'en', 'ja-jp', 'zh-tw'].includes(parts[1].toLowerCase())) {
-                parts[1] = s.language.toLowerCase();
-            } else {
-                parts.splice(1, 0, s.language.toLowerCase());
-            }
-            navigate(parts.join('/') + location.search, { replace: true });
+            navigate(buildAppPathForLanguage(location.pathname, normalizeAppLang(s.language)) + location.search, { replace: true });
         }
     };
 

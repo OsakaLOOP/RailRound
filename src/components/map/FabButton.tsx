@@ -2,15 +2,16 @@ import React from 'react';
 import { Magnet, MapPin } from 'lucide-react';
 import { useStore, PinMode } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
+import { useAppRouteState } from '../../hooks/useAppRouteState';
 
 export const FabButton: React.FC = () => {
-    const { activeTab, pinMode, editingPin, setPinMode, setEditingPin } = useStore(useShallow(state => ({
-        activeTab: state.activeTab,
+    const { pinMode, editingPin, setPinMode, setEditingPin } = useStore(useShallow(state => ({
         pinMode: state.pinMode,
         editingPin: state.editingPin,
         setPinMode: state.setPinMode,
         setEditingPin: state.setEditingPin
     })));
+    const { tab: activeTab } = useAppRouteState();
 
     const togglePinMode = () => {
         if (pinMode === PinMode.Idle) {

@@ -6,6 +6,7 @@ import changelog from '../../../public/changelog.json';
 const { meta } = changelog;
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
+import { useAppRouteState } from '../../hooks/useAppRouteState';
 
 const CURRENT_VERSION = meta["currentVersion"];
 
@@ -16,7 +17,8 @@ export const Header: React.FC<{
     handleCompanyUpload: (e: any) => void;
     handleFileUpload: (e: any) => void;
 }> = ({ handleExportKML, handleExportUserData, handleImportUserData, handleCompanyUpload, handleFileUpload }) => {
-    const { user, activeTab } = useStore(useShallow(state => ({ user: state.user, activeTab: state.activeTab })));
+    const { user } = useStore(useShallow(state => ({ user: state.user })));
+    const { tab: activeTab } = useAppRouteState();
     const setModalState = useStore(state => state.setModalState);
     const logout = useStore(state => state.logout);
     const { t } = useTranslation();

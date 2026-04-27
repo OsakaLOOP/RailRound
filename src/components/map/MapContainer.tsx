@@ -13,6 +13,7 @@ import { syncLeafletLayerGroup } from "../../utils/leafletSync";
 import { cachedTileLayer } from "../../utils/CachedTileLayer";
 import { useShallow } from "zustand/react/shallow";
 import toast from "react-hot-toast";
+import { useAppRouteState } from "../../hooks/useAppRouteState";
 
 // 记录各域名最后一次报错的时间，用于节流
 const lastTileErrorTime: Record<string, number> = {};
@@ -63,6 +64,7 @@ export const MapContainer: React.FC<Props> = ({
   const wasDraggingRef = useRef(false);
 
   const [isMapInitialized, setIsMapInitialized] = React.useState(false);
+  const { tab: activeTab } = useAppRouteState();
 
   const animateRubberRetract = (
     polyline: L.Polyline,
@@ -100,7 +102,6 @@ export const MapContainer: React.FC<Props> = ({
     geoData,
     leafletReady,
     tripSegmentsGeometry,
-    activeTab,
     mapZoom,
     setMapZoom,
     setLeafletReady,
@@ -116,7 +117,6 @@ export const MapContainer: React.FC<Props> = ({
       geoData: state.geoData,
       leafletReady: state.leafletReady,
       tripSegmentsGeometry: state.tripSegmentsGeometry,
-      activeTab: state.activeTab,
       mapZoom: state.mapZoom,
       setMapZoom: state.setMapZoom,
       setLeafletReady: state.setLeafletReady,

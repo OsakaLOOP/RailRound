@@ -195,6 +195,7 @@ export interface UserProfile {
 
 export interface BadgeSettings {
   enabled: boolean;
+  /** @deprecated User language preference. The actual display language is derived from the URL via useAppRouteState().lang */
   language?: string;
   defaultMapCenter?: {
     mode: 'fixed' | 'latest';
@@ -253,7 +254,9 @@ export interface GlobalStore {
   setBadgeSettings: (settings: BadgeSettings) => void;
 
   // UI Slice
+  // @deprecated Use useAppRouteState().tab instead
   activeTab: 'records' | 'map' | 'stats';
+  // @deprecated Navigation should use useAppNavigation() instead
   setActiveTab: (tab: 'records' | 'map' | 'stats') => void;
 
   isAprilFool: boolean;

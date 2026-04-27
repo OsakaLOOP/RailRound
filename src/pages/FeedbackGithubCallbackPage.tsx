@@ -1,5 +1,6 @@
-﻿import React from 'react';
-import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
+import React from 'react';
+import { useSearchParams, useParams } from 'react-router-dom';
+import { useAppNavigation } from '../hooks/useAppNavigation';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
@@ -10,7 +11,7 @@ type ConfirmState = 'loading' | 'success' | 'failed';
 
 export const FeedbackGithubCallbackPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
+  const { goToTab } = useAppNavigation();
   const { lang } = useParams();
   const { t } = useTranslation();
   const user = useStore((state) => state.user);
@@ -111,7 +112,7 @@ export const FeedbackGithubCallbackPage: React.FC = () => {
 
         <div className="mt-6 flex justify-end gap-2">
           <button
-            onClick={() => navigate(buildAppPath(normalizeAppLang(lang), 'stats'))}
+            onClick={() => goToTab('stats')}
             className="px-3 py-2 rounded-lg border text-sm hover:bg-gray-50"
           >
             {t('feedback.callbackBackApp')}

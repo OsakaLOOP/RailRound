@@ -48,7 +48,9 @@ export async function onRequest(event) {
 
       const records = await Promise.all(
         (page.keys || []).map(async (k) => {
-          const raw = await DB.get(k.name);
+          const keyName = typeof k?.name === "string" ? k.name : null;
+          if (!keyName) return null;
+          const raw = await DB.get(keyName);
           if (!raw) return null;
           try {
             return typeof raw === "string" ? JSON.parse(raw) : raw;

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { useAppNavigation } from '../hooks/useAppNavigation';
 import { Github, Folder, TrendingUp, Move, MapPin, Map as MapIcon, Globe, MessageSquare, Shield } from 'lucide-react';
 import { useStore } from '../store';
 import { calcDist } from '../core/tripCalculator';
@@ -30,7 +31,7 @@ const CITIES = {
 };
 
 export const StatsPage: React.FC = () => {
-    const navigate = useNavigate();
+    const { goToLanguage } = useAppNavigation();
     const location = useLocation();
 
     const {
@@ -211,7 +212,7 @@ export const StatsPage: React.FC = () => {
                                         setBadgeSettings(newSettings);
                                         if (user) saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
 
-                                        navigate(buildAppPathForLanguage(location.pathname, normalizeAppLang(newLang)) + location.search, { replace: true });
+                                        goToLanguage(newLang);
                                     }}
                                 >
                                     <option value="zh-CN">简体中文</option>

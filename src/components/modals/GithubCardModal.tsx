@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { X, Github, Eye, EyeOff, Lock, Loader2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { api } from '../../services/api';
@@ -10,7 +11,7 @@ import { showAlert } from '../../utils/alerts';
 import { buildAppPathForLanguage, normalizeAppLang } from '../../utils/routes';
 
 export const GithubCardModal: React.FC = () => {
-    const navigate = useNavigate();
+    const { goToLanguage } = useAppNavigation();
     const location = useLocation();
 
     const { isOpen, user, folders, badgeSettings } = useStore(useShallow(state => ({
@@ -75,7 +76,7 @@ export const GithubCardModal: React.FC = () => {
             saveData(user.token, trips, pins, folders, s).catch((e: any) => showAlert(t('app.saveFail', "保存失败: ") + e.message, '', 'error'));
         }
         if (langChanged) {
-            navigate(buildAppPathForLanguage(location.pathname, normalizeAppLang(s.language)) + location.search, { replace: true });
+            goToLanguage(s.language);
         }
     };
 

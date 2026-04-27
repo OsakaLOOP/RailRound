@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { useAppNavigation } from '../hooks/useAppNavigation';
 import { X, LogIn, UserPlus, Github, Mail } from 'lucide-react';
 import { api } from '../services/api';
 import { useStore } from '../store';
@@ -200,7 +201,7 @@ const renderMarkdown = (text) => {
 };
 
 export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
-  const navigate = useNavigate();
+  const { goToLanguage } = useAppNavigation();
   const location = useLocation();
   const { saveData } = useUserData();
   const { trips, pins, folders } = useStore(useShallow(state => ({ trips: state.trips, pins: state.pins, folders: state.folders })));
@@ -378,7 +379,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess, user }) => {
                                 if (user) {
                                   saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
                                 }
-                                navigate(buildAppPathForLanguage(location.pathname, normalizeAppLang(l)) + location.search, { replace: true });
+                                goToLanguage(l);
                             }}
                             className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${lang === l ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
                         >

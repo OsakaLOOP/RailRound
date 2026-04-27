@@ -118,8 +118,12 @@ export const FeedbackAdminModal: React.FC = () => {
     }
 
     try {
+      const safeCursor =
+        !reset && typeof cursor === 'string' && cursor && cursor !== 'undefined' && cursor !== 'null'
+          ? cursor
+          : undefined;
       const res = await api.getFeedbackAdminList({
-        cursor: reset ? undefined : cursor || undefined,
+        cursor: safeCursor,
         limit: 20,
         category: categoryFilter === 'all' ? undefined : categoryFilter,
         status: statusFilter === 'all' ? undefined : statusFilter

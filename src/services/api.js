@@ -113,7 +113,14 @@ export const api = {
 
   async getFeedbackAdminList(params = {}, token) {
     const search = new URLSearchParams();
-    if (params.cursor) search.set('cursor', params.cursor);
+    const cursor =
+      typeof params.cursor === 'string' &&
+      params.cursor.trim() &&
+      params.cursor !== 'undefined' &&
+      params.cursor !== 'null'
+        ? params.cursor.trim()
+        : null;
+    if (cursor) search.set('cursor', cursor);
     if (params.limit) search.set('limit', String(params.limit));
     if (params.category) search.set('category', params.category);
     if (params.status) search.set('status', params.status);

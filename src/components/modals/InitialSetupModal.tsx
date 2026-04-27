@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { useShallow } from 'zustand/react/shallow';
 import { MapPin, Globe, ChevronRight, Check } from 'lucide-react';
 import { useUserData } from '../../hooks/useUserData';
@@ -454,7 +455,7 @@ const LanguageSVG = () => (
 );
 
 export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, onComplete }) => {
-    const navigate = useNavigate();
+    const { goToLanguage } = useAppNavigation();
     const location = useLocation();
 
     const { badgeSettings, setBadgeSettings, user, trips, pins, folders } = useStore(useShallow(state => ({
@@ -497,7 +498,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ isOpen, on
         setStep(2);
 
         // Instant visual update of app language
-        navigate(buildAppPathForLanguage(location.pathname, normalizeAppLang(langId)) + location.search, { replace: true });
+        goToLanguage(langId);
     };
 
     const handleBack = () => {

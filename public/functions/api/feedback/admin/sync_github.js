@@ -203,11 +203,13 @@ export async function onRequest(event) {
       listComplete = Boolean(page.list_complete);
       const pageRows = await Promise.all(
         (page.keys || []).map(async (keyInfo) => {
-          const raw = await DB.get(keyInfo.name);
+          const keyName = typeof keyInfo?.name === "string" ? keyInfo.name : null;
+          if (!keyName) return null;
+          const raw = await DB.get(keyName);
           if (!raw) return null;
           try {
             const row = typeof raw === "string" ? JSON.parse(raw) : raw;
-            return { key: keyInfo.name, row };
+            return { key: keyName, row };
           } catch {
             return null;
           }

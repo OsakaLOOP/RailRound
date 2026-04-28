@@ -9,6 +9,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as turf from '@turf/turf';
 import { isMobile } from 'react-device-detect';
+import { getStationById } from './core/railwayRouting';
 
 // Quick import-time log to ensure the module loads when Vite imports it.
 try { console.log('[icon] module loaded'); } catch { }
@@ -1267,12 +1268,12 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
                 if (isWalk) {
                     let startName = t.fromId || '';
                     let endName = t.toId || '';
-                    Object.values(railwayData).forEach(line => {
-                        const s = line.stations.find(st => st.id === t.fromId);
-                        if (s) startName = s.name_ja;
-                        const e = line.stations.find(st => st.id === t.toId);
-                        if (e) endName = e.name_ja;
-                    });
+
+                    const s = getStationById(railwayData, t.fromId || '');
+                    if (s) startName = s.name_ja;
+
+                    const e = getStationById(railwayData, t.toId || '');
+                    if (e) endName = e.name_ja;
 
                     const isTree = t.walkType === 'tree';
                     const cls = {

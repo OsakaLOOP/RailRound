@@ -18,7 +18,6 @@ i18n
   .init({
     fallbackLng: 'zh-CN',
     supportedLngs: ['zh-CN', 'en', 'ja-JP', 'zh-TW'],
-    nonExplicitSupportedLngs: true,
     debug: true,
     interpolation: {
       escapeValue: false,
@@ -26,7 +25,7 @@ i18n
     load: 'currentOnly',
     detection: {
       order: ['path', 'localStorage', 'navigator', 'htmlTag'],
-      lookupFromPathIndex: 0,
+      lookupFromPathIndex: 1,
       caches: ['localStorage'],
       convertDetectedLanguage: (lng: string) => normalizeDetectedLanguage(lng),
     },

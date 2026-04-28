@@ -43,7 +43,7 @@ import { useLocation } from 'react-router-dom';
 import { useAppRouteState } from './hooks/useAppRouteState';
 import { useAppNavigation } from './hooks/useAppNavigation';
 import { AppSEO } from './components/layout/AppSEO';
-import { getRouteInfoFromPath } from './utils/routes';
+import { getRouteInfoFromPath, toI18nLang } from './utils/routes';
 
 
 const CURRENT_VERSION = meta["currentVersion"];
@@ -97,7 +97,7 @@ export const AppLayout: React.FC = () => {
 
     useEffect(() => {
         if (location.pathname.startsWith('/blog')) return;
-        const targetLang = routeState.lang; // Use derived normalized language
+        const targetLang = toI18nLang(routeState.lang);
         if (i18n.language !== targetLang) {
             void i18n.changeLanguage(targetLang);
         }

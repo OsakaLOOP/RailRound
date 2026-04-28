@@ -5,6 +5,10 @@
     "nextBtn": "次へ",
     "finishBtn": "完了",
     "waitAction": "指示に従ってください",
+    "start": {
+      "title": "チュートリアルを表示しますか？",
+      "content": "基本機能を紹介する簡単なガイドです。"
+    },
     "welcome": {
       "title": "RailLOOP へようこそ",
       "content": "RailLOOP は、鉄道の旅を追跡・管理し、旅行の足跡を直感的に表示するための、個人向け乗り鉄手帳アプリです。"

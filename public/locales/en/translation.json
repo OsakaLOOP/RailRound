@@ -5,6 +5,10 @@
     "nextBtn": "Next",
     "finishBtn": "Finish",
     "waitAction": "Please follow the instructions",
+    "start": {
+      "title": "View Tutorial?",
+      "content": "Here's a brief guide to get you familiar with the basics."
+    },
     "welcome": {
       "title": "Welcome to RailLOOP",
       "content": "RailLOOP is a personal railway diary web app designed to help you track and manage your railway journeys, visually presenting and sharing your travel footprints."

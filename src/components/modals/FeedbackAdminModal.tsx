@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X, Loader2, RefreshCw } from 'lucide-react';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -106,7 +106,9 @@ export const FeedbackAdminModal: React.FC = () => {
     return translated === key ? ERROR_MODULE_LABEL_FALLBACK[module] : translated;
   };
 
-  const onClose = () => setModalState({ feedbackAdminModalOpen: false });
+  const onClose = useCallback(() => setModalState({ feedbackAdminModalOpen: false }), [setModalState]);
+const onCloseRef = useRef(onClose);
+onCloseRef.current = onClose;
   const selectedItem = useMemo(() => items.find((item) => item.id === selectedId) || null, [items, selectedId]);
 
   const loadList = async (reset = true) => {
@@ -198,11 +200,11 @@ export const FeedbackAdminModal: React.FC = () => {
       return;
     }
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, onClose, setModalState, t, user]);
+  }, [isOpen, setModalState, t, user]);
 
   useEffect(() => {
     if (isOpen) {

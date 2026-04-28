@@ -5,6 +5,10 @@
     "nextBtn": "继续",
     "finishBtn": "结束",
     "waitAction": "请按提示操作",
+    "start": {
+      "title": "是否查看教程？",
+      "content": "这里是一个简短的指南，带你了解基本功能。"
+    },
     "welcome": {
       "title": "欢迎来到 RailLOOP",
       "content": "RailLOOP 是一个个人向旅铁手账应用, 旨在帮助追踪和管理你的铁路旅程, 直观可感地展示旅行足迹."

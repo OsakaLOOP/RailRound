@@ -9,7 +9,6 @@ import {
   DEFAULT_APP_TAB,
   SITE_ORIGIN,
   buildAppPath,
-  buildFeedbackCallbackPath,
   getAppSeo,
 } from '../src/utils/routes.js';
 
@@ -134,17 +133,6 @@ for (const lang of APP_LANGS) {
   }
 
   writeCompatibilityEntry(lang, buildAppPath(lang, DEFAULT_APP_TAB), lang);
-
-  const callbackPath = buildFeedbackCallbackPath(lang);
-  const callbackSeo = getAppSeo(lang, DEFAULT_APP_TAB);
-  const callbackHtml = withSeoHead(baseHtml, {
-    lang,
-    title: callbackSeo.title,
-    description: callbackSeo.description,
-    canonicalPath: callbackPath,
-    noindex: true,
-  });
-  writeHtml(path.join(lang, 'feedback', 'github', 'callback', 'index.html'), callbackHtml);
 }
 
 for (const tab of APP_TABS) {

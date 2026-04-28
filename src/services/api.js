@@ -111,6 +111,28 @@ export const api = {
     return data;
   },
 
+  async getMyFeedbackIssues(token) {
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/feedback/my-issues`, { method: 'GET', headers });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch my feedback issues');
+    return data;
+  },
+
+  async searchSimilarFeedback(content, category, token = null) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/feedback/search-similar`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ content, category })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to search similar feedback');
+    return data;
+  },
+
   async getFeedbackAdminList(params = {}, token) {
     const search = new URLSearchParams();
     if (params.cursor) search.set('cursor', params.cursor);

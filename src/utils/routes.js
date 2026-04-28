@@ -138,10 +138,6 @@ export function buildAppUrl(lang = DEFAULT_APP_LANG, tab = DEFAULT_APP_TAB) {
   return `${SITE_ORIGIN}${buildAppPath(lang, tab)}`;
 }
 
-export function buildFeedbackCallbackPath(lang = DEFAULT_APP_LANG) {
-  return `/${normalizeAppLang(lang)}/feedback/github/callback`;
-}
-
 export function buildBlogPath(lang = DEFAULT_APP_LANG, rest = '') {
   const suffix = String(rest || '').replace(/^\/+/, '');
   return `/blog/${normalizeAppLang(lang)}/${suffix}`;
@@ -190,9 +186,6 @@ export function getCanonicalAppPath(pathname = '/', fallbackLang = DEFAULT_APP_L
 
   const lang = normalizeAppLang(first, null);
   if (lang) {
-    if (parts[1] === 'feedback' && parts[2] === 'github' && parts[3] === 'callback') {
-      return buildFeedbackCallbackPath(lang);
-    }
     const tab = normalizeAppTab(parts[1], DEFAULT_APP_TAB);
     return buildAppPath(lang, tab);
   }

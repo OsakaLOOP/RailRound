@@ -454,6 +454,22 @@
     "callbackClose": "关闭窗口",
     "callbackMissingTicket": "缺少 ticket 参数",
     "callbackConfirmFailed": "确认 GitHub Issue 失败",
-    "callbackToastSuccess": "反馈 Issue 已确认，点击可打开 Issue。"
+    "callbackToastSuccess": "反馈 Issue 已确认，点击可打开 Issue。",
+    "viewIssues": "查看已有 Issue",
+    "confirmPrompt": "Issue 草稿已开启, 请在 GitHub 完成提交后返回此处点击确认以完成关联。",
+    "confirmButton": "确认",
+    "confirmCancelButton": "取消",
+    "confirming": "正在确认...",
+    "confirmSuccess": "确认成功, Issue 已关联。",
+    "confirmFailed": "确认失败, 请重试。",
+    "confirmNotFound": "尚未找到对应 Issue, 请先在 GitHub 提交后再试。",
+    "tabWrite": "写反馈",
+    "tabMyFeedback": "我的反馈",
+    "myIssuesLoading": "加载中...",
+    "myIssuesEmpty": "暂无反馈记录",
+    "myIssuesError": "加载失败",
+    "similarTitle": "可能相关的反馈",
+    "similarSearching": "查找中...",
+    "similarNone": "未找到相似反馈"
   }
 }

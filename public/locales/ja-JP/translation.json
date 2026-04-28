@@ -449,6 +449,22 @@
     "callbackClose": "ウィンドウを閉じる",
     "callbackMissingTicket": "ticket パラメータが不足しています",
     "callbackConfirmFailed": "GitHub Issue の確認に失敗しました",
-    "callbackToastSuccess": "フィードバック Issue を確認しました。クリックで Issue を開けます。"
+    "callbackToastSuccess": "フィードバック Issue を確認しました。クリックで Issue を開けます。",
+    "viewIssues": "既存のIssueを確認",
+    "confirmPrompt": "Issueの下書きが開きました。GitHubで提出後、ここに戻って確認ボタンをクリックして連携を完了してください。",
+    "confirmButton": "確認",
+    "confirmCancelButton": "キャンセル",
+    "confirming": "確認中...",
+    "confirmSuccess": "確認成功。Issueが連携されました。",
+    "confirmFailed": "確認に失敗しました。再試行してください。",
+    "confirmNotFound": "Issueが見つかりません。先にGitHubで提出してから再試行してください。",
+    "tabWrite": "作成",
+    "tabMyFeedback": "自分のフィードバック",
+    "myIssuesLoading": "読み込み中...",
+    "myIssuesEmpty": "フィードバック履歴がありません",
+    "myIssuesError": "読み込み失敗",
+    "similarTitle": "関連するフィードバック",
+    "similarSearching": "検索中...",
+    "similarNone": "類似のフィードバックが見つかりません"
   }
 }

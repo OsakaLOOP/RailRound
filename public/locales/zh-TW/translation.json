@@ -448,6 +448,22 @@
     "callbackClose": "關閉視窗",
     "callbackMissingTicket": "缺少 ticket 參數",
     "callbackConfirmFailed": "確認 GitHub Issue 失敗",
-    "callbackToastSuccess": "回饋 Issue 已確認，點擊可開啟 Issue。"
+    "callbackToastSuccess": "回饋 Issue 已確認，點擊可開啟 Issue。",
+    "viewIssues": "查看已有 Issue",
+    "confirmPrompt": "Issue 草稿已開啟, 請在 GitHub 完成提交後返回此處點擊確認以完成關聯。",
+    "confirmButton": "確認",
+    "confirmCancelButton": "取消",
+    "confirming": "正在確認...",
+    "confirmSuccess": "確認成功, Issue 已關聯。",
+    "confirmFailed": "確認失敗, 請重試。",
+    "confirmNotFound": "尚未找到對應 Issue, 請先在 GitHub 提交後再試。",
+    "tabWrite": "寫回饋",
+    "tabMyFeedback": "我的回饋",
+    "myIssuesLoading": "載入中...",
+    "myIssuesEmpty": "暫無回饋記錄",
+    "myIssuesError": "載入失敗",
+    "similarTitle": "可能相關的回饋",
+    "similarSearching": "查找中...",
+    "similarNone": "未找到相似回饋"
   }
 }

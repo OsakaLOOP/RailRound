@@ -256,12 +256,109 @@ export function clipText(input, maxLen) {
   return input.length > maxLen ? input.slice(0, maxLen) : input;
 }
 
+const FEEDBACK_INDEX_KEY = "feedback:ids";
+const FEEDBACK_KEY_PREFIX = "feedback:";
+
+export async function appendToFeedbackIndex(DB, feedbackId) {
+  try {
+    const raw = await DB.get(FEEDBACK_INDEX_KEY);
+    const ids = raw ? JSON.parse(raw) : [];
+    ids.unshift(feedbackId);
+    if (ids.length > 2000) ids.length = 2000;
+    await DB.put(FEEDBACK_INDEX_KEY, JSON.stringify(ids));
+  } catch {
+    // best-effort, index repair can be done via admin sync
+  }
+}
+
+export async function getFeedbackIndexPage(DB, { cursor = 0, limit = 20 } = {}) {
+  try {
+    const raw = await DB.get(FEEDBACK_INDEX_KEY);
+    if (!raw) return { items: [], nextCursor: null, hasMore: false };
+    const ids = JSON.parse(raw);
+    if (!Array.isArray(ids)) return { items: [], nextCursor: null, hasMore: false };
+    const start = Math.max(0, Number(cursor) || 0);
+    const end = Math.min(ids.length, start + Math.max(1, Math.min(50, Number(limit) || 20)));
+    const pageIds = ids.slice(start, end);
+    const records = [];
+    for (const id of pageIds) {
+      const rawRecord = await DB.get(`${FEEDBACK_KEY_PREFIX}${id}`);
+      if (!rawRecord) continue;
+      try {
+        records.push(typeof rawRecord === "string" ? JSON.parse(rawRecord) : rawRecord);
+      } catch {
+        // skip corrupted
+      }
+    }
+    return {
+      items: records,
+      nextCursor: end < ids.length ? end : null,
+      hasMore: end < ids.length
+    };
+  } catch {
+    return { items: [], nextCursor: null, hasMore: false };
+  }
+}
+
+export async function getAllFeedbackIds(DB) {
+  try {
+    const raw = await DB.get(FEEDBACK_INDEX_KEY);
+    if (!raw) return [];
+    const ids = JSON.parse(raw);
+    return Array.isArray(ids) ? ids : [];
+  } catch {
+    return [];
+  }
+}
+
 export function getMimeExtension(mime) {
   if (mime === "image/jpeg") return "jpg";
   if (mime === "image/png") return "png";
   if (mime === "image/webp") return "webp";
   if (mime === "image/gif") return "gif";
   return "bin";
+}
+
+export async function getAllFeedbackDebugDump(DB) {
+  const dump = {
+    indexKey: FEEDBACK_INDEX_KEY,
+    indexRaw: null,
+    indexIds: [],
+    indexCount: 0,
+    records: [],
+    foundCount: 0,
+    missingIds: []
+  };
+
+  try {
+    const raw = await DB.get(FEEDBACK_INDEX_KEY);
+    dump.indexRaw = typeof raw === "string" ? raw : (raw ? JSON.stringify(raw) : null);
+    if (raw) {
+      const ids = JSON.parse(raw);
+      if (Array.isArray(ids)) {
+        dump.indexIds = ids;
+        dump.indexCount = ids.length;
+        for (const id of ids) {
+          const rawRecord = await DB.get(`${FEEDBACK_KEY_PREFIX}${id}`);
+          if (!rawRecord) {
+            dump.missingIds.push(id);
+            continue;
+          }
+          try {
+            const record = typeof rawRecord === "string" ? JSON.parse(rawRecord) : rawRecord;
+            dump.records.push(record);
+          } catch {
+            dump.missingIds.push(id);
+          }
+        }
+        dump.foundCount = dump.records.length;
+      }
+    }
+  } catch (err) {
+    dump.error = err?.message || String(err);
+  }
+
+  return dump;
 }
 
 export function getIssueCategoryLabel(category) {

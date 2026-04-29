@@ -1,0 +1,180 @@
+---
+title: 'v0.52 零登录反馈闭环与路由导航体系重构'
+description: '全面上线零登录反馈系统，用户无需认证即可提交问题与建议；同步重构路由导航层，统一多语言 URL 管理，并接入 EdgeOne CDN 优化边缘缓存策略。'
+pubDate: '2026-04-28'
+category: 'dev'
+tags: ['feedback', 'routing', 'cdn', 'architecture', 'dx', 'edgeone']
+version: '0.52'
+---
+
+## 本版概述
+
+v0.52 是一次以"开发者体验（DX）与用户反馈闭环"为核心的结构性升级。我们上线了一套完整的**零登录反馈系统**，让任何用户都能在不登录的情况下提交错误报告或改进建议；同时重构了应用内路由导航层，将分散在各组件中的 URL 拼接逻辑统一收口，并引入 EdgeOne Pages CDN 配置以优化边缘缓存策略。
+
+---
+
+## 一、架构设计
+
+### 1.1 零登录反馈系统
+
+反馈系统的设计目标是在**不强制用户登录**的前提下，完成从提交 → 确认 → GitHub Issue 创建 → 同步回溯的完整闭环。
+
+**整体链路：**
+
+```
+用户操作 (FeedbackModal)
+    │
+    ▼
+Edge Function (submit.js)
+    ├─ 参数校验与内容裁剪
+    ├─ 图片压缩与 R2 存储
+    ├─ 相似问题搜索 (search-similar.js)
+    ├─ 生成确认票据（HMAC 签名）
+    └─ 写入 KV (feedback:${id})
+         │
+         ▼
+    确认回调 (confirm.js)
+         │
+         ▼
+    GitHub Issue 创建 (_github.js)
+         │
+         ▼
+    同步回写 KV + 管理后台可查
+```
+
+**关键设计决策：**
+
+1. **零信任接入**：用户无需 GitHub 登录即可提交反馈。系统基于 `confirm.js` 生成一次性确认票据（HMAC + TTL 15 分钟），用户在 FeedbackModal 中点击确认链接即可完成 Issue 创建。这避免了"需要登录才能报 bug"的悖论。
+
+2. **可选身份绑定**：虽然基础提交无需登录，但如果用户已通过 GitHub OAuth 登录，可以选择 `submitAsGithubIdentity` 模式，将反馈与 GitHub 账户关联，Issue 将以用户身份创建。
+
+3. **相似问题搜索**：在用户填写内容 800ms 防抖后，自动调用 `search-similar.js` 在已有 Issues 中检索相似内容，减少重复提交。
+
+4. **图片处理管线**：前端在 `FeedbackModal` 中完成图片压缩（HTML Canvas → 二次采样 + 质量递减），后端在 `submit.js` 中将图片存入 R2 Bucket，Issue body 中引用 R2 公网 URL。
+
+5. **管理后台**：`FeedbackAdminModal` 提供审核面板，支持按状态筛选、手动同步 GitHub Issue 状态、查看附件图片。
+
+**Edge Functions 清单：**
+
+| 端点 | 功能 |
+|---|---|
+| `submit.js` | 提交反馈，写入 KV，返回确认票据 |
+| `confirm.js` | 验证票据，创建 GitHub Issue |
+| `my-issues.js` | 查询当前用户的提交记录 |
+| `search-similar.js` | 基于内容的相似 Issue 检索 |
+| `admin/list.js` | 管理后台列表查询 |
+| `admin/item.js` | 管理后台单条操作 |
+| `admin/image.js` | 附件图片代理访问 |
+| `admin/sync_github.js` | 手动同步 GitHub Issue 状态 |
+
+### 1.2 路由导航层重构
+
+在 v0.51 引入 React Router 后，路由相关的逻辑散布在 `AppLayout`、`BottomNav`、`Header`、`LoginModal` 等多个组件中，存在以下问题：
+
+- URL 拼接逻辑重复（多处手写 `/${lang}/${tab}`）
+- 语言规范化逻辑不一致（有的用 `zh-CN`，有的用 `zh-cn`）
+- canonical URL 判别逻辑混在组件生命周期中
+
+v0.52 引入三层分离：
+
+```
+src/utils/routes.js          ← 纯函数层：路径构建、语言规范化、SEO 数据
+src/hooks/useAppRouteState.ts ← 状态推导层：从 URL 推导 lang/tab/canonical
+src/hooks/useAppNavigation.ts ← 行为层：导航跳转、canonical 自动修正
+src/components/layout/AppSEO.tsx ← 渲染层：Helmet SEO 标签注入
+```
+
+**核心收益：**
+
+- `routes.js` 作为单一真相源（Single Source of Truth），所有路径构建必须通过 `buildAppPath()` / `buildBlogPath()` / `getCanonicalAppPath()`。
+- `useAppRouteState` 统一从 `location.pathname` 推导当前语言与标签页，消除了组件间通过 props 传递 `lang`/`tab` 的模式。
+- `useAppNavigation` 封装 `goToTab()` 和 `goToLanguage()`，自动保留 search/hash 参数，避免导航跳转丢失上下文。
+- `AppSEO` 独立管理 `<title>`、`<meta description>`、`<link rel="canonical">` 和 `<link rel="alternate" hreflang="...">`，与路由状态解耦。
+
+**语言规范化规则**（`normalizeAppLang`）：
+
+- `zh` / `zh-cn` / `zh-hans` → `zh-cn`
+- `zh-tw` / `zh-hk` / `zh-mo` / `zh-hant` → `zh-tw`
+- `ja` / `ja-jp` → `ja-jp`
+- `en` / `en-*` → `en`
+- 非法值 → 回退到 `zh-cn`
+
+### 1.3 EdgeOne Pages CDN 集成
+
+新增 `edgeone.json` 和 `public/edgeone.json`，配置分层缓存策略：
+
+- `/*` — 静态资源默认缓存 1 天（`max-age=86400`）
+- `/` 和 `/index.html` — SPA 入口禁止缓存（`no-cache, must-revalidate`）
+- `/bundle/*` — 带 hash 的构建产物设置 `immutable` + CORS 允许跨域
+
+构建流程中 `scripts/postbuild.js` 在生成 `dist/` 后会同步输出 `dist/edgeone.json`，确保部署时 EdgeOne Pages 能正确读取 header 配置。
+
+---
+
+## 二、心得体会
+
+### 2.1 "零登录"不是偷懒，是降低反馈门槛
+
+反馈系统最容易被忽视的问题是**反馈者和修复者不是同一个人**。一个遇到 bug 的普通用户，让他先去 GitHub 授权登录才能提交 bug，本身就是一道不合理的门槛。
+
+我们选择在 Edge Function 层完成身份安全校验（HMAC 票据 + TTL），而非在 UI 层拦截用户。这意味着：
+
+- 用户点击反馈 → 填写 → 提交 → 收邮件确认 → GitHub Issue 自动创建。
+- 整个流程**没有任何 OAuth 弹窗**。
+- 对于已经登录的用户，可以选择绑定 GitHub 身份以获得更好的追踪体验。
+
+这种"可选绑定"的模式在用户体验和系统安全之间找到了平衡点。
+
+### 2.2 路由层"统一收口"的价值
+
+在 v0.50 和 v0.51 中，路由相关代码分散在 8+ 个文件中。每次新增一个语言或调整 URL 结构，都需要同时修改多处代码。
+
+v0.52 将路由逻辑收口到 `routes.js` 后，新增语言只需在 `APP_LANGS` 数组中添加一项，所有下游逻辑自动适配。这种"先分散再收敛"的重构路径在实践中很常见——在需求不明确时过度抽象会适得其反，而在模式稳定后集中重构则事半功倍。
+
+### 2.3 EdgeOne 边缘缓存的坑
+
+部署 EdgeOne Pages 时，默认的缓存策略会导致 SPA 路由（如 `/en/map`）被当作独立页面缓存，用户切换语言后可能看到旧版本。
+
+解决方案是：
+1. 只对带 hash 的构建产物（`/bundle/*`）启用长期缓存
+2. SPA 入口 `/` 和 `/index.html` 强制 `no-cache`
+3. 其他路径使用短周期缓存 + CDN 会自动回源验证
+
+这种策略需要在构建时确定文件路径结构，而不仅仅依赖 CDN 配置。
+
+---
+
+## 三、用户指引
+
+### 3.1 提交反馈
+
+1. 点击应用右下角的 **反馈按钮**（💬 图标）。
+2. 选择反馈类型：
+   - **错误报告**：遇到 bug 时选择，需指定出错模块（路由/地图/认证/同步/本地化/UI/性能/其他）。
+   - **改进建议**：提出功能建议或体验优化。
+3. 填写详细描述（最多 2000 字符），可选附上截图（自动压缩至 2MB 以下）。
+4. 提交后，系统会生成一个**确认链接**发送至关联邮箱。点击确认后，GitHub Issue 自动创建。
+5. 可在反馈面板的 **"我的反馈"** 标签页查看提交记录及 Issue 状态。
+
+### 3.2 导航改进
+
+- 切换语言或标签页时，URL 会自动更新为规范化路径。
+- 使用浏览器前进/后退按钮时，应用状态与 URL 保持同步。
+- 从外部链接或书签进入时，应用会自动跳转至正确的 canonical URL。
+
+### 3.3 查看反馈进度
+
+所有通过反馈系统创建的 Issue 都会出现在 [GitHub Issues](https://github.com/OsakaLOOP/RailRound/issues) 中，标记 `feedback` label。你可以直接订阅 Issue 以获取修复进展通知。
+
+---
+
+## 后续计划
+
+- [x] 零登录反馈系统上线
+- [x] 路由导航层统一重构
+- [x] EdgeOne CDN 集成
+- [ ] 反馈系统的邮件通知闭环
+- [ ] `trips/[slug]` 动态路由详情页
+- [ ] 社交媒体 OG Image 动态渲染
+
+> 感谢你帮助 RailRound 变得更好。每一个反馈都在推动这个项目前进 🚃

@@ -182,7 +182,8 @@ export async function onRequest(event) {
       return json({ ok: false, hook: failed.hook }, 200, headers);
     }
 
-    const draft = buildIssueDraft(record, { markerNonce: ticketData.nonce });
+    const imageBaseUrl = new URL(event.request.url).origin;
+    const draft = buildIssueDraft(record, { markerNonce: ticketData.nonce, imageBaseUrl });
     const computedHash = await buildIssueBodyHash(draft.body);
     const expectedHash = String(ticketData.body_hash || "");
     if (!expectedHash || computedHash !== expectedHash) {

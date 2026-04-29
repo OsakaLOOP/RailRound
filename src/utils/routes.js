@@ -143,6 +143,10 @@ export function buildBlogPath(lang = DEFAULT_APP_LANG, rest = '') {
   return `/blog/${normalizeAppLang(lang)}/${suffix}`;
 }
 
+export function buildFeedbackCallbackPath(lang = DEFAULT_APP_LANG) {
+  return `/${normalizeAppLang(lang)}/feedback/github/callback`;
+}
+
 export function getCanonicalBlogBase(lang = DEFAULT_APP_LANG) {
   return buildBlogPath(lang);
 }

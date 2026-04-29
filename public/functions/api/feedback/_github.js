@@ -68,6 +68,11 @@ export function buildIssueDraft(record, options = {}) {
     "```"
   ];
 
+  if (record?.screenshot?.r2_key && options.imageBaseUrl) {
+    const imgUrl = `${options.imageBaseUrl}/api/feedback/image?id=${encodeURIComponent(record.id)}`;
+    bodyLines.push("", "Screenshot:", `![Screenshot](${imgUrl})`);
+  }
+
   const body = bodyLines.join("\n");
   const labels = [
     "feedback",

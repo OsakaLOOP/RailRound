@@ -5,7 +5,7 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, "src/index.ts"),
-      name: "RailRoundRouteSlicePreview",
+      name: "RailLOOPRouteSlicePreview",
       formats: ["es", "cjs", "umd"],
       fileName: (format) => {
         if (format === "es") return "index.mjs";

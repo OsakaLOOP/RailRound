@@ -111,12 +111,21 @@ export const api = {
     return data;
   },
 
-  async getMyFeedbackIssues(token) {
+  async getMyFeedbackIssues(token, ids = []) {
     const headers = {};
     if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(`${API_BASE}/feedback/my-issues`, { method: 'GET', headers });
+    const params = new URLSearchParams();
+    params.set('debug', '1');
+    if (ids.length > 0) params.set('ids', ids.join(','));
+    const qs = params.toString();
+    const res = await fetch(`${API_BASE}/feedback/my-issues?${qs}`, { method: 'GET', headers });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.error('[my-issues] non-JSON response:', text.slice(0, 500));
+      throw new Error('Failed to fetch my feedback issues');
+    }
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to fetch my feedback issues');
+    if (data._debug) console.log('[my-issues] KV debug dump:', data._debug);
     return data;
   },
 
@@ -135,20 +144,26 @@ export const api = {
 
   async getFeedbackAdminList(params = {}, token) {
     const search = new URLSearchParams();
+    search.set('debug', '1');
     if (params.cursor) search.set('cursor', params.cursor);
     if (params.limit) search.set('limit', String(params.limit));
     if (params.category) search.set('category', params.category);
     if (params.status) search.set('status', params.status);
 
     const query = search.toString();
-    const res = await fetch(`${API_BASE}/feedback/admin/list${query ? `?${query}` : ''}`, {
+    const res = await fetch(`${API_BASE}/feedback/admin/list?${query}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`
       }
     });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.error('[admin/list] non-JSON response:', text.slice(0, 500));
+      throw new Error(text ? `Server error: ${text.slice(0, 200)}` : 'Failed to fetch feedback list');
+    }
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to fetch feedback list');
+    if (data._debug) console.log('[admin/list] KV debug dump:', data._debug);
     return data;
   },
 

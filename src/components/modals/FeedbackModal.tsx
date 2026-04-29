@@ -93,11 +93,14 @@ async function compressImageToLimit(file: File, maxBytes = MAX_IMAGE_BYTES): Pro
 }
 
 export const FeedbackModal: React.FC = () => {
-  const { isOpen, user, userProfile } = useStore(
+  const { isOpen, user, userProfile, myFeedbackIds, addMyFeedbackId, appVersion } = useStore(
     useShallow((state) => ({
       isOpen: state.modals.feedbackModalOpen,
       user: state.user,
-      userProfile: state.userProfile
+      userProfile: state.userProfile,
+      myFeedbackIds: state.myFeedbackIds,
+      addMyFeedbackId: state.addMyFeedbackId,
+      appVersion: state.appVersion
     }))
   );
   const setModalState = useStore((state) => state.setModalState);
@@ -124,6 +127,7 @@ export const FeedbackModal: React.FC = () => {
   const similarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const categoryRef = useRef(category);
   categoryRef.current = category;
+  const myIssuesFetchedRef = useRef(false);
   const getErrorModuleLabel = (module: ErrorModule) => {
     const key = `feedback.errorModuleOptions.${module}`;
     const translated = t(key);
@@ -152,6 +156,7 @@ export const FeedbackModal: React.FC = () => {
       setSimilarIssues([]);
       setSimilarSearching(false);
       setLastSearchedContent('');
+      myIssuesFetchedRef.current = false;
       return;
     }
     const onKeyDown = (e: KeyboardEvent) => {
@@ -170,24 +175,24 @@ export const FeedbackModal: React.FC = () => {
   const hasGithubBinding = Boolean(userProfile?.bindings?.github?.login);
 
   const fetchMyIssues = useCallback(async () => {
-    if (!user?.token || !hasGithubBinding) return;
     setMyIssuesLoading(true);
     setMyIssuesError(null);
     try {
-      const res = await api.getMyFeedbackIssues(user.token);
+      const res = await api.getMyFeedbackIssues(user?.token || null, myFeedbackIds);
       setMyIssues(res.issues || []);
     } catch (err: any) {
       setMyIssuesError(err?.message || t('feedback.myIssuesError'));
     } finally {
       setMyIssuesLoading(false);
     }
-  }, [user?.token, hasGithubBinding, t]);
+  }, [user?.token, myFeedbackIds, t]);
 
   useEffect(() => {
-    if (isOpen && activeTab === 'my-feedback' && myIssues.length === 0 && !myIssuesLoading) {
+    if (isOpen && activeTab === 'my-feedback' && !myIssuesFetchedRef.current && !myIssuesLoading) {
+      myIssuesFetchedRef.current = true;
       fetchMyIssues();
     }
-  }, [isOpen, activeTab, myIssues.length, myIssuesLoading, fetchMyIssues]);
+  }, [isOpen, activeTab, myIssuesLoading, fetchMyIssues]);
 
   useEffect(() => {
     if (!hasGithubBinding && submitAsGithubIdentity) {
@@ -317,15 +322,19 @@ export const FeedbackModal: React.FC = () => {
       formData.append('issue_submit_mode', submitAsGithubIdentity ? 'github_user_manual' : 'system_auto');
       formData.append('lang', navigator.language || '');
       formData.append('path', `${window.location.pathname}${window.location.search}`);
-      formData.append('appVersion', (import.meta as any).env?.VITE_APP_VERSION || 'unknown');
+      formData.append('appVersion', appVersion);
       if (screenshot) {
         formData.append('screenshot', screenshot, screenshot.name);
       }
 
       const submitRes = await api.submitFeedback(formData, user?.token || null);
+      if (submitRes?.id) addMyFeedbackId(submitRes.id);
+
       if (submitAsGithubIdentity && submitRes?.ticket) {
         if (submitRes?.draft_url) {
-          window.open(submitRes.draft_url, '_blank', 'noopener,noreferrer');
+          setTimeout(() => {
+            window.open(submitRes.draft_url, '_blank', 'noopener,noreferrer');
+          }, 700);
         }
         setConfirmTicket(submitRes.ticket);
         setConfirmStatus('pending');
@@ -586,19 +595,42 @@ export const FeedbackModal: React.FC = () => {
                 ) : myIssues.length === 0 ? (
                   <p className="py-8 text-center text-sm text-gray-400">{t('feedback.myIssuesEmpty')}</p>
                 ) : (
-                  myIssues.map((issue: any) => (
-                    <a
-                      key={issue.number}
-                      href={issue.html_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors group"
-                    >
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${issue.state === 'open' ? 'bg-emerald-500' : issue.state === 'closed' ? 'bg-purple-500' : 'bg-gray-400'}`} />
-                      <span className="text-sm text-gray-700 flex-1 truncate group-hover:text-gray-900">{issue.title}</span>
-                      <span className="text-xs text-gray-400 flex-shrink-0">#{issue.number}</span>
-                    </a>
-                  ))
+                  <div className="space-y-2">
+                    {myIssues.map((item: any) => (
+                      <div
+                        key={item.id}
+                        className="p-3 rounded-lg border border-gray-200 bg-white space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-gray-700">
+                            {item.category === 'error' ? t('feedback.error') : t('feedback.suggestion')}
+                          </span>
+                          <span className="text-[10px] text-gray-400">{new Date(item.created_at).toLocaleString()}</span>
+                        </div>
+                        <div className="text-sm text-gray-800 line-clamp-2">{item.content_preview}</div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {item.hook?.issue_state && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                              item.hook.issue_state === 'open' ? 'bg-emerald-100 text-emerald-700' :
+                              item.hook.issue_state === 'closed' ? 'bg-gray-200 text-gray-700' :
+                              item.hook.issue_state === 'deleted' ? 'bg-red-100 text-red-700' :
+                              'bg-amber-100 text-amber-700'
+                            }`}>
+                              {item.hook.issue_state}
+                            </span>
+                          )}
+                          {item.hook?.issue_url && (
+                            <a href={item.hook.issue_url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 hover:underline">
+                              #{item.hook.issue_number}
+                            </a>
+                          )}
+                        </div>
+                        {item.screenshot_url && (
+                          <img src={item.screenshot_url} alt="screenshot" className="mt-1 max-h-24 rounded border" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}

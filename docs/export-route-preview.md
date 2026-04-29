@@ -4,9 +4,9 @@ The RouteSlicePreview component lets you embed an interactive railway route map 
 
 ## How It Works
 
-1. Open [RailleRound](https://rail.s3xyseia.xyz)
+1. Open [RailLOOP](https://rail.s3xyseia.xyz)
 2. Navigate to your trip or open a folder
-3. Click the export icon ( `<>` ) on any trip card
+3. Click the **Code** button (`</>`) on any trip card
 4. Configure options in the export modal
 5. Copy the generated MDX code or download as `.mdx` file
 6. Paste into your blog post
@@ -113,7 +113,7 @@ interface RouteSliceData {
 
 ## Generating Static Data
 
-The easiest way: open [RailleRound](https://rail.s3xyseia.xyz), find your route, and use the **Export** button to generate the `data` JSON automatically.
+The easiest way: open [RailLOOP](https://rail.s3xyseia.xyz), find your route, and click the **Code** button (`</>`) on the trip card to generate the `data` JSON automatically.
 
 To generate programmatically, use the `@railloop/route-slice-preview` types:
 

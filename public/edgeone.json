@@ -39,6 +39,21 @@
           "value": "public, max-age=86400, immutable"
         }
       ]
+    },
+    {
+      "source": "/blog/*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "src": "/blog/(.*)",
+      "dest": "/blog/$1"
     }
   ]
 }

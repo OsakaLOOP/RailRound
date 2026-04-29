@@ -3,6 +3,7 @@
   json,
   getKV,
   putFeedbackObject,
+  appendToFeedbackIndex,
   getUsernameFromAuthHeader,
   hmacHex,
   secureCompareHex,
@@ -97,7 +98,7 @@ function buildClientMeta(request, formData) {
   };
 }
 
-async function runGitHubHook(DB, feedbackId, env) {
+async function runGitHubHook(DB, feedbackId, env, imageBaseUrl) {
   try {
     const raw = await DB.get(`feedback:${feedbackId}`);
     if (!raw) return;
@@ -107,7 +108,8 @@ async function runGitHubHook(DB, feedbackId, env) {
       throw new Error("GitHub feedback hook not configured");
     }
     const { issue } = await createGitHubIssueFromDraft(record, cfg, {
-      markerNonce: "system-auto"
+      markerNonce: "system-auto",
+      imageBaseUrl
     });
     await updateHookStatus(DB, feedbackId, {
       ...buildHookSuccessFromIssue(issue),
@@ -142,14 +144,14 @@ async function signTicketPayload(payload, secret) {
   return btoa(unescape(encodeURIComponent(JSON.stringify(ticketObject))));
 }
 
-async function createManualIssueTicket(record, username, githubLogin, env) {
+async function createManualIssueTicket(record, username, githubLogin, env, imageBaseUrl) {
   const cfg = getGitHubConfig(env);
   if (!cfg) {
     throw new Error("GitHub feedback hook not configured");
   }
 
   const nonce = crypto.randomUUID();
-  const issueDraft = buildIssueDraft(record, { markerNonce: nonce });
+  const issueDraft = buildIssueDraft(record, { markerNonce: nonce, imageBaseUrl });
   const bodyHash = await buildIssueBodyHash(issueDraft.body);
   const now = Date.now();
   const issuedAtIso = new Date(now).toISOString();
@@ -341,10 +343,18 @@ export async function onRequest(event) {
     }
 
     const record = await buildRecordFromFormData(event, formData, reporter, issueSubmitMode);
-    await DB.put(`feedback:${record.id}`, JSON.stringify(record));
+    const putPromise = DB.put(`feedback:${record.id}`, JSON.stringify(record));
+    const indexPromise = appendToFeedbackIndex(DB, record.id);
+    await putPromise;
+    if (typeof event.waitUntil === "function") {
+      event.waitUntil(indexPromise);
+    } else {
+      indexPromise.catch(() => undefined);
+    }
 
     if (issueSubmitMode === "system_auto") {
-      const hookPromise = runGitHubHook(DB, record.id, event.env);
+      const imageBaseUrl = new URL(event.request.url).origin;
+      const hookPromise = runGitHubHook(DB, record.id, event.env, imageBaseUrl);
       if (typeof event.waitUntil === "function") {
         event.waitUntil(hookPromise);
       } else {
@@ -353,7 +363,8 @@ export async function onRequest(event) {
       return json({ success: true, id: record.id, hook_status: "pending", issue_submit_mode: issueSubmitMode }, 200, headers);
     }
 
-    const ticketPayload = await createManualIssueTicket(record, username, githubLogin, event.env);
+    const imageBaseUrl = new URL(event.request.url).origin;
+    const ticketPayload = await createManualIssueTicket(record, username, githubLogin, event.env, imageBaseUrl);
     await updateHookStatus(DB, record.id, {
       provider: "github_issue",
       status: "pending",

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { db } from '../utils/db';
+import changelog from '../../public/changelog.json';
 
 // --- Custom IndexedDB Storage for Zustand ---
 // Because railwayData can easily exceed the 5MB localStorage limit,
@@ -233,6 +234,8 @@ export interface GlobalStore {
   pins: Pin[];
   folders: Folder[];
   badgeSettings: BadgeSettings;
+  appVersion: string;
+
   isHydrated: boolean;
   setHydrated: (hydrated: boolean) => void;
 
@@ -252,6 +255,9 @@ export interface GlobalStore {
 
   setFolders: (folders: Folder[] | ((prev: Folder[]) => Folder[])) => void;
   setBadgeSettings: (settings: BadgeSettings) => void;
+
+  myFeedbackIds: string[];
+  addMyFeedbackId: (id: string) => void;
 
   // UI Slice
   // @deprecated Use useAppRouteState().tab instead
@@ -335,10 +341,11 @@ export const useStore = create<GlobalStore>()(
       trips: [],
       pins: [],
       folders: [],
-      badgeSettings: { 
-        enabled: true, 
-        language: (typeof localStorage !== 'undefined' && localStorage.getItem('i18nextLng')) || 'zh-CN', 
-        defaultMapCenter: { mode: 'fixed', lat: 35.6812, lng: 139.7671 } 
+      appVersion: changelog.meta.currentVersion || '0.0.0',
+      badgeSettings: {
+        enabled: true,
+        language: (typeof localStorage !== 'undefined' && localStorage.getItem('i18nextLng')) || 'zh-CN',
+        defaultMapCenter: { mode: 'fixed', lat: 35.6812, lng: 139.7671 }
       },
       isHydrated: false,
       setHydrated: (hydrated) => set({ isHydrated: hydrated }),
@@ -359,6 +366,12 @@ export const useStore = create<GlobalStore>()(
 
       setFolders: (input) => set((state) => ({ folders: typeof input === 'function' ? input(state.folders) : input })),
       setBadgeSettings: (settings) => set({ badgeSettings: settings }),
+
+      myFeedbackIds: [],
+      addMyFeedbackId: (id) => set((state) => {
+        if (state.myFeedbackIds.includes(id)) return state;
+        return { myFeedbackIds: [id, ...state.myFeedbackIds].slice(0, 200) };
+      }),
 
       // --- UI Slice ---
       activeTab: 'records',

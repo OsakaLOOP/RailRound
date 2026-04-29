@@ -255,18 +255,29 @@ export const AppLayout: React.FC = () => {
 
   // --- Auth & URL Parsing ---
   useEffect(() => {
+    const getCookie = (name) => {
+      const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+      return match ? decodeURIComponent(match[1]) : null;
+    };
+
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get("token");
     const usernameFromUrl = urlParams.get("username");
     const regTokenFromUrl = urlParams.get("reg_token");
     const status = urlParams.get("status");
 
-    if (tokenFromUrl && usernameFromUrl) {
+    // Token from URL param (legacy) or cookie (OAuth)
+    const token = tokenFromUrl || getCookie("rl_token");
+
+    if (token && usernameFromUrl) {
       // Handle OAuth Login
-      useStore.getState().login(tokenFromUrl, usernameFromUrl);
-      loadUserData(tokenFromUrl, true);
-      // Clean URL
+      useStore.getState().login(token, usernameFromUrl);
+      loadUserData(token, true);
+      // Clean URL & cookie
       window.history.replaceState({}, document.title, window.location.pathname);
+      if (!tokenFromUrl) {
+        document.cookie = "rl_token=; Path=/; Max-Age=0; SameSite=Lax";
+      }
     } else if (regTokenFromUrl) {
       // Handle GitHub Registration
       setModalState({ githubRegToken: regTokenFromUrl, isGithubRegOpen: true });

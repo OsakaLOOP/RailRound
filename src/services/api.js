@@ -82,7 +82,7 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to get card key');
-    return data.key;
+    return { key: data.key, write_key: data.write_key };
   },
 
   async submitFeedback(formData, token = null) {

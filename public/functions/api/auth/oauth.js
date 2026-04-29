@@ -1,6 +1,5 @@
 export async function onRequest(event) {
-  
-  
+
   const headers = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -13,10 +12,12 @@ export async function onRequest(event) {
   try {
     const url = new URL(event.request.url);
     const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
     const error = url.searchParams.get("error");
     const provider = url.searchParams.get("provider");
     const CLIENT_ID = event.env.CLIENT_ID || "";
     const CLIENT_SECRET = event.env.CLIENT_SEC || "";
+    const DB = globalThis.RAILROUND_KV;
 
     // 1. Handle Callback (if 'code' is present)
     if (code) {
@@ -24,6 +25,19 @@ export async function onRequest(event) {
         return new Response(JSON.stringify({ error }), { status: 400, headers: { "Content-Type": "application/json" } });
       }
 
+      // Verify state parameter for CSRF protection
+      if (!state) {
+        return new Response(JSON.stringify({ error: "Missing state parameter" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      if (!DB) {
+        return new Response(JSON.stringify({ error: "KV Missing" }), { status: 500, headers: { "Content-Type": "application/json" } });
+      }
+      const stateKey = `oauth_state:${state}`;
+      const stateValue = await DB.get(stateKey);
+      if (!stateValue) {
+        return new Response(JSON.stringify({ error: "Invalid or expired state" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      await DB.delete(stateKey);
 
       if (!CLIENT_ID || !CLIENT_SECRET) {
         return new Response(JSON.stringify({ error: "Server Configuration Error" }), { status: 500, headers: { "Content-Type": "application/json" } });
@@ -57,10 +71,6 @@ export async function onRequest(event) {
 
       if (!userResponse.ok) throw new Error("Failed to fetch GitHub user");
       const githubUser = await userResponse.json();
-
-      // Database Logic
-      const DB = globalThis.RAILROUND_KV;
-      if (!DB) throw new Error("KV Missing");
 
       const bindingKey = `binding:github:${githubUser.id}`;
       let username = await DB.get(bindingKey);
@@ -103,8 +113,11 @@ export async function onRequest(event) {
       const sessionKey = `session:${token}`;
       await DB.put(sessionKey, username, { expirationTtl: 86400 * 30 });
 
-      // Redirect to App
-      return Response.redirect(`${url.origin}/?token=${token}&username=${username}`, 302);
+      // Deliver token via cookie; username in URL for client routing
+      const redirectHeaders = new Headers();
+      redirectHeaders.set("Location", `${url.origin}/?username=${encodeURIComponent(username)}`);
+      redirectHeaders.set("Set-Cookie", `rl_token=${token}; Path=/; Max-Age=2592000; SameSite=Lax`);
+      return new Response(null, { status: 302, headers: redirectHeaders });
     }
 
     // 2. Handle Initiation (if 'provider' is present)
@@ -112,10 +125,17 @@ export async function onRequest(event) {
       if (!CLIENT_ID) {
           return new Response(JSON.stringify({ error: "Server Configuration Error: Missing CLIENT_ID" }), { status: 500, headers: { "Content-Type": "application/json" } });
       }
+      if (!DB) {
+        return new Response(JSON.stringify({ error: "KV Missing" }), { status: 500, headers: { "Content-Type": "application/json" } });
+      }
+
+      // Generate state for CSRF protection
+      const oauthState = crypto.randomUUID();
+      await DB.put(`oauth_state:${oauthState}`, "1", { expirationTtl: 600 });
 
       // Point back to THIS file for the callback
       const redirectUri = `${url.origin}/api/auth/oauth`;
-      const targetUrl = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${redirectUri}&scope=read:user`;
+      const targetUrl = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user&state=${encodeURIComponent(oauthState)}`;
 
       return Response.redirect(targetUrl, 302);
     }

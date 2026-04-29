@@ -28,7 +28,7 @@ export const GithubCardModal: React.FC = () => {
     const { saveData } = useUserData();
     const { t } = useTranslation();
 
-    const [cardKey, setCardKey] = useState<string | null>(null);
+    const [cardKeys, setCardKeys] = useState<{ key: string; write_key: string } | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [source, setSource] = useState('global'); // 'global' or folder_id
@@ -36,14 +36,14 @@ export const GithubCardModal: React.FC = () => {
     const onClose = () => setModalState({ cardModalUser: null });
 
     useEffect(() => {
-        if (isOpen && user && !cardKey) {
+        if (isOpen && user && !cardKeys) {
             setLoading(true);
             api.getOrCreateCardKey(user.token)
-                .then(setCardKey)
+                .then(setCardKeys)
                 .catch((err: any) => setError(err.message))
                 .finally(() => setLoading(false));
         }
-    }, [isOpen, user, cardKey]);
+    }, [isOpen, user, cardKeys]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -57,8 +57,8 @@ export const GithubCardModal: React.FC = () => {
     if (!isOpen || !user) return null;
 
     let url = "";
-    if (source === 'global' && cardKey) {
-        url = `${window.location.origin}/api/card?key=${cardKey}`;
+    if (source === 'global' && cardKeys) {
+        url = `${window.location.origin}/api/card?key=${cardKeys.key}`;
     } else if (source !== 'global') {
         const f = folders.find(fo => fo.id === source);
         if (f && f.hash) {

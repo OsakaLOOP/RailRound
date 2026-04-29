@@ -186,11 +186,37 @@ export interface Folder {
   hash?: string | null;
 }
 
+export type TierLevel = 'free' | 'premium' | 'permanent';
+
+export interface SubscriptionMonth {
+  year: number;
+  month: number;
+  planName: string;
+  amount: number;
+  orderId: string;
+  lastPayTime: string;
+  status: 'active' | 'cancelled';
+}
+
+export interface SubscriptionHistory {
+  username: string;
+  totalMonths: number;
+  months: SubscriptionMonth[];
+  lastUpdated: string;
+}
+
 export interface UserProfile {
   token: string;
   username: string;
+  tier?: TierLevel;
+  tierVerified?: boolean;
+  tierToken?: string;
+  tierExpiresAt?: string;
+  permanentUpgradedAt?: string;
+  subscriptionMonths?: number;
   bindings?: {
     github?: { login: string; avatar_url: string; id: number; };
+    afdian?: { user_id: string; bound_at: string; };
   };
   badge_settings?: { enabled: boolean; };
 }
@@ -313,6 +339,7 @@ export interface GlobalStore {
     exportRouteModalOpen: boolean;
     currentTripForExport: Trip | null;
     githubRegToken: string | null;
+    isSubscribeOpen: boolean;
   };
   setModalState: (updates: Partial<GlobalStore['modals']>) => void;
 }
@@ -460,6 +487,7 @@ export const useStore = create<GlobalStore>()(
         exportRouteModalOpen: false,
         currentTripForExport: null,
         githubRegToken: null,
+        isSubscribeOpen: false,
       },
       setModalState: (updates) => set((state) => ({ modals: { ...state.modals, ...updates } })),
     }),
@@ -472,7 +500,8 @@ export const useStore = create<GlobalStore>()(
         trips: state.trips,
         pins: state.pins,
         folders: state.folders,
-        badgeSettings: state.badgeSettings
+        badgeSettings: state.badgeSettings,
+        myFeedbackIds: state.myFeedbackIds,
       }),
       onRehydrateStorage: (state) => {
         return () => {

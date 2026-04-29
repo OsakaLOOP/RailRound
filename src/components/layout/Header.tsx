@@ -1,7 +1,8 @@
 import React from 'react';
-import { Train, LogOut, User, Download, Upload, Building2, FilePlus } from 'lucide-react';
+import { Train, LogOut, User, Download, Upload, Building2, FilePlus, Star } from 'lucide-react';
 import { useStore } from '../../store';
 import { VersionBadge } from '../VersionBadge';
+import { PremiumBadge } from '../PremiumBadge';
 import changelog from '../../../public/changelog.json';
 const { meta } = changelog;
 import { useShallow } from 'zustand/react/shallow';
@@ -17,7 +18,7 @@ export const Header: React.FC<{
     handleCompanyUpload: (e: any) => void;
     handleFileUpload: (e: any) => void;
 }> = ({ handleExportKML, handleExportUserData, handleImportUserData, handleCompanyUpload, handleFileUpload }) => {
-    const { user } = useStore(useShallow(state => ({ user: state.user })));
+    const { user, userProfile } = useStore(useShallow(state => ({ user: state.user, userProfile: state.userProfile })));
     const { tab: activeTab } = useAppRouteState();
     const setModalState = useStore(state => state.setModalState);
     const logout = useStore(state => state.logout);
@@ -34,6 +35,16 @@ export const Header: React.FC<{
                 {user ? (
                    <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-300 hidden sm:inline">{t('header.welcome', '欢迎, {{name}}', { name: user.username })}</span>
+                      <PremiumBadge />
+                      {(!userProfile?.tier || userProfile.tier === 'free') && (
+                        <button
+                          onClick={() => setModalState({ isSubscribeOpen: true })}
+                          className="bg-amber-600 hover:bg-amber-500 p-2 rounded text-xs flex items-center gap-1 transition font-bold"
+                          title={t('premium.subscribe', 'Subscribe to Premium')}
+                        >
+                          <Star size={14}/>
+                        </button>
+                      )}
                       <button id="btn-login-user" onClick={logout} className="bg-slate-700 hover:bg-red-900 p-2 rounded text-xs flex items-center gap-1 transition">
                           <LogOut size={14}/><span className="hidden sm:inline">{t('header.logout', '退出')}</span>
                       </button>

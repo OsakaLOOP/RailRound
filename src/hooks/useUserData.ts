@@ -27,7 +27,10 @@ export const useUserData = () => {
             const cloudData = await api.getData(token);
             const state = useStore.getState();
 
-            state.setUserProfile(cloudData);
+            state.setUserProfile({
+                ...cloudData,
+                subscriptionMonths: cloudData._subscriptionMonths || cloudData.subscriptionMonths || 0,
+            } as any);
 
             let newTrips = cloudData.trips || [];
             let newPins = cloudData.pins || [];

@@ -190,5 +190,41 @@ export const api = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to sync feedback github state');
     return data;
-  }
+  },
+
+  // --- Premium / Tier ---
+
+  async getTierStatus(token) {
+    const res = await fetch(`${API_BASE}/user/tier`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to get tier status');
+    return data;
+  },
+
+  async bindAfdian(token, afdianUserId) {
+    const res = await fetch(`${API_BASE}/user/bind-afdian`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ afdianUserId })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to bind Afdian');
+    return data;
+  },
+
+  async getSubscriptionHistory(token) {
+    const res = await fetch(`${API_BASE}/user/subscription-history`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to get subscription history');
+    return data;
+  },
 };

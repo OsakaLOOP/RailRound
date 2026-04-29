@@ -10,6 +10,7 @@ import { FolderManagerModal } from "./components/modals/FolderManagerModal";
 import { AddToFolderModal } from "./components/modals/AddToFolderModal";
 import { ExportRouteModal } from "./components/modals/ExportRouteModal";
 import { FeedbackModal } from "./components/modals/FeedbackModal";
+import { SubscribeModal } from "./components/modals/SubscribeModal";
 import { FeedbackAdminModal } from "./components/modals/FeedbackAdminModal";
 import { TripEditor } from "./components/modals/TripEditor";
 import { WalkTripEditor } from "./components/modals/WalkTripEditor";
@@ -1752,6 +1753,7 @@ export const AppLayout: React.FC = () => {
         <FeedbackModal />
         <FeedbackAdminModal />
         <AddToFolderModal />
+        <SubscribeModal />
         <ExportRouteModal />
 
         <Tutorial

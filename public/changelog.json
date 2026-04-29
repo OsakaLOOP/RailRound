@@ -11,13 +11,13 @@
       "version": "0.52",
       "date": "2026-04-28",
       "type": "feat",
-      "content": "新增零登录反馈系统, 用户无需认证即可提交错误报告与改进建议, 支持图片压缩、相似问题搜索与 GitHub Issue 自动同步.\n重构路由导航层, 抽取统一的路由工具库与 SEO 组件, 规范化多语言 canonical URL 行为.\n新增 EdgeOne Pages CDN 缓存配置, 集成 Blog 构建产物至主应用部署流程."
+      "content": "新增零登录反馈系统, 支持图片压缩、相似问题搜索与 GitHub Issue 自动同步.\n重构路由导航层, 抽取统一的路由工具库与 SEO 组件, 修复多语言 URL 行为.\n新增 CDN 缓存配置. 修复了大量交互和安全问题."
     },
     {
       "version": "0.51",
       "date": "2026-04-26",
       "type": "feat",
-      "content": "引入 Astro Blog 双轨架构, 支持 4 语言、RSS、分类路由与 SSR SEO.\n新增 RouteSlicePreview 交互式地图 MDX 组件, 可在 Blog 文章中内嵌 Leaflet 线路切片.\n全面接入 React Router, 规范化 /lang/tab 路由与 hreflang, 自动生成 sitemap.\n新增路线导出与序列化系统, 发布 @railloop/route-slice-preview npm 包供外站接入.\n新增版本内容校验与 pre-submit 预提交检查, 大幅优化 findNearbyStations 算法."
+      "content": "规范化主应用路由, 引入 Astro Blog 双轨架构, 集成 Blog 构建产物至主应用部署流程.\n新增交互式地图 MDX 组件, 实现序列化行程导出, 发布 npm 包供外站接入, 可在任意 Blog 文章中内嵌 Leaflet 线路切片.\n新增版本内容校验与 pre-submit 预提交检查. 优化一些算法."
     },
     {
       "version": "0.50",

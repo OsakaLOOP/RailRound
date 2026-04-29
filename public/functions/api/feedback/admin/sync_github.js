@@ -111,7 +111,9 @@ async function syncOne(DB, key, row, cfg) {
       cfg
     );
   } catch (err) {
-    if (Number(err?.status) === 404) {
+    const errStatus = Number(err?.status);
+    const errMsg = String(err?.message || "");
+    if (errStatus === 404 || errStatus === 410 || /deleted|gone/i.test(errMsg)) {
       const next = {
         ...row,
         hook: {

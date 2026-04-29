@@ -7,7 +7,7 @@
     "dev": "vite",
     "check:release-content": "node scripts/validate-release-content.mjs",
     "check:release-content:strict-locales": "node scripts/validate-release-content.mjs --strict-locales",
-    "build": "npm run check:release-content && vite build && node scripts/postbuild.js && npm --prefix blog run build && node scripts/merge-blog-dist.js",
+    "build": "npm run check:release-content && vite build && node scripts/postbuild.js && npm --prefix blog run build && node scripts/merge-blog-dist.js && node scripts/submit-bing-indexing.js",
     "pre-submit": "npm run build && npm --prefix blog run test",
     "build:all": "node scripts/build_all.js",
     "build:package": "tsx scripts/build-package.ts",

@@ -77,6 +77,7 @@ interface PlatformAreaProperties extends RailGraphFeatureProperties {
 - 若站台缺少 `trackRefs`，`enrichment.ts` 可按最近站线、方向、站场范围推断，并输出 `warn` 诊断。
 
 ### 3.2 站线 / 股道
+
 站线或股道使用线对象。输入可为整条 `MultiLineString`，标准化时必须允许提取片段并在渲染时拼接。
 
 ```ts
@@ -85,11 +86,14 @@ interface TrackGeometryProperties extends RailGraphFeatureProperties {
     kind: "track_geometry";
     track: {
       role: "main" | "platform" | "passing" | "storage" | "yard" | "connector";
-      lineRef?: string;
-      trackCode?: string;
-      stationRef?: string;
-      direction?: "up" | "down" | "both" | "unknown";
+      trackCode?: string;          // 物理轨道编号
+      name?: string;               // 物理区段名称，如 "新宿-池袋本線"
       serviceable?: boolean;
+      properties?: {
+        gauge?: number;            // 轨距 (mm)
+        electrified?: boolean;
+        maxSpeedKmh?: number;
+      };
       extraction?: {
         sourceFeatureRef?: string;
         multiLineIndex?: number;
@@ -105,6 +109,7 @@ interface TrackGeometryProperties extends RailGraphFeatureProperties {
 标准化要求：
 - `LineString` 可直接成为一个 edge。
 - `MultiLineString` 必须拆成可寻址 edge 片段，并保留 `source_geometry_slice` relation。
+- **物理 edge 不携带 `lineRef`、`direction`、`stationRef`**：这些属于服务层语义，由 `ServicePattern` 承载。同一物理 edge 可被多个 ServicePattern 引用。
 - 后续渲染若需要合并显示，使用 `stitchGroupRef` 与 edge sequence 拼接，不把拼接结果反写为唯一真源。
 
 ### 3.3 道岔
@@ -242,17 +247,15 @@ interface NormalizedEntityBatch {
 interface RailGraph {
   schemaVersion: "rail-graph-v1";
   infraLayer: {
-    nodes: InfraNode[];
-    edges: InfraEdge[];
+    nodes: InfraNode[];            // 物理节点：站、道岔、线端点
+    edges: InfraEdge[];            // 物理边：轨道片段，不携带服务语义
     areas: InfraArea[];
     sections: SpecialSection[];
     adjacency: GraphAdjacency;
   };
   serviceLayer: {
-    serviceEdges: ServiceEdge[];
+    servicePatterns: ServicePattern[];   // ★ 一等公民：每条运行线路的完整服务语义
     doubleTrackRelations: DoubleTrackRelation[];
-    directionRules: DirectionRule[];
-    systemRules: SystemRule[];
   };
   eventLayer: {
     anchors: EventAnchor[];
@@ -264,6 +267,81 @@ interface RailGraph {
 }
 ```
 
+#### 4.3.1 InfraEdge（物理边）
+
+```ts
+interface InfraEdge {
+  id: EntityRef;
+  geometry: GeoJSON.LineString;   // 标准化后的坐标
+  role: "main" | "platform" | "passing" | "storage" | "yard" | "connector";
+  name?: string;                   // 物理区段名称
+  trackCode?: string;
+  properties?: {
+    gauge?: number;
+    electrified?: boolean;
+    maxSpeedKmh?: number;
+    lengthMeters: number;
+  };
+  extraction?: {                   // 源几何切片信息
+    sourceFeatureRef?: string;
+    multiLineIndex?: number;
+    startMeasure?: number;
+    endMeasure?: number;
+    stitchGroupRef?: string;
+  };
+}
+```
+
+规则：InfraEdge 只表达物理轨道。`lineRef`、`direction`、站点归属、停站模式全部由 `ServicePattern` 承载。
+
+#### 4.3.2 ServicePattern（服务线路）
+
+```ts
+interface ServicePattern {
+  patternId: EntityRef;
+  lineRef: EntityRef;              // 所属线路标识
+  systemRef: EntityRef;            // 运行系统 (JR-East, TokyoMetro 等)
+
+  // 核心：该服务线路的有序边序列和站点序列
+  edgeSequence: EntityRef[];       // 指向 InfraEdge.id，按运行方向排列
+  stationSequence: {               // 指向 InfraNode.id，按运行方向排列
+    nodeRef: EntityRef;
+    stopType: "mandatory_stop" | "pass_through" | "conditional_stop";
+    landmark?: boolean;            // 渲染时 landmark —— 非事件，仅渲染接口
+  }[];
+
+  // 方向约定（每个 ServicePattern 独立定义）
+  directionConvention: {
+    forwardLabel: string;          // "内回り" / "up" / "clockwise"
+    reverseLabel: string;          // "外回り" / "down" / "counterclockwise"
+  };
+
+  // 拓扑类型
+  topologyType: "linear" | "cyclic" | "branching";
+  cycleCheck?: {                   // topologyType=cyclic 时存在
+    isCycle: boolean;
+    modularModulo: number;         // 模算术模数 = stationSequence 长度
+  };
+
+  // 服务类型
+  serviceType: "local" | "rapid" | "express" | "limited_express" | "freight" | "maintenance";
+
+  // 运行时标签
+  displayName?: string;            // 渲染用名称
+  displayColor?: string;           // 渲染用颜色 (#hex)
+}
+```
+
+规则：
+- **同一 InfraEdge 可被多个 ServicePattern 引用**：一条物理轨道承载多条运行线路。
+- **每个 ServicePattern 有独立的站序和方向定义**：JR 山手线的 "up" 和 JR 崎京线的 "up" 可以语义不同。
+- **`landmark` 是 station 属性，属渲染时接口**：不参与路径决策，不由 events.ts 消费。渲染层沿 `RunPath.nodeSequence` 收集 `landmark=true` 的站即可生成 "经由 新宿、渋谷" 显示。
+- **`stopType` 决定事件生成**：`events.ts` 按 `mandatory_stop` 生成 `platform_stop`，`pass_through` 生成 `platform_pass`，`conditional_stop` 结合 `RunSpec.eventPolicy` 决定。
+- 路径搜索在 serviceLayer 上运行：`path-resolver.ts` 按 `RunSpec` 匹配 `ServicePattern`，再在其 `edgeSequence` 中选择路径。
+- `topologyType` 在 `graph-builder.ts` 中通过 adjacency 遍历判定：若某个 lineRef 下 edge 序列首尾节点 ID 相同，则标记为 `cyclic`。
+- `modularModulo` 为环线方向比较提供确定性参照：`computeLoopVia` 模运算使用此值。
+- **人工数据的优先性**：若输入源（ORM/GeoJSON）中已明确标注 `topology: "cyclic"`，直接采用，不重新检测。
+
 ## 5. 运行 JSON 层级
 
 ### 5.1 RunSpec
@@ -272,7 +350,8 @@ interface RunSpec {
   runId?: string;
   startRef: EntityRef;
   endRef: EntityRef;
-  viaRefs?: EntityRef[];
+  viaRefs?: EntityRef[];          // 环线时承载 loopVia 语义：指定环上必须经过的站点
+  avoidRefs?: EntityRef[];        // 环线时承载"不经过"的排除语义（可选）
   directionHint?: "up" | "down" | "clockwise" | "counterclockwise" | "unknown";
   pathOverride?: ManualPathOverride;
   timetableAnchors?: TimetableAnchor[];
@@ -280,6 +359,11 @@ interface RunSpec {
   editMode?: "read_only" | "preview_patch" | "apply_patch";
 }
 ```
+
+规则：
+- `directionHint` 的 `clockwise`/`counterclockwise` 以站序索引递增方向为参照：站序索引 0→1→2→...→N→0 为 `clockwise`，反向为 `counterclockwise`。对非环线，这两个值会被降级为 `unknown` 并记录诊断。
+- `viaRefs[]` 在环线场景下承载 loopVia 语义：路径求解时必须经过指定的站点；若与 `directionHint` 矛盾（如指定 clockwise 但 viaRef 在 counterclockwise 路径上），`viaRefs` 优先，方向降级为 `unknown` 并输出 `warn`。
+- `avoidRefs[]` 用于进一步收窄环线候选（如"不走有施工的站"），可选。
 
 ### 5.2 RunPath / RenderGeometryPlan / RunOrder / Timeline / EventStream
 ```ts
@@ -289,6 +373,14 @@ interface RunPath {
   chosenDirection: string;
   resolvedBy: "manual" | "auto" | "mixed";
   candidateScores: PathScore[];
+  loopDecision?: {                  // 仅当路径涉及环线时存在
+    isLoopRun: boolean;
+    viaRefUsed?: EntityRef;         // 用户指定的 loopVia 站点
+    directionSource: "explicit" | "via_inference" | "distance_based" | "consistency_based";
+    fullCycleDistance: number;      // 环全周长 (m)
+    chosenDistance: number;         // 所选方向路径长度 (m)
+    alternativeDistance: number;    // 另一方向路径长度 (m)
+  };
 }
 
 interface RenderGeometryPlan {

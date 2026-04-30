@@ -299,6 +299,14 @@ interface RenderGeometryPlan {
   diagnostics: Diagnostic[];
 }
 
+interface OffsetSmoothingPlan {
+  startMeasure: number;         // 平滑过渡起点在 edge 上的 measure (0–1)
+  endMeasure: number;           // 平滑过渡终点在 edge 上的 measure (0–1)
+  joinStrategy: "bezier" | "arc" | "linear_blend";
+  transitionMeters: number;     // 过渡段长度（米）
+  controlPoints?: [number, number][];  // bezier 模式的手动控制点（可选，自动生成时为 undefined）
+}
+
 interface RunOrder {
   orderPoints: OrderPoint[];
   boundaries: RunBoundary[];
@@ -391,6 +399,31 @@ interface UserDefinedEventPayload {
 规则：
 - 基础系统必须能保存、排序、导出与回放用户事件。
 - 用户事件是额外事件层级，永不参与寻路；它只在时空语义上与车辆运行相对绑定，可绑定 order/time/entity/geometry anchor。
+
+### 6.4 事件策略类型
+
+```ts
+type EventPolicyRef = string;
+
+interface EventPolicy {
+  policyId: EventPolicyRef;
+  scope: {
+    stationRefs?: EntityRef[];
+    edgeRefs?: EntityRef[];
+    eventTypes?: RunEventType[];
+  };
+  action: "mandatory_stop" | "pass_through" | "auto" | "skip_event";
+  priority?: number;  // 多条策略冲突时数字大者优先
+  reason?: string;
+}
+```
+
+规则：
+- `mandatory_stop`: 强制该站/区段生成 `platform_stop` 事件。
+- `pass_through`: 强制生成 `platform_pass`（即使线路通常停靠此站）。
+- `auto`: 由 `events.ts` 按默认规则决定。
+- `skip_event`: 抑制该位置的指定类型事件（如跳过某段 scenic_view）。
+- `EventPolicyRef` 作为 `RunSpec.eventPolicy` 的引用 id，也可在 `PatchOp` 中通过 `update_event_policy` 操作。
 
 ## 7. 编辑输出契约
 

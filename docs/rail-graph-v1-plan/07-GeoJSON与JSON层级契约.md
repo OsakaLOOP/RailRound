@@ -801,6 +801,7 @@ interface RunSnapshot {
 规则：
 - **两层模型**：`SystemContext` 是 graph 级（构建一次，多 run 共享）；`RunContext` 是 run 级（每个 RunSpec 一个，链式填充）。
 - **内容寻址**：`graphId = sha256(graph)`，`runId = sha256(graphId + spec)`。同一 graph + spec 必然同 runId，可缓存。
-- **快照不替代显式参数**：内部函数签名保持 `(graph, path, timeline)` 风格。`RunContext` 和 `RunSnapshot` 仅在 debug 导出和缓存边界使用。
+- **分层接口策略**：编排层函数使用 `(ctx) => ctx`（保证链路一致性与可复现）；内部算法函数可保持 `(graph, path, timeline)` 等显式参数纯函数风格。
+- **快照边界**：`RunSnapshot` 用于 debug 导出和缓存边界，不替代核心运行数据本身。
 - **graph 变更** → graphId 变 → 所有 runId 失效。符合语义：共享根变了，下游全部重算。
 - **hashes 列表**：`DeployedSystem.contentHash` 和 `presetHashes` 供部署校验完整性。

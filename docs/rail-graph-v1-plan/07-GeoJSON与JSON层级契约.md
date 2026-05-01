@@ -307,7 +307,10 @@ interface ServicePattern {
   stationSequence: {               // 指向 InfraNode.id，按运行方向排列
     nodeRef: EntityRef;
     stopType: "mandatory_stop" | "pass_through" | "conditional_stop";
+    platformNumber?: number;       // 站台编号（数字 ID），可自动从站序推导或手动覆写
+    platformName?: string;         // "1番線" —— platformNumber 的人类可读形式
     landmark?: boolean;            // 渲染时 landmark —— 非事件，仅渲染接口
+    operationType?: "coupling" | "decoupling" | "turnback" | "stabling";  // 编组/解挂等作业
   }[];
 
   // 方向约定（每个 ServicePattern 独立定义）
@@ -337,6 +340,8 @@ interface ServicePattern {
 - **每个 ServicePattern 有独立的站序和方向定义**：JR 山手线的 "up" 和 JR 崎京线的 "up" 可以语义不同。
 - **`landmark` 是 station 属性，属渲染时接口**：不参与路径决策，不由 events.ts 消费。渲染层沿 `RunPath.nodeSequence` 收集 `landmark=true` 的站即可生成 "经由 新宿、渋谷" 显示。
 - **`stopType` 决定事件生成**：`events.ts` 按 `mandatory_stop` 生成 `platform_stop`，`pass_through` 生成 `platform_pass`，`conditional_stop` 结合 `RunSpec.eventPolicy` 决定。
+- **`platformNumber` 为管理员预写入的数字 ID**：严格要求预写入，不自动推导。区别于全局几何 ID，是站内站台序号。渲染时由系统生成显示文本（如 `platformNumber=1` → "1番線"）。用户端通过 `StationStop.platformNumber` 和 `platformName` 获取。
+- **`operationType` 触发作业事件**：管理员在 ServicePattern 上标注编组/解挂/折返/停泊后，`events.ts` 的 `projectOperationEvents` 按标注生成对应 RunEvent。
 - 路径搜索在 serviceLayer 上运行：`path-resolver.ts` 按 `RunSpec` 匹配 `ServicePattern`，再在其 `edgeSequence` 中选择路径。
 - `topologyType` 在 `graph-builder.ts` 中通过 adjacency 遍历判定：若某个 lineRef 下 edge 序列首尾节点 ID 相同，则标记为 `cyclic`。
 - `modularModulo` 为环线方向比较提供确定性参照：`computeLoopVia` 模运算使用此值。
@@ -554,3 +559,248 @@ interface EditableRailGraphSnapshot {
 - 调试接口必须能导出 `EditableRailGraphSnapshot`。
 - 自动补全生成的 patch 必须可预览、可应用、可撤销。
 - 编辑输出只表达差异，不污染原始 GeoJSON/ORM 输入。
+
+---
+
+## 8. 对外接口类型
+
+### 8.1 部署与固化
+
+```ts
+interface DeployedSystem {
+  systemId: string;
+  version: string;
+  createdAt: string;
+  servicePatterns: ServicePattern[];
+  stations: StationMeta[];
+  relations: GraphRelation[];
+  defaultTimetables: TimetableSet[];
+  generatedPresets: PathPreset[];
+  contributions?: ContributionStore;
+  contentHash: string;                    // sha256(canonicalJson(servicePatterns + stations + relations))
+  presetHashes: Record<string, string>;  // presetId → runId
+}
+
+interface StationMeta {
+  stationRef: string;
+  name: string;
+  nameJa?: string;
+  coordinates: [number, number];    // [lat, lng]
+  landmark?: boolean;
+}
+```
+
+### 8.2 路径模板
+
+```ts
+interface PathPreset {
+  presetId: string;
+  label: string;
+  shortLabel: string;
+  serviceLabel: string;
+  displayColor: string;
+  startStation: StationRef;
+  endStation: StationRef;
+  viaStations: StationRef[];
+  landmarkLabels: string[];
+  directionLabel: string;
+  estimatedTimeMinutes: number;
+  distanceKm: number;
+  runSpec: RunSpec;                // 内部引用，用户不可见
+}
+```
+
+### 8.3 规划请求与结果
+
+```ts
+interface TripPlanRequest {
+  presetId?: string;
+  systemId: string;
+  startStationRef: StationRef;
+  endStationRef: StationRef;
+  viaRefs?: StationRef[];
+  directionPreference?: string;
+  date?: string;
+}
+
+type PlanTripResult =
+  | { status: "ok"; trip: TripResult }
+  | { status: "unreachable"; reason: string; suggestions?: PathPreset[] }
+  | { status: "invalid_request"; reason: string };
+  // 注：失败时内层可附带完整 snapshot 供调试
+
+interface TripResult {
+  tripId: string;
+  presetId?: string;
+  planUsed: "preset" | "auto";
+  segments: TripResultSegment[];
+  totalDistanceKm: number;
+  totalTimeMinutes: number;
+  internalRunPaths: RunPath[];       // 内部固化数据，用户不可见
+}
+
+interface TripResultSegment {
+  lineLabel: string;
+  displayColor: string;
+  fromStation: StationMeta;
+  toStation: StationMeta;
+  viaStations: StationStop[];
+  landmarkLabel: string;
+  distanceKm: number;
+  timeMinutes: number;
+  geometry: GeoJSON.LineString;      // [lat, lng][] 可直接渲染
+  events: TripEvent[];
+}
+
+interface StationStop {
+  station: StationMeta;
+  stopType: "stop" | "pass";
+  platformNumber?: number;           // 管理员预写入的站台序号
+  platformName?: string;             // 生成文本，如 "1番線"
+  arrivalTime?: string;
+  departureTime?: string;
+}
+```
+
+### 8.4 用户可见事件
+
+```ts
+type TripEvent =
+  | TripStopEvent
+  | TripPassEvent
+  | TripTransferEvent
+  | TripScenicEvent
+  | TripNoteEvent;
+
+interface TripStopEvent {
+  type: "stop";
+  source: "system" | "timetable";
+  stationRef: StationRef;
+  label: string;
+  arrivalTime?: string;
+  departureTime?: string;
+  durationMinutes?: number;
+  platformNumber?: number;
+  platformName?: string;
+}
+
+interface TripPassEvent {
+  type: "pass";
+  source: "system" | "timetable";
+  stationRef: StationRef;
+  label: string;
+  passTime?: string;
+}
+
+interface TripTransferEvent {
+  type: "transfer";
+  source: "transfer";
+  label: string;
+  timestamp?: string;
+  fromLine?: string;
+  toLine?: string;
+  transferMode?: "alight" | "through";
+  walkMinutes?: number;
+}
+
+interface TripScenicEvent {
+  type: "scenic";
+  source: "system" | "user";
+  label: string;
+  timestamp?: string;
+  title?: string;
+  description?: string;
+  imageUrls?: string[];
+  viewSide?: "left" | "right" | "front" | "back";
+}
+
+interface TripNoteEvent {
+  type: "note";
+  source: "user";
+  label: string;
+  timestamp?: string;
+  text?: string;
+  imageUrls?: string[];
+}
+```
+
+### 8.5 行程保存
+
+```ts
+interface SavedTrip {
+  savedId: string;
+  name?: string;
+  tripResult: TripResult;
+  createdAt: string;
+  systemId: string;
+}
+```
+
+### 8.6 用户共建数据
+
+```ts
+interface EntityAnnotation {
+  annotationId: string;
+  targetRef: EntityRef;
+  targetType: "service_pattern" | "station" | "edge";
+  field: string;                     // "rollingStock", "wheelchairCar", "livery", ...
+  value: string | number | boolean;
+  confidence: "confirmed" | "reported" | "disputed";
+  submittedBy?: string;
+  submittedAt: string;
+  evidence?: string;
+}
+
+interface ContributionStore {
+  annotations: EntityAnnotation[];
+  moderationQueue: string[];
+}
+```
+
+规则：
+- `EntityAnnotation` 挂在 `DeployedSystem.contributions` 上，与核心类型（ServicePattern/InfraEdge）完全隔离。
+- 用户提交 `confidence="reported"` → 管理员审核 → `confirmed` 或删除。
+- 字段名不穷举，社区自驱扩展。
+
+### 8.7 内容寻址与快照
+
+```ts
+interface SystemContext {
+  readonly graphId: string;            // sha256(canonicalJson(graph))
+  readonly graph: RailGraph;
+  readonly diagnostics: readonly Diagnostic[];
+  readonly createdAt: string;
+}
+
+interface RunContext {
+  readonly runId: string;              // sha256(graphId + canonicalJson(spec))
+  readonly graphId: string;            // 指向 SystemContext
+  readonly spec: RunSpec;
+  readonly path: RunPath | null;
+  readonly renderPlan: RenderGeometryPlan | null;
+  readonly order: RunOrder | null;
+  readonly timeline: readonly TimelinePoint[] | null;
+  readonly events: readonly RunEvent[] | null;
+  readonly diagnostics: readonly Diagnostic[];
+}
+
+interface RunSnapshot {
+  readonly runId: string;
+  readonly graphId: string;
+  readonly stageHashes: {
+    readonly path: string | null;
+    readonly renderPlan: string | null;
+    readonly order: string | null;
+    readonly timeline: string | null;
+    readonly events: string | null;
+  };
+  readonly exportedAt: string;
+}
+```
+
+规则：
+- **两层模型**：`SystemContext` 是 graph 级（构建一次，多 run 共享）；`RunContext` 是 run 级（每个 RunSpec 一个，链式填充）。
+- **内容寻址**：`graphId = sha256(graph)`，`runId = sha256(graphId + spec)`。同一 graph + spec 必然同 runId，可缓存。
+- **快照不替代显式参数**：内部函数签名保持 `(graph, path, timeline)` 风格。`RunContext` 和 `RunSnapshot` 仅在 debug 导出和缓存边界使用。
+- **graph 变更** → graphId 变 → 所有 runId 失效。符合语义：共享根变了，下游全部重算。
+- **hashes 列表**：`DeployedSystem.contentHash` 和 `presetHashes` 供部署校验完整性。

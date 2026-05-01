@@ -172,12 +172,10 @@ export const TripsPage: React.FC = () => {
                         if (isWalk) {
                             let startName = trip.fromId || '';
                             let endName = trip.toId || '';
-                            Object.values(railwayData).forEach(line => {
-                                const s = line.stations.find(st => st.id === trip.fromId);
-                                if (s) startName = s.name_ja;
-                                const e = line.stations.find(st => st.id === trip.toId);
-                                if (e) endName = e.name_ja;
-                            });
+                            const s = getStationById(railwayData, trip.fromId);
+                            if (s) startName = s.name_ja;
+                            const e = getStationById(railwayData, trip.toId);
+                            if (e) endName = e.name_ja;
 
                             const isTree = trip.walkType === 'tree';
                             const cls = {
@@ -288,6 +286,7 @@ export const TripsPage: React.FC = () => {
 };
 
 import { ArrowUp, ArrowDown } from 'lucide-react';
+import { getStationById } from '../core/railwayRouting';
 
 export const FloatingActionButtons: React.FC<{
     fileInputRef: React.RefObject<HTMLInputElement>,

@@ -34,6 +34,7 @@ const { meta } = changelog;
 import { useStore } from './store';
 import toast from 'react-hot-toast';
 import { ESLint } from 'eslint';
+import { getStationById } from './core/railwayRouting';
 
 const CURRENT_VERSION = meta["currentVersion"];
 const LAST_MODIFIED = manifest.lastModified
@@ -1267,12 +1268,10 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
                 if (isWalk) {
                     let startName = t.fromId || '';
                     let endName = t.toId || '';
-                    Object.values(railwayData).forEach(line => {
-                        const s = line.stations.find(st => st.id === t.fromId);
+                    const s = getStationById(railwayData, t.fromId);
                         if (s) startName = s.name_ja;
-                        const e = line.stations.find(st => st.id === t.toId);
+                        const e = getStationById(railwayData, t.toId);
                         if (e) endName = e.name_ja;
-                    });
 
                     const isTree = t.walkType === 'tree';
                     const cls = {
@@ -1462,9 +1461,11 @@ const StatsView = ({ trips, railwayData, geoData, user, userProfile, segmentGeom
                     let count = 0;
                     if (railwayData) {
                         const uniqueStations = new Set();
-                        Object.values(railwayData).forEach(line => {
+                        for (const lineKey in railwayData) {
+                            if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+                            const line = railwayData[lineKey];
                             if (line.stations) line.stations.forEach(s => uniqueStations.add(s.id));
-                        });
+                        }
                         count = uniqueStations.size;
                     }
                     return count;

@@ -3,6 +3,7 @@ import { calcDist } from '../core/tripCalculator'; // Ensure calcDist is exporte
 
 // 预构建的换乘站索引缓存
 let stationNameIndexCache: Map<string, {lineKey: string, stationIndex: number}[]> | null = null;
+let stationIdIndexCache: Map<string, {lineKey: string, stationIndex: number}> | null = null;
 let lastRailwayDataRef: RailwayMap | null = null;
 
 export const isCompanyCompatible = (meta1: CompanyMeta | undefined, meta2: CompanyMeta | undefined) => {
@@ -13,25 +14,45 @@ export const isCompanyCompatible = (meta1: CompanyMeta | undefined, meta2: Compa
 };
 
 export const buildStationIndex = (railwayData: RailwayMap) => {
-    if (stationNameIndexCache && lastRailwayDataRef === railwayData) {
+    if (stationNameIndexCache && stationIdIndexCache && lastRailwayDataRef === railwayData) {
         return stationNameIndexCache;
     }
 
-    const index = new Map<string, {lineKey: string, stationIndex: number}[]>();
+    const nameIndex = new Map<string, {lineKey: string, stationIndex: number}[]>();
+    const idIndex = new Map<string, {lineKey: string, stationIndex: number}>();
+
     for (const lineKey in railwayData) {
         if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
         const line = railwayData[lineKey];
         line.stations.forEach((st, idx) => {
-            if (!index.has(st.name_ja)) {
-                index.set(st.name_ja, []);
+            if (!nameIndex.has(st.name_ja)) {
+                nameIndex.set(st.name_ja, []);
             }
-            index.get(st.name_ja)!.push({ lineKey, stationIndex: idx });
+            nameIndex.get(st.name_ja)!.push({ lineKey, stationIndex: idx });
+
+            if (st.id) {
+                idIndex.set(st.id, { lineKey, stationIndex: idx });
+            }
         });
     }
 
-    stationNameIndexCache = index;
+    stationNameIndexCache = nameIndex;
+    stationIdIndexCache = idIndex;
     lastRailwayDataRef = railwayData;
-    return index;
+    return nameIndex;
+};
+
+export const getStationById = (railwayData: RailwayMap, stationId: string): Station | undefined => {
+    if (!stationId) return undefined;
+
+    // Ensure caches are built
+    buildStationIndex(railwayData);
+
+    if (stationIdIndexCache && stationIdIndexCache.has(stationId)) {
+        const info = stationIdIndexCache.get(stationId)!;
+        return railwayData[info.lineKey]?.stations[info.stationIndex];
+    }
+    return undefined;
 };
 
 export const getTransferableLines = (station: Station | undefined, currentLineKey: string, railwayData: RailwayMap, strictMode = true) => {

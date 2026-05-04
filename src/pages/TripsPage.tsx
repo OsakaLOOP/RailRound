@@ -172,12 +172,21 @@ export const TripsPage: React.FC = () => {
                         if (isWalk) {
                             let startName = trip.fromId || '';
                             let endName = trip.toId || '';
-                            Object.values(railwayData).forEach(line => {
-                                const s = line.stations.find(st => st.id === trip.fromId);
-                                if (s) startName = s.name_ja;
-                                const e = line.stations.find(st => st.id === trip.toId);
-                                if (e) endName = e.name_ja;
-                            });
+                            let foundStart = false;
+                            let foundEnd = false;
+                            for (const lineKey in railwayData) {
+                                if (foundStart && foundEnd) break;
+                                if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+                                const line = railwayData[lineKey];
+                                if (!foundStart) {
+                                    const s = line.stations.find(st => st.id === trip.fromId);
+                                    if (s) { startName = s.name_ja; foundStart = true; }
+                                }
+                                if (!foundEnd) {
+                                    const e = line.stations.find(st => st.id === trip.toId);
+                                    if (e) { endName = e.name_ja; foundEnd = true; }
+                                }
+                            }
 
                             const isTree = trip.walkType === 'tree';
                             const cls = {

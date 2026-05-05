@@ -246,33 +246,75 @@ interface NormalizedEntityBatch {
 ```ts
 interface RailGraph {
   schemaVersion: "rail-graph-v1";
-  infraLayer: {
-    nodes: InfraNode[];            // 物理节点：站、道岔、线端点
-    edges: InfraEdge[];            // 物理边：轨道片段，不携带服务语义
-    areas: InfraArea[];
-    sections: SpecialSection[];
-    adjacency: GraphAdjacency;
+
+  // 拓扑热层：决定 graphId。变更 → graphId 变 → 所有 run 缓存失效
+  topo: {
+    infraLayer: {
+      nodes: InfraNode[];            // 物理节点：站、道岔、线端点
+      edges: InfraEdge[];            // 物理边：轨道片段，不含 geometry
+      areas: InfraArea[];
+      sections: SpecialSection[];
+      adjacency: GraphAdjacency;
+    };
+    serviceLayer: {
+      servicePatterns: ServicePattern[];   // edgeSequence, stationSequence, topologyType
+      doubleTrackRelations: DoubleTrackRelation[];
+    };
   };
-  serviceLayer: {
-    servicePatterns: ServicePattern[];   // ★ 一等公民：每条运行线路的完整服务语义
-    doubleTrackRelations: DoubleTrackRelation[];
+
+  // 温层：不影响寻路，变更不触发 graphId 变化，但触发 renderFingerprint / eventFingerprint 变化
+  geometryStore: {
+    edgeGeometries: Map<EntityRef, GeoJSON.LineString>;  // edge 坐标，与 topo 分离
+    nodePositions: Map<EntityRef, GeoJSON.Position>;     // node 坐标
+  };
+  displayStore: {
+    patternDisplay: Map<EntityRef, { displayName?: string; displayColor?: string; landmark?: boolean }>;
+    stationDisplay: Map<EntityRef, StationMeta>;
   };
   eventLayer: {
     anchors: EventAnchor[];
     policies: EventPolicy[];
   };
+
   indexes: RailGraphIndexes;
+
+  // 冷层：不影响任何缓存键
   provenance: ProvenanceRecord[];
   diagnostics: Diagnostic[];
 }
 ```
+
+`graphId = sha256(canonicalJson(topo))`——仅覆盖拓扑热层。`geometryStore`、`displayStore`、`eventLayer`、`provenance`、`diagnostics` 的变更不触发 graphId 变化，仅触发对应阶段 artifact 的缓存失效。
+
+#### 4.3.0 RailGraphIndexes
+
+```ts
+interface RailGraphIndexes {
+  // === 正向索引 ===
+  nodeById: Map<EntityRef, InfraNode>;
+  edgeById: Map<EntityRef, InfraEdge>;
+  areaById: Map<EntityRef, InfraArea>;
+  sectionById: Map<EntityRef, SpecialSection>;
+  patternById: Map<EntityRef, ServicePattern>;
+  adjacency: GraphAdjacency;                        // node → 相邻 edge[]
+
+  // === 反向索引（构建时同步填充，O(1) 变更影响面查询） ===
+  patternsByEdge: Map<EntityRef, Set<EntityRef>>;   // edge → 引用它的 ServicePattern.id[]
+  patternsByNode: Map<EntityRef, Set<EntityRef>>;   // node → 经过它的 ServicePattern.id[]
+  edgesBySection: Map<EntityRef, Set<EntityRef>>;   // specialSection → 包含的 edge[]
+  tracksByPlatform: Map<EntityRef, Set<EntityRef>>; // platform area → 服务的 track edge[]
+  platformsByTrack: Map<EntityRef, Set<EntityRef>>; // track edge → 服务的 platform area[]
+}
+```
+
+所有反向索引在 `graph-builder.ts` 构建阶段同步填充，内存增量在数百 KB 级别（15MB 图规模下），不做运行时遍历。
 
 #### 4.3.1 InfraEdge（物理边）
 
 ```ts
 interface InfraEdge {
   id: EntityRef;
-  geometry: GeoJSON.LineString;   // 标准化后的坐标
+  // geometry 存储在 geometryStore.edgeGeometries 中，不在此处——geometry 变更不影响 graphId
   role: "main" | "platform" | "passing" | "storage" | "yard" | "connector";
   name?: string;                   // 物理区段名称
   trackCode?: string;
@@ -766,7 +808,7 @@ interface ContributionStore {
 
 ```ts
 interface SystemContext {
-  readonly graphId: string;            // sha256(canonicalJson(graph))
+  readonly graphId: string;            // sha256(canonicalJson(topo))——仅覆盖拓扑热层
   readonly graph: RailGraph;
   readonly diagnostics: readonly Diagnostic[];
   readonly createdAt: string;
@@ -800,8 +842,10 @@ interface RunSnapshot {
 
 规则：
 - **两层模型**：`SystemContext` 是 graph 级（构建一次，多 run 共享）；`RunContext` 是 run 级（每个 RunSpec 一个，链式填充）。
-- **内容寻址**：`graphId = sha256(graph)`，`runId = sha256(graphId + spec)`。同一 graph + spec 必然同 runId，可缓存。
-- **分层接口策略**：编排层函数使用 `(ctx) => ctx`（保证链路一致性与可复现）；内部算法函数可保持 `(graph, path, timeline)` 等显式参数纯函数风格。
+- **内容寻址**：`graphId = sha256(topo)`（仅覆盖拓扑热层：nodes, edges, adjacency, edgeSequence, stationSequence, topologyType）。`runId = sha256(graphId + spec)`。同一 graph + spec 必然同 runId，可缓存。
+- **graphId 不变语义**：修改 geometry、displayColor、displayName、landmark、eventAnchor、eventPolicy、provenance、diagnostics 等非拓扑字段不触发 graphId 变化——RunPath 缓存仍然有效，仅 renderPlan/events 缓存失效。
+- **分层接口策略**：编排层函数使用 `(ctx) => ctx`（保证链路一致性与可复现）；内部算法函数可保持 `(topo, path, timeline)` 等显式参数纯函数风格——内部算法只接收 topo 而非整个 graph。
 - **快照边界**：`RunSnapshot` 用于 debug 导出和缓存边界，不替代核心运行数据本身。
-- **graph 变更** → graphId 变 → 所有 runId 失效。符合语义：共享根变了，下游全部重算。
+- **graph 拓扑变更** → graphId 变 → 所有 runId 失效。符合语义：共享根变了，下游全部重算。
+- **反向索引**：`graph-builder.ts` 构建时同步填充 `patternsByEdge`、`patternsByNode`、`edgesBySection`、`tracksByPlatform`、`platformsByTrack`，支持 O(1) 的变更影响面查询。
 - **hashes 列表**：`DeployedSystem.contentHash` 和 `presetHashes` 供部署校验完整性。

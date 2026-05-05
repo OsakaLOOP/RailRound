@@ -41,11 +41,19 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect, 
         const matchedLines: any[] = [];
         const matchedStations: any[] = [];
 
-        Object.entries(railwayData).forEach(([lineKey, lineData]) => {
+        for (const lineKey in railwayData) {
+            if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+
+            // Early exit if we have reached our caps
+            if (matchedLines.length >= 50 && matchedStations.length >= 100) {
+                break;
+            }
+
+            const lineData = railwayData[lineKey];
             const displayName = lineKey.includes(':') ? lineKey.split(':').slice(1).join(':') : lineKey;
 
             // Check line match
-            if (lineKey.toLowerCase().includes(lowerQuery) || displayName.toLowerCase().includes(lowerQuery)) {
+            if (matchedLines.length < 50 && (lineKey.toLowerCase().includes(lowerQuery) || displayName.toLowerCase().includes(lowerQuery))) {
                 matchedLines.push({
                     lineKey,
                     displayName,
@@ -59,28 +67,35 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect, 
             }
 
             // Check station match
-            lineData.stations.forEach(station => {
-                if (station.name_ja.toLowerCase().includes(lowerQuery)) {
-                    matchedStations.push({
-                        lineKey,
-                        lineDisplayName: displayName,
-                        stationId: station.id,
-                        stationName: station.name_ja,
-                        company: lineData.meta.company || '',
-                        logo: lineData.meta.logo || null,
-                        icon: lineData.meta.icon || null,
-                        companyIcon: lineData.meta.companyIcon || null,
-                        recolor: lineData.meta.recolor,
-                        color: lineData.meta.color
-                    });
+            if (matchedStations.length < 100 && lineData.stations) {
+                for (let i = 0; i < lineData.stations.length; i++) {
+                    const station = lineData.stations[i];
+                    if (station.name_ja.toLowerCase().includes(lowerQuery)) {
+                        matchedStations.push({
+                            lineKey,
+                            lineDisplayName: displayName,
+                            stationId: station.id,
+                            stationName: station.name_ja,
+                            company: lineData.meta.company || '',
+                            logo: lineData.meta.logo || null,
+                            icon: lineData.meta.icon || null,
+                            companyIcon: lineData.meta.companyIcon || null,
+                            recolor: lineData.meta.recolor,
+                            color: lineData.meta.color
+                        });
+                        // Stop adding stations if limit is reached
+                        if (matchedStations.length >= 100) {
+                            break;
+                        }
+                    }
                 }
-            });
-        });
+            }
+        }
 
         // (the code up there already populated `matchedLines` and `matchedStations` so no need to do performSearch here)
         return {
-            lines: matchedLines.slice(0, 50), // Limit results for performance
-            stations: matchedStations.slice(0, 100)
+            lines: matchedLines, // Limit results for performance already enforced by early break
+            stations: matchedStations // Limit results for performance already enforced by early break
         };
     }, [query, railwayData]);
 

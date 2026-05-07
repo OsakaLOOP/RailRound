@@ -91,7 +91,23 @@ export const TripsPage: React.FC = () => {
     const { saveData } = useUserData();
     const { t } = useTranslation();
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // ⚡ Bolt: Replaced O(N*M) nested array lookups with O(1) Map lookup
+    // Optimization: Reduces TripsPage render time by avoiding full iterations of railwayData
+    const stationDataMap = useMemo(() => {
+        const map = new Map<string, any>();
+        for (const key in railwayData) {
+            const line = railwayData[key];
+            if (line.stations) {
+                for (let i = 0; i < line.stations.length; i++) {
+                    map.set(line.stations[i].id, line.stations[i]);
+                }
+            }
+        }
+        return map;
+    }, [railwayData]);
+
+const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleImportSuica = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -172,12 +188,10 @@ export const TripsPage: React.FC = () => {
                         if (isWalk) {
                             let startName = trip.fromId || '';
                             let endName = trip.toId || '';
-                            Object.values(railwayData).forEach(line => {
-                                const s = line.stations.find(st => st.id === trip.fromId);
-                                if (s) startName = s.name_ja;
-                                const e = line.stations.find(st => st.id === trip.toId);
-                                if (e) endName = e.name_ja;
-                            });
+                            const s = stationDataMap.get(trip.fromId);
+                            if (s) startName = s.name_ja;
+                            const e = stationDataMap.get(trip.toId);
+                            if (e) endName = e.name_ja;
 
                             const isTree = trip.walkType === 'tree';
                             const cls = {

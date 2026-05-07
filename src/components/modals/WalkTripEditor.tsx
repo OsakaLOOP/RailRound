@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Edit2, X, AlertTriangle, Save, Trash2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -23,7 +23,23 @@ export const WalkTripEditor: React.FC = () => {
         user: state.user
     })));
 
-    const setForm = useStore(state => state.setTripForm);
+
+    // ⚡ Bolt: Replaced O(N*M) nested array lookups with O(1) Map lookup
+    // Optimization: Reduces WalkTripEditor render time by avoiding full iterations of railwayData
+    const stationDataMap = useMemo(() => {
+        const map = new Map<string, any>();
+        for (const key in railwayData) {
+            const line = railwayData[key];
+            if (line.stations) {
+                for (let i = 0; i < line.stations.length; i++) {
+                    map.set(line.stations[i].id, line.stations[i]);
+                }
+            }
+        }
+        return map;
+    }, [railwayData]);
+
+const setForm = useStore(state => state.setTripForm);
     const closeEditor = useStore(state => state.closeWalkTripEditor);
     const setTrips = useStore(state => state.setTrips);
     const { saveData } = useUserData();
@@ -82,12 +98,10 @@ export const WalkTripEditor: React.FC = () => {
             // Find coordinates for the Bezier curve
             let startCoords = null;
             let endCoords = null;
-            Object.values(railwayData).forEach(line => {
-                const s = line.stations.find(st => st.id === form.fromId);
-                if (s) startCoords = [s.lng, s.lat];
-                const e = line.stations.find(st => st.id === form.toId);
-                if (e) endCoords = [e.lng, e.lat];
-            });
+            const s = stationDataMap.get(form.fromId || '');
+            if (s) startCoords = [s.lng, s.lat];
+            const e = stationDataMap.get(form.toId || '');
+            if (e) endCoords = [e.lng, e.lat];
 
             if (startCoords && endCoords) {
                 walkPath = generateBezierPath(startCoords as [number, number], endCoords as [number, number]);
@@ -130,12 +144,10 @@ export const WalkTripEditor: React.FC = () => {
     // Resolving station names for read-only display
     let startName = t('walk.unknownStart', "未知起点");
     let endName = t('walk.unknownEnd', "未知终点");
-    Object.values(railwayData).forEach(line => {
-        const s = line.stations.find(st => st.id === form.fromId);
-        if (s) startName = s.name_ja;
-        const e = line.stations.find(st => st.id === form.toId);
-        if (e) endName = e.name_ja;
-    });
+    const startStation = stationDataMap.get(form.fromId || '');
+    if (startStation) startName = startStation.name_ja;
+    const endStation = stationDataMap.get(form.toId || '');
+    if (endStation) endName = endStation.name_ja;
 
     const isTree = form.walkType === 'tree';
 

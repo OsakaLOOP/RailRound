@@ -5,3 +5,7 @@
 ## 2024-04-15 - [Avoid O(N log N) Sorting on Massive Geographical Collections]
 **Learning:** In spatial queries like `findNearbyStations` where we scan `railwayData` containing thousands of stations to find the top K nearest points, allocating all elements to an array and running `Array.prototype.sort()` results in massive temporary object allocation and $O(N \log N)$ execution time (taking ~8.5ms in benchmarks).
 **Action:** Replace full array sorts with a bounded Top-K array using a simple $O(K)$ insertion sort during the $O(N)$ iteration phase. This brings the time complexity effectively down to $O(N)$, speeding up operations by ~36x (taking ~0.24ms). Remember to apply a final sort if total elements found are less than $K$.
+
+## 2024-05-08 - [Avoid Redundant Visualization Processing in Stats Calculation]
+**Learning:** In `calculateLatestStats`, generating SVG paths, computing PCA for orientation, and calculating bounding boxes via `getRouteVisualData` for *all* trips just to get the `grandTotalDist` causes unnecessary CPU load and memory allocations.
+**Action:** Introduced a `skipVisuals` parameter to visualization-heavy helper functions. When calculating aggregate statistics over large arrays where only simple scalar values (like total distance) are needed, explicitly decouple or bypass the presentation-layer computations by passing `skipVisuals=true`.

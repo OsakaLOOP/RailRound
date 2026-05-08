@@ -158,7 +158,7 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) =>
 };
 
 // --- Shared Helper: Calculate Visualization Data ---
-export const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData) => {
+export const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData, skipVisuals = false) => {
     let totalDist = 0;
     const allCoords = [];
 
@@ -233,7 +233,7 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
         }
     });
 
-    if (allCoords.length === 0) return { totalDist, visualPaths: [] };
+    if (allCoords.length === 0 || skipVisuals) return { totalDist, visualPaths: [] };
 
     // PCA & Projection Logic
     let sumLat = 0, sumLng = 0, count = 0;
@@ -328,7 +328,7 @@ export const calculateLatestStats = (trips, segmentGeometries, railwayData, geoD
     const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
 
     // Calc total distance using helper (aggregating cached or on-the-fly)
-    const { totalDist: grandTotalDist } = getRouteVisualData(allSegments, segmentGeometries, railwayData, geoData);
+    const { totalDist: grandTotalDist } = getRouteVisualData(allSegments, segmentGeometries, railwayData, geoData, true);
 
     // 2. Latest 5
     const latest = trips.slice(0, 5).map(t => {

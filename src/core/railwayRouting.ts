@@ -50,17 +50,20 @@ export const getTransferableLines = (station: Station | undefined, currentLineKe
         });
     }
 
-    for (const lineKey in railwayData) {
-        if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
-        if (lineKey === currentLineKey) continue;
-        if (validLines.has(lineKey)) continue;
-        const nextMeta = railwayData[lineKey].meta;
-        const sameNameStation = railwayData[lineKey].stations.find(s => s.name_ja === station.name_ja);
-        if (sameNameStation) {
-            const dist = calcDist(station.lat, station.lng, sameNameStation.lat, sameNameStation.lng);
-            if (dist < 0.5) validLines.add(lineKey);
-        }
+    // ⚡ Bolt Optimization: Use cached O(1) station index lookup instead of O(N) array iteration
+    const stationIndexMap = buildStationIndex(railwayData);
+    const sameNameNodes = stationIndexMap.get(station.name_ja) || [];
+
+    for (const tNode of sameNameNodes) {
+        if (tNode.lineKey === currentLineKey) continue;
+        if (validLines.has(tNode.lineKey)) continue;
+
+        const targetStation = railwayData[tNode.lineKey].stations[tNode.stationIndex];
+        const dist = calcDist(station.lat, station.lng, targetStation.lat, targetStation.lng);
+
+        if (dist < 0.5) validLines.add(tNode.lineKey);
     }
+
     return Array.from(validLines);
 };
 

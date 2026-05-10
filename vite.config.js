@@ -10,6 +10,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        railGraphMvp: path.resolve(__dirname, 'rail-graph-mvp.html')
+      }
+    }
+  },
   plugins: [
     react(),
     tailwindcss(),

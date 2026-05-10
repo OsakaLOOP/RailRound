@@ -23,6 +23,31 @@ import type { ServicePathSegment, ServicePattern, ServiceTraceEntry } from "./se
 
 export type TemplateDraftStatus = "draft" | "reviewing" | "confirmed" | "rejected";
 
+/**
+ * 用户在 admin 工具中提交一条 PlatformTrackBinding 时的输入 wrapper。
+ * 编译器据此生成正式 PlatformTrackBinding (附加 id 与校验)。
+ */
+export interface PlatformTrackBindingInput {
+  stationRef: string;
+  platformRef: string;
+  edgeRef: string;
+  side: PlatformTrackBinding["side"];
+  servingDirection?: DirectionLabel;
+}
+
+/**
+ * 用户在 admin 工具中确认一个 StoppingPoint 时的输入 wrapper。
+ * 编译器据此生成正式 StoppingPoint (confirmation: "confirmed")。
+ */
+export interface StoppingPointInput {
+  stationRef: string;
+  platformRef: string;
+  edgeRef: string;
+  direction: StoppingPoint["direction"];
+  /** 0-1 的 EdgeMeasure, 编译期会 clamp。 */
+  measure: number;
+}
+
 export interface ServiceTemplateDraft {
   draftId: EntityRef;
   baseGraphId: string;

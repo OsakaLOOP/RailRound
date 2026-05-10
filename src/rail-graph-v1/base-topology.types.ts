@@ -20,6 +20,37 @@ export type TopologyEdgeRole =
 
 export type TraversalDirection = "both" | "forward";
 
+/**
+ * 股道的物理身份。与运用功能 (functionalUse) 和方向角色 (directionRole) 正交。
+ * - main:   正线 (本線) — 区间线路在站内的延续
+ * - siding: 到发线 (副本線/到発線) — 列车到达/始发停车用
+ * - yard:   段管线 — 机务段/动车段内股道
+ * - lead:   牵出线 — 调车作业用
+ * - safety: 安全线 — 防止列车冲撞用的尽头线
+ */
+export type TrackPhysicalKind = "main" | "siding" | "yard" | "lead" | "safety";
+
+/**
+ * 股道的运用功能。一条 edge 可同时具有多个功能。
+ * - through:  通过运用 — 列车直接驶过, 不停车
+ * - stopping: 停车运用 — 列车在此停靠
+ * - passing:  越行运用 — 快车从此越过停车的慢车
+ * - turnback: 折返运用 — 列车在此折返
+ * - storage:  留置运用 — 列车在此停留待发
+ *
+ * 编译期不得从 binding 状态或位置反推此字段。
+ */
+export type TrackFunctionalUse = "through" | "stopping" | "passing" | "turnback" | "storage";
+
+/**
+ * 股道的方向角色。用于自动聚合 DoubleTrackPair。
+ * - up_main:    上行正线
+ * - down_main:  下行正线
+ * - siding:     双向到发线 (不归属任何方向)
+ * - reversible: 可逆运用线
+ */
+export type TrackDirectionRole = "up_main" | "down_main" | "siding" | "reversible";
+
 /** 固定 topo 节点。站不是 node；站由 Station/Platform/Binding 表达。 */
 export interface TopologyNode {
   id: EntityRef;
@@ -37,12 +68,22 @@ export interface TopologyEdge {
   fromNodeRef: EntityRef;
   toNodeRef: EntityRef;
   traversal: TraversalDirection;
+  /**
+   * 旧的一维角色标签。保留作过渡, 新代码应优先使用
+   * physicalKind / functionalUse / directionRole 三个独立维度。
+   */
   role: TopologyEdgeRole;
   name?: string;
   trackCode?: string;
   geometryRef?: EntityRef;
   lengthMeters: number;
   sourceSlice?: SourceGeometrySlice;
+  /** 物理身份。必须由 annotation 显式声明, 不得反推。 */
+  physicalKind?: TrackPhysicalKind;
+  /** 运用功能, 多值。必须由 annotation 显式声明, 不得从 binding 状态反推。 */
+  functionalUse?: TrackFunctionalUse[];
+  /** 方向角色。编译期据此自动聚合 DoubleTrackPair。 */
+  directionRole?: TrackDirectionRole;
   properties?: {
     gauge?: number;
     electrified?: boolean;
@@ -76,6 +117,13 @@ export interface Station {
 
 export type PlatformType = "side" | "island" | "bay" | "unknown";
 
+/**
+ * 站台。MVP 阶段不为岛式站台拆分独立的 face 实体, 而是用同一 platformRef
+ * 上的两条 PlatformTrackBinding (side=left + side=right) 表达双面靠车。
+ *
+ * type 必须由 annotation 显式声明; 编译期不得从几何或 binding 推断,
+ * 缺失时发 warn 但 fallback 为 "unknown"。
+ */
 export interface Platform {
   id: EntityRef;
   stationRef: EntityRef;
@@ -85,12 +133,35 @@ export interface Platform {
   areaRef?: EntityRef;
 }
 
-/** 站台与股道的固定绑定。没有 binding 的 platform edge 不能被当作可停靠站线。 */
+/**
+ * 站台与股道的固定绑定。没有 binding 的 edge 不能被推断为可停靠站线,
+ * 也不能被反推为越行/通过线 — edge 的功能必须由 TopologyEdge.functionalUse
+ * 显式声明, 与有无 binding 无关。
+ *
+ * 岛式站台 (Platform.type = "island") 通过同一 platformRef 的两条 binding
+ * 来表达两个靠车面: 一条 side=left + 一条 side=right, 各服务一条相邻 edge。
+ */
 export interface PlatformTrackBinding {
   id: EntityRef;
   stationRef: EntityRef;
   platformRef: EntityRef;
   edgeRef: EntityRef;
+  /**
+   * 站台相对于该 edge 的方位。
+   *
+   * 参考系 (不变量): 沿 edge.fromNodeRef → edge.toNodeRef 方向观察,
+   *   left  = 站台位于 edge 行进方向的左侧
+   *   right = 站台位于 edge 行进方向的右侧
+   *   both  = 同一站台在 edge 两侧均有靠车面 (罕见, 例如折返岛)
+   *   unknown = 尚未确认
+   *
+   * 与列车运行方向 (servingDirection: up/down) 无关。
+   * 与 annotation 编辑顺序无关。
+   *
+   * 不变量: 当 edge 的几何被反向重建 (fromNodeRef ↔ toNodeRef 互换) 时,
+   * 所有引用该 edge 的 binding 必须同步翻转 left ↔ right。
+   * 此翻转不会改变 servingDirection。
+   */
   side: "left" | "right" | "both" | "unknown";
   servingDirection?: DirectionLabel;
 }

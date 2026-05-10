@@ -12,7 +12,6 @@ import type {
   BaseTopologyLayer,
   DoubleTrackPair,
   GraphAdjacency,
-  EntityRef,
   Platform,
   PlatformTrackBinding,
   Station,
@@ -242,4 +241,60 @@ export function isTraversalForbidden(
       && constraint.targetRefs.includes(edgeRef)
       && constraint.targetRefs.includes(toNodeRef);
   });
+}
+
+// ── 4. DirectionRole Aggregation ───────────────────────────
+
+/**
+ * 基于 TopologyEdge.directionRole 自动聚合 DoubleTrackPair。
+ *
+ * 行为:
+ * - directionRole = "up_main"    → upEdgeRefs
+ * - directionRole = "down_main"  → downEdgeRefs
+ * - directionRole = "siding"     → sharedGeometryEdgeRefs (双向到发线)
+ * - directionRole = "reversible" → sharedGeometryEdgeRefs (可逆运用线)
+ *
+ * 当且仅当存在 ≥1 条 up_main 与 ≥1 条 down_main 时, 才生成一条 DoubleTrackPair。
+ * 生成的 confirmation 标为 "imported_confirmed", 表示由编译派生而非用户原始输入。
+ *
+ * MVP 阶段的限制: 只生成单一全局 pair, 不按 station/line 切分。
+ * 后续可以扩展接受 grouping 函数。
+ */
+export function aggregateDoubleTrackPairs(
+  edges: TopologyEdge[],
+  pairId: EntityRef,
+): DoubleTrackPair[] {
+  const upEdgeRefs: EntityRef[] = [];
+  const downEdgeRefs: EntityRef[] = [];
+  const sharedGeometryEdgeRefs: EntityRef[] = [];
+
+  for (const edge of edges) {
+    switch (edge.directionRole) {
+      case "up_main":
+        upEdgeRefs.push(edge.id);
+        break;
+      case "down_main":
+        downEdgeRefs.push(edge.id);
+        break;
+      case "siding":
+      case "reversible":
+        sharedGeometryEdgeRefs.push(edge.id);
+        break;
+      default:
+        // 无 directionRole 声明的 edge 不参与聚合
+        break;
+    }
+  }
+
+  if (upEdgeRefs.length === 0 || downEdgeRefs.length === 0) {
+    return [];
+  }
+
+  return [{
+    id: pairId,
+    upEdgeRefs,
+    downEdgeRefs,
+    sharedGeometryEdgeRefs: sharedGeometryEdgeRefs.length > 0 ? sharedGeometryEdgeRefs : undefined,
+    confirmation: "imported_confirmed",
+  }];
 }

@@ -8,6 +8,7 @@
 export type * from "./primitives";
 export type * from "./geojson";
 export type * from "./diagnostic-types";
+export type * from "./annotation.types";
 export type * from "./base-topology.types";
 export type * from "./service-template.types";
 export type * from "./editing.types";

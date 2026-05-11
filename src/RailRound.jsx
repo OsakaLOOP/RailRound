@@ -1368,33 +1368,56 @@ const RecordsView = ({ trips, railwayData, setTrips, onEdit, onDelete, onAdd, se
 );
 const StatsView = ({ trips, railwayData, geoData, user, userProfile, segmentGeometries, onOpenCard, onOpenFolders, companyDB, setIsLoginOpen }) => {
     const totalTrips = trips.length;
-    const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
-    const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
     let totalDist = 0;
     let totalCost = 0;
-    trips.forEach(t => totalCost += (t.cost || 0));
 
-    if (segmentGeometries && turf) {
-        allSegments.forEach(seg => {
-            const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
-            const geom = segmentGeometries.get(key);
-            if (geom && geom.coords) {
-                if (geom.isMulti) {
-                    geom.coords.forEach(c => totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]]))));
+    const uniqueLinesSet = new Set();
+    const lineCounts = new Map();
+
+    for (let i = 0; i < trips.length; i++) {
+        const trip = trips[i];
+        totalCost += (trip.cost || 0);
+
+        const segments = trip.segments || [{ lineKey: trip.lineKey, fromId: trip.fromId, toId: trip.toId }];
+        for (let j = 0; j < segments.length; j++) {
+            const seg = segments[j];
+            if (!seg.lineKey) continue;
+
+            uniqueLinesSet.add(seg.lineKey);
+            lineCounts.set(seg.lineKey, (lineCounts.get(seg.lineKey) || 0) + 1);
+
+            if (segmentGeometries && turf) {
+                const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+                const geom = segmentGeometries.get(key);
+                if (geom && geom.coords) {
+                    if (geom.isMulti) {
+                        for (let k = 0; k < geom.coords.length; k++) {
+                            const c = geom.coords[k];
+                            totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
+                        }
+                    } else {
+                        totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                    }
                 } else {
-                    totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
-                }
-            } else {
-                // Fallback (Approx)
-                const line = railwayData[seg.lineKey];
-                if (line) {
-                    const s1 = line.stations.find(st => st.id === seg.fromId);
-                    const s2 = line.stations.find(st => st.id === seg.toId);
-                    if (s1 && s2) totalDist += calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
+                    // Fallback (Approx)
+                    const line = railwayData[seg.lineKey];
+                    if (line && line.stations) {
+                        let s1, s2;
+                        for (let k = 0; k < line.stations.length; k++) {
+                            const st = line.stations[k];
+                            if (st.id === seg.fromId) s1 = st;
+                            else if (st.id === seg.toId) s2 = st;
+                            if (s1 && s2) break;
+                        }
+                        if (s1 && s2) totalDist += calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
+                    }
                 }
             }
-        });
+        }
     }
+
+    const uniqueLines = uniqueLinesSet.size;
+    const rankedSegments = Array.from(lineCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
     return (
         <div id="stats-view-content" className="flex-1 overflow-y-auto p-4 space-y-4">
             {user && (
@@ -1452,7 +1475,7 @@ const StatsView = ({ trips, railwayData, geoData, user, userProfile, segmentGeom
                 <div className="border-t border-white/20 pt-2 flex items-center gap-2 text-sm opacity-90"><span className="font-bold">¥</span> 总开销: {totalCost.toLocaleString()}</div>
             </div>
             <div className="bg-white rounded-xl border overflow-hidden"><div className="p-3 border-b bg-slate-50 font-bold text-sm text-slate-600">常乘路线排行</div>
-                {Object.entries(allSegments.reduce((acc, s) => { acc[s.lineKey] = (acc[s.lineKey] || 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([line, count], idx) => { const icon = railwayData[line]?.meta?.icon; return (<div key={line} className="p-3 border-b last:border-0 flex justify-between items-center"><div className="flex items-center gap-3"><span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{idx + 1}</span>{icon && <img src={icon} alt="" className="line-icon" />}<span>{line}</span></div><span className="font-bold text-slate-400 text-sm">{count}</span></div>) })}
+                {rankedSegments.map(([line, count], idx) => { const icon = railwayData[line]?.meta?.icon; return (<div key={line} className="p-3 border-b last:border-0 flex justify-between items-center"><div className="flex items-center gap-3"><span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{idx + 1}</span>{icon && <img src={icon} alt="" className="line-icon" />}<span>{line}</span></div><span className="font-bold text-slate-400 text-sm">{count}</span></div>) })}
             </div>
 
             <div className="text-center text-xs text-gray-400 mt-8 pb-4">
@@ -1934,36 +1957,50 @@ function RailLOOPContent() {
     // Async Logic to load/calc geometries
     useEffect(() => {
         // 1. Identify segments needed
-        const allSegments = trips.flatMap(t => t.segments || []);
         const uniqueKeys = new Set();
-        const needed = allSegments.filter(seg => {
-            if (!seg.lineKey || !seg.fromId || !seg.toId) return false;
-            const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
-            uniqueKeys.add(key);
-            // Only fetch if not already in memory cache
-            return !segmentGeometries.has(key);
-        });
+        const needed = [];
+        const geometryList = [];
+        let missingCount = 0;
 
-        if (needed.length === 0) {
-            // Just rebuild the list for rendering using cache
-            const geometryList = allSegments.map(seg => {
+        for (let i = 0; i < trips.length; i++) {
+            const trip = trips[i];
+            const segments = trip.segments || [];
+            for (let j = 0; j < segments.length; j++) {
+                const seg = segments[j];
+                if (!seg.lineKey || !seg.fromId || !seg.toId) continue;
+
                 const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
-                const cached = segmentGeometries.get(key);
-                const line = railwayData[seg.lineKey];
-                const s1 = line?.stations.find(s => s.id === seg.fromId);
-                const s2 = line?.stations.find(s => s.id === seg.toId);
-                const name1 = s1?.name_ja || seg.fromId;
-                const name2 = s2?.name_ja || seg.toId;
+                uniqueKeys.add(key);
 
-                if (cached) {
-                    return {
-                        id: seg.id || key,
-                        popup: `${seg.lineKey}: ${name1} → ${name2}`,
-                        ...cached
-                    };
+                if (!segmentGeometries.has(key)) {
+                    needed.push(seg);
+                    missingCount++;
+                } else {
+                    const cached = segmentGeometries.get(key);
+                    const line = railwayData[seg.lineKey];
+                    let s1, s2;
+                    if (line && line.stations) {
+                        for (let k = 0; k < line.stations.length; k++) {
+                            if (line.stations[k].id === seg.fromId) s1 = line.stations[k];
+                            if (line.stations[k].id === seg.toId) s2 = line.stations[k];
+                        }
+                    }
+                    const name1 = s1?.name_ja || seg.fromId;
+                    const name2 = s2?.name_ja || seg.toId;
+
+                    if (cached) {
+                        geometryList.push({
+                            id: seg.id || key,
+                            popup: `${seg.lineKey}: ${name1} → ${name2}`,
+                            ...cached
+                        });
+                    }
                 }
-                return null;
-            }).filter(Boolean);
+            }
+        }
+
+        if (missingCount === 0) {
+            // Just rebuild the list for rendering using cache
             setTripSegmentsGeometry(geometryList);
             return;
         }

@@ -15,12 +15,14 @@ import type {
   TrackFunctionalUse,
   TrackPhysicalKind,
 } from "./base-topology.types";
+import type { EdgeMeasure } from "./primitives";
 
 /**
  * Feature 的语义类别。决定该 Feature 在编译期被解释为哪种 topo 实体。
  * - track_geometry:  编译为 TopologyEdge
  * - station_point:   编译为 Station
  * - platform_area:   编译为 Platform
+ * - signal_point:    编译为 Signal (不参与寻径)
  * - switch_point:    将编译为 junction TopologyNode (MVP 阶段尚未实现)
  * - special_section: 将编译为 SpecialSection (MVP 阶段尚未实现)
  * - unknown:         未标注, 编译期跳过并发 warn
@@ -29,6 +31,7 @@ export type RailGraphFeatureKind =
   | "track_geometry"
   | "station_point"
   | "platform_area"
+  | "signal_point"
   | "switch_point"
   | "special_section"
   | "unknown";
@@ -61,6 +64,17 @@ export interface RailGraphPlatformAnnotation {
 }
 
 /**
+ * 信号机 annotation. edgeRef + measure 必须显式提供 (MVP 不空间投影)。
+ * geometry 可为 Point (供地图可视化定位 fallback), 但编译期以 edgeRef + measure 为准。
+ */
+export interface RailGraphSignalAnnotation {
+  edgeRef: string;
+  measure: EdgeMeasure;
+  facing: "forward" | "reverse" | "both";
+  name?: string;
+}
+
+/**
  * 写入 Feature.properties.railGraph 的标注。
  */
 export interface RailGraphAnnotation {
@@ -73,6 +87,7 @@ export interface RailGraphAnnotation {
   track?: RailGraphTrackAnnotation;
   station?: RailGraphStationAnnotation;
   platform?: RailGraphPlatformAnnotation;
+  signal?: RailGraphSignalAnnotation;
 }
 
 /**

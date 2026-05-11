@@ -43,13 +43,21 @@ export type TrackPhysicalKind = "main" | "siding" | "yard" | "lead" | "safety";
 export type TrackFunctionalUse = "through" | "stopping" | "passing" | "turnback" | "storage";
 
 /**
- * 股道的方向角色。用于自动聚合 DoubleTrackPair。
- * - up_main:    上行正线
- * - down_main:  下行正线
- * - siding:     双向到发线 (不归属任何方向)
- * - reversible: 可逆运用线
+ * 股道的方向角色。表达"运行方向归属", 与"主/副线"正交 (后者由 physicalKind 表达)。
+ *
+ * - up:            仅上行单向运行
+ * - down:          仅下行单向运行
+ * - bidirectional: 双向可运行 — 不同列车不同时刻可走任一方向, **但不允许同一列车换向**
+ *                  典型: 道岔联络 connector, 单线区间, 站间双向使用线
+ * - reversible:    在 bidirectional 基础上**额外允许列车在此换向**
+ *                  即 reversible ⊃ bidirectional (蕴含双向可运行能力)
+ *                  典型: 国铁型中线, 折返线, 尽头型站台股道
+ *
+ * 与 functionalUse 的关系: functionalUse 含 "turnback" 表达"在此换向是确认的运用",
+ * 与 directionRole=reversible 一起声明 (互为校验)。compile 期若 functionalUse 含
+ * turnback 但 directionRole !== reversible, 发 warn (但仍允许)。
  */
-export type TrackDirectionRole = "up_main" | "down_main" | "siding" | "reversible";
+export type TrackDirectionRole = "up" | "down" | "bidirectional" | "reversible";
 
 /** 固定 topo 节点。站不是 node；站由 Station/Platform/Binding 表达。 */
 export interface TopologyNode {
@@ -180,6 +188,25 @@ export interface StoppingPoint {
   confirmation: "confirmed" | "imported_confirmed";
 }
 
+/**
+ * 信号机。固定的 topo 注解, 不参与寻径硬约束 (MVP), 仅作可视化与诊断。
+ *
+ * facing 含义:
+ * - "forward": 控制沿 edge.fromNodeRef → edge.toNodeRef 方向行进的列车
+ * - "reverse": 控制沿 to → from 方向行进的列车 (适用于 bidirectional / reversible edge)
+ * - "both":    双向都控制 (例如出于简化, 或者真实双面信号机)
+ *
+ * 信号机必须设在道岔外 (即在 main edge 的延伸段 / 站间联络段上, 而非道岔位置)。
+ * MVP 不做空间投影, edgeRef + measure 必须由 annotation 显式提供。
+ */
+export interface Signal {
+  id: EntityRef;
+  edgeRef: EntityRef;
+  measure: EdgeMeasure;
+  facing: "forward" | "reverse" | "both";
+  name?: string;
+}
+
 export type SpecialSectionCategory = "bridge" | "tunnel" | "viaduct" | "cutting" | "other";
 export type DirectionSeparation = "none" | "up_down_split" | "multi_bore" | "unknown";
 
@@ -233,6 +260,7 @@ export interface BaseTopologyLayer {
   platforms: Platform[];
   platformTrackBindings: PlatformTrackBinding[];
   stoppingPoints: StoppingPoint[];
+  signals: Signal[];
   specialSections: SpecialSection[];
   doubleTrackPairs: DoubleTrackPair[];
   relations: BaseTopologyRelation[];

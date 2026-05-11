@@ -14,14 +14,16 @@ import type {
   GraphAdjacency,
   Platform,
   PlatformTrackBinding,
+  Signal,
   Station,
   StoppingPoint,
   TopologyEdge,
   TopologyHardConstraint,
   TopologyNode,
+  TrackDirectionRole,
 } from "./base-topology.types";
 import type { Diagnostic } from "./diagnostic-types";
-import type { EntityRef } from "./primitives";
+import type { DirectionLabel, EntityRef } from "./primitives";
 import type { ServiceTraceEntry } from "./service-template.types";
 
 // ── 0. Topology Graph ──────────────────────────────────────
@@ -49,9 +51,14 @@ export interface TopologyLookup {
   stationsById: Record<string, Station>;
   platformsById: Record<string, Platform>;
   bindingsByEdge: Record<string, PlatformTrackBinding[]>;
+  /** edge.id → 该 edge 上挂载的 PlatformTrackBinding (与 bindingsByEdge 等价, 命名保留) */
+  bindingsByPlatform: Record<string, PlatformTrackBinding[]>;
   stoppingPointsByEdge: Record<string, StoppingPoint[]>;
+  signalsByEdge: Record<string, Signal[]>;
   doubleTrackPairsByEdge: Record<string, DoubleTrackPair[]>;
   hardConstraintsByTarget: Record<string, TopologyHardConstraint[]>;
+  /** 按 directionRole 分组的 edge id 列表; undefined directionRole 不收录 */
+  edgesByDirectionRole: Record<TrackDirectionRole, EntityRef[]>;
 }
 
 // ── 1. Edge Traversal Primitives ───────────────────────────
@@ -108,9 +115,17 @@ export function buildTopologyLookup(topo: BaseTopologyLayer): TopologyLookup {
   const stationsById: Record<string, Station> = {};
   const platformsById: Record<string, Platform> = {};
   const bindingsByEdge: Record<string, PlatformTrackBinding[]> = {};
+  const bindingsByPlatform: Record<string, PlatformTrackBinding[]> = {};
   const stoppingPointsByEdge: Record<string, StoppingPoint[]> = {};
+  const signalsByEdge: Record<string, Signal[]> = {};
   const doubleTrackPairsByEdge: Record<string, DoubleTrackPair[]> = {};
   const hardConstraintsByTarget: Record<string, TopologyHardConstraint[]> = {};
+  const edgesByDirectionRole: Record<TrackDirectionRole, EntityRef[]> = {
+    up: [],
+    down: [],
+    bidirectional: [],
+    reversible: [],
+  };
 
   for (const node of topo.nodes) {
     nodesById[node.id] = node;
@@ -118,6 +133,9 @@ export function buildTopologyLookup(topo: BaseTopologyLayer): TopologyLookup {
 
   for (const edge of topo.edges) {
     edgesById[edge.id] = edge;
+    if (edge.directionRole) {
+      edgesByDirectionRole[edge.directionRole].push(edge.id);
+    }
   }
 
   for (const station of topo.stations) {
@@ -130,10 +148,15 @@ export function buildTopologyLookup(topo: BaseTopologyLayer): TopologyLookup {
 
   for (const binding of topo.platformTrackBindings) {
     (bindingsByEdge[binding.edgeRef] ??= []).push(binding);
+    (bindingsByPlatform[binding.platformRef] ??= []).push(binding);
   }
 
   for (const stoppingPoint of topo.stoppingPoints) {
     (stoppingPointsByEdge[stoppingPoint.edgeRef] ??= []).push(stoppingPoint);
+  }
+
+  for (const signal of topo.signals) {
+    (signalsByEdge[signal.edgeRef] ??= []).push(signal);
   }
 
   for (const pair of topo.doubleTrackPairs) {
@@ -158,9 +181,12 @@ export function buildTopologyLookup(topo: BaseTopologyLayer): TopologyLookup {
     stationsById,
     platformsById,
     bindingsByEdge,
+    bindingsByPlatform,
     stoppingPointsByEdge,
+    signalsByEdge,
     doubleTrackPairsByEdge,
     hardConstraintsByTarget,
+    edgesByDirectionRole,
   };
 }
 
@@ -249,12 +275,12 @@ export function isTraversalForbidden(
  * 基于 TopologyEdge.directionRole 自动聚合 DoubleTrackPair。
  *
  * 行为:
- * - directionRole = "up_main"    → upEdgeRefs
- * - directionRole = "down_main"  → downEdgeRefs
- * - directionRole = "siding"     → sharedGeometryEdgeRefs (双向到发线)
- * - directionRole = "reversible" → sharedGeometryEdgeRefs (可逆运用线)
+ * - directionRole = "up"            → upEdgeRefs
+ * - directionRole = "down"          → downEdgeRefs
+ * - directionRole = "bidirectional" → sharedGeometryEdgeRefs (含 connector / 单线区间)
+ * - directionRole = "reversible"    → sharedGeometryEdgeRefs (含中线换向用)
  *
- * 当且仅当存在 ≥1 条 up_main 与 ≥1 条 down_main 时, 才生成一条 DoubleTrackPair。
+ * 当且仅当存在 ≥1 条 up 与 ≥1 条 down 时, 才生成一条 DoubleTrackPair。
  * 生成的 confirmation 标为 "imported_confirmed", 表示由编译派生而非用户原始输入。
  *
  * MVP 阶段的限制: 只生成单一全局 pair, 不按 station/line 切分。
@@ -270,13 +296,13 @@ export function aggregateDoubleTrackPairs(
 
   for (const edge of edges) {
     switch (edge.directionRole) {
-      case "up_main":
+      case "up":
         upEdgeRefs.push(edge.id);
         break;
-      case "down_main":
+      case "down":
         downEdgeRefs.push(edge.id);
         break;
-      case "siding":
+      case "bidirectional":
       case "reversible":
         sharedGeometryEdgeRefs.push(edge.id);
         break;
@@ -297,4 +323,73 @@ export function aggregateDoubleTrackPairs(
     sharedGeometryEdgeRefs: sharedGeometryEdgeRefs.length > 0 ? sharedGeometryEdgeRefs : undefined,
     confirmation: "imported_confirmed",
   }];
+}
+
+// ── 5. Direction / Turnback Helpers ────────────────────────
+
+/**
+ * 判断该 edge 是否允许在其上换向 (turnback).
+ *
+ * 规则: edge.directionRole === "reversible" AND edge.functionalUse 含 "turnback"。
+ * reversible 蕴含 "双向运行 + 允许换向" 两层语义; functionalUse 含 turnback
+ * 表示运用上确实在此换向 — 两者必须同时声明, 编译期不得反推。
+ */
+export function isTurnbackAllowed(edge: TopologyEdge): boolean {
+  return edge.directionRole === "reversible"
+    && Array.isArray(edge.functionalUse)
+    && edge.functionalUse.includes("turnback");
+}
+
+/**
+ * 返回与给定 directionRole 相反的 role。
+ * up ↔ down; bidirectional / reversible 没有相反值 (它们已经允许双向, 返回 undefined)。
+ */
+export function oppositeDirectionRole(role: TrackDirectionRole): TrackDirectionRole | undefined {
+  switch (role) {
+    case "up": return "down";
+    case "down": return "up";
+    default: return undefined;
+  }
+}
+
+/**
+ * 返回某 platform 沿指定方向 (DirectionLabel: "up"/"down") 服务的 edges。
+ * 基于 PlatformTrackBinding.servingDirection 匹配。
+ * 缺失 / "unknown" 的 servingDirection 视为该 platform 在任一方向都可服务。
+ */
+export function getPlatformDirectedEdges(
+  lookup: TopologyLookup,
+  platformRef: EntityRef,
+  direction: DirectionLabel,
+): { edge: TopologyEdge; binding: PlatformTrackBinding }[] {
+  const bindings = lookup.bindingsByPlatform[platformRef] ?? [];
+  const matched = bindings.filter((b) =>
+    !b.servingDirection
+    || b.servingDirection === "unknown"
+    || b.servingDirection === direction,
+  );
+  return matched.flatMap((binding) => {
+    const edge = lookup.edgesById[binding.edgeRef];
+    return edge ? [{ edge, binding }] : [];
+  });
+}
+
+/**
+ * 判断两个 directionRole 在寻径过程中是否兼容。
+ *
+ * 规则 (核心: bidirectional 与 reversible 都视为"双向", 与任何方向兼容):
+ * - undefined ↔ 任意: 兼容 (向后兼容)
+ * - bidirectional / reversible ↔ 任意: 兼容
+ * - up ↔ up: 兼容
+ * - down ↔ down: 兼容
+ * - up ↔ down: **不兼容** (需要换向)
+ */
+export function isDirectionRoleCompatible(
+  current: TrackDirectionRole | undefined,
+  candidate: TrackDirectionRole | undefined,
+): boolean {
+  if (!current || !candidate) return true;
+  if (current === "bidirectional" || current === "reversible") return true;
+  if (candidate === "bidirectional" || candidate === "reversible") return true;
+  return current === candidate;
 }

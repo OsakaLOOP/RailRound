@@ -21,8 +21,22 @@ import type {
   GeoJSONPosition,
 } from "../rail-graph-v1/geojson";
 import type { EntityRef } from "../rail-graph-v1/primitives";
-import { aggregateDoubleTrackPairs, buildAdjacency } from "../rail-graph-v1/topology";
+import {
+  aggregateDoubleTrackPairs,
+  buildAdjacency,
+  buildTopologyLookup,
+  type TopologyLookup,
+} from "../rail-graph-v1/topology";
 import { buildLiangMianSiXianGeoJson, BINDING_PLAN, STOP_PLAN } from "./poc-liangmiansixian";
+import {
+  buildTwoStationGeoJson,
+  BINDING_PLAN as TWO_STATION_BINDING_PLAN,
+  STOP_PLAN as TWO_STATION_STOP_PLAN,
+} from "./poc-twostation";
+import { runScenarios, summarizeScenarios } from "./poc-pathfinding";
+import type { ScenarioResult } from "./poc-pathfinding";
+import { createMapView, type MapView } from "./map-view";
+import { createListView, type ListView } from "./list-view";
 
 type RailGraphKind = RailGraphFeatureKind;
 type GeoJsonGeometry = GeoJSONGeometry;
@@ -46,6 +60,7 @@ const EMPTY_TOPO: BaseTopologyLayer = {
   platforms: [],
   platformTrackBindings: [],
   stoppingPoints: [],
+  signals: [],
   specialSections: [],
   doubleTrackPairs: [],
   relations: [],
@@ -59,6 +74,10 @@ export const state: RailGraphMvpState = {
   topo: null,
   diagnostics: [],
 };
+
+let mapView: MapView | null = null;
+let listView: ListView | null = null;
+let lastPathfindingResults: ScenarioResult[] | undefined;
 
 export function loadGeoJson(raw: string | GeoJsonFeatureCollection): RailGraphMvpState {
   state.source = null;
@@ -352,7 +371,7 @@ function addStationFeature(
     return;
   }
 
-  const id = stableId("manual", "station", annotation.id);
+  const id = annotation.id as EntityRef;
   topo.stations.push({
     id,
     name: annotation.station?.name || feature.properties.name as string || `Station ${featureIndex + 1}`,
@@ -376,7 +395,7 @@ function addPlatformFeature(
     return;
   }
 
-  const id = stableId("manual", "platform", annotation.id);
+  const id = annotation.id as EntityRef;
   const stationRef = annotation.platform?.stationRef || firstStationRef(topo);
   if (!stationRef) {
     diagnostics.push(diagnostic("warn", "MVP_PLATFORM_WITHOUT_STATION", "compile", "Platform has no stationRef.", { featureIndex }));
@@ -666,28 +685,35 @@ function render(): void {
     return;
   }
 
+  // 仅在首次渲染时建结构; 后续调用走 refreshViews() / renderFeatures()
+  if (root.dataset.mounted === "true") {
+    refreshViews();
+    renderFeatures();
+    return;
+  }
+
   root.innerHTML = `
     <style>
       body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f6f7f9; color: #1f2937; }
-      .shell { display: grid; grid-template-columns: minmax(360px, 42%) 1fr; gap: 16px; height: 100vh; padding: 16px; box-sizing: border-box; }
+      .shell { display: grid; grid-template-columns: 320px 1fr 380px; gap: 12px; height: 100vh; padding: 12px; box-sizing: border-box; }
       .panel { background: #fff; border: 1px solid #d7dce2; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
-      .panel h1, .panel h2 { margin: 0; padding: 12px 14px; border-bottom: 1px solid #e5e7eb; font-size: 15px; }
-      .body { padding: 12px 14px; overflow: auto; }
-      textarea { width: 100%; min-height: 180px; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; }
+      .panel h1, .panel h2 { margin: 0; padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+      .body { padding: 10px 12px; overflow: auto; flex: 1; min-height: 0; }
+      textarea { width: 100%; min-height: 110px; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; }
       button, select, input { font: inherit; }
-      button { border: 1px solid #b8c2cc; background: #fff; border-radius: 6px; padding: 6px 9px; cursor: pointer; }
+      button { border: 1px solid #b8c2cc; background: #fff; border-radius: 6px; padding: 5px 8px; cursor: pointer; font-size: 12px; }
       button.primary { background: #155e75; color: #fff; border-color: #155e75; }
       button:disabled { opacity: .5; cursor: not-allowed; }
-      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
-      .feature { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; margin-bottom: 8px; }
-      .feature strong { display: block; margin-bottom: 6px; }
-      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-      .field { display: grid; gap: 3px; font-size: 12px; }
-      .field input, .field select { border: 1px solid #cbd5e1; border-radius: 5px; padding: 5px; min-width: 0; }
-      pre { background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 6px; overflow: auto; font-size: 12px; }
-      .diag-warn { color: #a16207; }
-      .diag-error, .diag-fatal { color: #b91c1c; }
-      .diag-info { color: #0369a1; }
+      .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+      .feature { border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 11.5px; }
+      .feature strong { display: block; margin-bottom: 4px; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+      .field { display: grid; gap: 2px; font-size: 11px; }
+      .field input, .field select { border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px; min-width: 0; font-size: 11.5px; }
+      .map-panel { padding: 0; }
+      #mvp-map { flex: 1; min-height: 0; height: 100%; }
+      .map-toolbar { padding: 6px 10px; border-bottom: 1px solid #e5e7eb; display: flex; gap: 6px; align-items: center; font-size: 12px; flex-shrink: 0; background: #f8fafc; }
+      .list-panel-body { padding: 0; }
     </style>
     <main class="shell">
       <section class="panel">
@@ -698,8 +724,11 @@ function render(): void {
             <button id="mvp-load" class="primary">Load Reset</button>
             <button id="mvp-import">Import Append</button>
             <button id="mvp-sample">Sample</button>
+          </div>
+          <div class="row">
             <button id="mvp-liangmiansixian" class="primary">两面四線 Demo</button>
-            <button id="mvp-compile">Compile Topo</button>
+            <button id="mvp-pathfinding" class="primary">Pathfinding 4 场景</button>
+            <button id="mvp-compile">Compile</button>
           </div>
           <div class="feature">
             <strong>Create Object</strong>
@@ -721,66 +750,184 @@ function render(): void {
                   ${kindOption("special_section")}
                 </select>
               </label>
-              <label class="field">Name
-                <input id="mvp-create-name" placeholder="optional" />
-              </label>
             </div>
+            <label class="field">Name
+              <input id="mvp-create-name" placeholder="optional" />
+            </label>
             <label class="field">Coordinates JSON
-              <textarea id="mvp-create-coordinates" style="min-height:70px" placeholder="[139.7,35.69]"></textarea>
+              <textarea id="mvp-create-coordinates" style="min-height:50px" placeholder="[139.7,35.69]"></textarea>
             </label>
             <div class="row">
               <button id="mvp-create-object">Create Into Queue</button>
             </div>
           </div>
+          <div class="feature">
+            <strong>Binding / Stop</strong>
+            <div class="grid">
+              <label class="field">Station
+                <select id="mvp-station-ref">${topoOptions("stations")}</select>
+              </label>
+              <label class="field">Platform
+                <select id="mvp-platform-ref">${topoOptions("platforms")}</select>
+              </label>
+              <label class="field">Edge
+                <select id="mvp-edge-ref">${topoOptions("edges")}</select>
+              </label>
+              <label class="field">Side
+                <select id="mvp-binding-side">
+                  <option value="unknown">unknown</option>
+                  <option value="left">left</option>
+                  <option value="right">right</option>
+                  <option value="both">both</option>
+                </select>
+              </label>
+              <label class="field">Direction
+                <select id="mvp-stop-direction">
+                  <option value="both">both</option>
+                  <option value="up">up</option>
+                  <option value="down">down</option>
+                </select>
+              </label>
+              <label class="field">Measure
+                <input id="mvp-stop-measure" type="number" min="0" max="1" step="0.01" value="0.5" />
+              </label>
+            </div>
+            <div class="row">
+              <button id="mvp-add-binding">Add Binding</button>
+              <button id="mvp-add-stop">Confirm Stop</button>
+            </div>
+          </div>
+          <div class="row">
+            <button id="mvp-export-geojson">Export GeoJSON</button>
+            <button id="mvp-export-topo">Export Topo</button>
+          </div>
           <div id="mvp-features"></div>
         </div>
       </section>
-      <section class="panel">
-        <h2>Topology</h2>
-        <div class="body">
-          <div class="row">
-            <button id="mvp-add-binding">Add Binding</button>
-            <button id="mvp-add-stop">Confirm Stop</button>
-            <button id="mvp-export-geojson">Export Annotated GeoJSON</button>
-            <button id="mvp-export-topo">Export Topo</button>
-          </div>
-          <div class="grid">
-            <label class="field">Station
-              <select id="mvp-station-ref">${topoOptions("stations")}</select>
-            </label>
-            <label class="field">Platform
-              <select id="mvp-platform-ref">${topoOptions("platforms")}</select>
-            </label>
-            <label class="field">Edge
-              <select id="mvp-edge-ref">${topoOptions("edges")}</select>
-            </label>
-            <label class="field">Direction
-              <select id="mvp-stop-direction">
-                <option value="both">both</option>
-                <option value="up">up</option>
-                <option value="down">down</option>
-              </select>
-            </label>
-            <label class="field">Measure
-              <input id="mvp-stop-measure" type="number" min="0" max="1" step="0.01" value="0.5" />
-            </label>
-            <label class="field">Side
-              <select id="mvp-binding-side">
-                <option value="unknown">unknown</option>
-                <option value="left">left</option>
-                <option value="right">right</option>
-                <option value="both">both</option>
-              </select>
-            </label>
-          </div>
-          <pre id="mvp-output">${escapeHtml(JSON.stringify(summary(), null, 2))}</pre>
+      <section class="panel map-panel">
+        <div class="map-toolbar">
+          <strong>Map</strong>
+          <span style="flex:1"></span>
+          <label class="field" style="display:flex;flex-direction:row;align-items:center;gap:4px;font-size:11px">
+            Base
+            <select id="mvp-base-layer" style="font-size:11px">
+              <option value="positron">Positron (lite)</option>
+              <option value="plain">Plain</option>
+            </select>
+          </label>
+          <button id="mvp-fit-data" style="font-size:11px">Fit</button>
         </div>
+        <div id="mvp-map"></div>
+      </section>
+      <section class="panel list-panel-body">
+        <div id="mvp-list" style="flex:1;min-height:0;display:flex;flex-direction:column"></div>
       </section>
     </main>
   `;
+  root.dataset.mounted = "true";
 
+  initViews();
   bindUi();
   renderFeatures();
+  refreshViews();
+}
+
+function initViews(): void {
+  const mapContainer = document.getElementById("mvp-map");
+  const listContainer = document.getElementById("mvp-list");
+  if (!mapContainer || !listContainer) return;
+
+  mapView = createMapView(mapContainer);
+  listView = createListView(listContainer);
+
+  // 联动: map ↔ list
+  mapView.onHover((ref) => {
+    if (!listView) return;
+    listView.highlightEntity(ref);
+    if (ref) {
+      const related = computeRelatedRefs(ref);
+      mapView?.highlightEntities([ref], related);
+    } else {
+      mapView?.clearHighlight();
+    }
+  });
+  mapView.onClick((ref) => {
+    listView?.highlightEntity(ref);
+  });
+
+  listView.onEntityHover((ref) => {
+    if (ref) {
+      const related = computeRelatedRefs(ref);
+      mapView?.highlightEntities([ref], related);
+    } else {
+      mapView?.clearHighlight();
+    }
+  });
+  listView.onEntityClick((_ref) => {
+    // 不做 zoom, 因为 fit-to-entity 还没实现 (后续 phase)
+  });
+  listView.onPathHover((edgeSequence) => {
+    if (edgeSequence) {
+      mapView?.highlightPath(edgeSequence);
+    } else {
+      mapView?.clearHighlight();
+    }
+  });
+  listView.onPathClick((edgeSequence) => {
+    mapView?.highlightPath(edgeSequence);
+  });
+}
+
+function computeRelatedRefs(ref: EntityRef): EntityRef[] {
+  if (!state.topo) return [];
+  const lookup: TopologyLookup = buildTopologyLookup(state.topo);
+  const related: EntityRef[] = [];
+
+  // Station ref?
+  const station = lookup.stationsById[ref];
+  if (station) {
+    related.push(...station.platformRefs);
+    for (const pid of station.platformRefs) {
+      const bindings = lookup.bindingsByPlatform[pid] ?? [];
+      for (const b of bindings) related.push(b.edgeRef);
+    }
+    return dedupe(related);
+  }
+  // Platform ref?
+  const platform = lookup.platformsById[ref];
+  if (platform) {
+    related.push(platform.stationRef);
+    const bindings = lookup.bindingsByPlatform[ref] ?? [];
+    for (const b of bindings) related.push(b.edgeRef);
+    return dedupe(related);
+  }
+  // Edge ref?
+  const edge = lookup.edgesById[ref];
+  if (edge) {
+    const bindings = lookup.bindingsByEdge[ref] ?? [];
+    for (const b of bindings) {
+      related.push(b.platformRef);
+      related.push(b.stationRef);
+    }
+    return dedupe(related);
+  }
+  return [];
+}
+
+function dedupe<T>(arr: T[]): T[] {
+  return Array.from(new Set(arr));
+}
+
+function refreshViews(): void {
+  if (!mapView || !listView) return;
+  if (state.topo && state.source) {
+    mapView.update(state.topo, state.source);
+  }
+  listView.update({
+    topo: state.topo,
+    diagnostics: state.diagnostics,
+    pathfindingResults: lastPathfindingResults,
+  });
 }
 
 function bindUi(): void {
@@ -796,86 +943,43 @@ function bindUi(): void {
     if (input) {
       input.value = JSON.stringify(buildLiangMianSiXianGeoJson(), null, 2);
     }
-    // Step 1: 导入并编译
     const geoJson = buildLiangMianSiXianGeoJson();
     loadGeoJson(geoJson);
     compileTopology();
-
-    // Step 2: 自动创建所有站台-股道绑定
-    for (const b of BINDING_PLAN) {
-      addPlatformTrackBinding(b);
-    }
-
-    // Step 3: 自动确认所有停车标
-    for (const s of STOP_PLAN) {
-      confirmStoppingPoint(s);
-    }
-
-    // Step 4: 最终编译
+    for (const b of BINDING_PLAN) addPlatformTrackBinding(b);
+    for (const s of STOP_PLAN) confirmStoppingPoint(s);
     compileTopology();
-    render();
-    renderOutput(summary());
-
-    // 额外展示设计观察
-    const output = document.getElementById("mvp-output");
-    if (output) {
-      const topo = state.topo!;
-      const obs = collectDesignObservations(topo);
-      const fullOutput = {
-        summary: summary(),
-        designObservations: obs,
-        topologySnapshot: {
-          nodes: topo.nodes.map(n => ({ id: n.id, kind: n.kind })),
-          edges: topo.edges.map(e => ({
-            id: e.id,
-            role: e.role,
-            traversal: e.traversal,
-            trackCode: e.trackCode,
-            physicalKind: e.physicalKind,
-            functionalUse: e.functionalUse,
-            directionRole: e.directionRole,
-            lengthMeters: Math.round(e.lengthMeters),
-          })),
-          stations: topo.stations.map(s => ({ id: s.id, name: s.name, platformRefs: s.platformRefs })),
-          platforms: topo.platforms.map(p => ({ id: p.id, name: p.name, number: p.number, type: p.type, stationRef: p.stationRef })),
-          platformTrackBindings: topo.platformTrackBindings.map(b => ({ id: b.id, platformRef: b.platformRef, edgeRef: b.edgeRef, side: b.side, servingDirection: b.servingDirection })),
-          stoppingPoints: topo.stoppingPoints.map(s => ({ id: s.id, platformRef: s.platformRef, edgeRef: s.edgeRef, direction: s.direction, measure: s.measure })),
-          doubleTrackPairs: topo.doubleTrackPairs,
-          adjacency: {
-            outEdges: topo.adjacency.outEdges,
-            inEdges: topo.adjacency.inEdges,
-          },
-        },
-      };
-      output.textContent = JSON.stringify(fullOutput, null, 2);
-    }
+    lastPathfindingResults = undefined;
+    renderFeatures();
+    refreshViews();
+    mapView?.fitToData();
   });
 
   document.getElementById("mvp-load")?.addEventListener("click", () => {
     const input = document.getElementById("mvp-input") as HTMLTextAreaElement | null;
-    if (!input) {
-      return;
-    }
+    if (!input) return;
     try {
       loadGeoJson(input.value);
+      lastPathfindingResults = undefined;
+      compileTopology();
       renderFeatures();
-      renderOutput(summary());
+      refreshViews();
+      mapView?.fitToData();
     } catch (error) {
-      renderOutput({ error: error instanceof Error ? error.message : String(error) });
+      handleError(error);
     }
   });
 
   document.getElementById("mvp-import")?.addEventListener("click", () => {
     const input = document.getElementById("mvp-input") as HTMLTextAreaElement | null;
-    if (!input) {
-      return;
-    }
+    if (!input) return;
     try {
       importGeoJson(input.value);
+      compileTopology();
       renderFeatures();
-      renderOutput(summary());
+      refreshViews();
     } catch (error) {
-      renderOutput({ error: error instanceof Error ? error.message : String(error) });
+      handleError(error);
     }
   });
 
@@ -891,17 +995,18 @@ function bindUi(): void {
         kind,
         name,
       });
+      compileTopology();
       renderFeatures();
-      renderOutput(summary());
+      refreshViews();
     } catch (error) {
-      renderOutput({ error: error instanceof Error ? error.message : String(error) });
+      handleError(error);
     }
   });
 
   document.getElementById("mvp-compile")?.addEventListener("click", () => {
     compileTopology();
-    render();
-    renderOutput(summary());
+    renderFeatures();
+    refreshViews();
   });
 
   document.getElementById("mvp-add-binding")?.addEventListener("click", () => {
@@ -913,9 +1018,8 @@ function bindUi(): void {
     if (stationRef && platformRef && edgeRef) {
       addPlatformTrackBinding({ stationRef, platformRef, edgeRef, side });
       compileTopology();
-      render();
     }
-    renderOutput(summary());
+    refreshViews();
   });
 
   document.getElementById("mvp-add-stop")?.addEventListener("click", () => {
@@ -928,13 +1032,40 @@ function bindUi(): void {
     if (stationRef && platformRef && edgeRef) {
       confirmStoppingPoint({ stationRef, platformRef, edgeRef, direction, measure });
       compileTopology();
-      render();
     }
-    renderOutput(summary());
+    refreshViews();
   });
 
-  document.getElementById("mvp-export-geojson")?.addEventListener("click", () => renderOutput(exportAnnotatedGeoJson()));
-  document.getElementById("mvp-export-topo")?.addEventListener("click", () => renderOutput(exportTopology()));
+  document.getElementById("mvp-export-geojson")?.addEventListener("click", () => writeExportToInput(exportAnnotatedGeoJson()));
+  document.getElementById("mvp-export-topo")?.addEventListener("click", () => writeExportToInput(exportTopology()));
+
+  document.getElementById("mvp-base-layer")?.addEventListener("change", (e) => {
+    const select = e.target as HTMLSelectElement;
+    mapView?.setBaseLayer(select.value as "positron" | "plain");
+  });
+  document.getElementById("mvp-fit-data")?.addEventListener("click", () => {
+    mapView?.fitToData();
+  });
+
+  document.getElementById("mvp-pathfinding")?.addEventListener("click", () => {
+    const input = document.getElementById("mvp-input") as HTMLTextAreaElement | null;
+    const geoJson = buildTwoStationGeoJson();
+    if (input) {
+      input.value = JSON.stringify(geoJson, null, 2);
+    }
+    loadGeoJson(geoJson);
+    compileTopology();
+    for (const b of TWO_STATION_BINDING_PLAN) addPlatformTrackBinding(b);
+    for (const s of TWO_STATION_STOP_PLAN) confirmStoppingPoint(s);
+    compileTopology();
+
+    const topo = state.topo!;
+    lastPathfindingResults = runScenarios(topo);
+    void summarizeScenarios;  // kept for window-side debugging
+    renderFeatures();
+    refreshViews();
+    mapView?.fitToData();
+  });
 }
 
 function renderFeatures(): void {
@@ -1048,7 +1179,7 @@ function updateAnnotationFromElement(element: HTMLElement): void {
       type: platformTypeRaw ? (platformTypeRaw as "side" | "island" | "bay" | "unknown") : undefined,
     } : undefined,
   });
-  renderOutput(summary());
+  refreshViews();
 }
 
 function kindOption(kind: RailGraphKind, selected?: RailGraphKind): string {
@@ -1077,11 +1208,19 @@ function selectedValue(id: string): string {
   return (document.getElementById(id) as HTMLSelectElement | null)?.value ?? "";
 }
 
-function renderOutput(value: unknown): void {
-  const output = document.getElementById("mvp-output");
-  if (output) {
-    output.textContent = JSON.stringify(value, null, 2);
+function writeExportToInput(value: unknown): void {
+  const input = document.getElementById("mvp-input") as HTMLTextAreaElement | null;
+  if (input) {
+    input.value = JSON.stringify(value, null, 2);
+    input.scrollIntoView({ block: "nearest" });
   }
+}
+
+function handleError(error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error("[MVP]", error);
+  // 软提示, 不打断
+  alert(message);
 }
 
 function summary(): unknown {
@@ -1101,45 +1240,7 @@ function summary(): unknown {
   };
 }
 
-function collectDesignObservations(topo: BaseTopologyLayer) {
-  const obs: { severity: string; target: string; problem: string; suggestion: string }[] = [];
-
-  // 1. Switch point 物理建模仍未实现 (deferred)
-  const connectorEdges = topo.edges.filter((e) => e.role === "connector");
-  const hasDeferredSwitches = state.diagnostics.some(
-    (d) => d.code === "MVP_KIND_DEFERRED",
-  );
-  if (connectorEdges.length > 0 || hasDeferredSwitches) {
-    obs.push({
-      severity: "major",
-      target: "switch_point compilation",
-      problem: "switch_point 在 MVP 中不编译, 咽喉道岔仍用 role=connector 的 track_geometry 模拟, 丢失道岔的物理语义、岔位状态、限速等信息。",
-      suggestion: "实现 switch_point → junction TopologyNode 的编译, connector edges 退化为该 junction 的进出枝。",
-    });
-  }
-
-  // 2. Route / 径路概念缺失 (Layer 2/3 范围)
-  if (topo.stoppingPoints.length > 0 && connectorEdges.length > 0) {
-    obs.push({
-      severity: "critical",
-      target: "Route / path through station",
-      problem: "当前可表达 'edge 上某点有停车标', 但无法表达完整径路 (例如: 1番 → 西咽 1-2 → 2番 → 停 PlatformA → 东咽 1-2 → 1番)。这是退避运用的核心语义。",
-      suggestion: "在 Layer 2 (服务模板) 引入 Route { segments: { edgeRef, fromMeasure, toMeasure, traversal }[], stoppingPointRefs[] }。",
-    });
-  }
-
-  // 3. 站界 (station boundary) 概念缺失
-  if (topo.stoppingPoints.length > 0) {
-    obs.push({
-      severity: "info",
-      target: "Station boundary",
-      problem: "StoppingPoint.measure 没有验证是否在站界 (进站信号机 ~ 出站信号机) 范围内。",
-      suggestion: "在 Station 上增加 trackScopedBoundaries: { edgeRef, startMeasure, endMeasure }[]。",
-    });
-  }
-
-  return obs;
-}
+void summary;  // 保留供 window-side debug 调用
 
 function sampleGeoJson(): GeoJsonFeatureCollection {
   return {

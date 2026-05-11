@@ -749,17 +749,19 @@ export const AppLayout: React.FC = () => {
     useEffect(() => {
         // 使用 setTimeout 加上简单的防抖，防止编辑/添加行程时高频触发导致卡顿
         const timerId = setTimeout(() => {
-            const allSegments = trips.flatMap(trip => trip.segments || []);
-
-
             // Extract visited stations logic
             const visited = new Set<string>();
-            allSegments.forEach(seg => {
-                const line = railwayData[seg.lineKey];
-                if (!line) return;
 
-                const fromIdx = line.stations.findIndex(s => s.id === seg.fromId);
-                const toIdx = line.stations.findIndex(s => s.id === seg.toId);
+            for (let i = 0; i < trips.length; i++) {
+                const trip = trips[i];
+                const segments = trip.segments || [];
+                for (let j = 0; j < segments.length; j++) {
+                    const seg = segments[j];
+                    const line = railwayData[seg.lineKey];
+                    if (!line) continue;
+
+                    const fromIdx = line.stations.findIndex(s => s.id === seg.fromId);
+                    const toIdx = line.stations.findIndex(s => s.id === seg.toId);
 
                 if (fromIdx !== -1 && toIdx !== -1) {
                     const isLoop = !!line.meta?.isLoop;
@@ -792,7 +794,8 @@ export const AppLayout: React.FC = () => {
                         }
                     }
                 }
-            });
+                }
+            }
             setVisitedStations(visited);
 
             // 1. 优先使用已有的缓存进行渲染，保证部分路线立即显示，防止整张地图因为几段缺失而瘫痪。

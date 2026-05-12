@@ -532,16 +532,21 @@ function applyPathHighlight(
   const turnbackSet = new Set(turnbackEdgeIndices ?? []);
 
   // 1) 推算每条 edge 在 path 中的实际行进方向 (entry node → exit node)
-  // 由 edge 的 fromNode/toNode 与相邻 edge 共享节点确定
+  // 由 edge 的 fromNode/toNode 与相邻 edge 共享节点确定.
+  // 关键: turnback edge 上, 列车在 edge 上停车反向, exit = entry (从原入口端离开).
+  //       下一条 edge 的 entry node = 本条 edge 的 entry node (而非 toNode).
   type Dir = "forward" | "reverse";  // forward = 沿 edge.fromNode→toNode; reverse = 反向
   const directions: Dir[] = [];
+  /** 每条 edge 的真实"出口节点" (turnback edge 上 = 入口节点) */
+  const exitNodes: (EntityRef | null)[] = [];
   let prevExitNode: EntityRef | null = null;
 
   for (let i = 0; i < edgeSequence.length; i += 1) {
     const edgeRef = edgeSequence[i];
     const edge = state.edgeById.get(edgeRef);
     if (!edge) {
-      directions.push("forward");  // fallback
+      directions.push("forward");
+      exitNodes.push(null);
       continue;
     }
     let dir: Dir;
@@ -554,11 +559,10 @@ function applyPathHighlight(
       // 第一条 edge: 用第二条 edge 反推共享节点
       const nextEdge = state.edgeById.get(edgeSequence[i + 1]);
       if (nextEdge) {
-        // 第一条 edge 的 exit node = 与下条共享的节点
         if (edge.toNodeRef === nextEdge.fromNodeRef || edge.toNodeRef === nextEdge.toNodeRef) {
-          dir = "forward";  // exit = toNode
+          dir = "forward";
         } else if (edge.fromNodeRef === nextEdge.fromNodeRef || edge.fromNodeRef === nextEdge.toNodeRef) {
-          dir = "reverse";  // exit = fromNode
+          dir = "reverse";
         } else {
           dir = "forward";
         }
@@ -566,12 +570,18 @@ function applyPathHighlight(
         dir = "forward";
       }
     } else {
-      dir = "forward";  // 单条 edge path, 默认 forward
+      dir = "forward";
     }
     directions.push(dir);
-    // 计算 exit node, 供下条 edge 用
-    if (dir === "forward") prevExitNode = edge.toNodeRef;
-    else prevExitNode = edge.fromNodeRef;
+
+    // 计算 exit node:
+    //   turnback edge: 列车反向出原入口, exit = entry
+    //   普通 edge:     exit = 另一端
+    const entryNode = dir === "forward" ? edge.fromNodeRef : edge.toNodeRef;
+    const oppositeNode = dir === "forward" ? edge.toNodeRef : edge.fromNodeRef;
+    const exitNode = turnbackSet.has(i) ? entryNode : oppositeNode;
+    exitNodes.push(exitNode);
+    prevExitNode = exitNode;
   }
 
   // 2) 渲染绿色叠加 + 方向箭头 + dim 原 arrow

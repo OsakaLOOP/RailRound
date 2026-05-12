@@ -119,8 +119,7 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) =>
       const snappedStart = turf.nearestPointOnLine(line, startPt);
       const snappedEnd = turf.nearestPointOnLine(line, endPt);
 
-        const startIdx = snappedStart.properties.index;
-        const endIdx = snappedEnd.properties.index;
+
 
         // 2. 环线检测
         const coords = line.geometry.coordinates;
@@ -158,7 +157,7 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) =>
 };
 
 // --- Shared Helper: Calculate Visualization Data ---
-export const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData) => {
+export const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData, skipVisuals = false) => {
     let totalDist = 0;
     const allCoords = [];
 
@@ -234,6 +233,10 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
     });
 
     if (allCoords.length === 0) return { totalDist, visualPaths: [] };
+
+    if (skipVisuals) {
+        return { totalDist, visualPaths: [], widthPx: 0, heightPx: 0 };
+    }
 
     // PCA & Projection Logic
     let sumLat = 0, sumLng = 0, count = 0;
@@ -324,11 +327,23 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
 export const calculateLatestStats = (trips, segmentGeometries, railwayData, geoData) => {
     // 1. Basic Stats
     const totalTrips = trips.length;
-    const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
-    const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
+
+    // Performance: Avoid flatMap and map allocations over potentially huge trip datasets
+    const allSegments = [];
+    const uniqueLinesSet = new Set();
+    for (let i = 0; i < trips.length; i++) {
+        const t = trips[i];
+        const segs = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
+        for (let j = 0; j < segs.length; j++) {
+            allSegments.push(segs[j]);
+            uniqueLinesSet.add(segs[j].lineKey);
+        }
+    }
+    const uniqueLines = uniqueLinesSet.size;
 
     // Calc total distance using helper (aggregating cached or on-the-fly)
-    const { totalDist: grandTotalDist } = getRouteVisualData(allSegments, segmentGeometries, railwayData, geoData);
+    // Pass skipVisuals = true to bypass PCA and SVG path generation for the global stat
+    const { totalDist: grandTotalDist } = getRouteVisualData(allSegments, segmentGeometries, railwayData, geoData, true);
 
     // 2. Latest 5
     const latest = trips.slice(0, 5).map(t => {

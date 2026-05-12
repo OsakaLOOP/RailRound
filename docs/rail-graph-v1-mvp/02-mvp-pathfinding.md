@@ -58,6 +58,56 @@
 | `ServicePathSegment` | 同上 | pathSegments 元素 |
 | `PathGenerationRuleTrace` | `editing.types.ts` | 寻径决策痕迹 (MVP 暂未填充) |
 
+### 2.3 PathGoal — 寻径目标系统
+
+寻径目标 schema, 描述"这次运行要干什么" — 停几次、在哪停、是否换向。
+`PathfindingOptions.pathGoal?: PathGoal`, 默认 undefined = implicit.
+
+#### 2.3.1 三层级设计
+
+| kind | 用途 |
+|---|---|
+| `implicit` | 无目标约束 (向后兼容). 事件生成沿用当前规则: 所有有 binding + StoppingPoint 的 edge 都 stop |
+| `explicit` | 精确停站目标. `stops: StopIntent[]` + `turnback?: TurnbackIntent` |
+| `shorthand` | 简略模式. `pattern: ShorthandPattern` 映射到 explicit |
+
+#### 2.3.2 ShorthandPattern
+
+| pattern | explicit 翻译 |
+|---|---|
+| `main_in_main_out_turnback_once` | turnback.count=1 上限 + 主线优先. 事件生成按 explicit 规则 (只 stop 在 main-line platforms) |
+| `main_in_main_out_no_stop` | turnback.count=0 (不允许换向), stops=[] |
+| `stop_all` | 等价 implicit (所有 binding+StoppingPoint edge 都 stop) |
+| `any` | 等价 implicit |
+
+#### 2.3.3 StopIntent
+
+| target 类型 | 含义 |
+|---|---|
+| `{ platformRef: EntityRef }` | 精确指定站台. 首次出现在 path 上时生成 stop (后续同 platform 出现则 pass) |
+| `{ platformRef, edgeRef }` | 精确指定站台 + binding edge |
+| `{ stationRef }` | 某站任意 platform (MVP 暂不实现) |
+| `{ kind: "arbitrary" }` | 任意停一次 (MVP 暂不实现) |
+
+`required: boolean` — true→ 强制, candidate 后过滤时若未满足则移除; false→ 可选, 保留 candidate 发 info
+
+#### 2.3.4 TurnbackIntent
+
+| 字段 | 影响 |
+|---|---|
+| `count?: number` | DFS 中 turnback 次数上限. 每触发一次减一, 剩余 0 时不再尝试 turnback |
+| `exact: boolean` | exact=true → 候选后过滤, 不足 count 移除 |
+| `edgeRef?: EntityRef` | 指定换向 edge — DFS 中仅在匹配此 reversible edge 时允许 turnback |
+
+**未声明 turnback 的正常行为**: `turnback: undefined` → DFS 中 turnback 不受限制; 路径中可能自然发生 turnback; 事件生成时仍为每个 turnbackAt edge 生成 turnback entry. "没声明" ≠ "不允许".
+
+#### 2.3.5 stop 与 turnback — 独立维度, 不合并
+
+stop (乘降) 与 turnback (换向) 是两个独立概念, 各自产生独立的 trace entry。
+若两者发生在同一条 edge 上 (PD→2番B 既是 stop 目标又是 turnback 场所),
+traceSequence 中出现**两个独立的 entry**, 分别表达不同的事物.
+后续"机外停车"场景中 turnback 所在 edge 连 platform binding 都没有, 只有纯 turnback entry.
+
 ---
 
 ## 3. 换向 (turnback) 规则
@@ -193,14 +243,16 @@ LON 139.6980 ~ 139.7020                        LON 139.7060 ~ 139.7100
 
 ## 6. 四种情形 (PoC 场景)
 
-| # | 场景 | start | end | 期望 phases | 期望 turnback edge |
-|---|---|---|---|---|---|
-| 1 | 纯上行 | `platform: PA, direction: up` | `platform: PC, direction: up` | `[up_run]` | — |
-| 2 | 纯下行 | `platform: PD, direction: down` | `platform: PB, direction: down` | `[down_run]` | — |
-| 3 | 上→下换向 (跨站) | `platform: PA, direction: up` | `platform: PB, direction: down` | `[up_run, turnback, down_run]` | 2番B |
-| 4 | 下→上换向 (同站) | `platform: PD, direction: down` | `platform: PC, direction: up` | `[down_run, turnback, up_run]` | 2番B |
+所有场景的起终点均为**延伸段远端节点** (主线尽头), 起点 marker 自然落在主线上。
 
-> **关于跨站下→上 换向**: 在本 PoC 的拓扑 (上行单线 A→B + 下行单线 B→A) 中, PD→PA 这种跨站下→上换向**物理不可行**, 因为没有 站 B 反向回站 A 的上行通路。算法正确返回"无候选"。真实铁路中这种换向只能在终点站 / 折返站 / 三角线 完成。S4 改为同站换向 PD→PC 以验证 turnback phase 形态。
+| # | 场景 | start | end | pathGoal | 期望 phases | turnback edge |
+|---|---|---|---|---|---|---|
+| 1 | 纯上行 | `NODE_A1_WEST_EXT (up)` | `NODE_B1_EAST_EXT` | `main_in_main_out_no_stop` | `[up_run]` | — |
+| 2 | 纯下行 | `NODE_B3_EAST_EXT (down)` | `NODE_A4_WEST_EXT` | `main_in_main_out_no_stop` | `[down_run]` | — |
+| 3 | 上→下换向 (西外往返) | `NODE_A1_WEST_EXT (up)` | `NODE_A4_WEST_EXT` | `main_in_main_out_turnback_once` | `[up_run, turnback, down_run]` | 2番B |
+| 4 | 下→上换向 (东外往返) | `NODE_B3_EAST_EXT (down)` | `NODE_B1_EAST_EXT` | `main_in_main_out_turnback_once` | `[down_run, turnback, up_run]` | 2番B |
+
+> **关于跨站下→上 换向**: 在本 PoC 的拓扑 (上行单线 A→B + 下行单线 B→A) 中, PD→PA 这种跨站下→上换向**物理不可行**, 因为没有 站 B 反向回站 A 的上行通路。S4 选用同站换向 PD→PC, 起点设在东端延伸段远端, 自然验证 turnback phase 形态与事件分离。
 
 ### 6.1 典型路径形态
 

@@ -15,7 +15,7 @@
 // ============================================================
 
 import type { BaseTopologyLayer } from "../rail-graph-v1/base-topology.types";
-import type { PathSeed, PathfindingResult } from "../rail-graph-v1/pathfinding";
+import type { PathGoal, PathSeed, PathfindingResult } from "../rail-graph-v1/pathfinding";
 import { findPaths } from "../rail-graph-v1/pathfinding";
 import { buildTopologyLookup } from "../rail-graph-v1/topology";
 import { TwoStationRefs } from "./poc-twostation";
@@ -25,6 +25,7 @@ export interface PathfindingScenario {
   description: string;
   startSeed: PathSeed;
   endSeed: PathSeed;
+  pathGoal: PathGoal;
   expectedPhaseKinds: ("up_run" | "down_run" | "turnback")[];
   /** 是否期望在 2番B 上发生 turnback */
   expectsTurnbackOnB2: boolean;
@@ -36,6 +37,7 @@ export const SCENARIOS: PathfindingScenario[] = [
     description: "上行列车从站 A 西端线路边界进入, 经 1番A (PA) 与上行联络段, 抵达站 B 东端线路边界 (途经 PC).",
     startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A1_WEST_EXT, alongDirection: "up" },
     endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_B1_EAST_EXT },
+    pathGoal: { kind: "shorthand", pattern: "main_in_main_out_no_stop" },
     expectedPhaseKinds: ["up_run"],
     expectsTurnbackOnB2: false,
   },
@@ -44,6 +46,7 @@ export const SCENARIOS: PathfindingScenario[] = [
     description: "下行列车从站 B 东端线路边界进入, 经 3番B (PD) 与下行联络段, 抵达站 A 西端线路边界 (途经 PB).",
     startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_B3_EAST_EXT, alongDirection: "down" },
     endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A4_WEST_EXT },
+    pathGoal: { kind: "shorthand", pattern: "main_in_main_out_no_stop" },
     expectedPhaseKinds: ["down_run"],
     expectsTurnbackOnB2: false,
   },
@@ -52,6 +55,7 @@ export const SCENARIOS: PathfindingScenario[] = [
     description: "上行列车从西端进入, 抵达站 B 后在 2番B 中线停车换向, 改沿下行返回西端线路边界 (途经 PA, 换向, PB).",
     startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A1_WEST_EXT, alongDirection: "up" },
     endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A4_WEST_EXT },
+    pathGoal: { kind: "shorthand", pattern: "main_in_main_out_turnback_once" },
     expectedPhaseKinds: ["up_run", "turnback", "down_run"],
     expectsTurnbackOnB2: true,
   },
@@ -60,6 +64,7 @@ export const SCENARIOS: PathfindingScenario[] = [
     description: "下行列车从东端进入, 抵达站 B 后在 2番B 中线停车换向, 改沿上行返回东端线路边界 (途经 PD, 换向, PC).",
     startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_B3_EAST_EXT, alongDirection: "down" },
     endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_B1_EAST_EXT },
+    pathGoal: { kind: "shorthand", pattern: "main_in_main_out_turnback_once" },
     expectedPhaseKinds: ["down_run", "turnback", "up_run"],
     expectsTurnbackOnB2: true,
   },
@@ -86,6 +91,7 @@ export function runScenarios(topo: BaseTopologyLayer): ScenarioResult[] {
       maxCandidates: 8,
       maxDepth: 32,
       allowTurnback: true,
+      pathGoal: scenario.pathGoal,
     });
 
     if (candidates.length === 0) {

@@ -21,6 +21,8 @@ import type {
 import type { EntityRef } from "./primitives";
 import type {
   ServicePathSegment,
+  ServicePassEntry,
+  ServiceStopEntry,
   ServiceTraceEntry,
 } from "./service-template.types";
 import type { PathGenerationRuleTrace } from "./editing.types";
@@ -119,6 +121,8 @@ export interface PathfindingOptions {
    * 设 false 时: 仅返回主线起步候选, 副线 binding 被过滤掉.
    */
   allowSidingStarts?: boolean;
+  /** 寻径目标规范 (停几次, 怎么停, 是否/如何换向). 默认 undefined = implicit = 不约束. */
+  pathGoal?: PathGoal;
 }
 
 // ── 3. Result ───────────────────────────────────────────────
@@ -181,6 +185,58 @@ export const PathfindingDiagnosticCode = {
 } as const;
 
 export type PathfindingDiagnosticCodeKey = keyof typeof PathfindingDiagnosticCode;
+
+// ── 4.1 PathGoal (寻径目标系统) ──────────────────────────────
+
+/**
+ * 寻径目标。描述"这次运行要干什么" — 停几次、在哪停、是否换向。
+ * 默认为 undefined (等价 ImplicitGoal), 向后兼容。
+ */
+export type PathGoal = ImplicitGoal | ExplicitGoal | ShorthandGoal;
+
+export interface ImplicitGoal {
+  kind: "implicit";
+}
+
+export interface ExplicitGoal {
+  kind: "explicit";
+  stops: StopIntent[];
+  turnback?: TurnbackIntent;
+}
+
+export type ShorthandGoal = {
+  kind: "shorthand";
+  pattern: ShorthandPattern;
+};
+
+export type ShorthandPattern =
+  | "main_in_main_out_turnback_once"
+  | "main_in_main_out_no_stop"
+  | "stop_all"
+  | "any";
+
+export interface StopIntent {
+  target:
+    | { platformRef: EntityRef; edgeRef?: EntityRef }
+    | { stationRef: EntityRef }
+    | { kind: "arbitrary" };
+  required: boolean;
+}
+
+export interface TurnbackIntent {
+  edgeRef?: EntityRef;
+  nearStationRef?: EntityRef;
+  /** turnback 次数上限。DFS 中每触发一次减一, 剩余 0 时不再尝试 new turnback。undefined = 不限制 */
+  count?: number;
+  /** exact=true → 候选必须恰好满足 count (不足则后过滤移除); exact=false → 上限约束 */
+  exact: boolean;
+}
+
+export const PathGoalDiagnosticCode = {
+  NO_CANDIDATES_MEETING_GOAL: "PF_NO_CANDIDATES_MEETING_GOAL",
+  REQUIRED_STOP_NOT_MET: "PF_REQUIRED_STOP_NOT_MET",
+  TURNBACK_COUNT_VIOLATION: "PF_TURNBACK_COUNT_VIOLATION",
+} as const;
 
 // ── 5. Seed Resolver ───────────────────────────────────────
 
@@ -398,6 +454,13 @@ export function findPaths(
     ? startRes.entryPoints
     : startRes.entryPoints.filter((ep) => ep.startKind !== "siding");
 
+  // PathGoal turnback 约束: 设置 DFS 中可触发 turnback 的上限
+  const goal = options.pathGoal;
+  const explicitGoal: ExplicitGoal | null = (goal && goal.kind !== "implicit") ? expandShorthandGoal(goal) : null;
+  const tbMax = explicitGoal?.turnback?.count;
+  const tbEdgeRef = explicitGoal?.turnback?.edgeRef;
+  let tbRemaining = tbMax ?? Infinity;  // undefined = 无限制
+
   for (const start of filteredEntryPoints) {
     const initState = createInitialState(start, startRes.initialDirectionRole, lookup);
     if (!initState) continue;
@@ -414,15 +477,17 @@ export function findPaths(
     return [];
   }
 
-  candidates.sort((a, b) => {
-    // 主线起步优先 (即使距离更长). 这是设计原则: "寻径起点必须从主线开始".
+  // 后过滤: StopIntent 必须目标 + TurnbackIntent exact 检查
+  const filtered = filterByGoal(candidates, explicitGoal, lookup, diagnostics);
+
+  filtered.sort((a, b) => {
     const aIsMain = a.startKind === "main" ? 0 : 1;
     const bIsMain = b.startKind === "main" ? 0 : 1;
     if (aIsMain !== bIsMain) return aIsMain - bIsMain;
     return a.totalDistanceMeters - b.totalDistanceMeters;
   });
-  const top = candidates.slice(0, maxCandidates);
-  if (candidates.length > maxCandidates) {
+  const top = filtered.slice(0, maxCandidates);
+  if (filtered.length > maxCandidates) {
     diagnostics.push({
       level: "info",
       code: PathfindingDiagnosticCode.MAX_CANDIDATES_REACHED,
@@ -432,7 +497,7 @@ export function findPaths(
     });
   }
 
-  return top.map((raw) => buildResultFromCandidate(raw, topo, lookup, ruleTrace, diagnostics));
+  return top.map((raw) => buildResultFromCandidate(raw, topo, lookup, ruleTrace, diagnostics, explicitGoal));
 
   // ─────────── DFS 闭包 ───────────
 
@@ -453,15 +518,25 @@ export function findPaths(
     }
 
     // 1) 换向选项: 若上一条 edge 允许 turnback 且未曾换向过
+    //    PathGoal turnback 约束: count 上限 + edgeRef 精确匹配
     if (allowTurnback && state.edgeSequence.length > 0) {
       const lastIdx = state.edgeSequence.length - 1;
       const lastEdgeId = state.edgeSequence[lastIdx];
       const lastEdgeObj = lookup.edgesById[lastEdgeId];
       if (lastEdgeObj && isTurnbackAllowed(lastEdgeObj) && !state.turnbackAt.has(lastIdx)) {
-        const hasStop = (lookup.stoppingPointsByEdge[lastEdgeId] ?? []).length > 0;
-        const stopOk = !requireStopForTurnback || hasStop;
-        if (stopOk) {
-          tryTurnback(state, lastIdx, lastEdgeObj);
+        // DFS turnback count 上限检查
+        if (tbRemaining <= 0) {
+          // turnback 额度已用尽, 不进一步尝试
+        } else if (tbEdgeRef && lastEdgeObj.id !== tbEdgeRef) {
+          // edgeRef 约束: 仅在指定 reversible edge 上才允许 turnback
+        } else {
+          const hasStop = (lookup.stoppingPointsByEdge[lastEdgeId] ?? []).length > 0;
+          const stopOk = !requireStopForTurnback || hasStop;
+          if (stopOk) {
+            tbRemaining -= 1;
+            tryTurnback(state, lastIdx, lastEdgeObj);
+            tbRemaining += 1;
+          }
         }
       }
     }
@@ -529,6 +604,87 @@ export function findPaths(
     // currentDirectionRole 回溯: 找前一条 edge 的 directionRole, 或回到 initial
     state.currentDirectionRole = recomputeDirectionRole(state, lookup, startRes.initialDirectionRole);
   }
+}
+
+// ── Goal helper functions ────────────────────────────────────
+
+function expandShorthandGoal(goal: PathGoal): ExplicitGoal {
+  if (goal.kind === "explicit") return goal;
+  if (goal.kind === "implicit") return { kind: "explicit", stops: [] };
+  // shorthand → explicit
+  const p = goal.pattern;
+  if (p === "main_in_main_out_turnback_once") {
+    return { kind: "explicit", stops: [], turnback: { count: 1, exact: true } };
+  }
+  if (p === "main_in_main_out_no_stop") {
+    return { kind: "explicit", stops: [], turnback: { count: 0, exact: true } };
+  }
+  if (p === "stop_all") return { kind: "explicit", stops: [] };
+  // "any" → implicit (no constraint)
+  return { kind: "explicit", stops: [] };
+}
+
+function filterByGoal(
+  candidates: RawCandidate[],
+  goal: ExplicitGoal | null,
+  lookup: TopologyLookup,
+  diagnostics: Diagnostic[],
+): RawCandidate[] {
+  if (!goal) return candidates;
+  const out: RawCandidate[] = [];
+
+  for (const raw of candidates) {
+    let ok = true;
+
+    // StopIntent 过滤: 所有 required stop 必须在 edgeSequence 中
+    for (const si of goal.stops) {
+      if (!si.required) continue;
+      if ("platformRef" in si.target) {
+        const pid = si.target.platformRef as EntityRef;
+        const bindings = lookup.bindingsByPlatform[pid] ?? [];
+        const hasBinding = bindings.some((b) => raw.edgeSequence.includes(b.edgeRef));
+        if (!hasBinding) {
+          ok = false;
+          diagnostics.push({
+            level: "warn",
+            code: PathGoalDiagnosticCode.REQUIRED_STOP_NOT_MET,
+            stage: "filterByGoal",
+            message: "Candidate does not pass through required stop platform.",
+            context: { platformRef: pid },
+          });
+          break;
+        }
+      }
+      // stationRef / arbitrary 暂不实现
+    }
+    if (!ok) continue;
+
+    // Turnback exact 过滤
+    if (goal.turnback?.exact && goal.turnback.count !== undefined) {
+      const actual = raw.turnbackAt.length;
+      if (actual !== goal.turnback.count) {
+        diagnostics.push({
+          level: "warn",
+          code: PathGoalDiagnosticCode.TURNBACK_COUNT_VIOLATION,
+          stage: "filterByGoal",
+          message: `Candidate has ${actual} turnbacks, goal requires exactly ${goal.turnback.count}.`,
+          context: { expected: goal.turnback.count, actual },
+        });
+        continue;
+      }
+    }
+    out.push(raw);
+  }
+
+  if (out.length === 0 && candidates.length > 0) {
+    diagnostics.push({
+      level: "warn",
+      code: PathGoalDiagnosticCode.NO_CANDIDATES_MEETING_GOAL,
+      stage: "filterByGoal",
+      message: "No candidate met all PathGoal constraints.",
+    });
+  }
+  return out;
 }
 
 function createInitialState(
@@ -602,11 +758,12 @@ function buildResultFromCandidate(
   lookup: TopologyLookup,
   ruleTrace: PathGenerationRuleTrace[],
   diagnostics: Diagnostic[],
+  goal: ExplicitGoal | null,
 ): PathfindingResult {
   const localDiagnostics: Diagnostic[] = [];
   const turnbackSet = new Set(raw.turnbackAt);
 
-  const traceSequence = buildTraceSequence(raw, turnbackSet, lookup, localDiagnostics);
+  const traceSequence = buildTraceSequence(raw, turnbackSet, lookup, localDiagnostics, goal);
   const pathSegments = buildPathSegments(raw, lookup);
   const phases = buildPhases(raw, turnbackSet, lookup);
 
@@ -632,9 +789,21 @@ function buildTraceSequence(
   turnbackSet: Set<number>,
   lookup: TopologyLookup,
   diagnostics: Diagnostic[],
+  goal: ExplicitGoal | null,
 ): ServiceTraceEntry[] {
   const entries: ServiceTraceEntry[] = [];
   let orderIndex = 0;
+
+  // goal 中有 stop intents 的 platformRef 集合 (用于判定是否应在该 binding 上停)
+  const goalStopPlatforms = new Set<EntityRef>();
+  if (goal && goal.stops.length > 0) {
+    for (const si of goal.stops) {
+      if ("platformRef" in si.target) goalStopPlatforms.add(si.target.platformRef as EntityRef);
+    }
+  }
+
+  // 用于 goal 的首次 stop 追踪 (同一 platformRef 只设 1 次 stop, 其余 pass)
+  const platformStopped = new Set<EntityRef>();
 
   for (let i = 0; i < raw.edgeSequence.length; i += 1) {
     const edgeId = raw.edgeSequence[i];
@@ -646,57 +815,47 @@ function buildTraceSequence(
 
     for (const binding of bindings) {
       const platform = lookup.platformsById[binding.platformRef];
-      const matchingStop = stoppingPoints.find((sp) => sp.platformRef === binding.platformRef);
-      if (matchingStop) {
-        entries.push({
-          orderIndex: orderIndex++,
-          passageType: "stop",
-          stopType: "mandatory_stop",
-          stationRef: binding.stationRef,
-          platformRef: binding.platformRef,
-          edgeRef: edgeId,
-          stoppingPointRef: matchingStop.id,
-          measure: matchingStop.measure,
-          platformNumber: platform?.number,
-          platformName: platform?.name,
-        });
+
+      if (!goal) {
+        // implicit mode: 有 StoppingPoint → stop, 否则 pass
+        const matchingStop = stoppingPoints.find((sp) => sp.platformRef === binding.platformRef);
+        if (matchingStop) {
+          entries.push(makeStopEntry(orderIndex++, binding, edgeId, platform, matchingStop));
+        } else {
+          entries.push(makePassEntry(orderIndex++, binding, edgeId, platform));
+        }
+      } else if (goalStopPlatforms.has(binding.platformRef)) {
+        // explicit mode: platform 在 goal.stops 中 → stop (仅首次); 之后出现 pass
+        if (!platformStopped.has(binding.platformRef)) {
+          platformStopped.add(binding.platformRef);
+          const matchingStop = stoppingPoints.find((sp) => sp.platformRef === binding.platformRef);
+          if (matchingStop) {
+            entries.push(makeStopEntry(orderIndex++, binding, edgeId, platform, matchingStop));
+          } else {
+            // goal 要求停但无 StoppingPoint, 仍然生成 stop entry 但发 warn
+            diagnostics.push({
+              level: "warn",
+              code: "PF_STOP_NO_MATCHING_STOPPING_POINT",
+              stage: "buildTraceSequence",
+              message: "Goal requires stop at this platform, but edge has no matching StoppingPoint.",
+              context: { platformRef: binding.platformRef, edgeRef: edgeId },
+            });
+            entries.push(makeStopEntry(orderIndex++, binding, edgeId, platform, null));
+          }
+        } else {
+          // 已在其他 edge 上停过此 platform → pass (keep platformStopped logic)
+          entries.push(makePassEntry(orderIndex++, binding, edgeId, platform));
+        }
       } else {
-        entries.push({
-          orderIndex: orderIndex++,
-          passageType: "pass",
-          stopType: "pass_through",
-          stationRef: binding.stationRef,
-          edgeRef: edgeId,
-          platformRef: binding.platformRef,
-          measureRange: { startMeasure: 0, endMeasure: 1 },
-        });
+        // explicit mode: platform 不在 goal.stops 中 → pass
+        entries.push(makePassEntry(orderIndex++, binding, edgeId, platform));
       }
     }
 
-    // 在该 edge 上发生换向 → 追加 turnback stop entry
+    // 在该 edge 上发生换向 → 生成独立的 turnback entry (不与 stop 合并)
     if (turnbackSet.has(i)) {
-      // 选一个 binding 来挂 turnback (若无 binding, 仍然生成但 platformRef 用 undefined-like fallback)
       const anchorBinding = bindings[0];
-      const stoppingPointForTurnback = stoppingPoints[0];
-      if (!anchorBinding) {
-        diagnostics.push({
-          level: "warn",
-          code: PathfindingDiagnosticCode.TURNBACK_WITHOUT_STOP,
-          stage: "buildTraceSequence",
-          message: "Turnback occurred on an edge without any PlatformTrackBinding.",
-          context: { edgeRef: edgeId },
-        });
-      }
-      if (!stoppingPointForTurnback) {
-        diagnostics.push({
-          level: "warn",
-          code: PathfindingDiagnosticCode.TURNBACK_WITHOUT_STOP,
-          stage: "buildTraceSequence",
-          message: "Turnback occurred on an edge without StoppingPoint.",
-          context: { edgeRef: edgeId },
-        });
-      }
-      const platform = anchorBinding ? lookup.platformsById[anchorBinding.platformRef] : undefined;
+      const anchorPlatform = anchorBinding ? lookup.platformsById[anchorBinding.platformRef] : undefined;
       entries.push({
         orderIndex: orderIndex++,
         passageType: "stop",
@@ -704,16 +863,54 @@ function buildTraceSequence(
         stationRef: anchorBinding?.stationRef ?? (edge.fromNodeRef as EntityRef),
         platformRef: anchorBinding?.platformRef ?? (edge.fromNodeRef as EntityRef),
         edgeRef: edgeId,
-        stoppingPointRef: stoppingPointForTurnback?.id ?? (`${edgeId}:turnback` as EntityRef),
-        measure: stoppingPointForTurnback?.measure ?? 0.5,
-        platformNumber: platform?.number,
-        platformName: platform?.name,
+        stoppingPointRef: (anchorBinding?.platformRef ?? edgeId + ":turnback") as EntityRef,
+        measure: 0.5,
+        platformNumber: anchorPlatform?.number,
+        platformName: anchorPlatform?.name,
         operationType: "turnback",
-      });
+      } as ServiceStopEntry);
     }
   }
 
   return entries;
+}
+
+function makeStopEntry(
+  orderIndex: number,
+  binding: { stationRef: EntityRef; platformRef: EntityRef },
+  edgeRef: EntityRef,
+  platform: { name?: string; number?: number } | undefined,
+  matchingStop: { id: EntityRef; measure: number } | null,
+): ServiceStopEntry {
+  return {
+    orderIndex,
+    passageType: "stop",
+    stopType: "mandatory_stop",
+    stationRef: binding.stationRef,
+    platformRef: binding.platformRef,
+    edgeRef,
+    stoppingPointRef: matchingStop?.id ?? (`${binding.platformRef}:${edgeRef}` as EntityRef),
+    measure: matchingStop?.measure ?? 0.5,
+    platformNumber: platform?.number,
+    platformName: platform?.name,
+  };
+}
+
+function makePassEntry(
+  orderIndex: number,
+  binding: { stationRef: EntityRef; platformRef: EntityRef },
+  edgeRef: EntityRef,
+  platform: { name?: string; number?: number } | undefined,
+): ServicePassEntry {
+  void platform;
+  return {
+    orderIndex,
+    passageType: "pass",
+    stopType: "pass_through",
+    stationRef: binding.stationRef,
+    edgeRef,
+    platformRef: binding.platformRef,
+  };
 }
 
 function buildPathSegments(

@@ -1,10 +1,17 @@
 // ============================================================
 // PoC Pathfinding Scenarios: 4 种情形验证
 //
-// 1. 纯上行   PA → PC
-// 2. 纯下行   PD → PB
-// 3. 上→下换向 PA → PB (经 2番B 换向)
-// 4. 下→上换向 PD → PA (经 2番B 换向)
+// 起点 / 终点全部使用"延伸段远端节点" (= 主线尽头), 体现"列车从线路边界进入,
+// 经站内运行, 从线路边界出去"的真实运行场景. 起点 marker 自然落在主线上,
+// 不会出现"从越行线起步"的视觉歧义.
+//
+//   nodeA1WestExt (上行起, 西远) ─ 站 A ─ 联络 ─ 站 B ─ nodeB1EastExt (上行终, 东远)
+//   nodeA4WestExt (下行终, 西远) ─ 站 A ─ 联络 ─ 站 B ─ nodeB3EastExt (下行起, 东远)
+//
+// 1. 纯上行   nodeA1WestExt → nodeB1EastExt (经 PA, PC)
+// 2. 纯下行   nodeB3EastExt → nodeA4WestExt (经 PD, PB)
+// 3. 上→下换向 nodeA1WestExt → nodeA4WestExt (经 PA, 站 B 中线换向, PB)
+// 4. 下→上换向 nodeB3EastExt → nodeB1EastExt (经 PD, 站 B 中线换向, PC)
 // ============================================================
 
 import type { BaseTopologyLayer } from "../rail-graph-v1/base-topology.types";
@@ -25,34 +32,34 @@ export interface PathfindingScenario {
 
 export const SCENARIOS: PathfindingScenario[] = [
   {
-    name: "Scenario 1: 纯上行 (PA → PC)",
-    description: "上行列车从站 A PA (上行) 出发, 经 1番A 与 上行联络段 抵达站 B PC (上行).",
-    startSeed: { kind: "platform", platformRef: TwoStationRefs.PLATFORM_A, direction: "up" },
-    endSeed: { kind: "platform", platformRef: TwoStationRefs.PLATFORM_C, direction: "up" },
+    name: "Scenario 1: 纯上行 (西外 → 东外, 经 PA→PC)",
+    description: "上行列车从站 A 西端线路边界进入, 经 1番A (PA) 与上行联络段, 抵达站 B 东端线路边界 (途经 PC).",
+    startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A1_WEST_EXT, alongDirection: "up" },
+    endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_B1_EAST_EXT },
     expectedPhaseKinds: ["up_run"],
     expectsTurnbackOnB2: false,
   },
   {
-    name: "Scenario 2: 纯下行 (PD → PB)",
-    description: "下行列车从站 B PD (下行) 出发, 经 3番B 与 下行联络段 抵达站 A PB (下行).",
-    startSeed: { kind: "platform", platformRef: TwoStationRefs.PLATFORM_D, direction: "down" },
-    endSeed: { kind: "platform", platformRef: TwoStationRefs.PLATFORM_B, direction: "down" },
+    name: "Scenario 2: 纯下行 (东外 → 西外, 经 PD→PB)",
+    description: "下行列车从站 B 东端线路边界进入, 经 3番B (PD) 与下行联络段, 抵达站 A 西端线路边界 (途经 PB).",
+    startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_B3_EAST_EXT, alongDirection: "down" },
+    endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A4_WEST_EXT },
     expectedPhaseKinds: ["down_run"],
     expectsTurnbackOnB2: false,
   },
   {
-    name: "Scenario 3: 上→下换向 (PA → PB)",
-    description: "上行列车从 PA 出发, 在站 B 2番B 中線 停车换向, 反向沿下行返回站 A PB.",
-    startSeed: { kind: "platform", platformRef: TwoStationRefs.PLATFORM_A, direction: "up" },
-    endSeed: { kind: "platform", platformRef: TwoStationRefs.PLATFORM_B, direction: "down" },
+    name: "Scenario 3: 上→下换向 (西外往返, 经 PA → 2番B 换向 → PB)",
+    description: "上行列车从西端进入, 抵达站 B 后在 2番B 中线停车换向, 改沿下行返回西端线路边界 (途经 PA, 换向, PB).",
+    startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A1_WEST_EXT, alongDirection: "up" },
+    endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A4_WEST_EXT },
     expectedPhaseKinds: ["up_run", "turnback", "down_run"],
     expectsTurnbackOnB2: true,
   },
   {
-    name: "Scenario 4: 下→上换向 (PD → PC, 同站)",
-    description: "下行列车从 PD 出发, 进 2番B 中線 停车换向, 反向沿上行抵达同站的 PC. PoC 拓扑下跨站下→上换向无解 (上行 A→B 与下行 B→A 单线), 同站换向是真实场景.",
-    startSeed: { kind: "platform", platformRef: TwoStationRefs.PLATFORM_D, direction: "down" },
-    endSeed: { kind: "platform", platformRef: TwoStationRefs.PLATFORM_C, direction: "up" },
+    name: "Scenario 4: 下→上换向 (东外往返, 经 PD → 2番B 换向 → PC)",
+    description: "下行列车从东端进入, 抵达站 B 后在 2番B 中线停车换向, 改沿上行返回东端线路边界 (途经 PD, 换向, PC).",
+    startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_B3_EAST_EXT, alongDirection: "down" },
+    endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_B1_EAST_EXT },
     expectedPhaseKinds: ["down_run", "turnback", "up_run"],
     expectsTurnbackOnB2: true,
   },
@@ -97,15 +104,16 @@ export function runScenarios(topo: BaseTopologyLayer): ScenarioResult[] {
     const turnbackOk = scenario.expectsTurnbackOnB2
       ? best.phases.some((p) => p.kind === "turnback" && best.edgeSequence[p.edgeRange.startIndex] === TwoStationRefs.TRACK_B2)
       : best.phases.every((p) => p.kind !== "turnback");
+    const mainStartOk = best.startKind === "main";
 
     results.push({
       scenario,
       candidates,
       best,
-      passed: matchedShape && turnbackOk,
-      reason: matchedShape && turnbackOk
+      passed: matchedShape && turnbackOk && mainStartOk,
+      reason: matchedShape && turnbackOk && mainStartOk
         ? undefined
-        : `phases expected ${scenario.expectedPhaseKinds.join(",")} got ${actualPhases.join(",")}${scenario.expectsTurnbackOnB2 ? "; expects turnback on 2番B" : ""}`,
+        : `phases expected ${scenario.expectedPhaseKinds.join(",")} got ${actualPhases.join(",")}${scenario.expectsTurnbackOnB2 ? "; expects turnback on 2番B" : ""}${!mainStartOk ? `; startKind=${best.startKind}` : ""}`,
     });
   }
 
@@ -132,7 +140,9 @@ export function summarizeScenarios(results: ScenarioResult[]): unknown {
     candidatesCount: r.candidates.length,
     best: r.best ? {
       totalDistanceMeters: Math.round(r.best.totalDistanceMeters),
+      startKind: r.best.startKind,
       edgeSequence: r.best.edgeSequence,
+      turnbackEdgeIndices: r.best.turnbackEdgeIndices,
       phases: r.best.phases.map((p) => ({
         phaseIndex: p.phaseIndex,
         kind: p.kind,

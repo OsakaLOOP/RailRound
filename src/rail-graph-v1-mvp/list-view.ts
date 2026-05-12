@@ -9,6 +9,7 @@ import type {
   BaseTopologyLayer,
   Platform,
   PlatformTrackBinding,
+  Signal,
   Station,
   StoppingPoint,
   TopologyEdge,
@@ -30,13 +31,19 @@ export interface ListViewInput {
   pathfindingResults?: ScenarioResult[];
 }
 
+/** 路径 hover/click 时传给外部的对象 — 同时携带 edgeSequence 与 turnbackEdgeIndices, 避免 app.ts 反向反查 */
+export interface PathHandlerPayload {
+  edgeSequence: EntityRef[];
+  turnbackEdgeIndices: number[];
+}
+
 export interface ListView {
   update(input: ListViewInput): void;
   highlightEntity(ref: EntityRef | null): void;
   onEntityHover(handler: (ref: EntityRef | null) => void): void;
   onEntityClick(handler: (ref: EntityRef) => void): void;
-  onPathHover(handler: (edgeSequence: EntityRef[] | null) => void): void;
-  onPathClick(handler: (edgeSequence: EntityRef[]) => void): void;
+  onPathHover(handler: (path: PathHandlerPayload | null) => void): void;
+  onPathClick(handler: (path: PathHandlerPayload) => void): void;
 }
 
 type TabKey = "topology" | "pathfinding" | "diagnostics" | "raw";
@@ -47,8 +54,8 @@ interface InternalState {
   input: ListViewInput;
   hoverHandlers: Array<(ref: EntityRef | null) => void>;
   clickHandlers: Array<(ref: EntityRef) => void>;
-  pathHoverHandlers: Array<(edgeSequence: EntityRef[] | null) => void>;
-  pathClickHandlers: Array<(edgeSequence: EntityRef[]) => void>;
+  pathHoverHandlers: Array<(path: PathHandlerPayload | null) => void>;
+  pathClickHandlers: Array<(path: PathHandlerPayload) => void>;
   selectedEntity: EntityRef | null;
   selectedScenarioIdx: number | null;
   selectedCandidateIdx: number | null;
@@ -205,6 +212,7 @@ function renderTopologyTab(state: InternalState): void {
     ${section("Bindings", topo.platformTrackBindings, (b) => bindingItem(b))}
     ${section("Stopping Points", topo.stoppingPoints, (sp) => stoppingPointItem(sp))}
     ${section("Double-track Pairs", topo.doubleTrackPairs, (pair) => doubleTrackItem(pair))}
+    ${section("Signals", topo.signals, (sig) => signalItem(sig))}
   `;
   bindItemEvents(state);
 }
@@ -258,6 +266,13 @@ function doubleTrackItem(pair: { id: EntityRef; upEdgeRefs: EntityRef[]; downEdg
   </div>`;
 }
 
+function signalItem(sig: Signal): string {
+  return `<div class="lv-item" data-ref="${escapeAttr(sig.id)}">
+    <strong>${escapeHtml(sig.name ?? sig.id)}</strong>
+    <div class="meta">edge: ${shortId(sig.edgeRef)} · m: ${sig.measure} · facing: ${sig.facing}</div>
+  </div>`;
+}
+
 // ── Pathfinding tab ─────────────────────────────────────────
 
 function renderPathfindingTab(state: InternalState): void {
@@ -290,8 +305,10 @@ function scenarioCard(r: ScenarioResult, idx: number, state: InternalState): str
 function candidateItem(c: import("../rail-graph-v1/pathfinding").PathfindingResult, scenarioIdx: number, candidateIdx: number, state: InternalState): string {
   const isSelected = state.selectedScenarioIdx === scenarioIdx && state.selectedCandidateIdx === candidateIdx;
   const phaseSummary = c.phases.map((p) => `<span class="lv-phase-chip ${p.kind}">${p.kind}</span>`).join("");
+  const sidingBadge = c.startKind === "siding"
+    ? `<span class="lv-phase-chip" style="background:#fff7ed;color:#c2410c">siding-start</span> ` : "";
   return `<div class="lv-candidate ${isSelected ? "selected" : ""}" data-scenario-idx="${scenarioIdx}" data-candidate-idx="${candidateIdx}">
-    <div>[${candidateIdx}] ${Math.round(c.totalDistanceMeters)}m · ${c.edgeSequence.length} edges</div>
+    <div>[${candidateIdx}] ${sidingBadge}${Math.round(c.totalDistanceMeters)}m · ${c.edgeSequence.length} edges</div>
     <div style="margin-top:3px">${phaseSummary}</div>
     ${isSelected ? renderTraceList(c.traceSequence) : ""}
   </div>`;
@@ -355,11 +372,15 @@ function renderRawTab(state: InternalState): void {
     pathfindingResults: state.input.pathfindingResults?.map((r) => ({
       name: r.scenario.name,
       passed: r.passed,
+      reason: r.reason,
       candidatesCount: r.candidates.length,
       best: r.best ? {
         totalDistanceMeters: r.best.totalDistanceMeters,
+        startKind: r.best.startKind,
         edgeSequence: r.best.edgeSequence,
+        turnbackEdgeIndices: r.best.turnbackEdgeIndices,
         phases: r.best.phases,
+        traceSequence: r.best.traceSequence,
       } : null,
     })),
   };
@@ -403,8 +424,12 @@ function bindScenarioEvents(state: InternalState): void {
     const result = state.input.pathfindingResults?.[sIdx];
     const candidate = result?.candidates[cIdx];
     if (!candidate) return;
+    const payload: PathHandlerPayload = {
+      edgeSequence: candidate.edgeSequence,
+      turnbackEdgeIndices: candidate.turnbackEdgeIndices,
+    };
     cand.addEventListener("mouseenter", () => {
-      state.pathHoverHandlers.forEach((h) => h(candidate.edgeSequence));
+      state.pathHoverHandlers.forEach((h) => h(payload));
     });
     cand.addEventListener("mouseleave", () => {
       state.pathHoverHandlers.forEach((h) => h(null));
@@ -413,7 +438,7 @@ function bindScenarioEvents(state: InternalState): void {
       e.stopPropagation();
       state.selectedScenarioIdx = sIdx;
       state.selectedCandidateIdx = cIdx;
-      state.pathClickHandlers.forEach((h) => h(candidate.edgeSequence));
+      state.pathClickHandlers.forEach((h) => h(payload));
       renderActiveTab(state);
     });
   });

@@ -65,9 +65,13 @@
 ### 3.1 硬规则
 一条 edge 允许换向当且仅当:
 ```
-edge.traversal === "both"
+edge.directionRole === "reversible"
   AND  edge.functionalUse?.includes("turnback")
 ```
+
+> 注: `reversible` 蕴含 `bidirectional` 的双向运行能力 + 额外允许换向。
+> `bidirectional` 仅允许双向通行 (不同列车不同时刻), **不允许同一列车换向**。
+> 这两个区分是寻径正确性的关键。
 
 `isTurnbackAllowed(edge)` 是这条规则的唯一实现, 寻径过程中必须用它判定。
 不得从图结构 / 位置 / binding 状态反推。
@@ -85,17 +89,17 @@ edge.traversal === "both"
 ```
 
 其他主 edge:
-- 站 A 1番A/2番A: `traversal=forward, directionRole=up_main, functionalUse=["through","stopping"]`
-- 站 A 3番A/4番A: `traversal=forward, directionRole=down_main, functionalUse=["through","stopping"]`
+- 站 A 1番A/2番A: `traversal=forward, directionRole=up, functionalUse=["through","stopping"]`
+- 站 A 3番A/4番A: `traversal=forward, directionRole=down, functionalUse=["through","stopping"]`
 - 站 B 1番B: 同 1番A
 - 站 B 3番B: 同 3番A
-- 联络段 up_link / down_link: forward + up_main/down_main + ["through","stopping"]
+- 联络段 up_link / down_link: forward + up/down + ["through","stopping"]
 - 所有 connector: `traversal=both, no directionRole, functionalUse=["through"]`
 
 ### 3.3 换向语义
 当算法决定在 edge `e` 上换向:
 1. 列车物理上在 `e` 上停下并反向
-2. `currentDirectionRole` 翻转: `up_main ↔ down_main`
+2. `currentDirectionRole` 翻转: `up ↔ down`
 3. `currentNode` 回到该 edge 的入口节点 (即 列车从相反端离开 `e`)
 4. **不消耗距离**, 但生成一个 `ServiceStopEntry { operationType: "turnback", ... }`
 5. 同一条 edge 不重复换向 (turnbackAt set 防止)
@@ -111,10 +115,10 @@ edge.traversal === "both"
 ### 4.2 每步过滤
 1. **traversal**: `edge.traversal === "forward"` 时, 入向节点必须 = `edge.fromNodeRef`; `both` 时两端皆可入
 2. **directionRole 兼容性** (`isDirectionRoleCompatible`):
-   - `undefined ↔ 任意` → 兼容 (典型如 connector edge)
-   - `siding` / `reversible` ↔ 任意 → 兼容
-   - `up_main ↔ up_main` / `down_main ↔ down_main` → 兼容
-   - `up_main ↔ down_main` → **不兼容** (必须先换向)
+   - `undefined ↔ 任意` → 兼容 (向后兼容)
+   - `bidirectional` / `reversible` ↔ 任意 → 兼容 (双向可走)
+   - `up ↔ up` / `down ↔ down` → 兼容
+   - `up ↔ down` → **不兼容** (必须先换向)
 3. **simple path**: edge 不重复访问 (visitedEdges set)
 4. **maxDepth**: edge 数上限 (默认 32)
 
@@ -146,15 +150,15 @@ edge.traversal === "both"
 [站 A: 2 面 4 線 上下退避型]                   [站 B: 2 面 3 線 国铁型可换向]
 LON 139.6980 ~ 139.7020                        LON 139.7060 ~ 139.7100
 
-1番A (up_main, forward)   ━━━━━━━━━━━ →UL→ ━━━ 1番B (up_main, forward)
+1番A (up, forward)        ━━━━━━━━━━━ →UL→ ━━━ 1番B (up, forward)
        PA 北贴 (岛式)                                 PC 北贴 (侧式)
-2番A (up_main, forward, siding) ━━━━━━━━           ┃
+2番A (up, forward, siding) ━━━━━━━━━━━           ┃
        PA 南贴                                  2番B (reversible, BOTH,
 ─────── (无股道间隔) ───────                            ["stopping","turnback"])
        PB 北贴 (岛式)                                 PD 北贴 (岛式)
-3番A (down_main, forward, siding) ━━━━━━━━━━━━━━━━━━━ PD 南贴
-       PB 南贴                                  3番B (down_main, forward)
-4番A (down_main, forward) ━━━━━━━━━━━ ←DL← ━━━━━━━━━━━━━━━━━━━
+3番A (down, forward, siding) ━━━━━━━━━━━━━━━━━━━━━━━ PD 南贴
+       PB 南贴                                  3番B (down, forward)
+4番A (down, forward)      ━━━━━━━━━━━ ←DL← ━━━━━━━━━━━━━━━━━━━
 
 咽喉 connector (traversal=both, 无 directionRole):
   站 A 西/东咽: 1-2, 3-4
@@ -211,7 +215,7 @@ trace: stop on 1番A (PA up) + stop on 1番B (PC up)
 ```
 1番A → up_link → 1番B → B-east-1-2 → 2番B[turnback] → B-west-2-3 → 3番B → ... 
 ```
-但 3番B 是 forward + down_main, 几何 东→西。从 2番B 西端经 B-west-2-3 到 3番B 西端 = 3番B 的 toNode。这是 traversal=forward 的反向, 不允许!
+但 3番B 是 forward + down, 几何 东→西。从 2番B 西端经 B-west-2-3 到 3番B 西端 = 3番B 的 toNode。这是 traversal=forward 的反向, 不允许!
 
 **实际可行路径**:
 - 从 PA 走 1番A (向东) → up_link → 1番B (向东)

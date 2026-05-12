@@ -87,9 +87,10 @@
 
 | 实体 | 渲染样式 |
 |---|---|
-| edge `directionRole=up_main` | 蓝色 polyline `#1d4ed8`, weight 4 |
-| edge `directionRole=down_main` | 红色 polyline `#b91c1c`, weight 4 |
-| edge `directionRole=reversible` / `siding` | 紫色虚线 `#7e22ce`, weight 4, dasharray `6,4` |
+| edge `directionRole=up` | 蓝色 polyline `#1d4ed8`, weight 4 |
+| edge `directionRole=down` | 红色 polyline `#b91c1c`, weight 4 |
+| edge `directionRole=reversible` | 紫色虚线 `#7e22ce`, weight 4, dasharray `6,4` (允许换向) |
+| edge `directionRole=bidirectional` | 灰色 polyline `#94a3b8`, weight 2 (双向可走但不可换向) |
 | edge `role=connector` / 其他 | 灰色细线 `#94a3b8`, weight 2, opacity 0.6 |
 | station_point | 黑色 circle marker, radius 6, 白填充 |
 | platform_area | 黄色 polygon `#fde047`, 半透明 (fillOpacity 0.55), 边 `#a16207` |
@@ -103,17 +104,48 @@
 - Diagnostic badge: fatal/error 红 / warn 黄 / info 蓝
 - Scenario badge: PASS 绿 / FAIL 红
 - Trace entry 左边线: stop 蓝 / turnback 紫 / pass 灰
+- Candidate badge: `siding-start` 橙底 (副线起步)
+
+### 4.2 方向箭头 (每条 edge 中点 1 个 marker)
+
+| directionRole | 图标 | 旋转 |
+|---|---|---|
+| `up` | ▶ 单三角 (顶点朝北) | rotate(bearing) 朝运行方向 |
+| `down` | ▶ 单三角 (顶点朝北) | rotate(bearing) 朝运行方向 |
+| `bidirectional` | ⇄ 双向并列三角 (默认水平) | rotate(bearing - 90) 对齐 edge 走向 |
+| `reversible` | ⟲ 圆弧 + 内三角 (虚线圆) | 对称图形, 不旋转 |
+
+颜色继承 edge directionRole 配色。所有箭头都用 `<g transform="rotate(... cx cy)">` 包 polygon, 旋转中心在 SVG 中心。
+
+### 4.3 信号机 (Signal)
+
+红圆点 + facing 方向短线指示:
+- `facing: forward` → 圆点右侧短线 (沿 edge from→to 方向)
+- `facing: reverse` → 圆点左侧短线
+- `facing: both` → 圆点两侧各一短线
+
+整体按 edge bearing 旋转 (`rotate(bearing - 90 cx cy)`), 短线对齐轨道走向。
+信号机**必须设在道岔外** (站外延伸段或站间联络段上), 编译期不投影, 由 annotation `edgeRef + measure` 明确定位。
 
 ---
 
 ## 5. 路径高亮规则
 
-`listView.onPathHover(edgeSequence)` 与 `onPathClick(edgeSequence)` 触发:
+`listView.onPathHover(payload)` 与 `onPathClick(payload)` 触发时, payload 同时包含 `edgeSequence` 与 `turnbackEdgeIndices`。
 
-1. `mapView.highlightPath(edgeSequence)` 给 sequence 中每条 edge 叠一层粗绿 polyline
+1. `mapView.highlightPath(edgeSequence, turnbackEdgeIndices)` 给 sequence 中每条 edge 叠一层粗绿 polyline
 2. 起点 / 终点用深绿 marker 标注 (带 "Start" / "End" tooltip)
-3. **不清除** 底层 edge 的本色 — 用户仍能看到方向上色, 只是被绿色压在上面
-4. 后续任何 hover entity / 切换 candidate 都会清掉绿色叠层
+3. **路径方向叠加** (核心): 沿 path 顺序追踪每条 edge 的"实际行进方向"
+   - 上一条 edge 的 exit node = 本条 edge 的 entry node, 由 `fromNodeRef` / `toNodeRef` 与共享节点匹配确定
+   - 第一条 edge 用第二条 edge 反推
+   - bearing = entryLatLng → exitLatLng (不是 polyline first→last)
+   - 在 edge 中点放绿色 ▶, rotate 朝实际行进方向
+4. **turnback edge 用绿色 ⟲** (而非 ▶): `turnbackEdgeIndices` 中的 index 用 ⟲ 替代单向箭头
+5. **原 arrow dim/隐藏** (`L.Marker.setOpacity`):
+   - 单向 edge (`up`/`down`): `setOpacity(0)` 完全隐藏 (避免与绿色叠加冲突)
+   - 双向 edge (`bidirectional`/`reversible`): `setOpacity(0.2)` 半透明 (保留可见性, 表示双向通行的物理事实)
+6. **粘性 (sticky)**: hover entity 离开 (mouseout) 走 `clearEntityHighlight`, **不动 path**; 切换 path candidate 走 `highlightPath` (内部 `clearPathHighlight` 再叠新的), entity 高亮不变。
+7. **底层 polyline 本色保留**: 用户能看到方向配色, 只是被绿色压上。
 
 候选列表的视觉:
 ```
@@ -121,6 +153,7 @@
 [up_run] [turnback] [down_run]
   ← hover 整条路径变绿
   ← click 在卡内展开 trace 详情
+[0] [siding-start] 287m · 3 edges    ← S4 副线起步候选 (橙色 badge)
 ```
 
 Trace 详情 (展开后) 包含:
@@ -132,6 +165,12 @@ Trace 详情 (展开后) 包含:
 ```
 
 每个 trace entry 可独立 hover, 高亮对应 edge + platform (但不重画路径绿层)。
+
+### 5.1 MapView API 拆分 (粘性高亮)
+- `clearHighlight()` — 清除 entity + path 两类
+- `clearEntityHighlight()` — 仅清 entity (path 保留)
+- `clearPathHighlight()` — 仅清 path (entity 保留)
+- 调用方按 mouseout 类型选用
 
 ---
 

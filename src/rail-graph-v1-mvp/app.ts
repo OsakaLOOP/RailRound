@@ -217,6 +217,27 @@ export function compileTopology(): BaseTopologyLayer {
     }));
   }
 
+  // signal_point 编译: 直接从 annotation 拷 (不做空间投影)
+  for (const { feature, annotation, index } of annotatedFeatures) {
+    if (annotation?.kind === "signal_point") {
+      addSignalFeature(topo, diagnostics, annotation, index);
+    }
+  }
+
+  // directionRole 自动 fallback: traversal=both 但无 directionRole → 自动填 bidirectional
+  for (const edge of topo.edges) {
+    if (edge.traversal === "both" && !edge.directionRole) {
+      edge.directionRole = "bidirectional";
+      diagnostics.push(diagnostic(
+        "info",
+        "MVP_TRACK_DIRECTION_ROLE_INFERRED_BIDIRECTIONAL",
+        "compile",
+        "Edge has traversal=both but no directionRole; auto-assigned 'bidirectional'.",
+        { edgeId: edge.id },
+      ));
+    }
+  }
+
   topo.adjacency = buildAdjacency(topo.edges);
   addBindings(topo, diagnostics);
   addStoppingPoints(topo, diagnostics);
@@ -331,6 +352,21 @@ function addTrackFeature(
     ensureNode(topo, fromNodeRef, "line_endpoint", coordinates[0]);
     ensureNode(topo, toNodeRef, "line_endpoint", coordinates[coordinates.length - 1]);
 
+    // turnback 一致性校验: functionalUse 含 turnback 但 directionRole !== reversible
+    if (
+      Array.isArray(annotation.track?.functionalUse)
+      && annotation.track!.functionalUse!.includes("turnback")
+      && annotation.track?.directionRole !== "reversible"
+    ) {
+      diagnostics.push(diagnostic(
+        "warn",
+        "MVP_REVERSIBLE_WITHOUT_TURNBACK_ROLE",
+        "compile",
+        "Track has functionalUse=turnback but directionRole is not 'reversible'. turnback requires reversible direction role.",
+        { featureIndex, lineIndex, trackCode: annotation.track?.trackCode },
+      ));
+    }
+
     const geometryRef = stableId("manual", "geometry", `${annotation.id}:${lineIndex}`);
     geometryRefs.add(geometryRef);
     topo.edges.push({
@@ -423,6 +459,27 @@ function addPlatformFeature(
   if (station && !station.platformRefs.includes(id)) {
     station.platformRefs.push(id);
   }
+}
+
+function addSignalFeature(
+  topo: BaseTopologyLayer,
+  diagnostics: Diagnostic[],
+  annotation: RailGraphAnnotation,
+  featureIndex: number,
+): void {
+  if (!annotation.signal) {
+    diagnostics.push(diagnostic("warn", "MVP_SIGNAL_NO_DATA", "compile", "signal_point feature has no signal annotation.", { featureIndex }));
+    return;
+  }
+  // 直接从 annotation 拷, 不做空间投影
+  const id = annotation.id as EntityRef;
+  topo.signals.push({
+    id,
+    edgeRef: annotation.signal.edgeRef as EntityRef,
+    measure: clampMeasure(annotation.signal.measure),
+    facing: annotation.signal.facing,
+    name: annotation.signal.name,
+  });
 }
 
 function addBindings(topo: BaseTopologyLayer, diagnostics: Diagnostic[]): void {
@@ -841,6 +898,7 @@ function initViews(): void {
   listView = createListView(listContainer);
 
   // 联动: map ↔ list
+  // hover entity (map): 高亮 entity + related, 但 sticky 保留已选 path
   mapView.onHover((ref) => {
     if (!listView) return;
     listView.highlightEntity(ref);
@@ -848,33 +906,36 @@ function initViews(): void {
       const related = computeRelatedRefs(ref);
       mapView?.highlightEntities([ref], related);
     } else {
-      mapView?.clearHighlight();
+      mapView?.clearEntityHighlight();
     }
   });
   mapView.onClick((ref) => {
     listView?.highlightEntity(ref);
   });
 
+  // hover entity (list): 同 map.onHover, 不动 path
   listView.onEntityHover((ref) => {
     if (ref) {
       const related = computeRelatedRefs(ref);
       mapView?.highlightEntities([ref], related);
     } else {
-      mapView?.clearHighlight();
+      mapView?.clearEntityHighlight();
     }
   });
   listView.onEntityClick((_ref) => {
     // 不做 zoom, 因为 fit-to-entity 还没实现 (后续 phase)
   });
-  listView.onPathHover((edgeSequence) => {
-    if (edgeSequence) {
-      mapView?.highlightPath(edgeSequence);
+
+  // hover/click path candidate: 高亮 path, 不动 entity
+  listView.onPathHover((path) => {
+    if (path) {
+      mapView?.highlightPath(path.edgeSequence, path.turnbackEdgeIndices);
     } else {
-      mapView?.clearHighlight();
+      mapView?.clearPathHighlight();
     }
   });
-  listView.onPathClick((edgeSequence) => {
-    mapView?.highlightPath(edgeSequence);
+  listView.onPathClick((path) => {
+    mapView?.highlightPath(path.edgeSequence, path.turnbackEdgeIndices);
   });
 }
 

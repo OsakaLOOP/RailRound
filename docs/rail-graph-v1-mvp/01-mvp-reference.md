@@ -80,7 +80,7 @@ MVP 不构建服务模板 (Layer 2)、运行时径路 (Layer 3)、事件、时�
 | `TraversalDirection` | `both` / `forward` |
 | `TrackPhysicalKind` | `main` / `siding` / `yard` / `lead` / `safety` — 物理身份 |
 | `TrackFunctionalUse` | `through` / `stopping` / `passing` / `turnback` / `storage` — 运用功能 (多值) |
-| `TrackDirectionRole` | `up_main` / `down_main` / `siding` / `reversible` — 方向角色 |
+| `TrackDirectionRole` | `up` / `down` / `bidirectional` / `reversible` — 方向角色 (主/副本身份由 physicalKind 管, 不重叠); `reversible` 蕴含 `bidirectional` 的运行能力 + 额外允许换向 |
 | `TopologyEdge` | `id` / `fromNodeRef` / `toNodeRef` / `traversal` / `role` / `name?` / `trackCode?` / `geometryRef?` / `lengthMeters` / `sourceSlice?` / **`physicalKind?`** / **`functionalUse?`** / **`directionRole?`** / `properties?` |
 | `SourceGeometrySlice` | 几何切片溯源 |
 | `GraphAdjacency` | `outEdges` / `inEdges` 索引 |
@@ -93,6 +93,7 @@ MVP 不构建服务模板 (Layer 2)、运行时径路 (Layer 3)、事件、时�
 | `Platform` | `id` / `stationRef` / `type` / `name?` / `number?` / `areaRef?` |
 | `PlatformTrackBinding` | `id` / `stationRef` / `platformRef` / `edgeRef` / `side` / `servingDirection?` |
 | `StoppingPoint` | `id` / `stationRef` / `platformRef` / `edgeRef` / `direction` / `measure` / `confirmation` |
+| `Signal` | `id` / `edgeRef` / `measure` / `facing: forward\|reverse\|both` / `name?` — **不参与寻径**, 仅可视化与标注。必须设在道岔外 (即站外延伸段或站间联络段上). |
 
 #### 2.4.3 区间与关系
 | 类型 | 说明 |
@@ -257,6 +258,9 @@ topology 永远反映最新的 annotation + bindings + stops。
 | `MVP_STOP_MISSING_EDGE` | error | stopping point 的 edgeRef 不存在 |
 | `MVP_STOP_NO_MATCHING_BINDING` | warn | stopping point 的 (platform, edge, direction) 无匹配 binding |
 | `MVP_NO_TRACKS` | error | 编译后无任何 track edge |
+| `MVP_SIGNAL_NO_DATA` | warn | `signal_point` Feature 缺 `signal` annotation 字段 |
+| `MVP_TRACK_DIRECTION_ROLE_INFERRED_BIDIRECTIONAL` | info | edge 有 `traversal=both` 但无 `directionRole` → 自动填 `bidirectional` |
+| `MVP_REVERSIBLE_WITHOUT_TURNBACK_ROLE` | warn | edge `functionalUse` 含 `turnback` 但 `directionRole` 不是 `reversible` (功能与方向身份不匹配) |
 
 ---
 
@@ -299,6 +303,11 @@ topology 永远反映最新的 annotation + bindings + stops。
 - ~~Binding.side 参考系模糊~~ → 文档 + doc-comment 锁定
 - ~~Track 角色被位置反推~~ → 三类 `*_UNDECLARED` warn
 - ~~DoubleTrackPair 未自动填~~ → `aggregateDoubleTrackPairs`
+- ~~directionRole 命名混淆 (`up_main`/`down_main`/`siding` 把方向与主线身份绑死)~~ → 重命名为 `up`/`down`/`bidirectional`/`reversible`, 主/副本身份完全归 `physicalKind`
+- ~~`bidirectional` 与 `reversible` 区分缺失~~ → 4 值 directionRole; `isTurnbackAllowed` 仅认 `reversible`
+- ~~Signal 数据结构缺失~~ → 新增 `Signal` interface + `signal_point` annotation kind + `BaseTopologyLayer.signals[]`
+- ~~`resolveSeed` filter bug (`servingDirection: "unknown"` 字符串被误排除)~~ → 改为 `!servingDirection || === "unknown" || === seed.direction`
+- ~~寻径起点没有主/副线偏好~~ → `PathfindingResult.startKind` + 主线优先排序 + `PathfindingOptions.allowSidingStarts` (默认 true)
 - ~~Stop-Binding 一致性未校验~~ → `MVP_STOP_NO_MATCHING_BINDING`
 
 ### 7.2 仍未解决 (留给后续 Layer)

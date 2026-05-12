@@ -50,6 +50,8 @@ const LON_A_WEST = 139.6980;
 const LON_A_EAST = 139.7020;
 const LON_B_WEST = 139.7060;
 const LON_B_EAST = 139.7100;
+const LON_A_WEST_EXT = 139.6960;   // 站 A 西端外延
+const LON_B_EAST_EXT = 139.7120;   // 站 B 东端外延
 
 const LAT_BASE = 35.6900;
 const TRACK_SPACING = 0.0002;
@@ -92,6 +94,12 @@ const nodeB2East: GeoJSONPosition = [LON_B_EAST, LAT_B2];
 const nodeB3West: GeoJSONPosition = [LON_B_WEST, LAT_B3];
 const nodeB3East: GeoJSONPosition = [LON_B_EAST, LAT_B3];
 
+// 延伸段远端 (开放端点)
+const nodeA1WestExt: GeoJSONPosition = [LON_A_WEST_EXT, LAT_A1];
+const nodeA4WestExt: GeoJSONPosition = [LON_A_WEST_EXT, LAT_A4];
+const nodeB1EastExt: GeoJSONPosition = [LON_B_EAST_EXT, LAT_B1];
+const nodeB3EastExt: GeoJSONPosition = [LON_B_EAST_EXT, LAT_B3];
+
 // ---- ID 常量 ----
 
 const STATION_A = "demo:station:A";
@@ -110,6 +118,14 @@ const TRACK_B2 = "demo:track:B2";
 const TRACK_B3 = "demo:track:B3";
 const UP_LINK = "demo:track:up-link";
 const DOWN_LINK = "demo:track:down-link";
+const A1_WEST_EXT = "demo:track:A1-west-ext";
+const A4_WEST_EXT = "demo:track:A4-west-ext";
+const B1_EAST_EXT = "demo:track:B1-east-ext";
+const B3_EAST_EXT = "demo:track:B3-east-ext";
+const SIG_A1_HOME = "demo:signal:A1-west-home";
+const SIG_A4_START = "demo:signal:A4-west-start";
+const SIG_B1_START = "demo:signal:B1-east-start";
+const SIG_B3_HOME = "demo:signal:B3-east-home";
 
 function slug(value: string): string {
   let hash = 0;
@@ -121,6 +137,15 @@ function slug(value: string): string {
 
 function buildEdgeId(annotationId: string, lineIndex = 0): string {
   return `manual:edge:${slug(`${annotationId}:${lineIndex}`)}`;
+}
+
+// 与 app.ts 中 ENDPOINT_PRECISION + coordinateKey + nodeIdForCoordinate 保持一致
+const ENDPOINT_PRECISION = 6;
+function coordinateKey(coord: GeoJSONPosition): string {
+  return `${coord[0].toFixed(ENDPOINT_PRECISION)},${coord[1].toFixed(ENDPOINT_PRECISION)}`;
+}
+function buildNodeId(coord: GeoJSONPosition): string {
+  return `manual:node:${slug(coordinateKey(coord))}`;
 }
 
 // ---- GeoJSON 构造 ----
@@ -169,17 +194,17 @@ export function buildTwoStationGeoJson(): AnnotatedFeatureCollection {
       buildPlatformFeature(PLATFORM_D, STATION_B, "PD", 2, "island", LON_B_WEST, LON_B_EAST, LAT_PD),
 
       // ── 站 A 主轨 ──
-      buildMainTrack(TRACK_A1, "1番A", "1A", "up_main", "forward", nodeA1West, nodeA1East),
-      buildMainTrack(TRACK_A2, "2番A", "2A", "up_main", "forward", nodeA2West, nodeA2East, "siding"),
-      buildMainTrack(TRACK_A3, "3番A", "3A", "down_main", "forward", nodeA3East, nodeA3West, "siding"),
-      buildMainTrack(TRACK_A4, "4番A", "4A", "down_main", "forward", nodeA4East, nodeA4West),
+      buildMainTrack(TRACK_A1, "1番A", "1A", "up", "forward", nodeA1West, nodeA1East),
+      buildMainTrack(TRACK_A2, "2番A", "2A", "up", "forward", nodeA2West, nodeA2East, "siding"),
+      buildMainTrack(TRACK_A3, "3番A", "3A", "down", "forward", nodeA3East, nodeA3West, "siding"),
+      buildMainTrack(TRACK_A4, "4番A", "4A", "down", "forward", nodeA4East, nodeA4West),
 
       // ── 站间联络 ──
-      buildMainTrack(UP_LINK, "上行联络", "UL", "up_main", "forward", nodeA1East, nodeB1West),
-      buildMainTrack(DOWN_LINK, "下行联络", "DL", "down_main", "forward", nodeB3West, nodeA4East),
+      buildMainTrack(UP_LINK, "上行联络", "UL", "up", "forward", nodeA1East, nodeB1West),
+      buildMainTrack(DOWN_LINK, "下行联络", "DL", "down", "forward", nodeB3West, nodeA4East),
 
       // ── 站 B 主轨 ──
-      buildMainTrack(TRACK_B1, "1番B", "1B", "up_main", "forward", nodeB1West, nodeB1East),
+      buildMainTrack(TRACK_B1, "1番B", "1B", "up", "forward", nodeB1West, nodeB1East),
       // 2番B: 可换向中線, traversal=both, directionRole=reversible, 含 turnback functionalUse
       buildTrackWithFlags(
         TRACK_B2,
@@ -195,7 +220,13 @@ export function buildTwoStationGeoJson(): AnnotatedFeatureCollection {
           directionRole: "reversible",
         },
       ),
-      buildMainTrack(TRACK_B3, "3番B", "3B", "down_main", "forward", nodeB3East, nodeB3West),
+      buildMainTrack(TRACK_B3, "3番B", "3B", "down", "forward", nodeB3East, nodeB3West),
+
+      // ── 延伸段 (道岔外, 信号机放在这里) ──
+      buildMainTrack(A1_WEST_EXT, "1番A西延", "1Ae", "up", "forward", nodeA1WestExt, nodeA1West),
+      buildMainTrack(A4_WEST_EXT, "4番A西延", "4Ae", "down", "forward", nodeA4West, nodeA4WestExt),
+      buildMainTrack(B1_EAST_EXT, "1番B东延", "1Be", "up", "forward", nodeB1East, nodeB1EastExt),
+      buildMainTrack(B3_EAST_EXT, "3番B东延", "3Be", "down", "forward", nodeB3EastExt, nodeB3East),
 
       // ── 咽喉 connector ──
       buildConnector("demo:track:A-west-1-2", "A西咽-1-2", nodeA1West, nodeA2West),
@@ -206,6 +237,12 @@ export function buildTwoStationGeoJson(): AnnotatedFeatureCollection {
       buildConnector("demo:track:B-west-2-3", "B西咽-2-3", nodeB2West, nodeB3West),
       buildConnector("demo:track:B-east-1-2", "B东咽-1-2", nodeB1East, nodeB2East),
       buildConnector("demo:track:B-east-2-3", "B东咽-2-3", nodeB2East, nodeB3East),
+
+      // ── 信号机 (signal_point, 不参与寻径, 仅可视) ──
+      buildSignalFeature(SIG_A1_HOME, "A1西进站", A1_WEST_EXT, 0.5, "forward"),
+      buildSignalFeature(SIG_A4_START, "A4西出站", A4_WEST_EXT, 0.5, "forward"),
+      buildSignalFeature(SIG_B1_START, "B1东出站", B1_EAST_EXT, 0.5, "forward"),
+      buildSignalFeature(SIG_B3_HOME, "B3东进站", B3_EAST_EXT, 0.5, "forward"),
     ],
   };
 }
@@ -249,7 +286,7 @@ function buildMainTrack(
   id: string,
   name: string,
   trackCode: string,
-  directionRole: "up_main" | "down_main",
+  directionRole: "up" | "down",
   traversal: "forward" | "both",
   from: GeoJSONPosition,
   to: GeoJSONPosition,
@@ -290,7 +327,7 @@ function buildTrackWithFlags(
     traversal: "forward" | "both";
     physicalKind: "main" | "siding" | "yard" | "lead" | "safety";
     functionalUse: ("through" | "stopping" | "passing" | "turnback" | "storage")[];
-    directionRole?: "up_main" | "down_main" | "siding" | "reversible";
+    directionRole?: "up" | "down" | "bidirectional" | "reversible";
   },
 ): AnnotatedFeatureCollection["features"][number] {
   return {
@@ -331,7 +368,31 @@ function buildConnector(
           name,
           physicalKind: "main",
           functionalUse: ["through"],
+          directionRole: "bidirectional",
         },
+      },
+    },
+  };
+}
+
+function buildSignalFeature(
+  id: string,
+  name: string,
+  edgeRef: string,
+  measure: number,
+  facing: "forward" | "reverse" | "both",
+): AnnotatedFeatureCollection["features"][number] {
+  return {
+    type: "Feature",
+    geometry: { type: "Point", coordinates: [0, 0] },  // dummy geometry, edgeRef+measure 为准
+    properties: {
+      name,
+      railGraph: {
+        kind: "signal_point",
+        schemaVersion: "rail-graph-v1",
+        id,
+        source: "demo",
+        signal: { edgeRef, measure, facing, name },
       },
     },
   };
@@ -355,8 +416,8 @@ export const BINDING_PLAN: PlatformTrackBindingInput[] = [
   { stationRef: STATION_A, platformRef: PLATFORM_B, edgeRef: buildEdgeId(TRACK_A3), side: "left", servingDirection: "down" },
   { stationRef: STATION_A, platformRef: PLATFORM_B, edgeRef: buildEdgeId(TRACK_A4), side: "right", servingDirection: "down" },
   { stationRef: STATION_B, platformRef: PLATFORM_C, edgeRef: buildEdgeId(TRACK_B1), side: "right", servingDirection: "up" },
-  // 2番B 是中线可换向, servingDirection 留 unknown (上下行都可服务)
-  { stationRef: STATION_B, platformRef: PLATFORM_D, edgeRef: buildEdgeId(TRACK_B2), side: "right", servingDirection: "unknown" },
+  // 2番B 是中线可换向, servingDirection 省略 (上下行都可服务)
+  { stationRef: STATION_B, platformRef: PLATFORM_D, edgeRef: buildEdgeId(TRACK_B2), side: "right" },
   { stationRef: STATION_B, platformRef: PLATFORM_D, edgeRef: buildEdgeId(TRACK_B3), side: "right", servingDirection: "down" },
 ];
 
@@ -393,6 +454,19 @@ export const TwoStationRefs = {
   TRACK_B3: buildEdgeId(TRACK_B3),
   UP_LINK: buildEdgeId(UP_LINK),
   DOWN_LINK: buildEdgeId(DOWN_LINK),
+  A1_WEST_EXT: buildEdgeId(A1_WEST_EXT),
+  A4_WEST_EXT: buildEdgeId(A4_WEST_EXT),
+  B1_EAST_EXT: buildEdgeId(B1_EAST_EXT),
+  B3_EAST_EXT: buildEdgeId(B3_EAST_EXT),
+  SIG_A1_HOME,
+  SIG_A4_START,
+  SIG_B1_START,
+  SIG_B3_HOME,
+  // 4 个延伸段远端开放节点 (主线尽头) — 寻径的"线路入口/出口"
+  NODE_A1_WEST_EXT: buildNodeId(nodeA1WestExt),  // 上行起 (西远)
+  NODE_A4_WEST_EXT: buildNodeId(nodeA4WestExt),  // 下行终 (西远)
+  NODE_B1_EAST_EXT: buildNodeId(nodeB1EastExt),  // 上行终 (东远)
+  NODE_B3_EAST_EXT: buildNodeId(nodeB3EastExt),  // 下行起 (东远)
 } as const;
 
 if (typeof window !== "undefined") {

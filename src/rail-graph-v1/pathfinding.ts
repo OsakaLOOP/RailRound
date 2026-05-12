@@ -209,8 +209,9 @@ export function resolveSeed(
       });
       return { entryPoints: [], diagnostics };
     }
+    // node seed (常用于"线路尽头"如延伸段远端) 默认视为 main 起步
     return {
-      entryPoints: [{ startNodeRef: seed.nodeRef }],
+      entryPoints: [{ startNodeRef: seed.nodeRef, startKind: "main" }],
       initialDirectionRole: seed.alongDirection,
       diagnostics,
     };
@@ -413,7 +414,13 @@ export function findPaths(
     return [];
   }
 
-  candidates.sort((a, b) => a.totalDistanceMeters - b.totalDistanceMeters);
+  candidates.sort((a, b) => {
+    // 主线起步优先 (即使距离更长). 这是设计原则: "寻径起点必须从主线开始".
+    const aIsMain = a.startKind === "main" ? 0 : 1;
+    const bIsMain = b.startKind === "main" ? 0 : 1;
+    if (aIsMain !== bIsMain) return aIsMain - bIsMain;
+    return a.totalDistanceMeters - b.totalDistanceMeters;
+  });
   const top = candidates.slice(0, maxCandidates);
   if (candidates.length > maxCandidates) {
     diagnostics.push({

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Github, Folder, TrendingUp, Move, MapPin, Map as MapIcon, Globe } from 'lucide-react';
 import { useStore } from '../store';
-import { calcDist } from '../core/tripCalculator';
+import { calcDist, calcPathDist } from '../core/tripCalculator';
 import * as turf from '@turf/turf';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../hooks/useUserData';
@@ -77,10 +77,10 @@ export const StatsPage: React.FC = () => {
                         if (geom.isMulti) {
                             for (let k = 0; k < geom.coords.length; k++) {
                                 const c = geom.coords[k];
-                                _totalDist += turf.length(turf.lineString(c.map((p: any) => [p[1], p[0]])));
+                                _totalDist += calcPathDist(c);
                             }
                         } else {
-                            _totalDist += turf.length(turf.lineString(geom.coords.map((p: any) => [p[1], p[0]])));
+                            _totalDist += calcPathDist(geom.coords);
                         }
                     } else {
                         const line = railwayData[seg.lineKey];

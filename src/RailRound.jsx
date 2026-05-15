@@ -25,7 +25,7 @@ import StationMenu from './components/StationMenu';
 import Tutorial from './components/Tutorial';
 import { api } from './services/api';
 import { db } from './utils/db';
-import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './core/tripCalculator';
+import { calcDist, calcPathDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './core/tripCalculator';
 import { VersionBadge } from './components/VersionBadge';
 import manifest from '../public/geojson_manifest.json';
 
@@ -1380,9 +1380,9 @@ const StatsView = ({ trips, railwayData, geoData, user, userProfile, segmentGeom
             const geom = segmentGeometries.get(key);
             if (geom && geom.coords) {
                 if (geom.isMulti) {
-                    geom.coords.forEach(c => totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]]))));
+                    geom.coords.forEach(c => totalDist += calcPathDist(c));
                 } else {
-                    totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                    totalDist += calcPathDist(geom.coords);
                 }
             } else {
                 // Fallback (Approx)

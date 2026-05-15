@@ -13,6 +13,19 @@ export const calcDist = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
+// O(N) 路径距离计算: 避免构建临时 turf.lineString 和 map 开销
+export const calcPathDist = (coords) => {
+  if (!coords || coords.length < 2) return 0;
+  let dist = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p1 = coords[i];
+    const p2 = coords[i+1];
+    // Local coords are [lat, lng], calcDist expects (lat1, lon1, lat2, lon2)
+    dist += calcDist(p1[0], p1[1], p2[0], p2[1]);
+  }
+  return dist;
+};
+
 // [New] 路径缝合算法: 将乱序的 MultiLineString 缝合成连续的 LineString
 export const stitchRoutes = (turf, multiCoords, startPt) => {
   let pool = multiCoords.map((coords, i) => {
@@ -216,11 +229,11 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
             if (geom.isMulti) {
                 geom.coords.forEach(c => {
                     allCoords.push({ coords: c, color: geom.color || '#94a3b8' });
-                    if(turf) totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
+                    totalDist += calcPathDist(c);
                 });
             } else {
                 allCoords.push({ coords: geom.coords, color: geom.color || '#94a3b8' });
-                if(turf) totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                totalDist += calcPathDist(geom.coords);
             }
         } else {
              // Fallback Distance Approx

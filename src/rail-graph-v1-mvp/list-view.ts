@@ -94,6 +94,8 @@ interface InternalState {
   annotateFilter: "all" | "unannotated" | "track" | "station" | "platform" | "signal" | "entrance";
   /** Annotate tab 方向格式刷: null = off, 其他 = 点击 track 时刷该方向 */
   dirRoleBrush: TrackDirectionRole | null;
+  /** Annotate tab functionalUse 格式刷: 空数组 = off, 否则点击 track 时整体替换为该集合 */
+  functionalUseBrush: TrackFunctionalUse[];
 }
 
 const STYLE_ID = "mvp-list-view-styles";
@@ -203,6 +205,7 @@ const STYLES = `
 .lv-an-brush.brush-bidirectional.active { background: #ede9fe; border-color: #7e22ce; color: #581c87; }
 .lv-an-brush.brush-reversible.active { background: #fef3c7; border-color: #d97706; color: #78350f; }
 .lv-an-brush.brush-off.active { background: #e2e8f0; border-color: #64748b; color: #334155; }
+.lv-an-brush.fn-brush.active { background: #dcfce7; border-color: #15803d; color: #14532d; }
 `;
 
 function ensureStyles(): void {
@@ -249,6 +252,7 @@ export function createListView(container: HTMLElement): ListView {
     selectedFeatureIdx: null,
     annotateFilter: "all",
     dirRoleBrush: null,
+    functionalUseBrush: [],
   };
 
   bindTabClicks(state);
@@ -639,6 +643,14 @@ function renderAnnotateTab(state: InternalState): void {
   const brushOffActive = state.dirRoleBrush === null ? "active" : "";
   const brushBtnsHtml = `${brushBtns}<button class="lv-an-brush ${brushOffActive} brush-off" data-brush="" type="button" title="关闭格式刷">off</button>`;
 
+  // functionalUse 笔刷 (5 选多)
+  const fnBrushBtns = FUNCTIONAL_USE_OPTIONS.map((u) => {
+    const active = state.functionalUseBrush.includes(u) ? "active" : "";
+    return `<button class="lv-an-brush fn-brush ${active}" data-fn-brush="${u}" type="button" title="切换 functionalUse: ${u}">${u}</button>`;
+  }).join("");
+  const fnBrushOffActive = state.functionalUseBrush.length === 0 ? "active" : "";
+  const fnBrushBtnsHtml = `${fnBrushBtns}<button class="lv-an-brush ${fnBrushOffActive} brush-off" data-fn-brush-clear="1" type="button" title="清空 functionalUse 笔刷">off</button>`;
+
   body.innerHTML = `<div class="lv-an-root">
     <div class="lv-an-list">
       <div class="lv-an-toolbar">
@@ -650,6 +662,10 @@ function renderAnnotateTab(state: InternalState): void {
       <div class="lv-an-toolbar" style="background:#f8fafc;padding:4px 6px">
         <span style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em">dir brush:</span>
         ${brushBtnsHtml}
+      </div>
+      <div class="lv-an-toolbar" style="background:#f8fafc;padding:4px 6px">
+        <span style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em">fn brush:</span>
+        ${fnBrushBtnsHtml}
       </div>
       <div class="lv-an-feature-list">${listHtml}</div>
     </div>
@@ -991,12 +1007,27 @@ function bindAnnotateEvents(state: InternalState): void {
   });
 
   // Brush buttons (5 个 direction + off)
-  state.container.querySelectorAll<HTMLElement>(".lv-an-brush").forEach((btn) => {
+  state.container.querySelectorAll<HTMLElement>(".lv-an-brush[data-brush]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const val = btn.dataset.brush ?? "";
       state.dirRoleBrush = val ? (val as TrackDirectionRole) : null;
       renderActiveTab(state);
     });
+  });
+
+  // functionalUse brush buttons (toggle 多选)
+  state.container.querySelectorAll<HTMLElement>(".lv-an-brush[data-fn-brush]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const val = btn.dataset.fnBrush as TrackFunctionalUse;
+      const idx = state.functionalUseBrush.indexOf(val);
+      if (idx >= 0) state.functionalUseBrush.splice(idx, 1);
+      else state.functionalUseBrush.push(val);
+      renderActiveTab(state);
+    });
+  });
+  state.container.querySelector<HTMLElement>('.lv-an-brush[data-fn-brush-clear]')?.addEventListener("click", () => {
+    state.functionalUseBrush = [];
+    renderActiveTab(state);
   });
 
   // toolbar 全局动作: Auto-bind all platforms
@@ -1112,15 +1143,19 @@ function mergeTrack(ann: RailGraphAnnotation, patch: Partial<NonNullable<RailGra
 
 // ── Annotate auto-actions: dirRole brush / auto-bind station ─
 
-/** 若 brush 激活且 feature 是 track_geometry → 刷 directionRole 并阻断后续 click 行为. */
+/** 若 dirRole/functionalUse brush 任一激活, 且 feature 是 track_geometry → 应用并阻断后续 click 行为. */
 function applyDirRoleBrushIfActive(state: InternalState, featureIdx: number): boolean {
-  if (state.dirRoleBrush == null) return false;
+  const hasDir = state.dirRoleBrush != null;
+  const hasFn = state.functionalUseBrush.length > 0;
+  if (!hasDir && !hasFn) return false;
   const features = state.input.source?.features ?? [];
   const f = features[featureIdx];
   if (!f) return false;
   const ann = ensureAnnotation(f);
   if (ann.kind !== "track_geometry") return false;
-  const next = mergeTrack(ann, { directionRole: state.dirRoleBrush });
+  let next = ann;
+  if (hasDir) next = mergeTrack(next, { directionRole: state.dirRoleBrush! });
+  if (hasFn) next = mergeTrack(next, { functionalUse: [...state.functionalUseBrush] });
   emitAnnotationChange(state, featureIdx, next);
   return true;
 }

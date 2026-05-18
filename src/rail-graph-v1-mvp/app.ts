@@ -762,20 +762,29 @@ function setupShellGutters(root: HTMLElement): void {
   const gutters = shell.querySelectorAll<HTMLElement>(".panel-gutter");
   gutters.forEach((gutter) => {
     const which = gutter.dataset.gutter;
-    const varName = which === "left" ? "--shell-left" : "--shell-right";
+    const isRight = which !== "left";
+    const varName = isRight ? "--shell-right" : "--shell-left";
     setupResizableGutter(gutter, {
       direction: "horizontal",
       container: shell,
       varName,
       minSize: 200,
-      defaultSize: which === "left" ? 320 : 380,
+      defaultSize: isRight ? 380 : 320,
+      anchorFromEnd: isRight,
     });
   });
 }
 
 function setupResizableGutter(
   gutter: HTMLElement,
-  opts: { direction: "horizontal" | "vertical"; container: HTMLElement; varName: string; minSize: number; defaultSize: number },
+  opts: {
+    direction: "horizontal" | "vertical";
+    container: HTMLElement;
+    varName: string;
+    minSize: number;
+    defaultSize: number;
+    anchorFromEnd?: boolean;
+  },
 ): void {
   let dragging = false;
   gutter.addEventListener("mousedown", (e) => {
@@ -788,9 +797,10 @@ function setupResizableGutter(
   document.addEventListener("mousemove", (e) => {
     if (!dragging) return;
     const rect = opts.container.getBoundingClientRect();
+    // 右/底锚定 panel 的宽度 = 容器右(底)边距 - 鼠标位置; 否则 = 鼠标 - 左(顶)边距
     const size = opts.direction === "horizontal"
-      ? e.clientX - rect.left
-      : e.clientY - rect.top;
+      ? (opts.anchorFromEnd ? rect.right - e.clientX : e.clientX - rect.left)
+      : (opts.anchorFromEnd ? rect.bottom - e.clientY : e.clientY - rect.top);
     // 计算可用空间 — 加上 minSize*2 是左右/上下最少各自一个 panel 的空间
     const maxSingle = opts.direction === "horizontal"
       ? rect.width - opts.minSize * 2 - 8  // 8 = 2 gutters

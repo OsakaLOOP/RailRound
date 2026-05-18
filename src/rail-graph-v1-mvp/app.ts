@@ -35,6 +35,7 @@ import {
 } from "./poc-twostation";
 import { runScenarios, summarizeScenarios } from "./poc-pathfinding";
 import type { ScenarioResult } from "./poc-pathfinding";
+import { SENSEKI_RAIL, SENSEKI_STATIONS } from "./senseki-data";
 import { createMapView, type MapView } from "./map-view";
 import { createListView, type ListView } from "./list-view";
 
@@ -388,6 +389,7 @@ function addTrackFeature(
         startMeasure: 0,
         endMeasure: 1,
       },
+      sourceTags: extractSourceTags(feature.properties),
     });
   }
 }
@@ -694,6 +696,24 @@ function nodeIdForCoordinate(coordinate: GeoJSONPosition): EntityRef {
   return stableId("manual", "node", coordinateKey(coordinate));
 }
 
+function extractSourceTags(properties: Record<string, unknown>): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  const sourceTags = properties.sourceTags;
+  if (sourceTags && typeof sourceTags === "object") {
+    for (const [k, v] of Object.entries(sourceTags as Record<string, unknown>)) {
+      if (v === undefined || v === null) continue;
+      out[k] = typeof v === "string" ? v : JSON.stringify(v);
+    }
+  }
+  for (const [k, v] of Object.entries(properties)) {
+    if (k === "railGraph" || k === "sourceTags") continue;
+    if (v === undefined || v === null || v === "") continue;
+    if (out[k] !== undefined) continue;
+    out[k] = typeof v === "string" ? v : JSON.stringify(v);
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 function coordinateKey(coordinate: GeoJSONPosition): string {
   return `${coordinate[0].toFixed(ENDPOINT_PRECISION)},${coordinate[1].toFixed(ENDPOINT_PRECISION)}`;
 }
@@ -736,6 +756,67 @@ function toRadians(value: number): number {
   return value * Math.PI / 180;
 }
 
+function setupShellGutters(root: HTMLElement): void {
+  const shell = root.querySelector<HTMLElement>(".shell");
+  if (!shell) return;
+  const gutters = shell.querySelectorAll<HTMLElement>(".panel-gutter");
+  gutters.forEach((gutter) => {
+    const which = gutter.dataset.gutter;
+    const varName = which === "left" ? "--shell-left" : "--shell-right";
+    setupResizableGutter(gutter, {
+      direction: "horizontal",
+      container: shell,
+      varName,
+      minSize: 200,
+      defaultSize: which === "left" ? 320 : 380,
+    });
+  });
+}
+
+function setupResizableGutter(
+  gutter: HTMLElement,
+  opts: { direction: "horizontal" | "vertical"; container: HTMLElement; varName: string; minSize: number; defaultSize: number },
+): void {
+  let dragging = false;
+  gutter.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    dragging = true;
+    gutter.classList.add("dragging");
+    document.body.style.cursor = opts.direction === "horizontal" ? "col-resize" : "row-resize";
+    document.body.style.userSelect = "none";
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const rect = opts.container.getBoundingClientRect();
+    const size = opts.direction === "horizontal"
+      ? e.clientX - rect.left
+      : e.clientY - rect.top;
+    // 计算可用空间 — 加上 minSize*2 是左右/上下最少各自一个 panel 的空间
+    const maxSingle = opts.direction === "horizontal"
+      ? rect.width - opts.minSize * 2 - 8  // 8 = 2 gutters
+      : rect.height - opts.minSize * 2 - 8;
+    const clamped = Math.max(opts.minSize, Math.min(maxSingle, Math.round(size)));
+    opts.container.style.setProperty(opts.varName, `${clamped}px`);
+  });
+  document.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    gutter.classList.remove("dragging");
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    // 保存到本地存储
+    const val = opts.container.style.getPropertyValue(opts.varName);
+    if (val) {
+      try { localStorage.setItem(`mvp-gutter-${opts.varName}`, val); } catch { /* ignore */ }
+    }
+  });
+  // 恢复保存值
+  try {
+    const saved = localStorage.getItem(`mvp-gutter-${opts.varName}`);
+    if (saved) opts.container.style.setProperty(opts.varName, saved);
+  } catch { /* ignore */ }
+}
+
 function render(): void {
   const root = document.getElementById("rail-graph-mvp");
   if (!root) {
@@ -752,7 +833,9 @@ function render(): void {
   root.innerHTML = `
     <style>
       body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f6f7f9; color: #1f2937; }
-      .shell { display: grid; grid-template-columns: 320px 1fr 380px; gap: 12px; height: 100vh; padding: 12px; box-sizing: border-box; }
+      .shell { display: grid; grid-template-columns: var(--shell-left, 320px) 4px 1fr 4px var(--shell-right, 380px); gap: 0; height: 100vh; padding: 12px 12px 12px 9px; box-sizing: border-box; }
+.panel-gutter { cursor: col-resize; background: transparent; transition: background 120ms; user-select: none; border-radius: 2px; }
+.panel-gutter:hover, .panel-gutter.dragging { background: #93c5fd; }
       .panel { background: #fff; border: 1px solid #d7dce2; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
       .panel h1, .panel h2 { margin: 0; padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
       .body { padding: 10px 12px; overflow: auto; flex: 1; min-height: 0; }
@@ -784,6 +867,8 @@ function render(): void {
           </div>
           <div class="row">
             <button id="mvp-liangmiansixian" class="primary">两面四線 Demo</button>
+            <button id="mvp-senseki" class="primary">Import 仙石線 OSM</button>
+            <button id="mvp-clear-overrides">Clear annot overrides</button>
             <button id="mvp-pathfinding" class="primary">Pathfinding 4 场景</button>
             <button id="mvp-compile">Compile</button>
           </div>
@@ -861,6 +946,7 @@ function render(): void {
           <div id="mvp-features"></div>
         </div>
       </section>
+      <div class="panel-gutter" data-gutter="left"></div>
       <section class="panel map-panel">
         <div class="map-toolbar">
           <strong>Map</strong>
@@ -876,12 +962,15 @@ function render(): void {
         </div>
         <div id="mvp-map"></div>
       </section>
+      <div class="panel-gutter" data-gutter="right"></div>
       <section class="panel list-panel-body">
         <div id="mvp-list" style="flex:1;min-height:0;display:flex;flex-direction:column"></div>
       </section>
     </main>
   `;
   root.dataset.mounted = "true";
+
+  setupShellGutters(root);
 
   initViews();
   bindUi();
@@ -911,6 +1000,7 @@ function initViews(): void {
   });
   mapView.onClick((ref) => {
     listView?.highlightEntity(ref);
+    listView?.selectFeatureByRef(ref);
   });
 
   // hover entity (list): 同 map.onHover, 不动 path
@@ -937,6 +1027,101 @@ function initViews(): void {
   listView.onPathClick((path) => {
     mapView?.highlightPath(path.edgeSequence, path.turnbackEdgeIndices);
   });
+
+  // Annotate tab: 写回 Feature.properties.railGraph + 持久化到 localStorage + 触发 compile/map 重渲
+  listView.onAnnotationChange(({ featureIdx, annotation }) => {
+    if (!state.source) return;
+    const features = state.source.features;
+    if (featureIdx < 0 || featureIdx >= features.length) return;
+    const target = features[featureIdx];
+    features[featureIdx] = {
+      ...target,
+      properties: {
+        ...target.properties,
+        railGraph: annotation,
+      },
+    };
+    if (annotation.id) saveAnnotationOverride(annotation.id, annotation);
+    try { compileTopology(); } catch (error) { handleError(error); }
+    refreshViews();
+  });
+
+  // Annotate tab: 批量 annotation 变更 — 写回全部 + 编译一次
+  listView.onAnnotationBatch((payloads) => {
+    if (!state.source) return;
+    const features = state.source.features;
+    for (const { featureIdx, annotation } of payloads) {
+      if (featureIdx < 0 || featureIdx >= features.length) continue;
+      features[featureIdx] = {
+        ...features[featureIdx],
+        properties: {
+          ...features[featureIdx].properties,
+          railGraph: annotation,
+        },
+      };
+      if (annotation.id) saveAnnotationOverride(annotation.id, annotation);
+    }
+    console.log(`[annotate] batch applied ${payloads.length} changes`);
+    try { compileTopology(); } catch (error) { handleError(error); }
+    refreshViews();
+  });
+}
+
+// ── localStorage 持久化: annotation overrides ────────────────
+
+const ANNOTATION_OVERRIDES_KEY = "railround:senseki:annotation-overrides:v1";
+
+function loadAnnotationOverrides(): Record<string, RailGraphAnnotation> {
+  if (typeof localStorage === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(ANNOTATION_OVERRIDES_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<string, RailGraphAnnotation>;
+  } catch {
+    return {};
+  }
+}
+
+function saveAnnotationOverride(id: string, annotation: RailGraphAnnotation): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const overrides = loadAnnotationOverrides();
+    overrides[id] = annotation;
+    localStorage.setItem(ANNOTATION_OVERRIDES_KEY, JSON.stringify(overrides));
+  } catch {
+    // quota / privacy mode — silent
+  }
+}
+
+function applyAnnotationOverrides(): { applied: number; total: number } {
+  if (!state.source) return { applied: 0, total: 0 };
+  const overrides = loadAnnotationOverrides();
+  const total = Object.keys(overrides).length;
+  if (total === 0) return { applied: 0, total: 0 };
+  let applied = 0;
+  state.source = {
+    ...state.source,
+    features: state.source.features.map((f) => {
+      const id = f.properties.railGraph?.id;
+      if (id && overrides[id]) {
+        applied += 1;
+        return {
+          ...f,
+          properties: {
+            ...f.properties,
+            railGraph: overrides[id],
+          },
+        };
+      }
+      return f;
+    }),
+  };
+  return { applied, total };
+}
+
+function clearAnnotationOverrides(): void {
+  if (typeof localStorage === "undefined") return;
+  try { localStorage.removeItem(ANNOTATION_OVERRIDES_KEY); } catch {}
 }
 
 function computeRelatedRefs(ref: EntityRef): EntityRef[] {
@@ -988,6 +1173,7 @@ function refreshViews(): void {
     topo: state.topo,
     diagnostics: state.diagnostics,
     pathfindingResults: lastPathfindingResults,
+    source: state.source,
   });
 }
 
@@ -1014,6 +1200,29 @@ function bindUi(): void {
     renderFeatures();
     refreshViews();
     mapView?.fitToData();
+  });
+
+  document.getElementById("mvp-senseki")?.addEventListener("click", () => {
+    try {
+      loadGeoJson(SENSEKI_RAIL);
+      importGeoJson(SENSEKI_STATIONS);
+      const { applied, total } = applyAnnotationOverrides();
+      compileTopology();
+      if (total > 0) {
+        console.log(`[senseki] applied ${applied}/${total} persisted annotation overrides`);
+      }
+      lastPathfindingResults = undefined;
+      renderFeatures();
+      refreshViews();
+      mapView?.fitToData();
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+  document.getElementById("mvp-clear-overrides")?.addEventListener("click", () => {
+    clearAnnotationOverrides();
+    console.log("[senseki] cleared all persisted annotation overrides");
   });
 
   document.getElementById("mvp-load")?.addEventListener("click", () => {

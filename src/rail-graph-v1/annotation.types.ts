@@ -19,19 +19,21 @@ import type { EdgeMeasure } from "./primitives";
 
 /**
  * Feature 的语义类别。决定该 Feature 在编译期被解释为哪种 topo 实体。
- * - track_geometry:  编译为 TopologyEdge
- * - station_point:   编译为 Station
- * - platform_area:   编译为 Platform
- * - signal_point:    编译为 Signal (不参与寻径)
- * - switch_point:    将编译为 junction TopologyNode (MVP 阶段尚未实现)
- * - special_section: 将编译为 SpecialSection (MVP 阶段尚未实现)
- * - unknown:         未标注, 编译期跳过并发 warn
+ * - track_geometry:    编译为 TopologyEdge
+ * - station_point:     编译为 Station
+ * - platform_area:     编译为 Platform
+ * - signal_point:      编译为 Signal (不参与寻径)
+ * - station_entrance:  车站出入口 (Point), 仅 UI/可视用, 不参与寻径
+ * - switch_point:      将编译为 junction TopologyNode (MVP 阶段尚未实现)
+ * - special_section:   将编译为 SpecialSection (MVP 阶段尚未实现)
+ * - unknown:           未标注, 编译期跳过并发 warn
  */
 export type RailGraphFeatureKind =
   | "track_geometry"
   | "station_point"
   | "platform_area"
   | "signal_point"
+  | "station_entrance"
   | "switch_point"
   | "special_section"
   | "unknown";
@@ -53,6 +55,18 @@ export interface RailGraphTrackAnnotation {
 
 export interface RailGraphStationAnnotation {
   name: string;
+}
+
+/**
+ * 车站出入口 annotation (subway_entrance / train_station_entrance / station_entrance).
+ * stationRef 可选: 若 OSM 数据有 nearest_station 字段, ingest 时会反查 LOD station 填入.
+ * 不参与寻径与编译, 仅作 UI / 地图可视化的辅助.
+ */
+export interface RailGraphStationEntranceAnnotation {
+  stationRef?: string;
+  name?: string;
+  /** 出入口编号 (例: "A1" / "南口" / "北口"), 来自 OSM ref 标签. */
+  ref?: string;
 }
 
 export interface RailGraphPlatformAnnotation {
@@ -88,6 +102,7 @@ export interface RailGraphAnnotation {
   station?: RailGraphStationAnnotation;
   platform?: RailGraphPlatformAnnotation;
   signal?: RailGraphSignalAnnotation;
+  entrance?: RailGraphStationEntranceAnnotation;
 }
 
 /**

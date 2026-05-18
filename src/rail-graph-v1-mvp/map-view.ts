@@ -298,6 +298,32 @@ function rebuildLayers(
     state.entityLayers.set(station.id, { layer: marker, baseStyle, kind: "station" });
   }
 
+  // 3b) Platform → Station 绑定连线 (dashed, 不可点击)
+  const stationFeatureById = new Map<string, AnnotatedFeature>();
+  for (const station of topo.stations) {
+    const f = annotationIdToFeature.get(station.id);
+    if (f && f.geometry.type === "Point") stationFeatureById.set(station.id, f);
+  }
+  for (const platform of topo.platforms) {
+    if (!platform.stationRef) continue;
+    const stationFeature = stationFeatureById.get(platform.stationRef);
+    if (!stationFeature) continue;
+    const platformFeature = annotationIdToFeature.get(platform.id);
+    if (!platformFeature) continue;
+    const platformCenter = platformCentroidLatLng(platformFeature);
+    if (!platformCenter) continue;
+    const stationCoord = (stationFeature.geometry as GeoJSONPoint).coordinates;
+    const stationLatLng: [number, number] = [stationCoord[1], stationCoord[0]];
+    const bindLine = L.polyline([platformCenter, stationLatLng], {
+      color: "#0891b2",
+      weight: 1.5,
+      opacity: 0.75,
+      dashArray: "4 4",
+      interactive: false,
+    });
+    bindLine.addTo(state.featureGroup);
+  }
+
   // 4) Signals (CircleMarker on edge measure, with facing 视觉 + edge bearing 对齐)
   for (const signal of topo.signals) {
     const edgeCoords = getEdgeCoords(signal.edgeRef, topo, annotationIdToFeature);
@@ -352,6 +378,31 @@ function extractEdgeCoordinates(
 function extractPolygonRing(feature: AnnotatedFeature): GeoJSONPosition[] | null {
   if (feature.geometry.type === "Polygon") {
     return (feature.geometry as GeoJSONPolygon).coordinates[0] ?? null;
+  }
+  return null;
+}
+
+/** Platform 几何重心 → leaflet [lat, lng]. 兼容 Polygon (ring 平均) / LineString (中点) / Point (原坐标). */
+function platformCentroidLatLng(feature: AnnotatedFeature): [number, number] | null {
+  const g = feature.geometry;
+  if (!g) return null;
+  if (g.type === "Polygon") {
+    const ring = (g as GeoJSONPolygon).coordinates[0];
+    if (!ring || ring.length === 0) return null;
+    let sx = 0;
+    let sy = 0;
+    for (const p of ring) { sx += p[0]; sy += p[1]; }
+    return [sy / ring.length, sx / ring.length];
+  }
+  if (g.type === "LineString") {
+    const coords = (g as { coordinates: GeoJSONPosition[] }).coordinates;
+    if (coords.length === 0) return null;
+    const mid = coords[Math.floor(coords.length / 2)];
+    return [mid[1], mid[0]];
+  }
+  if (g.type === "Point") {
+    const c = (g as GeoJSONPoint).coordinates;
+    return [c[1], c[0]];
   }
   return null;
 }

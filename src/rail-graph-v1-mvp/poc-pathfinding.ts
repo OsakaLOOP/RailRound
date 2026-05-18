@@ -15,6 +15,8 @@
 // ============================================================
 
 import type { BaseTopologyLayer } from "../rail-graph-v1/base-topology.types";
+import type { IntentionChain } from "../rail-graph-v1/chain.types";
+import type { EntityRef } from "../rail-graph-v1/primitives";
 import type { PathGoal, PathSeed, PathfindingResult } from "../rail-graph-v1/pathfinding";
 import { findPaths } from "../rail-graph-v1/pathfinding";
 import { buildTopologyLookup } from "../rail-graph-v1/topology";
@@ -25,10 +27,15 @@ export interface PathfindingScenario {
   description: string;
   startSeed: PathSeed;
   endSeed: PathSeed;
-  pathGoal: PathGoal;
+  /** 旧入口, 兼容期保留. 若同时提供 intentionChain, intentionChain 优先. */
+  pathGoal?: PathGoal;
+  /** 新入口 — 运行意图链. */
+  intentionChain?: IntentionChain;
   expectedPhaseKinds: ("up_run" | "down_run" | "turnback")[];
   /** 是否期望在 2番B 上发生 turnback */
   expectsTurnbackOnB2: boolean;
+  /** sketch mode 额外校验: 期望 inferSketchChain 反向补出 reversal 落在某 edge */
+  expectedAutoReversalAt?: EntityRef;
 }
 
 export const SCENARIOS: PathfindingScenario[] = [
@@ -38,6 +45,13 @@ export const SCENARIOS: PathfindingScenario[] = [
     startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A1_WEST_EXT, alongDirection: "up" },
     endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_B1_EAST_EXT },
     pathGoal: { kind: "shorthand", pattern: "main_in_main_out_no_stop" },
+    intentionChain: {
+      mode: "strict",
+      nodes: [
+        { kind: "origin", at: { nodeRef: TwoStationRefs.NODE_A1_WEST_EXT }, direction: "up" },
+        { kind: "terminus", at: { nodeRef: TwoStationRefs.NODE_B1_EAST_EXT } },
+      ],
+    },
     expectedPhaseKinds: ["up_run"],
     expectsTurnbackOnB2: false,
   },
@@ -47,6 +61,13 @@ export const SCENARIOS: PathfindingScenario[] = [
     startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_B3_EAST_EXT, alongDirection: "down" },
     endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A4_WEST_EXT },
     pathGoal: { kind: "shorthand", pattern: "main_in_main_out_no_stop" },
+    intentionChain: {
+      mode: "strict",
+      nodes: [
+        { kind: "origin", at: { nodeRef: TwoStationRefs.NODE_B3_EAST_EXT }, direction: "down" },
+        { kind: "terminus", at: { nodeRef: TwoStationRefs.NODE_A4_WEST_EXT } },
+      ],
+    },
     expectedPhaseKinds: ["down_run"],
     expectsTurnbackOnB2: false,
   },
@@ -56,6 +77,14 @@ export const SCENARIOS: PathfindingScenario[] = [
     startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A1_WEST_EXT, alongDirection: "up" },
     endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A4_WEST_EXT },
     pathGoal: { kind: "shorthand", pattern: "main_in_main_out_turnback_once" },
+    intentionChain: {
+      mode: "strict",
+      nodes: [
+        { kind: "origin", at: { nodeRef: TwoStationRefs.NODE_A1_WEST_EXT }, direction: "up" },
+        { kind: "reversal", at: TwoStationRefs.TRACK_B2, boarding: "none" },
+        { kind: "terminus", at: { nodeRef: TwoStationRefs.NODE_A4_WEST_EXT } },
+      ],
+    },
     expectedPhaseKinds: ["up_run", "turnback", "down_run"],
     expectsTurnbackOnB2: true,
   },
@@ -65,8 +94,32 @@ export const SCENARIOS: PathfindingScenario[] = [
     startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_B3_EAST_EXT, alongDirection: "down" },
     endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_B1_EAST_EXT },
     pathGoal: { kind: "shorthand", pattern: "main_in_main_out_turnback_once" },
+    intentionChain: {
+      mode: "strict",
+      nodes: [
+        { kind: "origin", at: { nodeRef: TwoStationRefs.NODE_B3_EAST_EXT }, direction: "down" },
+        { kind: "reversal", at: TwoStationRefs.TRACK_B2, boarding: "none" },
+        { kind: "terminus", at: { nodeRef: TwoStationRefs.NODE_B1_EAST_EXT } },
+      ],
+    },
     expectedPhaseKinds: ["down_run", "turnback", "up_run"],
     expectsTurnbackOnB2: true,
+  },
+  {
+    name: "Scenario 5 (sketch): 上→下换向, 让 DFS 自由发挥",
+    description: "起终点同 S3, 但 chain 仅含 origin + terminus (sketch mode). DFS 自由探索, inferSketchChain 反向补出 reversal + passage 节点.",
+    startSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A1_WEST_EXT, alongDirection: "up" },
+    endSeed: { kind: "node", nodeRef: TwoStationRefs.NODE_A4_WEST_EXT },
+    intentionChain: {
+      mode: "sketch",
+      nodes: [
+        { kind: "origin", at: { nodeRef: TwoStationRefs.NODE_A1_WEST_EXT }, direction: "up" },
+        { kind: "terminus", at: { nodeRef: TwoStationRefs.NODE_A4_WEST_EXT } },
+      ],
+    },
+    expectedPhaseKinds: ["up_run", "turnback", "down_run"],
+    expectsTurnbackOnB2: true,
+    expectedAutoReversalAt: TwoStationRefs.TRACK_B2,
   },
 ];
 
@@ -91,6 +144,7 @@ export function runScenarios(topo: BaseTopologyLayer): ScenarioResult[] {
       maxCandidates: 8,
       maxDepth: 32,
       allowTurnback: true,
+      intentionChain: scenario.intentionChain,
       pathGoal: scenario.pathGoal,
     });
 
@@ -111,15 +165,22 @@ export function runScenarios(topo: BaseTopologyLayer): ScenarioResult[] {
       ? best.phases.some((p) => p.kind === "turnback" && best.edgeSequence[p.edgeRange.startIndex] === TwoStationRefs.TRACK_B2)
       : best.phases.every((p) => p.kind !== "turnback");
     const mainStartOk = best.startKind === "main";
+    const autoReversalOk = scenario.expectedAutoReversalAt
+      ? (best.resolvedChain?.nodes ?? []).some((n) => n.kind === "reversal" && n.at === scenario.expectedAutoReversalAt)
+      : true;
+
+    const reasons: string[] = [];
+    if (!matchedShape) reasons.push(`phases expected ${scenario.expectedPhaseKinds.join(",")} got ${actualPhases.join(",")}`);
+    if (!turnbackOk) reasons.push(scenario.expectsTurnbackOnB2 ? "expects turnback on 2番B" : "did not expect turnback");
+    if (!mainStartOk) reasons.push(`startKind=${best.startKind}`);
+    if (!autoReversalOk) reasons.push(`expected auto-inferred reversal at ${scenario.expectedAutoReversalAt}`);
 
     results.push({
       scenario,
       candidates,
       best,
-      passed: matchedShape && turnbackOk && mainStartOk,
-      reason: matchedShape && turnbackOk && mainStartOk
-        ? undefined
-        : `phases expected ${scenario.expectedPhaseKinds.join(",")} got ${actualPhases.join(",")}${scenario.expectsTurnbackOnB2 ? "; expects turnback on 2番B" : ""}${!mainStartOk ? `; startKind=${best.startKind}` : ""}`,
+      passed: matchedShape && turnbackOk && mainStartOk && autoReversalOk,
+      reason: reasons.length > 0 ? reasons.join("; ") : undefined,
     });
   }
 
@@ -175,6 +236,22 @@ export function summarizeScenarios(results: ScenarioResult[]): unknown {
           platformRef: t.platformRef,
           edgeRef: t.edgeRef,
         }),
+      chainMode: r.best.resolvedChain?.mode,
+      chainNodes: r.best.resolvedChain?.nodes.map((n) => ({
+        nodeIndex: n.nodeIndex,
+        kind: n.kind,
+        resolvedPlatformRef: n.resolvedPlatformRef,
+        resolvedEdgeRef: n.resolvedEdgeRef,
+        resolvedStationRef: n.resolvedStationRef,
+      })),
+      chainSegments: r.best.resolvedChain?.segments.map((s) => ({
+        fromNodeIndex: s.fromNodeIndex,
+        toNodeIndex: s.toNodeIndex,
+        direction: s.direction,
+        edgesCount: s.edges.length,
+        distanceMeters: Math.round(s.distanceMeters),
+        passagesCount: s.passages.length,
+      })),
       diagnostics: r.best.diagnostics,
     } : null,
   }));

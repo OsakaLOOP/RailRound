@@ -68,6 +68,12 @@ export interface TopologyNode {
   properties?: {
     mileageKm?: number;
   };
+  /**
+   * 透传的原始数据源标签 (OSM tags, KSJ 属性, etc)。
+   * 仅用于调试 / UI 展示 / 后续推导;
+   * **不得**直接驱动寻径或编译期决策 (那些应靠 physicalKind / functionalUse 等显式字段)。
+   */
+  sourceTags?: Record<string, string>;
 }
 
 /** 固定 topo 边。edge 是站线级循迹、里程和 GeoJSON 拼接的基础单位。 */
@@ -97,6 +103,8 @@ export interface TopologyEdge {
     electrified?: boolean;
     maxSpeedKmh?: number;
   };
+  /** 同 TopologyNode.sourceTags — 透传 OSM / KSJ / 其他原始数据源 tags, 仅调试 / UI 用。 */
+  sourceTags?: Record<string, string>;
 }
 
 export interface SourceGeometrySlice {

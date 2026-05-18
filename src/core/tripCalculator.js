@@ -2,6 +2,17 @@ import * as turf from '@turf/turf';
 import { computeLoopVia } from './railwayRouting';
 
 // 辅助：计算两点间直线距离 (Haversine Formula)
+
+// 辅助：计算连续路径的距离
+export const calcPathDistance = (coords) => {
+    let dist = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+        // coords 格式是 [lat, lng]
+        dist += calcDist(coords[i][0], coords[i][1], coords[i+1][0], coords[i+1][1]);
+    }
+    return dist;
+};
+
 export const calcDist = (lat1, lon1, lat2, lon2) => {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
   const R = 6371; // 地球半径 km
@@ -119,8 +130,8 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) =>
       const snappedStart = turf.nearestPointOnLine(line, startPt);
       const snappedEnd = turf.nearestPointOnLine(line, endPt);
 
-        const startIdx = snappedStart.properties.index;
-        const endIdx = snappedEnd.properties.index;
+        // const startIdx = snappedStart.properties.index;
+        // const endIdx = snappedEnd.properties.index;
 
         // 2. 环线检测
         const coords = line.geometry.coordinates;
@@ -158,7 +169,7 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) =>
 };
 
 // --- Shared Helper: Calculate Visualization Data ---
-export const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData) => {
+export const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData, skipVisuals = false) => {
     let totalDist = 0;
     const allCoords = [];
 
@@ -216,11 +227,11 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
             if (geom.isMulti) {
                 geom.coords.forEach(c => {
                     allCoords.push({ coords: c, color: geom.color || '#94a3b8' });
-                    if(turf) totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
+                    totalDist += calcPathDistance(c);
                 });
             } else {
                 allCoords.push({ coords: geom.coords, color: geom.color || '#94a3b8' });
-                if(turf) totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                totalDist += calcPathDistance(geom.coords);
             }
         } else {
              // Fallback Distance Approx
@@ -233,6 +244,7 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
         }
     });
 
+    if (skipVisuals) return { totalDist, visualPaths: [] };
     if (allCoords.length === 0) return { totalDist, visualPaths: [] };
 
     // PCA & Projection Logic
@@ -324,11 +336,27 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
 export const calculateLatestStats = (trips, segmentGeometries, railwayData, geoData) => {
     // 1. Basic Stats
     const totalTrips = trips.length;
-    const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
-    const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
+
+    // Performance Optimization: Avoid intermediate array allocations for large trips array
+    const allSegments = [];
+    const uniqueLinesSet = new Set();
+    for (let i = 0; i < trips.length; i++) {
+        const t = trips[i];
+        if (t.segments && t.segments.length > 0) {
+            for (let j = 0; j < t.segments.length; j++) {
+                allSegments.push(t.segments[j]);
+                uniqueLinesSet.add(t.segments[j].lineKey);
+            }
+        } else {
+            allSegments.push({ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId });
+            uniqueLinesSet.add(t.lineKey);
+        }
+    }
+    const uniqueLines = uniqueLinesSet.size;
 
     // Calc total distance using helper (aggregating cached or on-the-fly)
-    const { totalDist: grandTotalDist } = getRouteVisualData(allSegments, segmentGeometries, railwayData, geoData);
+    // Performance Optimization: skip PCA/SVG calculations for just total distance
+    const { totalDist: grandTotalDist } = getRouteVisualData(allSegments, segmentGeometries, railwayData, geoData, true);
 
     // 2. Latest 5
     const latest = trips.slice(0, 5).map(t => {

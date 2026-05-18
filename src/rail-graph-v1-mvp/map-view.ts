@@ -250,29 +250,50 @@ function rebuildLayers(
     state.arrowById.set(edge.id, arrowMarker);
   }
 
-  // 2) Platforms (polygon)
+  // 2) Platforms (Polygon / MultiPolygon / LineString / MultiLineString / Point)
   for (const platform of topo.platforms) {
     const feature = annotationIdToFeature.get(platform.id);
     if (!feature) continue;
-    const ring = extractPolygonRing(feature);
-    if (!ring) continue;
-    const latLngs = ring.map((c) => [c[1], c[0]] as [number, number]);
+    const geom = extractPlatformGeometry(feature);
+    if (!geom) continue;
     const baseStyle: L.PathOptions = {
       color: "#a16207",
       weight: 1.5,
       fillColor: COLORS.platform,
       fillOpacity: 0.55,
     };
-    const polygon = L.polygon([latLngs], baseStyle);
-    polygon.bindTooltip(
+    let layer: L.Path;
+    if (geom.kind === "polygon") {
+      const ringsLatLng = geom.rings.map((ring) => ring.map((c) => [c[1], c[0]] as [number, number]));
+      layer = L.polygon(ringsLatLng, baseStyle);
+    } else if (geom.kind === "line") {
+      // OpenRailwayMap 常用 LineString 描站台边缘: 用 polyline + dashArray 区别于 track edge.
+      const linesLatLng = geom.lines.map((line) => line.map((c) => [c[1], c[0]] as [number, number]));
+      layer = L.polyline(linesLatLng, {
+        ...baseStyle,
+        weight: 4,
+        opacity: 0.9,
+        fillOpacity: 0,
+        dashArray: "6 3",
+      });
+    } else {
+      const [lng, lat] = geom.coord;
+      layer = L.circleMarker([lat, lng], {
+        ...baseStyle,
+        weight: 2,
+        radius: 5,
+        fillOpacity: 0.8,
+      });
+    }
+    layer.bindTooltip(
       `<b>${escapeHtml(platform.name ?? platform.id)}</b><br/>` +
       `type: ${platform.type}<br/>` +
       `station: ${escapeHtml(platform.stationRef)}`,
       { sticky: true, direction: "top" },
     );
-    bindLayerEvents(state, polygon, platform.id);
-    polygon.addTo(state.featureGroup);
-    state.entityLayers.set(platform.id, { layer: polygon, baseStyle, kind: "platform" });
+    bindLayerEvents(state, layer, platform.id);
+    layer.addTo(state.featureGroup);
+    state.entityLayers.set(platform.id, { layer, baseStyle, kind: "platform" });
   }
 
   // 3) Stations (point)
@@ -375,9 +396,39 @@ function extractEdgeCoordinates(
   return null;
 }
 
-function extractPolygonRing(feature: AnnotatedFeature): GeoJSONPosition[] | null {
-  if (feature.geometry.type === "Polygon") {
-    return (feature.geometry as GeoJSONPolygon).coordinates[0] ?? null;
+type PlatformGeom =
+  | { kind: "polygon"; rings: GeoJSONPosition[][] }
+  | { kind: "line"; lines: GeoJSONPosition[][] }
+  | { kind: "point"; coord: GeoJSONPosition };
+
+/** Platform 几何 → 渲染用的归一化形式. 支持 Polygon/MultiPolygon/LineString/MultiLineString/Point. */
+function extractPlatformGeometry(feature: AnnotatedFeature): PlatformGeom | null {
+  const g = feature.geometry;
+  if (!g) return null;
+  if (g.type === "Polygon") {
+    const rings = (g as GeoJSONPolygon).coordinates;
+    if (!rings || rings.length === 0) return null;
+    return { kind: "polygon", rings };
+  }
+  if (g.type === "MultiPolygon") {
+    const polys = (g as { coordinates: GeoJSONPosition[][][] }).coordinates;
+    // 取每个 polygon 的外环, 内洞简化忽略 (MVP).
+    const outerRings = polys.map((p) => p?.[0]).filter((r): r is GeoJSONPosition[] => Array.isArray(r) && r.length > 0);
+    if (outerRings.length === 0) return null;
+    return { kind: "polygon", rings: outerRings };
+  }
+  if (g.type === "LineString") {
+    const line = (g as GeoJSONLineString).coordinates;
+    if (!line || line.length === 0) return null;
+    return { kind: "line", lines: [line] };
+  }
+  if (g.type === "MultiLineString") {
+    const lines = (g as GeoJSONMultiLineString).coordinates;
+    if (!lines || lines.length === 0) return null;
+    return { kind: "line", lines };
+  }
+  if (g.type === "Point") {
+    return { kind: "point", coord: (g as GeoJSONPoint).coordinates };
   }
   return null;
 }

@@ -203,7 +203,13 @@ export function compileTopology(): BaseTopologyLayer {
   }
 
   for (const { feature, annotation, index } of annotatedFeatures) {
-    if (!annotation || annotation.kind === "unknown" || annotation.kind === "station_point" || annotation.kind === "platform_area") {
+    if (
+      !annotation
+      || annotation.kind === "unknown"
+      || annotation.kind === "station_point"
+      || annotation.kind === "platform_area"
+      || annotation.kind === "signal_point"
+    ) {
       continue;
     }
 
@@ -219,9 +225,9 @@ export function compileTopology(): BaseTopologyLayer {
   }
 
   // signal_point 编译: 直接从 annotation 拷 (不做空间投影)
-  for (const { feature, annotation, index } of annotatedFeatures) {
+  for (const { annotation } of annotatedFeatures) {
     if (annotation?.kind === "signal_point") {
-      addSignalFeature(topo, diagnostics, annotation, index);
+      addSignalFeature(topo, annotation);
     }
   }
 
@@ -572,18 +578,63 @@ function addPlatformFeature(
   annotation: RailGraphAnnotation,
   featureIndex: number,
 ): void {
-  if (feature.geometry.type !== "Polygon" && feature.geometry.type !== "MultiPolygon" && feature.geometry.type !== "Point") {
-    diagnostics.push(diagnostic("error", "MVP_INVALID_PLATFORM_GEOMETRY", "compile", "platform_area requires Polygon, MultiPolygon, or Point in MVP.", {
+  // Phase 1.1: 接受 LineString / MultiLineString —
+  // OpenRailwayMap 中 platform=LineString (站台边缘线) 是常见模式, MVP 不再当作非法.
+  const geomType = feature.geometry.type;
+  const isAcceptedGeom =
+    geomType === "Polygon"
+    || geomType === "MultiPolygon"
+    || geomType === "Point"
+    || geomType === "LineString"
+    || geomType === "MultiLineString";
+  if (!isAcceptedGeom) {
+    diagnostics.push(diagnostic("error", "MVP_INVALID_PLATFORM_GEOMETRY", "compile", "platform_area requires Polygon/MultiPolygon/LineString/MultiLineString/Point in MVP.", {
       featureIndex,
-      geometryType: feature.geometry.type,
+      geometryType: geomType,
     }));
     return;
   }
 
   const id = annotation.id as EntityRef;
-  const stationRef = annotation.platform?.stationRef || firstStationRef(topo);
+
+  // Phase 1.2 + CC-3: stationRef 解析链 —
+  //   explicit annotation.platform.stationRef
+  //   → OSM nearest_station tag 反查 LOD station 名字
+  //   → firstStationRef fallback (兜底, 但来源不再受 array 顺序漂移)
+  //   命中任何 fallback 时只发 info, 仅在完全无 station 时维持 warn.
+  let stationRef: EntityRef | undefined = annotation.platform?.stationRef as EntityRef | undefined;
+  let stationRefSource: "explicit" | "nearest-station-tag" | "first-fallback" | undefined;
+  if (stationRef) {
+    stationRefSource = "explicit";
+  } else {
+    const sourceTags = feature.properties?.sourceTags as { nearest_station?: string } | undefined;
+    const nearestName = String(sourceTags?.nearest_station ?? "").trim();
+    if (nearestName) {
+      const found = topo.stations.find((s) => s.name === nearestName);
+      if (found) {
+        stationRef = found.id;
+        stationRefSource = "nearest-station-tag";
+      }
+    }
+    if (!stationRef) {
+      const first = firstStationRef(topo);
+      if (first) {
+        stationRef = first as EntityRef;
+        stationRefSource = "first-fallback";
+      }
+    }
+  }
+
   if (!stationRef) {
-    diagnostics.push(diagnostic("warn", "MVP_PLATFORM_WITHOUT_STATION", "compile", "Platform has no stationRef.", { featureIndex }));
+    diagnostics.push(diagnostic("warn", "MVP_PLATFORM_WITHOUT_STATION", "compile", "Platform has no stationRef and no station fallback available.", { featureIndex }));
+  } else if (stationRefSource && stationRefSource !== "explicit") {
+    diagnostics.push(diagnostic(
+      "info",
+      "MVP_PLATFORM_STATION_FALLBACK",
+      "compile",
+      `Platform stationRef resolved via fallback: ${stationRefSource}.`,
+      { featureIndex, source: stationRefSource, stationRef },
+    ));
   }
   if (!annotation.platform?.type) {
     diagnostics.push(diagnostic(
@@ -612,12 +663,12 @@ function addPlatformFeature(
 
 function addSignalFeature(
   topo: BaseTopologyLayer,
-  diagnostics: Diagnostic[],
   annotation: RailGraphAnnotation,
-  featureIndex: number,
 ): void {
   if (!annotation.signal) {
-    diagnostics.push(diagnostic("warn", "MVP_SIGNAL_NO_DATA", "compile", "signal_point feature has no signal annotation.", { featureIndex }));
+    // MVP 不消费 signal_point: 缺 signal 数据 (edgeRef/measure/facing) 静默跳过,
+    // 不污染诊断面板. signal_point 的 kind 标记本身已被编译器接受 (循环 1 skip).
+    // Phase 后续启用 signal 时再补诊断.
     return;
   }
   // 直接从 annotation 拷, 不做空间投影

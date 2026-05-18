@@ -11,7 +11,7 @@ import type {
   TopologyEdge,
   TopologyNode,
 } from "../rail-graph-v1/base-topology.types";
-import type { Diagnostic } from "../rail-graph-v1/diagnostic-types";
+import type { Diagnostic, DiagnosticLevel } from "../rail-graph-v1/diagnostic-types";
 import type {
   PlatformTrackBindingInput,
   StoppingPointInput,
@@ -272,6 +272,153 @@ export function exportDiagnostics(): Diagnostic[] {
     compileTopology();
   }
   return state.diagnostics;
+}
+
+// ── Demo state snapshot (Phase 0) ─────────────────────────────
+// 完整序列化当前仙石线 demo 状态 (annotation overrides + bindings + source GeoJSON
+// + 诊断 snapshot), 供用户在 ingest 重跑 / schema 升级 / 误操作前先 Export 一份
+// 作为回滚依据.
+
+export interface SensekiDemoSnapshot {
+  schemaVersion: "senseki-demo-v1";
+  exportedAt: string;
+  app: {
+    gitCommit?: string;
+    sensekiDataHash?: string;
+  };
+  source: GeoJsonFeatureCollection;
+  overrides: Record<string, RailGraphAnnotation>;
+  bindings: PlatformTrackBindingInput[];
+  stoppingPoints: StoppingPointInput[];
+  diagnostics: Diagnostic[];
+  topologySummary: {
+    counts: { stations: number; platforms: number; edges: number; signals: number; bindings: number };
+    diagnosticCounts: Record<DiagnosticLevel, number>;
+    diagnosticCountsByCode: Record<string, number>;
+  };
+}
+
+export function exportSensekiSnapshot(): SensekiDemoSnapshot {
+  if (!state.source) {
+    throw new Error("No GeoJSON source loaded.");
+  }
+  if (!state.topo) {
+    compileTopology();
+  }
+  const topo = state.topo!;
+  const overrides = loadAnnotationOverrides();
+
+  const diagnosticCounts: Record<DiagnosticLevel, number> = { fatal: 0, error: 0, warn: 0, info: 0 };
+  const diagnosticCountsByCode: Record<string, number> = {};
+  for (const d of state.diagnostics) {
+    diagnosticCounts[d.level] = (diagnosticCounts[d.level] ?? 0) + 1;
+    diagnosticCountsByCode[d.code] = (diagnosticCountsByCode[d.code] ?? 0) + 1;
+  }
+
+  return {
+    schemaVersion: "senseki-demo-v1",
+    exportedAt: new Date().toISOString(),
+    app: {
+      sensekiDataHash: hashSensekiData(),
+    },
+    source: JSON.parse(JSON.stringify(state.source)) as GeoJsonFeatureCollection,
+    overrides,
+    bindings: state.bindings.map((b) => ({ ...b })),
+    stoppingPoints: state.stoppingPoints.map((s) => ({ ...s })),
+    diagnostics: state.diagnostics.map((d) => ({ ...d })),
+    topologySummary: {
+      counts: {
+        stations: topo.stations.length,
+        platforms: topo.platforms.length,
+        edges: topo.edges.length,
+        signals: topo.signals.length,
+        bindings: topo.platformTrackBindings.length,
+      },
+      diagnosticCounts,
+      diagnosticCountsByCode,
+    },
+  };
+}
+
+export interface ImportSnapshotResult {
+  overridesApplied: number;
+  overridesTotal: number;
+  bindingsRestored: number;
+  stoppingPointsRestored: number;
+  hashMatch: boolean;
+  exportedAt: string;
+  exportedHash?: string;
+  currentHash: string;
+}
+
+export function importSensekiSnapshot(snapshot: SensekiDemoSnapshot): ImportSnapshotResult {
+  if (snapshot.schemaVersion !== "senseki-demo-v1") {
+    throw new Error(`Unsupported snapshot schemaVersion: ${snapshot.schemaVersion}`);
+  }
+  if (!snapshot.source || !Array.isArray(snapshot.source.features)) {
+    throw new Error("Snapshot missing source FeatureCollection.");
+  }
+
+  // 1. 写 overrides 到 localStorage (即使 source 已含合并后 annotation,
+  //    overrides 仍是权威备份, 供下次刷新或重新 Import 仙石線 时复用).
+  if (typeof localStorage !== "undefined") {
+    try {
+      localStorage.setItem(ANNOTATION_OVERRIDES_KEY, JSON.stringify(snapshot.overrides ?? {}));
+    } catch {
+      // quota / privacy mode — silent, source 已含 annotation 仍可用
+    }
+  }
+
+  // 2. 加载 source — loadGeoJson 会重置 bindings/stoppingPoints/topo/diagnostics
+  loadGeoJson(snapshot.source);
+
+  // 3. 重放 overrides (idempotent — snapshot.source 应已合并, 但这一步确保
+  //    任何 ID 漂移情况下 overrides 仍尽力打回去).
+  const { applied, total } = applyAnnotationOverrides();
+
+  // 4. 还原 bindings / stoppingPoints (loadGeoJson 已重置, 直接覆盖)
+  state.bindings = (snapshot.bindings ?? []).map((b) => ({ ...b }));
+  state.stoppingPoints = (snapshot.stoppingPoints ?? []).map((s) => ({ ...s }));
+  state.topo = null;
+
+  // 5. 重编 + 刷新视图
+  compileTopology();
+  lastPathfindingResults = undefined;
+  refreshViews();
+
+  const currentHash = hashSensekiData();
+  const exportedHash = snapshot.app?.sensekiDataHash;
+  return {
+    overridesApplied: applied,
+    overridesTotal: total,
+    bindingsRestored: state.bindings.length,
+    stoppingPointsRestored: state.stoppingPoints.length,
+    hashMatch: !exportedHash || exportedHash === currentHash,
+    exportedAt: snapshot.exportedAt,
+    exportedHash,
+    currentHash,
+  };
+}
+
+// 轻量 hash: 不必密码学级别, 只要能检测 senseki-data.ts 重跑后的 ID 漂移.
+// 采样 features 数量 + 首/中/尾 annotation.id 拼接成稳定字符串 → djb2.
+function hashSensekiData(): string {
+  const features = SENSEKI_RAIL.features;
+  const n = features.length;
+  if (n === 0) return "00000000";
+  const idAt = (idx: number): string =>
+    features[idx]?.properties?.railGraph?.id ?? "";
+  const sample = [
+    `n=${n}`,
+    `first=${idAt(0)}`,
+    `mid=${idAt(Math.floor(n / 2))}`,
+    `last=${idAt(n - 1)}`,
+  ].join("|");
+  let h = 5381;
+  for (let i = 0; i < sample.length; i++) {
+    h = ((h * 33) ^ sample.charCodeAt(i)) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0").slice(0, 8);
 }
 
 function normalizeAnnotation(feature: GeoJsonFeature, index: number): RailGraphAnnotation {
@@ -952,6 +1099,9 @@ function render(): void {
           <div class="row">
             <button id="mvp-export-geojson">Export GeoJSON</button>
             <button id="mvp-export-topo">Export Topo</button>
+            <button id="mvp-export-snapshot" class="primary">Export Demo Snapshot</button>
+            <button id="mvp-import-snapshot">Import Demo Snapshot</button>
+            <input type="file" id="mvp-import-snapshot-file" accept=".json,.railround.json" style="display:none" />
           </div>
           <div id="mvp-features"></div>
         </div>
@@ -1318,6 +1468,83 @@ function bindUi(): void {
 
   document.getElementById("mvp-export-geojson")?.addEventListener("click", () => writeExportToInput(exportAnnotatedGeoJson()));
   document.getElementById("mvp-export-topo")?.addEventListener("click", () => writeExportToInput(exportTopology()));
+
+  document.getElementById("mvp-export-snapshot")?.addEventListener("click", () => {
+    try {
+      const snapshot = exportSensekiSnapshot();
+      const json = JSON.stringify(snapshot, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const filename = `senseki-demo-${ts}.railround.json`;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      console.log(`[snapshot] exported ${filename}`, {
+        counts: snapshot.topologySummary.counts,
+        diagnostics: snapshot.topologySummary.diagnosticCounts,
+        overrides: Object.keys(snapshot.overrides).length,
+        bindings: snapshot.bindings.length,
+        stoppingPoints: snapshot.stoppingPoints.length,
+      });
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+  document.getElementById("mvp-import-snapshot")?.addEventListener("click", () => {
+    const fileInput = document.getElementById("mvp-import-snapshot-file") as HTMLInputElement | null;
+    if (!fileInput) return;
+    fileInput.value = "";
+    fileInput.click();
+  });
+
+  document.getElementById("mvp-import-snapshot-file")?.addEventListener("change", async (e) => {
+    const target = e.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as unknown;
+      if (!parsed || typeof parsed !== "object" || (parsed as { schemaVersion?: unknown }).schemaVersion !== "senseki-demo-v1") {
+        throw new Error("Not a valid senseki-demo-v1 snapshot.");
+      }
+      const snapshot = parsed as SensekiDemoSnapshot;
+      const confirmMessage = [
+        `Import demo snapshot exported at ${snapshot.exportedAt}?`,
+        `This will REPLACE current localStorage annotation overrides, in-memory bindings and stopping points.`,
+        `Tip: Export current state first if you want to keep it.`,
+      ].join("\n\n");
+      if (!window.confirm(confirmMessage)) return;
+      const result = importSensekiSnapshot(snapshot);
+      console.log(`[snapshot] imported`, result);
+      if (!result.hashMatch) {
+        console.warn(
+          `[snapshot] senseki-data.ts hash mismatch — exported ${result.exportedHash} vs current ${result.currentHash}. ` +
+          `Annotation overrides may not fully bind; check Diagnostics tab.`,
+        );
+        window.alert(
+          `Snapshot imported, but senseki-data.ts hash differs (exported: ${result.exportedHash}, current: ${result.currentHash}).\n` +
+          `Restored ${result.bindingsRestored} bindings, ${result.stoppingPointsRestored} stopping points, ` +
+          `${result.overridesApplied}/${result.overridesTotal} annotation overrides matched.\n` +
+          `Check Diagnostics tab for missing-binding warnings.`,
+        );
+      } else {
+        window.alert(
+          `Snapshot imported.\n` +
+          `Restored ${result.bindingsRestored} bindings, ${result.stoppingPointsRestored} stopping points, ` +
+          `${result.overridesApplied}/${result.overridesTotal} annotation overrides matched.`,
+        );
+      }
+      mapView?.fitToData();
+    } catch (error) {
+      handleError(error);
+    }
+  });
 
   document.getElementById("mvp-base-layer")?.addEventListener("change", (e) => {
     const select = e.target as HTMLSelectElement;

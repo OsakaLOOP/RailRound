@@ -32,6 +32,7 @@ import {
   isTurnbackAllowed,
   oppositeDirectionRole,
 } from "./topology";
+import { calculateTurnAngle } from "./geometry-math";
 import type {
   ChainEndpointAnchor,
   IntentionChain,
@@ -446,24 +447,46 @@ function isReachable(
   adjacency: Record<string, EntityRef[]> | any,
 ): boolean {
   const visited = new Set<string>();
-  const queue: { node: EntityRef; role: TrackDirectionRole | undefined }[] = [];
-  queue.push({ node: startNode, role: initialRole });
-  visited.add(`${startNode}:${initialRole}`);
+  const queue: { node: EntityRef; role: TrackDirectionRole | undefined; lastEdgeId: EntityRef | null }[] = [];
+  queue.push({ node: startNode, role: initialRole, lastEdgeId: null });
+  visited.add(`${startNode}:${initialRole}:null`);
 
   while (queue.length > 0) {
-    const { node, role } = queue.shift()!;
+    const { node, role, lastEdgeId } = queue.shift()!;
     const outEdges = adjacency.outEdges[node] ?? [];
     for (const eid of outEdges) {
-      if (eid === targetEdge) return true;
+      if (eid === targetEdge) {
+        if (lastEdgeId) {
+          const edgeIn = lookup.edgesById[lastEdgeId];
+          const edgeOut = lookup.edgesById[eid];
+          if (edgeIn?.coordinates && edgeOut?.coordinates) {
+            const nodeCoord = edgeIn.fromNodeRef === node ? edgeIn.coordinates[0] : edgeIn.coordinates[edgeIn.coordinates.length - 1];
+            const angle = calculateTurnAngle(edgeIn.coordinates, edgeOut.coordinates, nodeCoord);
+            if (angle >= 90) continue;
+          }
+        }
+        return true;
+      }
       const edge = lookup.edgesById[eid];
       if (!edge) continue;
       if (!isDirectionRoleCompatible(role, edge.directionRole)) continue;
+
+      if (lastEdgeId) {
+        const edgeIn = lookup.edgesById[lastEdgeId];
+        const edgeOut = edge;
+        if (edgeIn?.coordinates && edgeOut?.coordinates) {
+          const nodeCoord = edgeIn.fromNodeRef === node ? edgeIn.coordinates[0] : edgeIn.coordinates[edgeIn.coordinates.length - 1];
+          const angle = calculateTurnAngle(edgeIn.coordinates, edgeOut.coordinates, nodeCoord);
+          if (angle >= 90) continue;
+        }
+      }
+
       const nextNode = edge.fromNodeRef === node ? edge.toNodeRef : edge.fromNodeRef;
       const nextRole = (edge.directionRole === "up" || edge.directionRole === "down") ? edge.directionRole : role;
-      const stateKey = `${nextNode}:${nextRole}`;
+      const stateKey = `${nextNode}:${nextRole}:${eid}`;
       if (!visited.has(stateKey)) {
         visited.add(stateKey);
-        queue.push({ node: nextNode, role: nextRole });
+        queue.push({ node: nextNode, role: nextRole, lastEdgeId: eid });
       }
     }
   }
@@ -637,7 +660,7 @@ export function findPaths(
     } else if (node.kind === "passage") {
       if (!lastEdge) return false;
       if (node.throughKind === "platform") {
-        const bindings = lookup.bindingsByPlatform[node.throughRef] ?? [];
+        const bindings = lookup.bindingsByPlatform[node.through] ?? [];
         const matchPlatform = bindings.some((b) => b.edgeRef === lastEdge);
         if (matchPlatform) {
           state.currentIntentionIndex += 1;
@@ -711,6 +734,19 @@ export function findPaths(
         if (candidateEdgeId === lastEdgeId) {
           if (!state.turnbackAt.has(lastIdx)) {
             continue;
+          }
+        }
+
+        // 物理级防夹角转向过滤 (钝角偏转角拦截，即转角 >= 90°)
+        if (!state.turnbackAt.has(lastIdx)) {
+          const edgeIn = lookup.edgesById[lastEdgeId];
+          const edgeOut = edge;
+          if (edgeIn?.coordinates && edgeOut?.coordinates) {
+            const nodeCoord = edgeIn.fromNodeRef === state.currentNode ? edgeIn.coordinates[0] : edgeIn.coordinates[edgeIn.coordinates.length - 1];
+            const angle = calculateTurnAngle(edgeIn.coordinates, edgeOut.coordinates, nodeCoord);
+            if (angle >= 90) {
+              continue;
+            }
           }
         }
       }

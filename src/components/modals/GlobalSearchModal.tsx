@@ -202,7 +202,6 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect, 
                     )}
                 </div>
             </div>
-        </div>
     );
 
     if (isEmbedded) return content;

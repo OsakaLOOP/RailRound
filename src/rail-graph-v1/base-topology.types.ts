@@ -91,6 +91,7 @@ export interface TopologyEdge {
   trackCode?: string;
   geometryRef?: EntityRef;
   lengthMeters: number;
+  coordinates?: [number, number][];
   sourceSlice?: SourceGeometrySlice;
   /** 物理身份。必须由 annotation 显式声明, 不得反推。 */
   physicalKind?: TrackPhysicalKind;

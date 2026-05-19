@@ -27,6 +27,11 @@ import {
   buildTopologyLookup,
   type TopologyLookup,
 } from "../rail-graph-v1/topology";
+import {
+  projectPointToPolyline,
+  haversineDistance,
+  calculateTurnAngle,
+} from "../rail-graph-v1/geometry-math";
 import { buildLiangMianSiXianGeoJson, BINDING_PLAN, STOP_PLAN } from "./poc-liangmiansixian";
 import {
   buildTwoStationGeoJson,
@@ -278,6 +283,8 @@ export function compileTopology(): BaseTopologyLayer {
     }
   }
 
+  applyCrossoverSnapping(topo, diagnostics);
+  
   topo.adjacency = buildAdjacency(topo.edges);
   addBindings(topo, diagnostics);
   addStoppingPoints(topo, diagnostics);
@@ -581,6 +588,7 @@ function addTrackFeature(
       trackCode: annotation.track?.trackCode,
       geometryRef,
       lengthMeters: calculateLengthMeters(coordinates),
+      coordinates,
       physicalKind: annotation.track?.physicalKind,
       functionalUse: annotation.track?.functionalUse,
       directionRole: annotation.track?.directionRole,
@@ -709,22 +717,221 @@ function addPlatformFeature(
   }
 }
 
+function resolveAllSplitEdges(topo: BaseTopologyLayer, originalEdgeId: string): string[] {
+  const candidates = topo.edges.filter((e) => e.id === originalEdgeId || e.id.startsWith(originalEdgeId + ":"));
+  return candidates.map((e) => e.id);
+}
+
+function resolveEdgeAndMeasure(
+  topo: BaseTopologyLayer,
+  originalEdgeId: string,
+  originalMeasure: number,
+): { edgeId: string; measure: number } | null {
+  const candidates = topo.edges.filter((e) => e.id === originalEdgeId || e.id.startsWith(originalEdgeId + ":"));
+  if (candidates.length === 0) return null;
+
+  for (const edge of candidates) {
+    const sSlice = edge.sourceSlice;
+    if (!sSlice) continue;
+    const start = sSlice.startMeasure ?? 0;
+    const end = sSlice.endMeasure ?? 1;
+    if (originalMeasure >= start && originalMeasure <= end) {
+      const denom = end - start;
+      const localMeasure = denom > 0 ? (originalMeasure - start) / denom : 0;
+      return { edgeId: edge.id, measure: Math.max(0, Math.min(1, localMeasure)) };
+    }
+  }
+
+  return { edgeId: candidates[0].id, measure: originalMeasure };
+}
+
+function applyCrossoverSnapping(topo: BaseTopologyLayer, diagnostics: Diagnostic[]): void {
+  const SNAP_TOLERANCE = 0.5; // 0.5m
+  let snappedAny = true;
+  let iterations = 0;
+  const maxIterations = 100;
+
+  while (snappedAny && iterations < maxIterations) {
+    snappedAny = false;
+    iterations++;
+
+    const nodeDegrees: Record<string, number> = {};
+    for (const edge of topo.edges) {
+      nodeDegrees[edge.fromNodeRef] = (nodeDegrees[edge.fromNodeRef] ?? 0) + 1;
+      nodeDegrees[edge.toNodeRef] = (nodeDegrees[edge.toNodeRef] ?? 0) + 1;
+    }
+
+    for (const node of topo.nodes) {
+      if (nodeDegrees[node.id] !== 1) continue;
+
+      const edge = topo.edges.find((e) => e.fromNodeRef === node.id || e.toNodeRef === node.id);
+      if (!edge || !edge.coordinates) continue;
+
+      const isStart = edge.fromNodeRef === node.id;
+      const nodeCoord = isStart ? edge.coordinates[0] : edge.coordinates[edge.coordinates.length - 1];
+
+      for (const targetEdge of topo.edges) {
+        if (targetEdge.id === edge.id) continue;
+        if (!targetEdge.coordinates) continue;
+
+        const proj = projectPointToPolyline(nodeCoord, targetEdge.coordinates);
+        if (proj.distance < SNAP_TOLERANCE) {
+          const distToStart = haversineDistance(proj.snapped, targetEdge.coordinates[0]);
+          const distToEnd = haversineDistance(proj.snapped, targetEdge.coordinates[targetEdge.coordinates.length - 1]);
+
+          if (distToStart < 0.1) {
+            mergeNodes(topo, node.id, targetEdge.fromNodeRef, proj.snapped);
+            diagnostics.push(diagnostic(
+              "info",
+              "MVP_CROSSOVER_MERGE_NODE",
+              "compile",
+              `Crossover node '${node.id}' merged into target node '${targetEdge.fromNodeRef}' by snapping.`,
+              { crossoverNode: node.id, targetNode: targetEdge.fromNodeRef, distance: proj.distance },
+            ));
+            snappedAny = true;
+            break;
+          } else if (distToEnd < 0.1) {
+            mergeNodes(topo, node.id, targetEdge.toNodeRef, proj.snapped);
+            diagnostics.push(diagnostic(
+              "info",
+              "MVP_CROSSOVER_MERGE_NODE",
+              "compile",
+              `Crossover node '${node.id}' merged into target node '${targetEdge.toNodeRef}' by snapping.`,
+              { crossoverNode: node.id, targetNode: targetEdge.toNodeRef, distance: proj.distance },
+            ));
+            snappedAny = true;
+            break;
+          } else {
+            splitEdgeAtPoint(topo, targetEdge, proj.measure, proj.snapped, node.id);
+            diagnostics.push(diagnostic(
+              "info",
+              "MVP_CROSSOVER_SPLIT_EDGE",
+              "compile",
+              `Edge '${targetEdge.id}' split by crossover node '${node.id}' at measure ${proj.measure.toFixed(4)}.`,
+              { splitEdge: targetEdge.id, crossoverNode: node.id, measure: proj.measure, distance: proj.distance },
+            ));
+            snappedAny = true;
+            break;
+          }
+        }
+      }
+
+      if (snappedAny) break;
+    }
+  }
+}
+
+function mergeNodes(
+  topo: BaseTopologyLayer,
+  oldNodeId: string,
+  newNodeId: string,
+  snappedCoord: [number, number],
+): void {
+  for (const edge of topo.edges) {
+    if (edge.fromNodeRef === oldNodeId) {
+      edge.fromNodeRef = newNodeId;
+      if (edge.coordinates) edge.coordinates[0] = snappedCoord;
+    }
+    if (edge.toNodeRef === oldNodeId) {
+      edge.toNodeRef = newNodeId;
+      if (edge.coordinates) edge.coordinates[edge.coordinates.length - 1] = snappedCoord;
+    }
+  }
+  topo.nodes = topo.nodes.filter((n) => n.id !== oldNodeId);
+}
+
+function splitEdgeAtPoint(
+  topo: BaseTopologyLayer,
+  targetEdge: TopologyEdge,
+  measure: number,
+  snappedCoord: [number, number],
+  crossoverNodeId: string,
+): void {
+  const coords = targetEdge.coordinates!;
+  const proj = projectPointToPolyline(snappedCoord, coords);
+  const segIdx = proj.segmentIndex;
+
+  const coordsA: [number, number][] = [];
+  for (let i = 0; i <= segIdx; i++) {
+    coordsA.push(coords[i]);
+  }
+  coordsA.push(snappedCoord);
+
+  const coordsB: [number, number][] = [snappedCoord];
+  for (let i = segIdx + 1; i < coords.length; i++) {
+    coordsB.push(coords[i]);
+  }
+
+  const crossoverNode = topo.nodes.find((n) => n.id === crossoverNodeId);
+  if (crossoverNode) {
+    crossoverNode.kind = "junction";
+  }
+
+  const edgeAId = `${targetEdge.id}:part_A`;
+  const edgeBId = `${targetEdge.id}:part_B`;
+
+  const sSlice = targetEdge.sourceSlice!;
+  const originalStart = sSlice.startMeasure ?? 0;
+  const originalEnd = sSlice.endMeasure ?? 1;
+  const splitMeasure = originalStart + measure * (originalEnd - originalStart);
+
+  const edgeA: TopologyEdge = {
+    ...targetEdge,
+    id: edgeAId,
+    toNodeRef: crossoverNodeId,
+    coordinates: coordsA,
+    lengthMeters: calculateLengthMeters(coordsA),
+    sourceSlice: {
+      ...sSlice,
+      startMeasure: originalStart,
+      endMeasure: splitMeasure,
+    },
+  };
+
+  const edgeB: TopologyEdge = {
+    ...targetEdge,
+    id: edgeBId,
+    fromNodeRef: crossoverNodeId,
+    coordinates: coordsB,
+    lengthMeters: calculateLengthMeters(coordsB),
+    sourceSlice: {
+      ...sSlice,
+      startMeasure: splitMeasure,
+      endMeasure: originalEnd,
+    },
+  };
+
+  topo.edges = topo.edges.filter((e) => e.id !== targetEdge.id);
+  topo.edges.push(edgeA, edgeB);
+
+  for (const edge of topo.edges) {
+    if (edge.fromNodeRef === crossoverNodeId && edge.coordinates) {
+      edge.coordinates[0] = snappedCoord;
+    }
+    if (edge.toNodeRef === crossoverNodeId && edge.coordinates) {
+      edge.coordinates[edge.coordinates.length - 1] = snappedCoord;
+    }
+  }
+}
+
 function addSignalFeature(
   topo: BaseTopologyLayer,
   annotation: RailGraphAnnotation,
 ): void {
   if (!annotation.signal) {
-    // MVP 不消费 signal_point: 缺 signal 数据 (edgeRef/measure/facing) 静默跳过,
-    // 不污染诊断面板. signal_point 的 kind 标记本身已被编译器接受 (循环 1 skip).
-    // Phase 后续启用 signal 时再补诊断.
     return;
   }
-  // 直接从 annotation 拷, 不做空间投影
   const id = annotation.id as EntityRef;
+  const originalEdge = annotation.signal.edgeRef;
+  const originalMeasure = clampMeasure(annotation.signal.measure);
+
+  const resolved = resolveEdgeAndMeasure(topo, originalEdge, originalMeasure);
+  if (!resolved) return;
+
   topo.signals.push({
     id,
-    edgeRef: annotation.signal.edgeRef as EntityRef,
-    measure: clampMeasure(annotation.signal.measure),
+    edgeRef: resolved.edgeId as EntityRef,
+    measure: resolved.measure,
     facing: annotation.signal.facing,
     name: annotation.signal.name,
   });
@@ -740,27 +947,31 @@ function addBindings(topo: BaseTopologyLayer, diagnostics: Diagnostic[]): void {
       diagnostics.push(diagnostic("error", "MVP_BINDING_MISSING_PLATFORM", "compile", "Binding references a missing platform.", { index, platformRef: input.platformRef }));
       continue;
     }
-    if (!topo.edges.some((edge) => edge.id === input.edgeRef)) {
+
+    const activeEdges = resolveAllSplitEdges(topo, input.edgeRef);
+    if (activeEdges.length === 0) {
       diagnostics.push(diagnostic("error", "MVP_BINDING_MISSING_EDGE", "compile", "Binding references a missing edge.", { index, edgeRef: input.edgeRef }));
       continue;
     }
 
-    const id = stableId("manual", "binding", `${input.stationRef}:${input.platformRef}:${input.edgeRef}:${index}`);
-    topo.platformTrackBindings.push({
-      id,
-      stationRef: input.stationRef as EntityRef,
-      platformRef: input.platformRef as EntityRef,
-      edgeRef: input.edgeRef as EntityRef,
-      side: input.side,
-      servingDirection: input.servingDirection,
-    });
-    topo.relations.push({
-      id: stableId("manual", "relation", id),
-      kind: "platform_serves_track",
-      fromRef: input.platformRef as EntityRef,
-      toRef: input.edgeRef as EntityRef,
-      payload: { stationRef: input.stationRef, side: input.side },
-    });
+    for (const edgeId of activeEdges) {
+      const id = stableId("manual", "binding", `${input.stationRef}:${input.platformRef}:${edgeId}:${index}`);
+      topo.platformTrackBindings.push({
+        id,
+        stationRef: input.stationRef as EntityRef,
+        platformRef: input.platformRef as EntityRef,
+        edgeRef: edgeId as EntityRef,
+        side: input.side,
+        servingDirection: input.servingDirection,
+      });
+      topo.relations.push({
+        id: stableId("manual", "relation", id),
+        kind: "platform_serves_track",
+        fromRef: input.platformRef as EntityRef,
+        toRef: edgeId as EntityRef,
+        payload: { stationRef: input.stationRef, side: input.side },
+      });
+    }
   }
 }
 
@@ -774,14 +985,18 @@ function addStoppingPoints(topo: BaseTopologyLayer, diagnostics: Diagnostic[]): 
       diagnostics.push(diagnostic("error", "MVP_STOP_MISSING_PLATFORM", "compile", "Stopping point references a missing platform.", { index, platformRef: input.platformRef }));
       continue;
     }
-    if (!topo.edges.some((edge) => edge.id === input.edgeRef)) {
+
+    const resolved = resolveEdgeAndMeasure(topo, input.edgeRef, input.measure);
+    if (!resolved) {
       diagnostics.push(diagnostic("error", "MVP_STOP_MISSING_EDGE", "compile", "Stopping point references a missing edge.", { index, edgeRef: input.edgeRef }));
       continue;
     }
 
+    const { edgeId, measure } = resolved;
+
     const matchingBinding = topo.platformTrackBindings.find((binding) => {
       if (binding.platformRef !== input.platformRef) return false;
-      if (binding.edgeRef !== input.edgeRef) return false;
+      if (binding.edgeRef !== edgeId) return false;
       if (input.direction === "both") return true;
       if (!binding.servingDirection) return true;
       return binding.servingDirection === input.direction;
@@ -795,19 +1010,19 @@ function addStoppingPoints(topo: BaseTopologyLayer, diagnostics: Diagnostic[]): 
         {
           index,
           platformRef: input.platformRef,
-          edgeRef: input.edgeRef,
+          edgeRef: edgeId,
           direction: input.direction,
         },
       ));
     }
 
     topo.stoppingPoints.push({
-      id: stableId("manual", "stoppingPoint", `${input.stationRef}:${input.platformRef}:${input.edgeRef}:${input.direction}:${input.measure}`),
+      id: stableId("manual", "stoppingPoint", `${input.stationRef}:${input.platformRef}:${edgeId}:${input.direction}:${measure}`),
       stationRef: input.stationRef as EntityRef,
       platformRef: input.platformRef as EntityRef,
-      edgeRef: input.edgeRef as EntityRef,
+      edgeRef: edgeId as EntityRef,
       direction: input.direction,
-      measure: clampMeasure(input.measure),
+      measure: clampMeasure(measure),
       confirmation: "confirmed",
     });
   }

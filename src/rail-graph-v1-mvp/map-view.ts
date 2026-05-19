@@ -318,11 +318,16 @@ function rebuildLayers(
 
   // 1) Edges (track polylines)
   for (const edge of topo.edges) {
-    const sourceRef = edge.sourceSlice?.sourceFeatureRef;
-    if (!sourceRef) continue;
-    const feature = annotationIdToFeature.get(sourceRef);
-    if (!feature) continue;
-    const coords = extractEdgeCoordinates(feature, edge.sourceSlice?.multiLineIndex);
+    let coords = edge.coordinates;
+    if (!coords) {
+      const sourceRef = edge.sourceSlice?.sourceFeatureRef;
+      if (sourceRef) {
+        const feature = annotationIdToFeature.get(sourceRef);
+        if (feature) {
+          coords = extractEdgeCoordinates(feature, edge.sourceSlice?.multiLineIndex) ?? undefined;
+        }
+      }
+    }
     if (!coords || coords.length < 2) continue;
 
     const latLngs = coords.map((c) => [c[1], c[0]] as [number, number]);
@@ -1283,7 +1288,9 @@ function getEdgeCoords(
   annotationIdToFeature: Map<string, AnnotatedFeature>,
 ): GeoJSONPosition[] | null {
   const edge = topo.edges.find((e) => e.id === edgeRef);
-  if (!edge?.sourceSlice) return null;
+  if (!edge) return null;
+  if (edge.coordinates) return edge.coordinates;
+  if (!edge.sourceSlice) return null;
   const feature = annotationIdToFeature.get(edge.sourceSlice.sourceFeatureRef);
   if (!feature) return null;
   return extractEdgeCoordinates(feature, edge.sourceSlice.multiLineIndex);

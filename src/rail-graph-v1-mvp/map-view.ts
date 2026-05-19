@@ -25,6 +25,105 @@ import type {
   GeoJSONPosition,
 } from "../rail-graph-v1/geojson";
 import type { EntityRef } from "../rail-graph-v1/primitives";
+import type { ResolvedChain } from "../rail-graph-v1/chain.types";
+
+// ── 0. CSS Styles injection for Path Animation ──────────────────
+const STYLE_ID = "mvp-map-view-animation-styles";
+const STYLES = `
+/* Train marker style */
+.path-train-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.path-train-dot {
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border: 3px solid #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #10b981, 0 0 20px #10b981;
+}
+.path-train-pulse {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #10b981;
+  border-radius: 50%;
+  animation: train-pulse-anim 1.2s infinite ease-out;
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes train-pulse-anim {
+  0% { transform: scale(0.5); opacity: 0.8; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+/* Event marker style */
+.path-event-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.path-event-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+}
+.path-event-dot.origin { background: #ffffff; border: 3.5px solid #0891b2; color: #0891b2; }
+.path-event-dot.stop { background: #ffffff; border: 3.5px solid #16a34a; color: #16a34a; }
+.path-event-dot.reversal { background: #ffffff; border: 3.5px solid #d97706; color: #d97706; }
+.path-event-dot.terminus { background: #ffffff; border: 3.5px solid #ef4444; color: #ef4444; }
+
+.path-event-pulse {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  animation: event-pulse-anim 1.5s infinite ease-out;
+  opacity: 0;
+}
+@keyframes event-pulse-anim {
+  0% { transform: scale(0.4); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* Tooltip badge styling */
+.path-event-badge {
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  border: 1px solid #334155;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.path-event-badge.origin { border-color: #0891b2; }
+.path-event-badge.stop { border-color: #16a34a; }
+.path-event-badge.reversal { border-color: #d97706; }
+.path-event-badge.terminus { border-color: #ef4444; }
+.leaflet-tooltip.path-event-tooltip {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+.leaflet-tooltip-top.path-event-tooltip::before {
+  border-top-color: #1e293b;
+}
+`;
+function ensureStyles(): void {
+  if (document.getElementById(STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = STYLE_ID;
+  style.textContent = STYLES;
+  document.head.appendChild(style);
+}
 
 // ── 1. 颜色 / 样式常量 ──────────────────────────────────────
 
@@ -51,7 +150,7 @@ const POSITRON_ATTR = "&copy; OpenStreetMap contributors &copy; CARTO";
 export interface MapView {
   update(topo: BaseTopologyLayer, geoJson: AnnotatedFeatureCollection): void;
   highlightEntities(primaryRefs: EntityRef[], relatedRefs?: EntityRef[]): void;
-  highlightPath(edgeSequence: EntityRef[], turnbackEdgeIndices?: number[]): void;
+  highlightPath(edgeSequence: EntityRef[], turnbackEdgeIndices?: number[], resolvedChain?: ResolvedChain): void;
   clearHighlight(): void;
   clearEntityHighlight(): void;
   clearPathHighlight(): void;
@@ -94,11 +193,14 @@ interface InternalState {
   dimmedArrowKeys: Set<string>;
   hoverHandlers: Array<(ref: EntityRef | null) => void>;
   clickHandlers: Array<(ref: EntityRef) => void>;
+  animationFrameId?: number;
+  animationTimeouts?: number[];
 }
 
 // ── 4. Factory ──────────────────────────────────────────────
 
 export function createMapView(container: HTMLElement): MapView {
+  ensureStyles();
   const map = L.map(container, {
     center: [35.6900, 139.7040],
     zoom: 16,
@@ -125,6 +227,7 @@ export function createMapView(container: HTMLElement): MapView {
     dimmedArrowKeys: new Set(),
     hoverHandlers: [],
     clickHandlers: [],
+    animationTimeouts: [],
   };
 
   applyBaseLayer(state, "positron");
@@ -136,8 +239,8 @@ export function createMapView(container: HTMLElement): MapView {
     highlightEntities(primary, related) {
       applyHighlight(state, primary, related ?? []);
     },
-    highlightPath(edgeSequence, turnbackEdgeIndices) {
-      applyPathHighlight(state, edgeSequence, turnbackEdgeIndices);
+    highlightPath(edgeSequence, turnbackEdgeIndices, resolvedChain) {
+      applyPathHighlight(state, edgeSequence, turnbackEdgeIndices, resolvedChain);
     },
     clearHighlight() {
       clearAllHighlight(state);
@@ -627,6 +730,7 @@ function applyPathHighlight(
   state: InternalState,
   edgeSequence: EntityRef[],
   turnbackEdgeIndices?: number[],
+  resolvedChain?: ResolvedChain,
 ): void {
   clearPathHighlight(state);
   if (edgeSequence.length === 0) return;
@@ -634,12 +738,8 @@ function applyPathHighlight(
   const turnbackSet = new Set(turnbackEdgeIndices ?? []);
 
   // 1) 推算每条 edge 在 path 中的实际行进方向 (entry node → exit node)
-  // 由 edge 的 fromNode/toNode 与相邻 edge 共享节点确定.
-  // 关键: turnback edge 上, 列车在 edge 上停车反向, exit = entry (从原入口端离开).
-  //       下一条 edge 的 entry node = 本条 edge 的 entry node (而非 toNode).
-  type Dir = "forward" | "reverse";  // forward = 沿 edge.fromNode→toNode; reverse = 反向
+  type Dir = "forward" | "reverse";
   const directions: Dir[] = [];
-  /** 每条 edge 的真实"出口节点" (turnback edge 上 = 入口节点) */
   const exitNodes: (EntityRef | null)[] = [];
   let prevExitNode: EntityRef | null = null;
 
@@ -653,12 +753,10 @@ function applyPathHighlight(
     }
     let dir: Dir;
     if (prevExitNode !== null) {
-      // 上条 edge 的 exit node 必然是本条 edge 的 entry node
       if (edge.fromNodeRef === prevExitNode) dir = "forward";
       else if (edge.toNodeRef === prevExitNode) dir = "reverse";
-      else dir = "forward";  // 不连通, fallback (理论上不应发生)
+      else dir = "forward";
     } else if (i + 1 < edgeSequence.length) {
-      // 第一条 edge: 用第二条 edge 反推共享节点
       const nextEdge = state.edgeById.get(edgeSequence[i + 1]);
       if (nextEdge) {
         if (edge.toNodeRef === nextEdge.fromNodeRef || edge.toNodeRef === nextEdge.toNodeRef) {
@@ -676,149 +774,445 @@ function applyPathHighlight(
     }
     directions.push(dir);
 
-    // 计算 exit node:
-    //   turnback edge: 列车反向出原入口, exit = entry
-    //   普通 edge:     exit = 另一端
     const entryNode = dir === "forward" ? edge.fromNodeRef : edge.toNodeRef;
     const oppositeNode = dir === "forward" ? edge.toNodeRef : edge.fromNodeRef;
     const exitNode = turnbackSet.has(i) ? entryNode : oppositeNode;
     exitNodes.push(exitNode);
     prevExitNode = exitNode;
+
+    // 暗淡 / 隐藏原方向箭头
+    const arrowMarker = state.arrowById.get(edgeRef);
+    if (arrowMarker) {
+      const isBidir = edge.directionRole === "bidirectional" || edge.directionRole === "reversible";
+      arrowMarker.setOpacity(isBidir ? 0.2 : 0);
+      state.dimmedArrowKeys.add(edgeRef);
+    }
   }
 
-  // 2) 渲染绿色叠加 + 方向箭头 + dim 原 arrow
-  let firstPoint: L.LatLng | null = null;
-  let lastPoint: L.LatLng | null = null;
+  // 2) 提取动画里程碑 (Origin, Stops, Turnbacks, Terminus)
+  const milestones: Milestone[] = [];
+  if (resolvedChain && resolvedChain.nodes && resolvedChain.nodes.length > 0) {
+    let currentEdgeCount = 0;
+    resolvedChain.nodes.forEach((node, idx) => {
+      let edgeIdx = 0;
+      let measure = 0;
+      if (idx === 0) {
+        edgeIdx = 0;
+        measure = 0;
+      } else if (idx === resolvedChain.nodes.length - 1) {
+        edgeIdx = edgeSequence.length - 1;
+        measure = 1;
+      } else {
+        const prevSeg = resolvedChain.segments[idx - 1];
+        if (prevSeg) {
+          currentEdgeCount += prevSeg.edges.length;
+        }
+        edgeIdx = Math.max(0, currentEdgeCount - 1);
+        measure = node.resolvedMeasure !== undefined ? node.resolvedMeasure : 0.5;
+      }
 
-  for (let i = 0; i < edgeSequence.length; i += 1) {
+      let type: Milestone["type"] = "stop";
+      if (node.kind === "origin") type = "origin";
+      else if (node.kind === "terminus") type = "terminus";
+      else if (node.kind === "reversal") type = "reversal";
+
+      let label = "";
+      if (node.kind === "origin") {
+        label = "Start";
+      } else if (node.kind === "terminus") {
+        label = "Terminus";
+      } else if (node.kind === "service_stop") {
+        const namePart = node.resolvedPlatformRef ? shortId(node.resolvedPlatformRef) : shortId(node.at);
+        label = `Stop: ${namePart}`;
+      } else if (node.kind === "reversal") {
+        const namePart = node.resolvedPlatformRef ? shortId(node.resolvedPlatformRef) : (node.at ? shortId(node.at) : "");
+        label = `Turnback: ${namePart}`;
+      } else if (node.kind === "technical_stop") {
+        label = `Tech Stop: ${node.reason ?? ""}`;
+      } else {
+        return;
+      }
+
+      milestones.push({ type, edgeIdx, measure, label });
+    });
+  } else {
+    milestones.push({ type: "origin", edgeIdx: 0, measure: 0, label: "Start" });
+    for (let i = 0; i < edgeSequence.length; i++) {
+      if (turnbackSet.has(i)) {
+        milestones.push({ type: "reversal", edgeIdx: i, measure: 0.5, label: "Turnback" });
+      }
+    }
+    milestones.push({ type: "terminus", edgeIdx: edgeSequence.length - 1, measure: 1, label: "Terminus" });
+  }
+
+  // 3) 按照里程碑切割为 legs
+  interface Leg {
+    coords: L.LatLng[];
+    startEvent?: Milestone;
+    endEvent?: Milestone;
+  }
+  const legs: Leg[] = [];
+  for (let m = 0; m < milestones.length - 1; m++) {
+    const startM = milestones[m];
+    const endM = milestones[m + 1];
+
+    const legCoords: L.LatLng[] = [];
+    for (let k = startM.edgeIdx; k <= endM.edgeIdx; k++) {
+      const edgeRef = edgeSequence[k];
+      if (!edgeRef) continue;
+      const entry = state.entityLayers.get(edgeRef);
+      if (!entry || entry.kind !== "edge") continue;
+      const polyline = entry.layer as L.Polyline;
+      const latLngs = polyline.getLatLngs() as L.LatLng[];
+      if (latLngs.length === 0) continue;
+
+      const dir = directions[k];
+      const mStart = (k === startM.edgeIdx) ? startM.measure : 0;
+      let mEnd = 1;
+      if (k === endM.edgeIdx) {
+        mEnd = endM.measure;
+      } else if (turnbackSet.has(k)) {
+        mEnd = 0;
+      }
+
+      const sub = getSubCoords(latLngs, dir, mStart, mEnd);
+      legCoords.push(...sub);
+    }
+
+    legs.push({
+      coords: deduplicateLatLngs(legCoords),
+      startEvent: m === 0 ? startM : undefined,
+      endEvent: endM,
+    });
+  }
+
+  // 4) 渲染全局半透明背景轨迹
+  const fullCoords: L.LatLng[] = [];
+  for (let i = 0; i < edgeSequence.length; i++) {
     const edgeRef = edgeSequence[i];
     const entry = state.entityLayers.get(edgeRef);
     if (!entry || entry.kind !== "edge") continue;
     const polyline = entry.layer as L.Polyline;
     const latLngs = polyline.getLatLngs() as L.LatLng[];
     if (latLngs.length === 0) continue;
-
-    // 绿色叠加 (覆盖原 polyline)
-    const overlay = L.polyline(latLngs, {
+    const dir = directions[i];
+    const sub = getSubCoords(latLngs, dir, 0, 1);
+    fullCoords.push(...sub);
+  }
+  if (fullCoords.length > 0) {
+    const backgroundPath = L.polyline(deduplicateLatLngs(fullCoords), {
       color: COLORS.highlight_path,
-      weight: 7,
-      opacity: 0.85,
+      weight: 6,
+      opacity: 0.15,
       lineCap: "round",
       lineJoin: "round",
     });
-    overlay.addTo(state.pathHighlightGroup);
+    backgroundPath.addTo(state.pathHighlightGroup);
+  }
 
-    // path 实际行进方向的 entry / exit LatLng
-    const dir = directions[i];
-    const entryLatLng = dir === "forward" ? latLngs[0] : latLngs[latLngs.length - 1];
-    const exitLatLng = dir === "forward" ? latLngs[latLngs.length - 1] : latLngs[0];
-    if (i === 0) firstPoint = entryLatLng;
-    lastPoint = exitLatLng;
+  // 5) 动画主循环驱动
+  let traveledCoordsHistory: L.LatLng[] = [];
+  const animProgressGroup = L.featureGroup().addTo(state.pathHighlightGroup);
+  let trainMarker: L.Marker | null = null;
 
-    // 方向箭头: 中点 + 朝实际行进方向
-    const midPoint = midpointAlongLatLng(latLngs);
-    const isTurnback = turnbackSet.has(i);
+  const progressGlowPolyline = L.polyline([], {
+    color: "#10b981",
+    weight: 10,
+    opacity: 0.4,
+    lineCap: "round",
+    lineJoin: "round",
+  });
 
-    let svg: string;
-    if (isTurnback) {
-      // 绿色 U-turn 加粗换向标记 (实线, 与原方向箭头同语义)
-      svg = `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-        <path d="M 8 26 L 8 15 A 7 7 0 0 1 22 15 L 22 20" stroke="${COLORS.highlight_path_endpoint}" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        <polygon points="22,27 17,19 27,19" fill="${COLORS.highlight_path_endpoint}"/>
-        <circle cx="8" cy="26" r="2.4" fill="${COLORS.highlight_path_endpoint}"/>
-      </svg>`;
-    } else {
-      // 绿色 ▶ 朝行进方向
-      const pathBearing = computeBearingFromLatLng(entryLatLng, exitLatLng);
-      svg = `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <g transform="rotate(${pathBearing} 12 12)">
-          <polygon points="12,3 5,19 19,19" fill="${COLORS.highlight_path}" stroke="${COLORS.highlight_path_endpoint}" stroke-width="1.5" stroke-linejoin="round"/>
-        </g>
-      </svg>`;
+  const progressCorePolyline = L.polyline([], {
+    color: "#ffffff",
+    weight: 4,
+    opacity: 1.0,
+    lineCap: "round",
+    lineJoin: "round",
+  });
+
+  const initAnimation = () => {
+    animProgressGroup.clearLayers();
+    traveledCoordsHistory = [];
+
+    progressGlowPolyline.setLatLngs([]);
+    progressCorePolyline.setLatLngs([]);
+    progressGlowPolyline.addTo(animProgressGroup);
+    progressCorePolyline.addTo(animProgressGroup);
+
+    if (legs.length > 0 && legs[0].coords.length > 0) {
+      trainMarker = L.marker(legs[0].coords[0], {
+        icon: L.divIcon({
+          className: "path-train-marker",
+          html: `<div class="path-train-pulse"></div><div class="path-train-dot"></div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
+        }),
+        interactive: false,
+      });
+      trainMarker.addTo(animProgressGroup);
     }
-    L.marker(midPoint, {
+
+    playLeg(0);
+  };
+
+  const playLeg = (legIdx: number) => {
+    if (legIdx >= legs.length) {
+      // 完成一轮循环，停顿 1667ms (原 2500ms 加快 1.5x) 后重新开始
+      const tId = window.setTimeout(() => {
+        initAnimation();
+      }, 1667);
+      state.animationTimeouts?.push(tId);
+      return;
+    }
+
+    const leg = legs[legIdx];
+
+    if (legIdx > 0) {
+      traveledCoordsHistory.push(...legs[legIdx - 1].coords);
+    }
+
+    if (leg.startEvent) {
+      showEvent(leg.startEvent, leg.coords[0], () => {
+        moveAlongLeg(leg, () => {
+          handleEndEvent(leg, legIdx);
+        });
+      });
+    } else {
+      moveAlongLeg(leg, () => {
+        handleEndEvent(leg, legIdx);
+      });
+    }
+  };
+
+  const showEvent = (evt: Milestone, latLng: L.LatLng, callback: () => void) => {
+    const eventMarker = L.marker(latLng, {
       icon: L.divIcon({
-        className: isTurnback ? "mvp-path-arrow mvp-path-arrow--turnback" : "mvp-path-arrow",
-        html: svg,
-        iconSize: isTurnback ? [32, 32] : [24, 24],
-        iconAnchor: isTurnback ? [16, 16] : [12, 12],
+        className: "path-event-marker",
+        html: `
+          <div class="path-event-pulse ${evt.type}" style="color: ${eventColor(evt.type)}"></div>
+          <div class="path-event-dot ${evt.type}"></div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
       }),
       interactive: false,
-    }).addTo(state.pathArrowLayer);
+    });
+    eventMarker.addTo(animProgressGroup);
 
-    // 暗淡 / 隐藏原箭头
-    const arrowMarker = state.arrowById.get(edgeRef);
-    if (arrowMarker) {
-      const edge = state.edgeById.get(edgeRef);
-      const isBidir = edge?.directionRole === "bidirectional" || edge?.directionRole === "reversible";
-      // bidirectional/reversible 路径覆盖时半透明 (反向那一半仍可见); 单向完全隐藏
-      arrowMarker.setOpacity(isBidir ? 0.2 : 0);
-      state.dimmedArrowKeys.add(edgeRef);
+    eventMarker.bindTooltip(`
+      <div class="path-event-badge ${evt.type}">${evt.label}</div>
+    `, {
+      permanent: true,
+      direction: "top",
+      className: "path-event-tooltip",
+      offset: [0, -10],
+    }).addTo(animProgressGroup);
+
+    // 停顿时间加快 1.5x
+    let dwell = 800;
+    if (evt.type === "origin") dwell = 667;
+    else if (evt.type === "reversal") dwell = 1067;
+    else if (evt.type === "terminus") dwell = 1333;
+
+    const tId = window.setTimeout(callback, dwell);
+    state.animationTimeouts?.push(tId);
+  };
+
+  const handleEndEvent = (leg: Leg, legIdx: number) => {
+    if (leg.endEvent) {
+      showEvent(leg.endEvent, leg.coords[leg.coords.length - 1], () => {
+        playLeg(legIdx + 1);
+      });
+    } else {
+      playLeg(legIdx + 1);
     }
-  }
+  };
 
-  // 3) 起点 / 终点 marker
-  if (firstPoint) {
-    L.circleMarker(firstPoint, {
-      radius: 8,
-      color: "#ffffff",
-      weight: 2,
-      fillColor: COLORS.highlight_path_endpoint,
-      fillOpacity: 1,
-    }).bindTooltip("Start", { permanent: false, direction: "top" }).addTo(state.pathEndpointGroup);
-  }
-  if (lastPoint && (!firstPoint || !lastPoint.equals(firstPoint))) {
-    L.circleMarker(lastPoint, {
-      radius: 8,
-      color: "#ffffff",
-      weight: 2,
-      fillColor: COLORS.highlight_path_endpoint,
-      fillOpacity: 1,
-    }).bindTooltip("End", { permanent: false, direction: "top" }).addTo(state.pathEndpointGroup);
-  }
+  const moveAlongLeg = (leg: Leg, callback: () => void) => {
+    const coords = leg.coords;
+    if (coords.length < 2) {
+      callback();
+      return;
+    }
+
+    const dists: number[] = [0];
+    let totalDist = 0;
+    for (let i = 1; i < coords.length; i++) {
+      const d = coords[i - 1].distanceTo(coords[i]);
+      totalDist += d;
+      dists.push(totalDist);
+    }
+
+    const speed = 180; // 从 120 提升到 180 (1.5x)
+    const duration = Math.max(267, Math.min(2333, (totalDist / speed) * 1000));
+    const startTime = performance.now();
+
+    const frame = (now: number) => {
+      const elapsed = now - startTime;
+      const t = Math.min(1, elapsed / duration);
+
+      const currentDist = t * totalDist;
+      const currentLatLng = getLatLngAtDistance(coords, dists, currentDist);
+
+      if (trainMarker) {
+        trainMarker.setLatLng(currentLatLng);
+      }
+
+      const currentTraveled = getTraveledCoords(coords, dists, currentDist);
+      const fullTraveled = [...traveledCoordsHistory, ...currentTraveled];
+      progressGlowPolyline.setLatLngs(fullTraveled);
+      progressCorePolyline.setLatLngs(fullTraveled);
+
+      if (t < 1) {
+        state.animationFrameId = requestAnimationFrame(frame);
+      } else {
+        callback();
+      }
+    };
+
+    state.animationFrameId = requestAnimationFrame(frame);
+  };
+
+  // 启动第一轮动画
+  initAnimation();
 }
 
-function computeBearingFromLatLng(a: L.LatLng, b: L.LatLng): number {
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat), lat2 = toRad(b.lat);
-  const y = Math.sin(dLng) * Math.cos(lat2);
-  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+interface Milestone {
+  type: "origin" | "stop" | "reversal" | "terminus";
+  edgeIdx: number;
+  measure: number;
+  label: string;
 }
 
-function midpointAlong(coords: GeoJSONPosition[]): [number, number] {
-  return interpolateAlong(coords, 0.5);
+function shortId(ref: string): string {
+  if (!ref) return "";
+  const parts = ref.split(":");
+  return parts[parts.length - 1];
 }
 
-function midpointAlongLatLng(latLngs: L.LatLng[]): L.LatLng {
-  if (latLngs.length === 1) return latLngs[0];
-  // 简单等距找累计长度 50% 点
+function eventColor(type: string): string {
+  if (type === "origin") return "#0891b2";
+  if (type === "stop") return "#16a34a";
+  if (type === "reversal") return "#d97706";
+  if (type === "terminus") return "#ef4444";
+  return "#64748b";
+}
+
+function getSubCoords(
+  latLngs: L.LatLng[],
+  dir: "forward" | "reverse",
+  m1: number,
+  m2: number
+): L.LatLng[] {
+  const pts = dir === "forward" ? [...latLngs] : [...latLngs].reverse();
+  if (pts.length < 2) return [pts[0]];
+
+  const dists: number[] = [0];
   let total = 0;
-  const segLen: number[] = [];
-  for (let i = 1; i < latLngs.length; i += 1) {
-    const d = latLngs[i - 1].distanceTo(latLngs[i]);
-    segLen.push(d);
+  for (let i = 1; i < pts.length; i++) {
+    const d = pts[i - 1].distanceTo(pts[i]);
     total += d;
+    dists.push(total);
   }
-  let remaining = total / 2;
-  for (let i = 0; i < segLen.length; i += 1) {
-    if (remaining <= segLen[i]) {
-      const t = segLen[i] > 0 ? remaining / segLen[i] : 0;
+
+  const dStart = m1 * total;
+  const dEnd = m2 * total;
+  const result: L.LatLng[] = [];
+
+  if (m1 <= m2) {
+    result.push(interpolateAtDistance(pts, dists, dStart));
+    for (let i = 1; i < pts.length - 1; i++) {
+      if (dists[i] > dStart && dists[i] < dEnd) {
+        result.push(pts[i]);
+      }
+    }
+    result.push(interpolateAtDistance(pts, dists, dEnd));
+  } else {
+    result.push(interpolateAtDistance(pts, dists, dStart));
+    for (let i = pts.length - 2; i >= 1; i--) {
+      if (dists[i] < dStart && dists[i] > dEnd) {
+        result.push(pts[i]);
+      }
+    }
+    result.push(interpolateAtDistance(pts, dists, dEnd));
+  }
+
+  return result;
+}
+
+function interpolateAtDistance(pts: L.LatLng[], dists: number[], d: number): L.LatLng {
+  if (d <= 0) return pts[0];
+  if (d >= dists[dists.length - 1]) return pts[pts.length - 1];
+  for (let i = 1; i < dists.length; i++) {
+    if (d <= dists[i]) {
+      const segLen = dists[i] - dists[i - 1];
+      const ratio = segLen > 0 ? (d - dists[i - 1]) / segLen : 0;
       return L.latLng(
-        latLngs[i].lat + (latLngs[i + 1].lat - latLngs[i].lat) * t,
-        latLngs[i].lng + (latLngs[i + 1].lng - latLngs[i].lng) * t,
+        pts[i - 1].lat + (pts[i].lat - pts[i - 1].lat) * ratio,
+        pts[i - 1].lng + (pts[i].lng - pts[i - 1].lng) * ratio
       );
     }
-    remaining -= segLen[i];
   }
-  return latLngs[latLngs.length - 1];
+  return pts[pts.length - 1];
+}
+
+function getLatLngAtDistance(coords: L.LatLng[], dists: number[], d: number): L.LatLng {
+  if (d <= 0) return coords[0];
+  if (d >= dists[dists.length - 1]) return coords[coords.length - 1];
+  for (let i = 1; i < dists.length; i++) {
+    if (d <= dists[i]) {
+      const segLen = dists[i] - dists[i - 1];
+      const ratio = segLen > 0 ? (d - dists[i - 1]) / segLen : 0;
+      return L.latLng(
+        coords[i - 1].lat + (coords[i].lat - coords[i - 1].lat) * ratio,
+        coords[i - 1].lng + (coords[i].lng - coords[i - 1].lng) * ratio
+      );
+    }
+  }
+  return coords[coords.length - 1];
+}
+
+function getTraveledCoords(coords: L.LatLng[], dists: number[], d: number): L.LatLng[] {
+  if (d <= 0) return [coords[0]];
+  if (d >= dists[dists.length - 1]) return [...coords];
+  const result: L.LatLng[] = [];
+  for (let i = 0; i < coords.length; i++) {
+    if (dists[i] < d) {
+      result.push(coords[i]);
+    } else {
+      result.push(getLatLngAtDistance(coords, dists, d));
+      break;
+    }
+  }
+  return result;
+}
+
+function deduplicateLatLngs(pts: L.LatLng[]): L.LatLng[] {
+  if (pts.length === 0) return [];
+  const result = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i].distanceTo(result[result.length - 1]) > 0.01) {
+      result.push(pts[i]);
+    }
+  }
+  return result;
 }
 
 function clearPathHighlight(state: InternalState): void {
+  if (state.animationFrameId !== undefined) {
+    cancelAnimationFrame(state.animationFrameId);
+    state.animationFrameId = undefined;
+  }
+  if (state.animationTimeouts) {
+    state.animationTimeouts.forEach(clearTimeout);
+    state.animationTimeouts = [];
+  }
+
   state.pathHighlightGroup.clearLayers();
   state.pathEndpointGroup.clearLayers();
   state.pathArrowLayer.clearLayers();
-  // 还原被 dim 的原箭头
+
   for (const edgeRef of state.dimmedArrowKeys) {
     const marker = state.arrowById.get(edgeRef);
     if (marker) marker.setOpacity(1);
@@ -971,4 +1365,8 @@ function escapeHtml(value: string): string {
     "\"": "&quot;",
     "'": "&#39;",
   }[ch] ?? ch));
+}
+
+function midpointAlong(coords: GeoJSONPosition[]): [number, number] {
+  return interpolateAlong(coords, 0.5);
 }

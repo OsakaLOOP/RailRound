@@ -36,6 +36,14 @@ import {
 import { runScenarios, summarizeScenarios } from "./poc-pathfinding";
 import type { ScenarioResult } from "./poc-pathfinding";
 import { SENSEKI_RAIL, SENSEKI_STATIONS } from "./senseki-data";
+import {
+  SENSEKI_PF_OVERRIDES,
+  exportSensekiPathResults,
+  runSensekiScenarios,
+  summarizeSensekiResults,
+  type SensekiPathExportScenario,
+  type SensekiScenarioResult,
+} from "./poc-senseki-pathfinding";
 import { createMapView, type MapView } from "./map-view";
 import { createListView, type ListView } from "./list-view";
 
@@ -78,7 +86,7 @@ export const state: RailGraphMvpState = {
 
 let mapView: MapView | null = null;
 let listView: ListView | null = null;
-let lastPathfindingResults: ScenarioResult[] | undefined;
+let lastPathfindingResults: ScenarioResult[] | SensekiScenarioResult[] | undefined;
 
 export function loadGeoJson(raw: string | GeoJsonFeatureCollection): RailGraphMvpState {
   state.source = null;
@@ -184,10 +192,35 @@ export function compileTopology(): BaseTopologyLayer {
     annotation: feature.properties.railGraph,
   }));
 
+  // Phase 1.3b: 分类无标注 feature.
+  //   - 完全无 annotation / kind=unknown 且无 source 标记 → 每条发 MVP_UNKNOWN_FEATURE warn (真噪音)
+  //   - kind=unknown 且 source=osm-deferred-* → MVP 已知 OSM 真实存在但 MVP 暂不消费的类别
+  //     (level_crossing / subway_entrance / railway_landuse 等), 聚合发一条 info
+  //     MVP_OSM_KIND_NOT_CONSUMED, 不逐条 warn.
+  const osmKindNotConsumedTotals: Record<string, number> = {};
   for (const { annotation, index } of annotatedFeatures) {
-    if (!annotation || annotation.kind === "unknown") {
+    if (!annotation) {
+      diagnostics.push(diagnostic("warn", "MVP_UNKNOWN_FEATURE", "compile", "Feature is not annotated.", { index }));
+      continue;
+    }
+    if (annotation.kind !== "unknown") continue;
+    const src = annotation.source ?? "";
+    if (src.startsWith("osm-deferred-")) {
+      const classMain = src.slice("osm-deferred-".length);
+      osmKindNotConsumedTotals[classMain] = (osmKindNotConsumedTotals[classMain] ?? 0) + 1;
+    } else {
       diagnostics.push(diagnostic("warn", "MVP_UNKNOWN_FEATURE", "compile", "Feature is not annotated.", { index }));
     }
+  }
+  const osmKindNotConsumedTotal = Object.values(osmKindNotConsumedTotals).reduce((s, n) => s + n, 0);
+  if (osmKindNotConsumedTotal > 0) {
+    diagnostics.push(diagnostic(
+      "info",
+      "MVP_OSM_KIND_NOT_CONSUMED",
+      "compile",
+      `${osmKindNotConsumedTotal} OSM features fall in classes MVP does not consume (deferred).`,
+      { totalsByClass: osmKindNotConsumedTotals },
+    ));
   }
 
   for (const { feature, annotation, index } of annotatedFeatures) {
@@ -286,7 +319,7 @@ export function exportDiagnostics(): Diagnostic[] {
 // 作为回滚依据.
 
 export interface SensekiDemoSnapshot {
-  schemaVersion: "senseki-demo-v1";
+  schemaVersion: "senseki-demo-v1" | "senseki-demo-v2";
   exportedAt: string;
   app: {
     gitCommit?: string;
@@ -302,6 +335,8 @@ export interface SensekiDemoSnapshot {
     diagnosticCounts: Record<DiagnosticLevel, number>;
     diagnosticCountsByCode: Record<string, number>;
   };
+  /** v2+ 寻路结果 (含 geo 增强): 仅 senseki-pf 跑过后才有 */
+  pathfindingResults?: SensekiPathExportScenario[];
 }
 
 export function exportSensekiSnapshot(): SensekiDemoSnapshot {
@@ -322,7 +357,7 @@ export function exportSensekiSnapshot(): SensekiDemoSnapshot {
   }
 
   return {
-    schemaVersion: "senseki-demo-v1",
+    schemaVersion: "senseki-demo-v2",
     exportedAt: new Date().toISOString(),
     app: {
       sensekiDataHash: hashSensekiData(),
@@ -343,7 +378,20 @@ export function exportSensekiSnapshot(): SensekiDemoSnapshot {
       diagnosticCounts,
       diagnosticCountsByCode,
     },
+    pathfindingResults: lastPathfindingResults && isSensekiResults(lastPathfindingResults)
+      ? exportSensekiPathResults(lastPathfindingResults, topo)
+      : undefined,
   };
+}
+
+function isSensekiResults(
+  results: ScenarioResult[] | SensekiScenarioResult[],
+): results is SensekiScenarioResult[] {
+  // SensekiScenario 缺少 startSeed.intentionChain 字段, 而 ScenarioResult.scenario 含 expectedPhaseKinds.
+  // 用 expectedPhaseKinds 缺失作为判定: senseki scenario 不带这个字段.
+  if (results.length === 0) return false;
+  const first = results[0] as { scenario?: { expectedPhaseKinds?: unknown } };
+  return first.scenario?.expectedPhaseKinds === undefined;
 }
 
 export interface ImportSnapshotResult {
@@ -358,7 +406,7 @@ export interface ImportSnapshotResult {
 }
 
 export function importSensekiSnapshot(snapshot: SensekiDemoSnapshot): ImportSnapshotResult {
-  if (snapshot.schemaVersion !== "senseki-demo-v1") {
+  if (snapshot.schemaVersion !== "senseki-demo-v1" && snapshot.schemaVersion !== "senseki-demo-v2") {
     throw new Error(`Unsupported snapshot schemaVersion: ${snapshot.schemaVersion}`);
   }
   if (!snapshot.source || !Array.isArray(snapshot.source.features)) {
@@ -1078,6 +1126,7 @@ function render(): void {
             <button id="mvp-senseki" class="primary">Import 仙石線 OSM</button>
             <button id="mvp-clear-overrides">Clear annot overrides</button>
             <button id="mvp-pathfinding" class="primary">Pathfinding 4 场景</button>
+            <button id="mvp-senseki-pf" class="primary">Pathfinding 仙石線</button>
             <button id="mvp-compile">Compile</button>
           </div>
           <div class="feature">
@@ -1230,13 +1279,13 @@ function initViews(): void {
   // hover/click path candidate: 高亮 path, 不动 entity
   listView.onPathHover((path) => {
     if (path) {
-      mapView?.highlightPath(path.edgeSequence, path.turnbackEdgeIndices);
+      mapView?.highlightPath(path.edgeSequence, path.turnbackEdgeIndices, path.resolvedChain);
     } else {
       mapView?.clearPathHighlight();
     }
   });
   listView.onPathClick((path) => {
-    mapView?.highlightPath(path.edgeSequence, path.turnbackEdgeIndices);
+    mapView?.highlightPath(path.edgeSequence, path.turnbackEdgeIndices, path.resolvedChain);
   });
 
   // Annotate tab: 写回 Feature.properties.railGraph + 持久化到 localStorage + 触发 compile/map 重渲
@@ -1561,8 +1610,12 @@ function bindUi(): void {
     try {
       const text = await file.text();
       const parsed = JSON.parse(text) as unknown;
-      if (!parsed || typeof parsed !== "object" || (parsed as { schemaVersion?: unknown }).schemaVersion !== "senseki-demo-v1") {
-        throw new Error("Not a valid senseki-demo-v1 snapshot.");
+      if (!parsed || typeof parsed !== "object") {
+        throw new Error("Not a valid snapshot (not an object).");
+      }
+      const schemaVersion = (parsed as { schemaVersion?: unknown }).schemaVersion;
+      if (schemaVersion !== "senseki-demo-v1" && schemaVersion !== "senseki-demo-v2") {
+        throw new Error(`Not a valid senseki-demo snapshot. schemaVersion=${String(schemaVersion)}`);
       }
       const snapshot = parsed as SensekiDemoSnapshot;
       const confirmMessage = [
@@ -1623,6 +1676,50 @@ function bindUi(): void {
     renderFeatures();
     refreshViews();
     mapView?.fitToData();
+  });
+
+  document.getElementById("mvp-senseki-pf")?.addEventListener("click", () => {
+    try {
+      // 1. 确保仙石線数据已加载
+      if (!state.source || state.source.features.length === 0) {
+        loadGeoJson(SENSEKI_RAIL);
+        importGeoJson(SENSEKI_STATIONS);
+      }
+
+      // 2. 将寻路所需的 annotation 写入 localStorage
+      let saved = 0;
+      for (const [id, annotation] of Object.entries(SENSEKI_PF_OVERRIDES)) {
+        saveAnnotationOverride(id, annotation);
+        saved += 1;
+      }
+      console.log(`[senseki-pf] saved ${saved} annotation overrides to localStorage`);
+
+      // 3. 应用所有 overrides + 编译
+      const { applied, total } = applyAnnotationOverrides();
+      console.log(`[senseki-pf] applied ${applied}/${total} annotation overrides`);
+      compileTopology();
+      renderFeatures();
+      refreshViews();
+
+      // 4. 异步运行寻路 (setTimeout 让 UI 先渲染)
+      const topo = state.topo!;
+      console.log("[senseki-pf] 开始寻路 (异步)...");
+      setTimeout(() => {
+        try {
+          const start = performance.now();
+          lastPathfindingResults = runSensekiScenarios(topo);
+          const elapsed = (performance.now() - start).toFixed(0);
+          const summary = summarizeSensekiResults(lastPathfindingResults as SensekiScenarioResult[]);
+          console.log(`[senseki-pf] 完成, 耗时 ${elapsed}ms, results:`, summary);
+          refreshViews();
+          mapView?.fitToData();
+        } catch (error) {
+          handleError(error);
+        }
+      }, 20);
+    } catch (error) {
+      handleError(error);
+    }
   });
 }
 

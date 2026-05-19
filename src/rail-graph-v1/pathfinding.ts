@@ -415,10 +415,12 @@ interface DfsState {
   edgeEntryNodes: EntityRef[];
   /** 在 edgeSequence[i] 上发生过换向, i 加入此 set; 同一 edge 不再换向 */
   turnbackAt: Set<number>;
-  visitedEdges: Set<EntityRef>;
+  segmentVisitedEdges: Set<EntityRef>;
   totalDistanceMeters: number;
   /** 起点物理类型 — 跟随 entry point 决定, 不随 DFS 推进改变 */
   startKind: "main" | "siding";
+  currentIntentionIndex: number;
+  directionRoleHistory: (TrackDirectionRole | undefined)[];
 }
 
 /**
@@ -430,6 +432,42 @@ interface RawCandidate {
   turnbackAt: number[];
   totalDistanceMeters: number;
   startKind: "main" | "siding";
+  localDiagnostics: Diagnostic[];
+}
+
+/**
+ * 拓扑可达性预检
+ */
+function isReachable(
+  startNode: EntityRef,
+  initialRole: TrackDirectionRole | undefined,
+  targetEdge: EntityRef,
+  lookup: TopologyLookup,
+  adjacency: Record<string, EntityRef[]> | any,
+): boolean {
+  const visited = new Set<string>();
+  const queue: { node: EntityRef; role: TrackDirectionRole | undefined }[] = [];
+  queue.push({ node: startNode, role: initialRole });
+  visited.add(`${startNode}:${initialRole}`);
+
+  while (queue.length > 0) {
+    const { node, role } = queue.shift()!;
+    const outEdges = adjacency.outEdges[node] ?? [];
+    for (const eid of outEdges) {
+      if (eid === targetEdge) return true;
+      const edge = lookup.edgesById[eid];
+      if (!edge) continue;
+      if (!isDirectionRoleCompatible(role, edge.directionRole)) continue;
+      const nextNode = edge.fromNodeRef === node ? edge.toNodeRef : edge.fromNodeRef;
+      const nextRole = (edge.directionRole === "up" || edge.directionRole === "down") ? edge.directionRole : role;
+      const stateKey = `${nextNode}:${nextRole}`;
+      if (!visited.has(stateKey)) {
+        visited.add(stateKey);
+        queue.push({ node: nextNode, role: nextRole });
+      }
+    }
+  }
+  return false;
 }
 
 /**
@@ -473,6 +511,8 @@ export function findPaths(
 
   const candidates: RawCandidate[] = [];
   const adjacency = topo.adjacency;
+  let dfsIterations = 0;
+  const DFS_LOG_INTERVAL = 20000; // 每 2 万次迭代输出一次进度
 
   // 过滤副线起步 (若 allowSidingStarts === false)
   const allowSiding = options.allowSidingStarts ?? true;
@@ -494,15 +534,55 @@ export function findPaths(
   const { constraints: chainConstraints, diagnostics: compileDiags } = compileChainToConstraints(chain, lookup);
   diagnostics.push(...compileDiags);
 
-  // DFS turnback 上限来自 chain.turnbackUpperBound
-  const tbMax = chainConstraints.turnbackUpperBound;
-  let tbRemaining = tbMax;
+  // 地理意图连通性预检: 验证是否能到达 chain 中规定的首个关键掉头/停靠点
+  const reachableEntryPoints: SeedEntryPoint[] = [];
+  if (chain.mode === "strict") {
+    let targetEdge: EntityRef | undefined;
+    for (const node of chain.nodes) {
+      if (node.kind === "reversal" && node.at) {
+        targetEdge = node.at;
+        break;
+      } else if (node.kind === "service_stop" && node.edgeRef) {
+        targetEdge = node.edgeRef;
+        break;
+      }
+    }
 
-  for (const start of filteredEntryPoints) {
+    if (targetEdge) {
+      for (const start of filteredEntryPoints) {
+        const reachable = isReachable(
+          start.startNodeRef,
+          startRes.initialDirectionRole,
+          targetEdge,
+          lookup,
+          adjacency,
+        );
+        if (reachable) {
+          reachableEntryPoints.push(start);
+        } else {
+          diagnostics.push({
+            level: "warn",
+            code: PathfindingDiagnosticCode.NO_PATH_FOUND,
+            stage: "findPaths",
+            message: `Geographical Conflict: Target edge '${targetEdge}' is not reachable from start node '${start.startNodeRef}' with initial direction '${startRes.initialDirectionRole}'.`,
+            context: { startNode: start.startNodeRef, targetEdge, directionRole: startRes.initialDirectionRole },
+          });
+        }
+      }
+    } else {
+      reachableEntryPoints.push(...filteredEntryPoints);
+    }
+  } else {
+    reachableEntryPoints.push(...filteredEntryPoints);
+  }
+
+  for (const start of reachableEntryPoints) {
     const initState = createInitialState(start, startRes.initialDirectionRole, lookup);
     if (!initState) continue;
     dfsExplore(initState);
   }
+
+  console.log(`[pathfinding] DFS 完成: ${dfsIterations} iterations, ${candidates.length} raw candidates`);
 
   if (candidates.length === 0) {
     diagnostics.push({
@@ -538,39 +618,81 @@ export function findPaths(
 
   // ─────────── DFS 闭包 ───────────
 
-  function dfsExplore(state: DfsState): void {
-    // 终点判定 (在尝试扩展前)
-    const lastEdge = state.edgeSequence[state.edgeSequence.length - 1];
-    if (lastEdge !== undefined && targetEdges.has(lastEdge)) {
-      candidates.push(snapshotCandidate(state));
-      return;
+  function checkAndAdvanceIntention(state: DfsState): boolean {
+    if (state.currentIntentionIndex >= chain.nodes.length) {
+      return false;
     }
-    if (targetNodes.has(state.currentNode) && state.edgeSequence.length > 0) {
-      candidates.push(snapshotCandidate(state));
-      return;
+    const node = chain.nodes[state.currentIntentionIndex];
+    const lastEdge = state.edgeSequence[state.edgeSequence.length - 1];
+
+    if (node.kind === "service_stop") {
+      if (!lastEdge) return false;
+      const bindings = lookup.bindingsByPlatform[node.at] ?? [];
+      const matchPlatform = bindings.some((b) => b.edgeRef === lastEdge);
+      const matchEdge = node.edgeRef ? node.edgeRef === lastEdge : true;
+      if (matchPlatform && matchEdge) {
+        state.currentIntentionIndex += 1;
+        return true;
+      }
+    } else if (node.kind === "passage") {
+      if (!lastEdge) return false;
+      if (node.throughKind === "platform") {
+        const bindings = lookup.bindingsByPlatform[node.throughRef] ?? [];
+        const matchPlatform = bindings.some((b) => b.edgeRef === lastEdge);
+        if (matchPlatform) {
+          state.currentIntentionIndex += 1;
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function dfsExplore(state: DfsState): void {
+    dfsIterations += 1;
+    if (dfsIterations % DFS_LOG_INTERVAL === 0) {
+      console.log(`[pathfinding] DFS ${dfsIterations} iterations, depth=${state.edgeSequence.length}, candidates=${candidates.length}`);
+    }
+
+    // 意图满足判定
+    let advanced = true;
+    while (advanced) {
+      advanced = checkAndAdvanceIntention(state);
+    }
+
+    // 终点判定 (在尝试扩展前，且必须满足除 terminus 外的所有意图节点)
+    const isTerminusIntention = state.currentIntentionIndex === chain.nodes.length - 1;
+    if (isTerminusIntention) {
+      const lastEdge = state.edgeSequence[state.edgeSequence.length - 1];
+      if (lastEdge !== undefined && targetEdges.has(lastEdge)) {
+        candidates.push(snapshotCandidate(state));
+        return;
+      }
+      if (targetNodes.has(state.currentNode) && state.edgeSequence.length > 0) {
+        candidates.push(snapshotCandidate(state));
+        return;
+      }
     }
 
     if (state.edgeSequence.length >= maxDepth) {
       return;
     }
 
-    // 1) 换向选项: 若上一条 edge 允许 turnback 且未曾换向过
-    //    Chain turnback 约束: count 上限来自 chain.turnbackUpperBound;
-    //    具体 edge 限定 (chain.reversal.at) 改为后过滤检查, DFS 不做
+    // 1) 换向选项: 仅当当前意图指向 reversal，且到达特定边时，方可按需折返
     if (allowTurnback && state.edgeSequence.length > 0) {
-      const lastIdx = state.edgeSequence.length - 1;
-      const lastEdgeId = state.edgeSequence[lastIdx];
-      const lastEdgeObj = lookup.edgesById[lastEdgeId];
-      if (lastEdgeObj && isTurnbackAllowed(lastEdgeObj) && !state.turnbackAt.has(lastIdx)) {
-        if (tbRemaining <= 0) {
-          // turnback 额度已用尽, 不进一步尝试
-        } else {
+      const node = chain.nodes[state.currentIntentionIndex];
+      if (node && node.kind === "reversal") {
+        const lastIdx = state.edgeSequence.length - 1;
+        const lastEdgeId = state.edgeSequence[lastIdx];
+        const lastEdgeObj = lookup.edgesById[lastEdgeId];
+        
+        const matchLocation = !node.at || node.at === lastEdgeId;
+        
+        if (lastEdgeObj && matchLocation && isTurnbackAllowed(lastEdgeObj) && !state.turnbackAt.has(lastIdx)) {
           const hasStop = (lookup.stoppingPointsByEdge[lastEdgeId] ?? []).length > 0;
           const stopOk = !requireStopForTurnback || hasStop;
           if (stopOk) {
-            tbRemaining -= 1;
             tryTurnback(state, lastIdx, lastEdgeObj);
-            tbRemaining += 1;
           }
         }
       }
@@ -579,12 +701,35 @@ export function findPaths(
     // 2) 正常 outEdges 探索
     const outEdges = adjacency.outEdges[state.currentNode] ?? [];
     for (const candidateEdgeId of outEdges) {
-      if (state.visitedEdges.has(candidateEdgeId)) continue;
       const edge = lookup.edgesById[candidateEdgeId];
       if (!edge) continue;
 
+      // 物理级防振荡: 除非刚刚发生折返，否则禁止立刻原路返回前一条边
+      if (state.edgeSequence.length > 0) {
+        const lastIdx = state.edgeSequence.length - 1;
+        const lastEdgeId = state.edgeSequence[lastIdx];
+        if (candidateEdgeId === lastEdgeId) {
+          if (!state.turnbackAt.has(lastIdx)) {
+            continue;
+          }
+        }
+      }
+
+      // segment-based 去重: 隔离折返前后的探索集，绝对防止当前单向阶段回环
+      if (state.segmentVisitedEdges.has(candidateEdgeId)) continue;
+
       if (edge.traversal === "forward" && edge.fromNodeRef !== state.currentNode) continue;
       if (!isDirectionRoleCompatible(state.currentDirectionRole, edge.directionRole)) continue;
+
+      // 几何箭头一致性
+      if (
+        edge.traversal === "both" &&
+        (edge.directionRole === "up" || edge.directionRole === "down")
+      ) {
+        const matchesDirection = state.currentDirectionRole === edge.directionRole;
+        const enteringFromNode = state.currentNode === edge.fromNodeRef;
+        if (matchesDirection !== enteringFromNode) continue;
+      }
 
       pushEdge(state, edge);
       dfsExplore(state);
@@ -594,10 +739,6 @@ export function findPaths(
 
   function tryTurnback(state: DfsState, lastIdx: number, lastEdge: TopologyEdge): void {
     const enteredFrom = state.edgeEntryNodes[lastIdx];
-    const newNode = enteredFrom === lastEdge.fromNodeRef ? lastEdge.toNodeRef : lastEdge.fromNodeRef;
-    // newNode === enteredFrom 表示反向后回到原入口, 即"在 edge 上 turnback"
-    // 但 newNode 实际上应等于 enteredFrom: 列车从 enteredFrom 进入, 走到另一端,
-    // turnback 后又从另一端回到 enteredFrom 端。
     const reversedNode = enteredFrom;
 
     const prevNode = state.currentNode;
@@ -608,19 +749,30 @@ export function findPaths(
     state.currentNode = reversedNode;
     state.currentDirectionRole = opposite;
 
+    const prevIntentionIndex = state.currentIntentionIndex;
+    state.currentIntentionIndex += 1;
+
+    // 折返开启新的单向阶段探索，清空当前阶段去重集
+    const prevVisited = state.segmentVisitedEdges;
+    state.segmentVisitedEdges = new Set();
+
     dfsExplore(state);
 
+    state.currentIntentionIndex = prevIntentionIndex;
     state.turnbackAt.delete(lastIdx);
     state.currentNode = prevNode;
     state.currentDirectionRole = prevRole;
-    void newNode;
+    state.segmentVisitedEdges = prevVisited;
   }
 
   function pushEdge(state: DfsState, edge: TopologyEdge): void {
     state.edgeSequence.push(edge.id);
     state.edgeEntryNodes.push(state.currentNode);
-    state.visitedEdges.add(edge.id);
+    state.segmentVisitedEdges.add(edge.id);
     state.totalDistanceMeters += edge.lengthMeters;
+
+    state.directionRoleHistory.push(state.currentDirectionRole);
+
     const nextNode = edge.fromNodeRef === state.currentNode ? edge.toNodeRef : edge.fromNodeRef;
     state.currentNode = nextNode;
     if (edge.directionRole === "up" || edge.directionRole === "down") {
@@ -631,13 +783,12 @@ export function findPaths(
   function popEdge(state: DfsState, edge: TopologyEdge): void {
     state.edgeSequence.pop();
     const entryNode = state.edgeEntryNodes.pop();
-    state.visitedEdges.delete(edge.id);
+    state.segmentVisitedEdges.delete(edge.id);
     state.totalDistanceMeters -= edge.lengthMeters;
     if (entryNode !== undefined) {
       state.currentNode = entryNode;
     }
-    // currentDirectionRole 回溯: 找前一条 edge 的 directionRole, 或回到 initial
-    state.currentDirectionRole = recomputeDirectionRole(state, lookup, startRes.initialDirectionRole);
+    state.currentDirectionRole = state.directionRoleHistory.pop();
   }
 }
 
@@ -777,7 +928,7 @@ function filterByChain(
         const found = raw.edgeSequence.some((eid) => bindings.some((b) => b.edgeRef === eid));
         if (!found) {
           ok = false;
-          diagnostics.push({
+          raw.localDiagnostics.push({
             level: "warn",
             code: PathGoalDiagnosticCode.REQUIRED_STOP_NOT_MET,
             stage: "filterByChain",
@@ -796,7 +947,7 @@ function filterByChain(
           const found = raw.edgeSequence.some((eid) => bindings.some((b) => b.edgeRef === eid));
           if (!found) {
             ok = false;
-            diagnostics.push({
+            raw.localDiagnostics.push({
               level: "warn",
               code: PathGoalDiagnosticCode.REQUIRED_STOP_NOT_MET,
               stage: "filterByChain",
@@ -811,7 +962,7 @@ function filterByChain(
 
       // strict: 实际 turnback 次数必须等于 chain 中 reversal 节点数
       if (raw.turnbackAt.length !== constraints.reversals.length) {
-        diagnostics.push({
+        raw.localDiagnostics.push({
           level: "warn",
           code: PathGoalDiagnosticCode.TURNBACK_COUNT_VIOLATION,
           stage: "filterByChain",
@@ -828,7 +979,7 @@ function filterByChain(
         const tbIdx = raw.turnbackAt[i];
         if (raw.edgeSequence[tbIdx] !== rev.at) {
           ok = false;
-          diagnostics.push({
+          raw.localDiagnostics.push({
             level: "warn",
             code: PathGoalDiagnosticCode.TURNBACK_COUNT_VIOLATION,
             stage: "filterByChain",
@@ -876,9 +1027,11 @@ function createInitialState(
       edgeSequence: [],
       edgeEntryNodes: [],
       turnbackAt: new Set(),
-      visitedEdges: new Set(),
+      segmentVisitedEdges: new Set(),
       totalDistanceMeters: 0,
       startKind,
+      currentIntentionIndex: 1,
+      directionRoleHistory: [],
     };
   }
 
@@ -897,24 +1050,12 @@ function createInitialState(
     edgeSequence: [start.firstEdge],
     edgeEntryNodes: [start.startNodeRef],
     turnbackAt: new Set(),
-    visitedEdges: new Set([start.firstEdge]),
+    segmentVisitedEdges: new Set([start.firstEdge]),
     totalDistanceMeters: edge.lengthMeters,
     startKind,
+    currentIntentionIndex: 1,
+    directionRoleHistory: [role],
   };
-}
-
-function recomputeDirectionRole(
-  state: DfsState,
-  lookup: TopologyLookup,
-  fallback: TrackDirectionRole | undefined,
-): TrackDirectionRole | undefined {
-  for (let i = state.edgeSequence.length - 1; i >= 0; i -= 1) {
-    const edge = lookup.edgesById[state.edgeSequence[i]];
-    if (edge?.directionRole === "up" || edge?.directionRole === "down") {
-      return edge.directionRole;
-    }
-  }
-  return fallback;
 }
 
 function snapshotCandidate(state: DfsState): RawCandidate {
@@ -924,6 +1065,7 @@ function snapshotCandidate(state: DfsState): RawCandidate {
     turnbackAt: [...state.turnbackAt].sort((a, b) => a - b),
     totalDistanceMeters: state.totalDistanceMeters,
     startKind: state.startKind,
+    localDiagnostics: [],
   };
 }
 
@@ -980,7 +1122,7 @@ function buildResultFromCandidate(
     startKind: raw.startKind,
     turnbackEdgeIndices: [...raw.turnbackAt],
     ruleTrace: [...ruleTrace],
-    diagnostics: [...diagnostics, ...localDiagnostics],
+    diagnostics: [...diagnostics, ...raw.localDiagnostics, ...localDiagnostics],
     resolvedChain: resolved,
     phaseSequence,
   };

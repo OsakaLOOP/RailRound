@@ -40,13 +40,14 @@ import type {
   ServiceTraceEntry,
 } from "../rail-graph-v1/service-template.types";
 import type { ScenarioResult } from "./poc-pathfinding";
+import type { SensekiScenarioResult } from "./poc-senseki-pathfinding";
 
 // ── Public API ──────────────────────────────────────────────
 
 export interface ListViewInput {
   topo: BaseTopologyLayer | null;
   diagnostics: Diagnostic[];
-  pathfindingResults?: ScenarioResult[];
+  pathfindingResults?: ScenarioResult[] | SensekiScenarioResult[];
   source?: AnnotatedFeatureCollection | null;
 }
 
@@ -54,6 +55,7 @@ export interface ListViewInput {
 export interface PathHandlerPayload {
   edgeSequence: EntityRef[];
   turnbackEdgeIndices: number[];
+  resolvedChain?: ResolvedChain;
 }
 
 export interface AnnotationChangePayload {
@@ -404,7 +406,7 @@ function renderPathfindingTab(state: InternalState): void {
   bindScenarioEvents(state);
 }
 
-function scenarioCard(r: ScenarioResult, idx: number, state: InternalState): string {
+function scenarioCard(r: ScenarioResult | SensekiScenarioResult, idx: number, state: InternalState): string {
   const isExpanded = state.selectedScenarioIdx === idx;
   return `<div class="lv-scenario ${isExpanded ? "expanded" : ""}" data-scenario-idx="${idx}">
     <div class="lv-scenario-header">
@@ -1394,6 +1396,7 @@ function bindScenarioEvents(state: InternalState): void {
     const payload: PathHandlerPayload = {
       edgeSequence: candidate.edgeSequence,
       turnbackEdgeIndices: candidate.turnbackEdgeIndices,
+      resolvedChain: candidate.resolvedChain,
     };
     cand.addEventListener("mouseenter", () => {
       state.pathHoverHandlers.forEach((h) => h(payload));

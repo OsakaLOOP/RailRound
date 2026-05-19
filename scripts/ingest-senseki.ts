@@ -684,6 +684,13 @@ function annotateFeatureByKind(f: AnyFeature, lodStationNames: Set<string>): unk
     let role: string = "main";
     if (classSub === "crossover") role = "connector";
     else if (classSub === "siding" || classSub === "spur") role = "passing";
+
+    // Phase 2: 从 class_sub 派生 physicalKind (UI 仍可覆盖 — applyAnnotationOverrides 优先).
+    let physicalKind: string = "main";
+    if (classSub === "siding" || classSub === "spur") physicalKind = "siding";
+    else if (classSub === "yard" || classSub === "service") physicalKind = "yard";
+    else if (classSub === "crossover") physicalKind = "lead";
+
     return wrapFeature(f, {
       kind: "track_geometry",
       schemaVersion: "rail-graph-v1",
@@ -692,6 +699,7 @@ function annotateFeatureByKind(f: AnyFeature, lodStationNames: Set<string>): unk
       track: {
         role,
         traversal: "both",
+        physicalKind,
         name: name ?? undefined,
       },
     }, { name, osmId, sourceTags });
@@ -774,11 +782,14 @@ function annotateFeatureByKind(f: AnyFeature, lodStationNames: Set<string>): unk
   }
 
   // 其他: level_crossing / crossing / railway_landuse / catenary_* / etc → unknown
+  // Phase 1.3a: source 细化为 osm-deferred-{class_main}, 便于 app 端按 class_main
+  // 聚合发一条 MVP_OSM_KIND_NOT_CONSUMED, 避免每个 feature 都发 MVP_UNKNOWN_FEATURE warn.
+  const deferredSource = classMain ? `osm-deferred-${classMain}` : "osm";
   return wrapFeature(f, {
     kind: "unknown",
     schemaVersion: "rail-graph-v1",
     id: baseId,
-    source: "osm",
+    source: deferredSource,
   }, { name, osmId, sourceTags });
 }
 

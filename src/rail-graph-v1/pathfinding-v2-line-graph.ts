@@ -138,7 +138,7 @@ export function buildLineGraph(
   // ── Pass 1: 生成 LG nodes ──
   for (const edge of port.allEdges()) {
     stats.totalEdgesProcessed += 1;
-    const dirs: LGDir[] = edge.traversal === "forward" ? ["fromTo"] : ["fromTo", "toFrom"];
+    const dirs = allowedTraversalDirs(edge);
     for (const dir of dirs) {
       const lgNode = createLGNode(edge, dir, port);
       nodes.set(lgNode.id, lgNode);
@@ -209,6 +209,30 @@ export function buildLineGraph(
 }
 
 // ── 3. Helpers ───────────────────────────────────────────────
+
+/**
+ * 决定一条物理 edge 在 LG 中应生成的方向集合.
+ *
+ * 这是**方向约束作为 LG 一阶规则**的核心 — 把"哪些方向合法"在建图时
+ * 就锁定, 算法层不再处理非法方向 (无对应 LG node 即可).
+ *
+ * 规则:
+ *   - traversal="forward": 只能沿 fromNode→toNode (单向几何). 仅 fromTo.
+ *   - traversal="both" + directionRole ∈ {"up","down"}: 标注为**单向运营**
+ *     (仅上行/仅下行, 见 base-topology.types.ts:46-47 的语义定义).
+ *     即使几何允许双向, 运营上也只允许沿"标注方向"通过.
+ *     **约定: 几何方向 fromNode→toNode 即 directionRole 标注的运行方向**.
+ *     此约定与 v1 (pathfinding.ts:766 `enteringFromNode = currentNode === edge.fromNodeRef`) 一致.
+ *     若实际数据 OSM way 方向与 directionRole 不符, 需在 annotation 阶段反转.
+ *     仅 fromTo.
+ *   - 其它 (traversal="both" + directionRole undefined/bidirectional/reversible):
+ *     双向均允许. fromTo + toFrom.
+ */
+export function allowedTraversalDirs(edge: TopologyEdge): LGDir[] {
+  if (edge.traversal === "forward") return ["fromTo"];
+  if (edge.directionRole === "up" || edge.directionRole === "down") return ["fromTo"];
+  return ["fromTo", "toFrom"];
+}
 
 export function lgNodeId(edgeId: EntityRef, dir: LGDir): LGNodeId {
   return `${edgeId}#${dir}`;

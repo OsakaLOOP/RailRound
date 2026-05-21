@@ -8,6 +8,7 @@
 
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { computeSpeedProfile, sampleSpeedProfile, constantSpeedDuration, type SpeedProfile } from "./path-animation-speed";
 
 import type {
   BaseTopologyLayer,
@@ -859,11 +860,29 @@ function applyPathHighlight(
     milestones.push({ type: "terminus", edgeIdx: edgeSequence.length - 1, measure: 1, label: "Terminus" });
   }
 
+  // 2.5) 从里程碑提取坐标作为动画放慢中心
+  // 每个 milestone (origin/stop/reversal/terminus) 都是站台/站点位置
+  const slowCenters: L.LatLng[] = [];
+  for (const ms of milestones) {
+    const edgeRef = edgeSequence[ms.edgeIdx];
+    if (!edgeRef) continue;
+    const entry = state.entityLayers.get(edgeRef);
+    if (!entry || entry.kind !== "edge") continue;
+    const lls = (entry.layer as L.Polyline).getLatLngs() as L.LatLng[];
+    if (lls.length === 0) continue;
+    const dists = buildDists(lls);
+    const total = dists[dists.length - 1] || 1;
+    const coord = interpolateAtDistance(lls, dists, ms.measure * total);
+    slowCenters.push(coord);
+  }
+
   // 3) 按照里程碑切割为 legs
   interface Leg {
     coords: L.LatLng[];
     startEvent?: Milestone;
     endEvent?: Milestone;
+    /** 预计算的速度分布 (null = 恒定速度) */
+    speedProfile: SpeedProfile | null;
   }
   const legs: Leg[] = [];
   for (let m = 0; m < milestones.length - 1; m++) {
@@ -893,10 +912,22 @@ function applyPathHighlight(
       legCoords.push(...sub);
     }
 
+    const deduped = deduplicateLatLngs(legCoords);
+    // 预计算 speedProfile (若存在 slowCenters)
+    const profile = slowCenters.length > 0
+      ? computeSpeedProfile(deduped, slowCenters, {
+          baseSpeed: 60,
+          platformRangeMeters: 300,
+          sweepMargin: 200,
+          slowMultiplier: 1 / 1.5,
+        })
+      : null;
+
     legs.push({
-      coords: deduplicateLatLngs(legCoords),
+      coords: deduped,
       startEvent: m === 0 ? startM : undefined,
       endEvent: endM,
+      speedProfile: profile,
     });
   }
 
@@ -1061,28 +1092,42 @@ function applyPathHighlight(
       dists.push(totalDist);
     }
 
-    const speed = 60; // 从 120 降低到 60 (0.5x)
-    const duration = Math.max(800, Math.min(7000, (totalDist / speed) * 1000));
+    // 使用预计算 speedProfile (若存在), 否则回退到恒定速度
+    const profile = leg.speedProfile;
+    const duration = profile
+      ? profile.totalDuration
+      : constantSpeedDuration(totalDist, 60);
     const startTime = performance.now();
 
     const frame = (now: number) => {
       const elapsed = now - startTime;
-      const t = Math.min(1, elapsed / duration);
 
-      const currentDist = t * totalDist;
-      const currentLatLng = getLatLngAtDistance(coords, dists, currentDist);
+      let currentDist: number;
+      let currentLatLng: L.LatLng;
+      let currentTraveled: L.LatLng[];
+
+      if (profile) {
+        const sampled = sampleSpeedProfile(elapsed, profile, coords);
+        currentDist = sampled.currentDist;
+        currentLatLng = sampled.currentLatLng;
+        currentTraveled = sampled.traveledCoords;
+      } else {
+        const t = Math.min(1, elapsed / duration);
+        currentDist = t * totalDist;
+        currentLatLng = getLatLngAtDistance(coords, dists, currentDist);
+        currentTraveled = getTraveledCoords(coords, dists, currentDist);
+      }
 
       if (trainMarker) {
         trainMarker.setLatLng(currentLatLng);
         state.map.panTo(currentLatLng, { animate: false });
       }
 
-      const currentTraveled = getTraveledCoords(coords, dists, currentDist);
       const fullTraveled = [...traveledCoordsHistory, ...currentTraveled];
       progressGlowPolyline.setLatLngs(fullTraveled);
       progressCorePolyline.setLatLngs(fullTraveled);
 
-      if (t < 1) {
+      if (elapsed < duration) {
         state.animationFrameId = requestAnimationFrame(frame);
       } else {
         callback();
@@ -1157,6 +1202,20 @@ function getSubCoords(
   }
 
   return result;
+}
+
+function buildDists(pts: L.LatLng[]): number[] {
+  const dists: number[] = [0];
+  for (let i = 1; i < pts.length; i++) {
+    dists.push(dists[i - 1] + pts[i - 1].distanceTo(pts[i]));
+  }
+  return dists;
+}
+
+function totalEdgeDist(pts: L.LatLng[]): number {
+  if (pts.length < 2) return 0;
+  const d = buildDists(pts);
+  return d[d.length - 1];
 }
 
 function interpolateAtDistance(pts: L.LatLng[], dists: number[], d: number): L.LatLng {

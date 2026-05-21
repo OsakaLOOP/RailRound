@@ -29,7 +29,10 @@ import {
 export const OSM_WAY_351315047 = "osm:way:351315047"; // 单线可逆, 石巻侧
 export const OSM_WAY_1320551298 = "osm:way:1320551298"; // 青叶通站台线 1, 可逆+隧道
 export const OSM_WAY_775723282 = "osm:way:775723282";   // 青叶通站台线 2, 可逆+隧道
+export const OSM_WAY_775723282_1 = "osm:way:775723282(1)"; // 被分割的主线第一个对象
+export const OSM_WAY_775730626 = "osm:way:775730626";   // 上行第二个对象(渡线或后续主线)
 export const OSM_WAY_598378597 = "osm:way:598378597";   // 石巻侧 短折返用, 可逆
+export const OSM_WAY_103872841 = "osm:way:103872841";   // 中途主线对象
 
 // ---- Annotation Overrides (完整 RailGraphAnnotation) ----
 // 通过 app.ts saveAnnotationOverride → localStorage → applyAnnotationOverrides 生效.
@@ -72,6 +75,32 @@ export const SENSEKI_PF_OVERRIDES: Record<string, RailGraphAnnotation> = {
       traversal: "both",
       physicalKind: "main",
       directionRole: "reversible",
+      functionalUse: ["through", "stopping", "turnback"],
+    },
+  },
+  [OSM_WAY_775723282_1]: {
+    kind: "track_geometry",
+    schemaVersion: "rail-graph-v1",
+    id: OSM_WAY_775723282_1,
+    source: "osm",
+    track: {
+      role: "main",
+      traversal: "both",
+      physicalKind: "main",
+      directionRole: "up",
+      functionalUse: ["through", "stopping", "turnback"],
+    },
+  },
+  [OSM_WAY_775730626]: {
+    kind: "track_geometry",
+    schemaVersion: "rail-graph-v1",
+    id: OSM_WAY_775730626,
+    source: "osm",
+    track: {
+      role: "main",
+      traversal: "both",
+      physicalKind: "main",
+      directionRole: "up",
       functionalUse: ["through", "stopping", "turnback"],
     },
   },
@@ -247,11 +276,12 @@ export interface SensekiScenarioResult {
   passed: boolean;
   reason?: string;
 }
-function buildScenarios(topo: BaseTopologyLayer, lookup: TopologyLookup): SensekiScenario[] {
+export function buildScenarios(topo: BaseTopologyLayer, lookup: TopologyLookup): SensekiScenario[] {
   const edge3513 = findEdgeBySourceRef(topo, OSM_WAY_351315047);
   const edge5983 = findEdgeBySourceRef(topo, OSM_WAY_598378597);
   const edge1320 = findEdgeBySourceRef(topo, OSM_WAY_1320551298);
   const edge7757 = findEdgeBySourceRef(topo, OSM_WAY_775723282);
+  const edge7757_30626 = findEdgeBySourceRef(topo, OSM_WAY_775730626);
 
   if (!edge3513 || !edge5983) {
     console.warn("[senseki-pf] 目标 edge3513 或 edge5983 未在 topo 中找到");
@@ -340,6 +370,44 @@ function buildScenarios(topo: BaseTopologyLayer, lookup: TopologyLookup): Sensek
     console.warn("[senseki-pf] Aobadori edges (edge1320/edge7757) not found, skipping S1 and S2");
   }
 
+  if (edge1320 && edge7757_30626) {
+    const dead1320 = findDeadEndNode(edge1320);
+    // S3: 强制交叉渡线
+    scenarios.push({
+      name: "S3 强制渡线: 青叶通下行站台→上行第二个对象(775730626)",
+      description: "从 1320551298(青叶通下行站台)出发, 到 775730626(上行第二个对象)结束, 理论上会强制经过交叉渡线.",
+      startSeed: { kind: "node", nodeRef: dead1320, alongDirection: "down" },
+      endSeed: { kind: "node", nodeRef: edge7757_30626.fromNodeRef }
+    });
+  }
+
+  const edge103872841 = findEdgeBySourceRef(topo, OSM_WAY_103872841);
+  if (edge1320 && edge103872841 && edge103872841.coordinates) {
+    const dead1320 = findDeadEndNode(edge1320);
+    const coords = edge103872841.coordinates;
+    const westNode = coords[0][0] < coords[coords.length - 1][0]
+      ? edge103872841.fromNodeRef
+      : edge103872841.toNodeRef;
+    scenarios.push({
+      name: "S4 强制渡线: 青叶通下行站台→osm:way:103872841",
+      description: "从 1320551298(青叶通下行站台)出发, 到 103872841 结束, 理论上会强制经过交叉渡线.",
+      startSeed: { kind: "node", nodeRef: dead1320, alongDirection: "down" },
+      endSeed: { kind: "node", nodeRef: westNode }
+    });
+  }
+
+  if (edge1320) {
+    const dead1320 = findDeadEndNode(edge1320);
+    const dead3513 = findDeadEndNode(edge3513);
+    // S5 情景: 经过渡线上行到351315047为止 / Crossover to up-line towards 351315047
+    scenarios.push({
+      name: "S5 强制渡线: 青叶通下行站台→osm:way:351315047",
+      description: "从 1320551298(青叶通下行站台)出发, 到 351315047 结束, 经过全线上行及交叉渡线.",
+      startSeed: { kind: "node", nodeRef: dead1320, alongDirection: "down" },
+      endSeed: { kind: "node", nodeRef: dead3513 }
+    });
+  }
+
   return scenarios;
 }
 
@@ -375,7 +443,7 @@ export function runSensekiScenarios(topo: BaseTopologyLayer): SensekiScenarioRes
     console.log(`[senseki-pf] 运行: ${scenario.name}`);
     const candidates = findPaths(topo, lookup, scenario.startSeed, scenario.endSeed, {
       maxCandidates: 4,
-      maxDepth: 64,       // 短折返 ~16 edges 往返, 64 足够
+      maxDepth: 200,       // 全线单程/折返需要更多 edge 数
       allowTurnback: true,
       pathGoal: scenario.pathGoal,
     });
@@ -394,12 +462,14 @@ export function runSensekiScenarios(topo: BaseTopologyLayer): SensekiScenarioRes
     const best = candidates[0];
     const hasTurnback = best.phases.some((p) => p.kind === "turnback");
     console.log(`[senseki-pf]   → ${candidates.length} candidates, best: ${Math.round(best.totalDistanceMeters)}m, turnback=${hasTurnback}`);
+    const requiresTurnback = scenario.pathGoal?.turnback?.count !== undefined && scenario.pathGoal.turnback.count > 0;
+    const passed = requiresTurnback ? hasTurnback : !hasTurnback;
     results.push({
       scenario,
       candidates,
       best,
-      passed: hasTurnback,
-      reason: hasTurnback ? undefined : "no turnback phase detected",
+      passed,
+      reason: passed ? undefined : (requiresTurnback ? "no turnback phase detected" : "unexpected turnback phase detected"),
     });
   }
 
@@ -416,20 +486,20 @@ export function summarizeSensekiResults(results: SensekiScenarioResult[]): unkno
     candidatesCount: r.candidates.length,
     best: r.best
       ? {
-          totalDistanceMeters: Math.round(r.best.totalDistanceMeters),
-          startKind: r.best.startKind,
-          edgeCount: r.best.edgeSequence.length,
-          turnbackEdgeIndices: r.best.turnbackEdgeIndices,
-          phases: r.best.phases.map((p) => ({
-            phaseIndex: p.phaseIndex,
-            kind: p.kind,
-            directionRole: p.directionRole,
-            edgeRange: p.edgeRange,
-            distanceMeters: Math.round(p.distanceMeters),
-          })),
-          chainMode: r.best.resolvedChain?.mode,
-          diagnostics: r.best.diagnostics,
-        }
+        totalDistanceMeters: Math.round(r.best.totalDistanceMeters),
+        startKind: r.best.startKind,
+        edgeCount: r.best.edgeSequence.length,
+        turnbackEdgeIndices: r.best.turnbackEdgeIndices,
+        phases: r.best.phases.map((p) => ({
+          phaseIndex: p.phaseIndex,
+          kind: p.kind,
+          directionRole: p.directionRole,
+          edgeRange: p.edgeRange,
+          distanceMeters: Math.round(p.distanceMeters),
+        })),
+        chainMode: r.best.resolvedChain?.mode,
+        diagnostics: r.best.diagnostics,
+      }
       : null,
   }));
 }
@@ -614,6 +684,8 @@ if (typeof window !== "undefined") {
       OSM_WAY_351315047,
       OSM_WAY_1320551298,
       OSM_WAY_775723282,
+      OSM_WAY_775723282_1,
+      OSM_WAY_775730626,
       OSM_WAY_598378597,
       SENSEKI_PF_OVERRIDES,
       runSensekiScenarios,

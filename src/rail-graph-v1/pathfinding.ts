@@ -49,6 +49,7 @@ import {
   validateChain,
 } from "./chain";
 import { buildPhaseSequence, phaseSequenceToCoarsePhases } from "./phase";
+import { findPathsV2 } from "./pathfinding-v2";
 
 // ── 1. Path Seed ────────────────────────────────────────────
 
@@ -499,7 +500,125 @@ function isReachable(
  * 算法骨架: DFS + visitedEdges set + 可选 turnback 状态转换。
  * 命中 endSeed 后停止该分支, 收集候选, 全部跑完后按距离排序输出 top-maxCandidates。
  */
+// ── 6. findPaths — v2 入口 (Edge-Line-Graph + Layered Yen-A*) ──
+
+/**
+ * 在固定拓扑上做带方向语义的全量寻径.
+ *
+ * **v2 实现**: 基于 Edge-to-Edge Line Graph + 分层乘积图 + Yen K-Shortest A*.
+ * 见 docs/rail-graph-v1-plan/ 与 src/rail-graph-v1/pathfinding-v2.ts.
+ *
+ * 与 v1 (递归 DFS) 的差异:
+ *   - 完全 iterative, 无栈溢出风险
+ *   - 角度过滤作为连通性预处理 (Line Graph 边一阶约束)
+ *   - turnback 通过分层图自动剪枝, 不依赖 maxDepth
+ *   - chain 约束编入状态空间, label-setting 保证 strict mode 严格性
+ *
+ * v1 DFS 实现仍可通过 findPathsV1Legacy 调用 (供 baseline 对照测试用).
+ */
 export function findPaths(
+  topo: BaseTopologyLayer,
+  lookup: TopologyLookup,
+  startSeed: PathSeed,
+  endSeed: PathSeed,
+  options: PathfindingOptions = {},
+): PathfindingResult[] {
+  const maxCandidates = options.maxCandidates ?? 16;
+  const diagnostics: Diagnostic[] = [];
+  const ruleTrace: PathGenerationRuleTrace[] = [];
+
+  const startRes = resolveSeed(topo, lookup, startSeed);
+  const endRes = resolveSeed(topo, lookup, endSeed);
+  diagnostics.push(...startRes.diagnostics, ...endRes.diagnostics);
+
+  if (startRes.entryPoints.length === 0 || endRes.entryPoints.length === 0) {
+    return [];
+  }
+
+  // 过滤副线起步 (若 allowSidingStarts === false)
+  const allowSiding = options.allowSidingStarts ?? true;
+  const filteredEntryPoints = allowSiding
+    ? startRes.entryPoints
+    : startRes.entryPoints.filter((ep) => ep.startKind !== "siding");
+
+  // 解析 IntentionChain (优先 options.intentionChain, 否则从 pathGoal 适配, 否则 implicit)
+  const chain: IntentionChain = options.intentionChain
+    ?? fromPathGoalToChain(options.pathGoal, startSeed, endSeed)
+    ?? createImplicitChain(seedToAnchor(startSeed, "up"), seedToAnchor(endSeed));
+
+  const chainValidationDiags = validateChain(chain);
+  diagnostics.push(...chainValidationDiags);
+  if (chainValidationDiags.some((d) => d.level === "error" || d.level === "fatal")) {
+    return [];
+  }
+
+  // ── 调用 v2 主搜索 ──
+  const v2Result = findPathsV2({
+    topo,
+    lookup,
+    startEntryPoints: filteredEntryPoints,
+    endEntryPoints: endRes.entryPoints,
+    chain,
+    initialDirectionRole: startRes.initialDirectionRole,
+    maxCandidates,
+    angleThresholdDeg: 90,
+    timeoutMs: 10_000,
+  });
+  diagnostics.push(...v2Result.diagnostics);
+
+  if (v2Result.candidates.length === 0) {
+    diagnostics.push({
+      level: "warn",
+      code: PathfindingDiagnosticCode.NO_PATH_FOUND,
+      stage: "findPaths",
+      message: "No path found between start and end seed (v2 search exhausted).",
+    });
+    return [];
+  }
+
+  // ── RawCandidateV2 → RawCandidate (v1 兼容形态) → PathfindingResult ──
+  const rawV1Candidates: RawCandidate[] = v2Result.candidates.map((rc) => ({
+    edgeSequence: rc.edgeSequence,
+    edgeEntryNodes: rc.edgeEntryNodes,
+    turnbackAt: rc.turnbackAt,
+    totalDistanceMeters: rc.totalDistanceMeters,
+    startKind: rc.startKind,
+    localDiagnostics: rc.localDiagnostics,
+  }));
+
+  // 排序: 主线起步在前, 然后按距离
+  rawV1Candidates.sort((a, b) => {
+    const aIsMain = a.startKind === "main" ? 0 : 1;
+    const bIsMain = b.startKind === "main" ? 0 : 1;
+    if (aIsMain !== bIsMain) return aIsMain - bIsMain;
+    return a.totalDistanceMeters - b.totalDistanceMeters;
+  });
+
+  const top = rawV1Candidates.slice(0, maxCandidates);
+  if (rawV1Candidates.length > maxCandidates) {
+    diagnostics.push({
+      level: "info",
+      code: PathfindingDiagnosticCode.MAX_CANDIDATES_REACHED,
+      stage: "findPaths",
+      message: "More candidates exist than maxCandidates; truncated.",
+      context: { totalFound: rawV1Candidates.length, kept: maxCandidates },
+    });
+  }
+
+  console.log(`[pathfinding v2] ${top.length} candidates, ${v2Result.stats.searchInvocations} searches, ${v2Result.stats.lgBuildTimeMs.toFixed(1)}ms LG build`);
+
+  return top.map((raw) => buildResultFromCandidate(raw, topo, lookup, ruleTrace, diagnostics, chain, startSeed, endSeed));
+}
+
+// ── 6.1 v1 Legacy DFS findPaths (供 baseline 对照测试用) ─────
+
+/**
+ * v1 DFS 寻径 (legacy). 仅供 baseline 对照测试调用.
+ *
+ * 默认入口 findPaths 已切到 v2 (Line Graph + Yen-A*).
+ * 此函数保留 v1 行为以便对比, 不再随主代码演进.
+ */
+export function findPathsV1Legacy(
   topo: BaseTopologyLayer,
   lookup: TopologyLookup,
   startSeed: PathSeed,
@@ -755,14 +874,26 @@ export function findPaths(
       if (state.segmentVisitedEdges.has(candidateEdgeId)) continue;
 
       if (edge.traversal === "forward" && edge.fromNodeRef !== state.currentNode) continue;
-      if (!isDirectionRoleCompatible(state.currentDirectionRole, edge.directionRole)) continue;
+
+      // 若当前处于可逆/双向/未指定方向的轨道，则允许过渡到单向轨道并改变运行方向角色
+      // If currently on a reversible/bidirectional/undefined track, allow transition to a single-way track and change the direction role.
+      const currentEdgeId = state.edgeSequence[state.edgeSequence.length - 1];
+      const currentEdge = currentEdgeId ? lookup.edgesById[currentEdgeId] : null;
+      const isCurrentFlexible = !currentEdge || 
+        currentEdge.directionRole === "reversible" || 
+        currentEdge.directionRole === "bidirectional" || 
+        currentEdge.directionRole === undefined;
+
+      const isCompat = isCurrentFlexible || isDirectionRoleCompatible(state.currentDirectionRole, edge.directionRole);
+      if (!isCompat) continue;
 
       // 几何箭头一致性
       if (
         edge.traversal === "both" &&
         (edge.directionRole === "up" || edge.directionRole === "down")
       ) {
-        const matchesDirection = state.currentDirectionRole === edge.directionRole;
+        const nextDirectionRole = edge.directionRole;
+        const matchesDirection = nextDirectionRole === edge.directionRole;
         const enteringFromNode = state.currentNode === edge.fromNodeRef;
         if (matchesDirection !== enteringFromNode) continue;
       }

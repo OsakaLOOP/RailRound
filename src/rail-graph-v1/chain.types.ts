@@ -130,6 +130,22 @@ export interface OperationNode {
   opKind: OperationType;
 }
 
+/**
+ * 必须经过的物理 edge (v2 寻径用).
+ *
+ * 比 PassageNode 更精确 — 不依赖 platform/station binding, 直接锁定到一条
+ * 物理 edge. 适用于"经过某段轨道但该轨道未挂 platform"的中途约束 (例如仙石線
+ * S5 场景里的中途主线 edge).
+ *
+ * - `edgeRef`: 必须经过的物理 edge
+ * - `preferredDir`: 可选, 指定沿哪个方向经过 (Line Graph 上的 LGDir)
+ */
+export interface ViaEdgeNode {
+  kind: "via_edge";
+  edgeRef: EntityRef;
+  preferredDir?: "fromTo" | "toFrom";
+}
+
 export type IntentionNode =
   | OriginNode
   | ServiceStopNode
@@ -137,6 +153,7 @@ export type IntentionNode =
   | ReversalNode
   | TechnicalStopNode
   | OperationNode
+  | ViaEdgeNode
   | TerminusNode;
 
 export type IntentionNodeKind = IntentionNode["kind"];
@@ -144,10 +161,12 @@ export type IntentionNodeKind = IntentionNode["kind"];
 // ── 3. Chain mode ───────────────────────────────────────────
 
 /**
- * - `strict`: chain 完整描述运行剧本; DFS 必须严格满足所有约束; 额外 turnback 视为编译失败
- * - `sketch`: chain 仅给关键节点; DFS 自由发挥; 候选 path 反向"对齐"成 candidate chain (auto-inserted reversal/passage)
+ * - `strict`: chain 完整描述运行剧本; 寻径必须严格满足所有约束; 额外 turnback 视为编译失败
+ * - `sketch`: chain 仅给关键节点; 寻径自由发挥; 候选 path 反向"对齐"成 candidate chain (auto-inserted reversal/passage)
+ * - `guided`: chain 节点是**软约束** — 违反时不剪枝, 而是给路径加 penalty 权重 (例如每个未满足节点 +1000m).
+ *             适用于"用户大概想这么走但不强求"的场景, 介于 strict 和 sketch 之间.
  */
-export type ChainMode = "strict" | "sketch";
+export type ChainMode = "strict" | "sketch" | "guided";
 
 export interface IntentionChain {
   mode: ChainMode;

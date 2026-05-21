@@ -110,12 +110,12 @@ export function importGeoJson(raw: string | GeoJsonFeatureCollection): RailGraph
 
   const existing = state.source?.features ?? [];
   const incoming = parsed.features.map((feature, index) => ({
-      ...feature,
-      properties: {
-        ...feature.properties,
-        railGraph: normalizeAnnotation(feature, index),
-      },
-    }));
+    ...feature,
+    properties: {
+      ...feature.properties,
+      railGraph: normalizeAnnotation(feature, index),
+    },
+  }));
 
   const deduped = dedupeFeatures([...existing, ...incoming]);
   state.source = {
@@ -284,7 +284,7 @@ export function compileTopology(): BaseTopologyLayer {
   }
 
   applyCrossoverSnapping(topo, diagnostics);
-  
+
   topo.adjacency = buildAdjacency(topo.edges);
   addBindings(topo, diagnostics);
   addStoppingPoints(topo, diagnostics);
@@ -1580,13 +1580,28 @@ function applyAnnotationOverrides(): { applied: number; total: number } {
       const id = f.properties.railGraph?.id;
       if (id && overrides[id]) {
         applied += 1;
-        return {
+        const targetReversed = !!overrides[id].track?.geometryReversed;
+        const currentReversed = !!(f as any)._coordsReversed;
+        let nextCoords = f.geometry.coordinates;
+        let nextCoordsReversed = currentReversed;
+        if (targetReversed !== currentReversed && f.geometry.type === "LineString") {
+          nextCoords = [...f.geometry.coordinates].reverse();
+          nextCoordsReversed = targetReversed;
+        }
+
+        const nextFeature = {
           ...f,
+          geometry: {
+            ...f.geometry,
+            coordinates: nextCoords,
+          },
           properties: {
             ...f.properties,
             railGraph: overrides[id],
           },
         };
+        (nextFeature as any)._coordsReversed = nextCoordsReversed;
+        return nextFeature;
       }
       return f;
     }),
@@ -1596,7 +1611,7 @@ function applyAnnotationOverrides(): { applied: number; total: number } {
 
 function clearAnnotationOverrides(): void {
   if (typeof localStorage === "undefined") return;
-  try { localStorage.removeItem(ANNOTATION_OVERRIDES_KEY); } catch {}
+  try { localStorage.removeItem(ANNOTATION_OVERRIDES_KEY); } catch { }
 }
 
 function computeRelatedRefs(ref: EntityRef): EntityRef[] {

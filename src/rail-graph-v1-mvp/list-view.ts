@@ -1203,9 +1203,19 @@ function reverseFeatureGeometry(state: InternalState, featureIdx: number): void 
     ...f,
     geometry: { ...f.geometry, coordinates: coords },
   };
-  // 触发 recompile (annotation 不变, 但 geometry 变了 → fromNode/toNode 会交换)
+  (features[featureIdx] as any)._coordsReversed = !(f as any)._coordsReversed;
+  
+  // 触发 recompile 并保存
   const ann = ensureAnnotation(f);
-  emitAnnotationChange(state, featureIdx, ann);
+  const track = ann.track ?? { role: "main", traversal: "both" };
+  const next: RailGraphAnnotation = {
+    ...ann,
+    track: {
+      ...track,
+      geometryReversed: !track.geometryReversed,
+    },
+  };
+  emitAnnotationChange(state, featureIdx, next);
 }
 
 function emitAnnotationBatch(state: InternalState, payloads: AnnotationChangePayload[]): void {

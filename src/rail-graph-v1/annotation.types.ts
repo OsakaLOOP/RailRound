@@ -51,6 +51,7 @@ export interface RailGraphTrackAnnotation {
   physicalKind?: TrackPhysicalKind;
   functionalUse?: TrackFunctionalUse[];
   directionRole?: TrackDirectionRole;
+  geometryReversed?: boolean;
 }
 
 export interface RailGraphStationAnnotation {

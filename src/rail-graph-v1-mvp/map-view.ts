@@ -195,6 +195,9 @@ interface InternalState {
   clickHandlers: Array<(ref: EntityRef) => void>;
   animationFrameId?: number;
   animationTimeouts?: number[];
+  originalZoom?: number;
+  originalCenter?: L.LatLng;
+  isAnimatingPath?: boolean;
 }
 
 // ── 4. Factory ──────────────────────────────────────────────
@@ -740,6 +743,12 @@ function applyPathHighlight(
   clearPathHighlight(state);
   if (edgeSequence.length === 0) return;
 
+  if (!state.isAnimatingPath) {
+    state.originalZoom = state.map.getZoom();
+    state.originalCenter = state.map.getCenter();
+    state.isAnimatingPath = true;
+  }
+
   const turnbackSet = new Set(turnbackEdgeIndices ?? []);
 
   // 1) 推算每条 edge 在 path 中的实际行进方向 (entry node → exit node)
@@ -956,6 +965,9 @@ function applyPathHighlight(
         interactive: false,
       });
       trainMarker.addTo(animProgressGroup);
+
+      // 视角定位和放大到动画起点
+      state.map.setView(legs[0].coords[0], 18, { animate: true });
     }
 
     playLeg(0);
@@ -963,10 +975,10 @@ function applyPathHighlight(
 
   const playLeg = (legIdx: number) => {
     if (legIdx >= legs.length) {
-      // 完成一轮循环，停顿 1667ms (原 2500ms 加快 1.5x) 后重新开始
+      // 完成一轮循环，停顿 5000ms (0.5x 减慢) 后重新开始
       const tId = window.setTimeout(() => {
         initAnimation();
-      }, 1667);
+      }, 5000);
       state.animationTimeouts?.push(tId);
       return;
     }
@@ -1014,11 +1026,11 @@ function applyPathHighlight(
       offset: [0, -10],
     }).addTo(animProgressGroup);
 
-    // 停顿时间加快 1.5x
-    let dwell = 800;
-    if (evt.type === "origin") dwell = 667;
-    else if (evt.type === "reversal") dwell = 1067;
-    else if (evt.type === "terminus") dwell = 1333;
+    // 停顿时间减慢 0.5x
+    let dwell = 2400;
+    if (evt.type === "origin") dwell = 2000;
+    else if (evt.type === "reversal") dwell = 3200;
+    else if (evt.type === "terminus") dwell = 4000;
 
     const tId = window.setTimeout(callback, dwell);
     state.animationTimeouts?.push(tId);
@@ -1049,8 +1061,8 @@ function applyPathHighlight(
       dists.push(totalDist);
     }
 
-    const speed = 180; // 从 120 提升到 180 (1.5x)
-    const duration = Math.max(267, Math.min(2333, (totalDist / speed) * 1000));
+    const speed = 60; // 从 120 降低到 60 (0.5x)
+    const duration = Math.max(800, Math.min(7000, (totalDist / speed) * 1000));
     const startTime = performance.now();
 
     const frame = (now: number) => {
@@ -1062,6 +1074,7 @@ function applyPathHighlight(
 
       if (trainMarker) {
         trainMarker.setLatLng(currentLatLng);
+        state.map.panTo(currentLatLng, { animate: false });
       }
 
       const currentTraveled = getTraveledCoords(coords, dists, currentDist);
@@ -1223,6 +1236,15 @@ function clearPathHighlight(state: InternalState): void {
     if (marker) marker.setOpacity(1);
   }
   state.dimmedArrowKeys.clear();
+
+  if (state.isAnimatingPath) {
+    if (state.originalCenter && state.originalZoom !== undefined) {
+      state.map.setView(state.originalCenter, state.originalZoom, { animate: true });
+    }
+    state.isAnimatingPath = false;
+    state.originalCenter = undefined;
+    state.originalZoom = undefined;
+  }
 }
 
 function clearAllHighlight(state: InternalState): void {

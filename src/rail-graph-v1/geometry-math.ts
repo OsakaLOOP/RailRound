@@ -137,14 +137,46 @@ export function calculateTurnAngle(
   if (coordsA.length < 2 || coordsB.length < 2) return 180;
 
   // 寻找 A 中靠近交点的向量 (指向交点)
+  // Find the vector in A close to the intersection (pointing to it)
   const isAStartShared = haversineDistance(coordsA[0], sharedNodeCoord) < 0.1;
-  const vecAStart = isAStartShared ? coordsA[1] : coordsA[coordsA.length - 2];
+  let vecAStart = isAStartShared ? coordsA[1] : coordsA[coordsA.length - 2];
+  if (isAStartShared) {
+    for (let i = 1; i < coordsA.length; i++) {
+      if (haversineDistance(coordsA[i], sharedNodeCoord) > 0.1) {
+        vecAStart = coordsA[i];
+        break;
+      }
+    }
+  } else {
+    for (let i = coordsA.length - 2; i >= 0; i--) {
+      if (haversineDistance(coordsA[i], sharedNodeCoord) > 0.1) {
+        vecAStart = coordsA[i];
+        break;
+      }
+    }
+  }
   const vecAEnd = sharedNodeCoord;
 
   // 寻找 B 中靠近交点的向量 (离开交点)
+  // Find the vector in B close to the intersection (pointing away from it)
   const isBStartShared = haversineDistance(coordsB[0], sharedNodeCoord) < 0.1;
   const vecBStart = sharedNodeCoord;
-  const vecBEnd = isBStartShared ? coordsB[1] : coordsB[coordsB.length - 2];
+  let vecBEnd = isBStartShared ? coordsB[1] : coordsB[coordsB.length - 2];
+  if (isBStartShared) {
+    for (let i = 1; i < coordsB.length; i++) {
+      if (haversineDistance(coordsB[i], sharedNodeCoord) > 0.1) {
+        vecBEnd = coordsB[i];
+        break;
+      }
+    }
+  } else {
+    for (let i = coordsB.length - 2; i >= 0; i--) {
+      if (haversineDistance(coordsB[i], sharedNodeCoord) > 0.1) {
+        vecBEnd = coordsB[i];
+        break;
+      }
+    }
+  }
 
   const refLat = sharedNodeCoord[1];
   const a1 = toLocalMeters(vecAStart[0], vecAStart[1], refLat);

@@ -26,6 +26,7 @@ import Tutorial from './components/Tutorial';
 import { api } from './services/api';
 import { db } from './utils/db';
 import { calcDist, sliceGeoJsonPath, getRouteVisualData, calculateLatestStats, stitchRoutes } from './core/tripCalculator';
+import { buildStationIndex } from './core/railwayRouting';
 import { VersionBadge } from './components/VersionBadge';
 import manifest from '../public/geojson_manifest.json';
 
@@ -256,17 +257,25 @@ const getTransferableLines = (station, currentLineKey, railwayData, strictMode =
         });
     }
 
-    Object.keys(railwayData).forEach(lineKey => {
-        if (lineKey === currentLineKey) return;
-        if (validLines.has(lineKey)) return;
-        const nextMeta = railwayData[lineKey].meta;
-        if (strictMode && !isCompanyCompatible(currentMeta, nextMeta)) return;
-        const sameNameStation = railwayData[lineKey].stations.find(s => s.name_ja === station.name_ja);
-        if (sameNameStation) {
-            const dist = calcDist(station.lat, station.lng, sameNameStation.lat, sameNameStation.lng);
-            if (dist < 2.0) validLines.add(lineKey);
-        }
-    });
+    const stationIndexMap = buildStationIndex(railwayData);
+    const sameNameNodes = stationIndexMap.get(station.name_ja) || [];
+
+    for (let i = 0; i < sameNameNodes.length; i++) {
+        const { lineKey, stationIndex } = sameNameNodes[i];
+        if (lineKey === currentLineKey) continue;
+        if (validLines.has(lineKey)) continue;
+
+        const nextLine = railwayData[lineKey];
+        if (!nextLine) continue;
+
+        const nextMeta = nextLine.meta;
+        if (strictMode && !isCompanyCompatible(currentMeta, nextMeta)) continue;
+
+        const sameNameStation = nextLine.stations[stationIndex];
+        const dist = calcDist(station.lat, station.lng, sameNameStation.lat, sameNameStation.lng);
+        if (dist < 2.0) validLines.add(lineKey);
+    }
+
     return Array.from(validLines);
 };
 

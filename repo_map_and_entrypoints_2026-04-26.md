@@ -22,6 +22,13 @@
 - packages/route-slice-preview/: 可复用包（与 blog 组件联动）
 - docs/: 方案、审计与发布流程文档
   - geo worker 字段契约: docs/geo_worker_geojson_contract_2026-04-27.md
+  - rail graph v1 设计参考: docs/rail-graph-v1/
+- rail graph MVP 工作台:
+  - standalone HTML: rail-graph-mvp.html
+  - browser shell/engine adapter: src/rail-graph-v1-mvp/app.ts
+  - map/list interaction: src/rail-graph-v1-mvp/map-view.ts, src/rail-graph-v1-mvp/list-view.ts
+  - local pipeline model/API client: src/rail-graph-v1-mvp/pipeline.ts
+  - Vite dev local task API: scripts/rail-graph-mvp-server.js + vite.config.js plugin
 
 ### Routing / SEO / EdgeOne entry points
 
@@ -92,6 +99,19 @@
   - src/utils/fetchAndParseData.ts
   - src/core/bot/botDataBuilder.ts
   - docs/api/bot-integration-guide.md
+
+### D2. Rail Graph MVP local pipeline / workspace
+
+- primary:
+  - src/rail-graph-v1-mvp/app.ts
+  - src/rail-graph-v1-mvp/pipeline.ts
+  - scripts/rail-graph-mvp-server.js
+  - vite.config.js
+- external tools:
+  - D:\GIS\scripts\*.py (PBF extraction, matching, batch decisions, overrides)
+- companion:
+  - docs/rail-graph-v1/\*
+  - rail-graph-mvp.html
 
 ### E. API contract related updates
 

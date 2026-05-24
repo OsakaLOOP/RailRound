@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import path from 'path'
 import sirv from 'sirv'
 import fs from 'fs'
+import { railGraphMvpServerPlugin } from './scripts/rail-graph-mvp-server.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -21,6 +22,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    railGraphMvpServerPlugin(),
     {
       name: 'serve-static-blog',
       configureServer(server) {

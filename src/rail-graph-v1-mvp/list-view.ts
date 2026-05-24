@@ -41,6 +41,9 @@ import type {
 } from "../rail-graph-v1/service-template.types";
 import type { ScenarioResult } from "./poc-pathfinding";
 import type { SensekiScenarioResult } from "./poc-senseki-pathfinding";
+import type { MvpOverrideState } from "./pipeline";
+import type { PipelineReport } from "./rule-handlers";
+import { polylineLengthMeters } from "./spatial-helpers";
 
 // ── Public API ──────────────────────────────────────────────
 
@@ -49,6 +52,27 @@ export interface ListViewInput {
   diagnostics: Diagnostic[];
   pathfindingResults?: ScenarioResult[] | SensekiScenarioResult[];
   source?: AnnotatedFeatureCollection | null;
+  cleanBatch?: {
+    batchName: string;
+    batchPath: string;
+    decisionPath: string;
+    candidates: any[];
+    decisions: any[];
+    line_display_name?: string;
+  } | null;
+  cleanOverrides?: MvpOverrideState | null;
+  filterRules?: any[] | null;
+  activeFilters?: Record<string, boolean>;
+  activeLevels?: Record<string, boolean>;
+  searchQuery?: string;
+  selectMode?: boolean;
+  selectedCandidateFid?: string | null;
+  activeTab?: TabKey;
+  /** 由 app.ts 的 runFilterPipeline 算好的"经全部 active rules 后通过"的 fid 集合 — 优先用它过滤候选,
+   *  避免 list-view 自己再跑一次 filter (尤其涉及跨阶段 rule 时 list-view 算不出正确结果). */
+  cleanPassFids?: Set<string>;
+  /** 同一份 runFilterPipeline 的 per-rule 报告 — 渲染「规则剔除详情」可展开区. */
+  cleanPipelineReport?: PipelineReport;
 }
 
 /** 路径 hover/click 时传给外部的对象 — 同时携带 edgeSequence 与 turnbackEdgeIndices, 避免 app.ts 反向反查 */
@@ -75,9 +99,18 @@ export interface ListView {
   onAnnotationChange(handler: (payload: AnnotationChangePayload) => void): void;
   /** 一次性批量 annotation 变更 — inferDirections / autoBindAll 类操作触发, 避免触发多次 compile. */
   onAnnotationBatch(handler: (payloads: AnnotationChangePayload[]) => void): void;
+  onCleanDecisionChange(handler: (candidateId: string, action: "keep" | "remove" | "undecided", reason: string) => void): void;
+  onCleanAutoClean(handler: () => void): void;
+
+  onCleanOverrideChange(handler: (fid: string, action: "keep" | "remove" | "reset", reason?: string) => void): void;
+  onCleanFilterToggle(handler: (ruleId: string, checked: boolean) => void): void;
+  onCleanLevelToggle(handler: (level: string, checked: boolean) => void): void;
+  onCleanSearch(handler: (query: string) => void): void;
+  onCleanSelectModeToggle(handler: (active: boolean) => void): void;
+  onCleanCandidateSelect(handler: (fid: string | null) => void): void;
 }
 
-type TabKey = "topology" | "pathfinding" | "annotate" | "diagnostics" | "raw";
+export type TabKey = "clean" | "pathfinding" | "annotate" | "diagnostics" | "raw";
 
 interface InternalState {
   container: HTMLElement;
@@ -89,6 +122,14 @@ interface InternalState {
   pathClickHandlers: Array<(path: PathHandlerPayload) => void>;
   annotationChangeHandlers: Array<(payload: AnnotationChangePayload) => void>;
   annotationBatchHandlers: Array<(payloads: AnnotationChangePayload[]) => void>;
+  cleanDecisionChangeHandlers: Array<(candidateId: string, action: "keep" | "remove" | "undecided", reason: string) => void>;
+  cleanAutoCleanHandlers: Array<() => void>;
+  cleanOverrideChangeHandlers: Array<(fid: string, action: "keep" | "remove" | "reset", reason?: string) => void>;
+  cleanFilterToggleHandlers: Array<(ruleId: string, checked: boolean) => void>;
+  cleanLevelToggleHandlers: Array<(level: string, checked: boolean) => void>;
+  cleanSearchHandlers: Array<(query: string) => void>;
+  cleanSelectModeToggleHandlers: Array<(active: boolean) => void>;
+  cleanCandidateSelectHandlers: Array<(fid: string | null) => void>;
   selectedEntity: EntityRef | null;
   selectedScenarioIdx: number | null;
   selectedCandidateIdx: number | null;
@@ -98,6 +139,7 @@ interface InternalState {
   dirRoleBrush: TrackDirectionRole | null;
   /** Annotate tab functionalUse 格式刷: 空数组 = off, 否则点击 track 时整体替换为该集合 */
   functionalUseBrush: TrackFunctionalUse[];
+  cleanFilter: "all" | "undecided" | "keep" | "remove";
 }
 
 const STYLE_ID = "mvp-list-view-styles";
@@ -208,6 +250,47 @@ const STYLES = `
 .lv-an-brush.brush-reversible.active { background: #fef3c7; border-color: #d97706; color: #78350f; }
 .lv-an-brush.brush-off.active { background: #e2e8f0; border-color: #64748b; color: #334155; }
 .lv-an-brush.fn-brush.active { background: #dcfce7; border-color: #15803d; color: #14532d; }
+
+/* Clean tab styles */
+.lv-clean-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px; margin-bottom: 8px; }
+.lv-clean-title { font-weight: 700; font-size: 13px; color: #0f172a; }
+.lv-clean-stats { font-size: 10.5px; color: #64748b; }
+.lv-clean-filters { display: flex; gap: 4px; margin-bottom: 8px; }
+.lv-clean-filter-btn { font-size: 10px; padding: 2px 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; border-radius: 4px; }
+.lv-clean-filter-btn.active { background: #0284c7; color: #fff; border-color: #0284c7; font-weight: 600; }
+.lv-clean-item { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 8px; background: #fff; transition: all 120ms; cursor: pointer; position: relative; }
+.lv-clean-item:hover, .lv-clean-item.hovered { border-color: #0284c7; background: #f8fafc; }
+.lv-clean-item.keep { border-left: 4px solid #16a34a; }
+.lv-clean-item.remove { border-left: 4px solid #dc2626; }
+.lv-clean-item.undecided { border-left: 4px solid #94a3b8; }
+.lv-clean-name-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+.lv-clean-name { font-weight: 600; font-size: 12px; color: #0f172a; }
+.lv-clean-level-badge { font-size: 9px; padding: 1px 4px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+.lv-clean-level-badge.high { background: #d1fae5; color: #065f46; }
+.lv-clean-level-badge.medium { background: #fef3c7; color: #78350f; }
+.lv-clean-level-badge.low { background: #fee2e2; color: #991b1b; }
+.lv-clean-level-badge.all { background: #f1f5f9; color: #475569; }
+.lv-clean-meta-grid { display: grid; grid-template-columns: 1fr; gap: 2px; font-size: 10.5px; color: #64748b; margin-bottom: 6px; }
+.lv-clean-meta-item span { color: #334155; }
+.lv-clean-btn-group { display: flex; gap: 4px; margin-bottom: 6px; }
+.lv-clean-decision-btn { font-size: 10px; padding: 3px 8px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-weight: 500; }
+.lv-clean-decision-btn.keep.active { background: #16a34a; color: #fff; border-color: #16a34a; font-weight: 600; }
+.lv-clean-decision-btn.remove.active { background: #dc2626; color: #fff; border-color: #dc2626; font-weight: 600; }
+.lv-clean-reason-box { display: flex; gap: 4px; align-items: center; width: 100%; }
+.lv-clean-reason-input { flex: 1; min-width: 0; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 6px; font-size: 11px; color: #0f172a; background: #fff; }
+
+/* Custom clean override styles */
+.lv-clean-act-btn { font-size: 10px; padding: 2px 6px; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; background: #fff; color: #0f172a; font-weight: 500; transition: all 100ms; }
+.lv-clean-act-btn:hover { background: #f1f5f9; }
+.lv-clean-act-btn.keep.active { background: #16a34a !important; color: #fff !important; border-color: #16a34a !important; }
+.lv-clean-act-btn.remove.active { background: #dc2626 !important; color: #fff !important; border-color: #dc2626 !important; }
+.lv-clean-selmode-btn { transition: all 120ms; }
+.lv-clean-selmode-btn.active { background: #2563eb !important; color: #fff !important; border-color: #2563eb !important; }
+.lv-clean-item-card { transition: all 120ms; }
+.lv-clean-item-card:hover { border-color: #2563eb !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.lv-clean-inspector table td { font-size: 10px; border-bottom: 1px solid #f1f5f9; }
+.lv-clean-inspector table tr:hover { background: #f8fafc; }
+
 `;
 
 function ensureStyles(): void {
@@ -225,22 +308,22 @@ export function createListView(container: HTMLElement): ListView {
   container.classList.add("lv-root");
   container.innerHTML = `
     <div class="lv-tabs">
-      <button class="lv-tab active" data-tab="topology">Topology</button>
+      <button class="lv-tab active" data-tab="annotate">Annotate</button>
+      <button class="lv-tab" data-tab="clean" style="display:none;">Clean</button>
       <button class="lv-tab" data-tab="pathfinding">Pathfinding</button>
-      <button class="lv-tab" data-tab="annotate">Annotate</button>
       <button class="lv-tab" data-tab="diagnostics">Diagnostics</button>
       <button class="lv-tab" data-tab="raw">Raw JSON</button>
     </div>
-    <div class="lv-body" data-body="topology"></div>
+    <div class="lv-body" data-body="annotate"></div>
+    <div class="lv-body" data-body="clean" hidden></div>
     <div class="lv-body" data-body="pathfinding" hidden></div>
-    <div class="lv-body" data-body="annotate" hidden></div>
     <div class="lv-body" data-body="diagnostics" hidden></div>
     <div class="lv-body" data-body="raw" hidden></div>
   `;
 
   const state: InternalState = {
     container,
-    activeTab: "topology",
+    activeTab: "annotate",
     input: { topo: null, diagnostics: [] },
     hoverHandlers: [],
     clickHandlers: [],
@@ -248,6 +331,14 @@ export function createListView(container: HTMLElement): ListView {
     pathClickHandlers: [],
     annotationChangeHandlers: [],
     annotationBatchHandlers: [],
+    cleanDecisionChangeHandlers: [],
+    cleanAutoCleanHandlers: [],
+    cleanOverrideChangeHandlers: [],
+    cleanFilterToggleHandlers: [],
+    cleanLevelToggleHandlers: [],
+    cleanSearchHandlers: [],
+    cleanSelectModeToggleHandlers: [],
+    cleanCandidateSelectHandlers: [],
     selectedEntity: null,
     selectedScenarioIdx: null,
     selectedCandidateIdx: null,
@@ -255,19 +346,31 @@ export function createListView(container: HTMLElement): ListView {
     annotateFilter: "all",
     dirRoleBrush: null,
     functionalUseBrush: [],
+    cleanFilter: "all",
   };
 
   bindTabClicks(state);
 
   return {
     update(input) {
+      if (input.activeTab && input.activeTab !== state.activeTab) {
+        switchTab(state, input.activeTab);
+      }
       state.input = input;
+      // Show or hide Clean tab dynamically
+      const cleanBtn = container.querySelector<HTMLButtonElement>('.lv-tab[data-tab="clean"]');
+      if (cleanBtn) {
+        cleanBtn.style.display = input.source ? "" : "none";
+      }
       renderActiveTab(state);
     },
     highlightEntity(ref) {
       applyEntityHover(state, ref);
     },
     selectFeatureByRef(ref) {
+      if (state.activeTab === "clean") {
+        return;
+      }
       const idx = findFeatureIdxByRef(state, ref);
       if (idx == null) return;
       // brush 激活 + track feature → 仅刷方向, 不切 tab/不改 selected
@@ -281,6 +384,14 @@ export function createListView(container: HTMLElement): ListView {
     onPathClick(h) { state.pathClickHandlers.push(h); },
     onAnnotationChange(h) { state.annotationChangeHandlers.push(h); },
     onAnnotationBatch(h) { state.annotationBatchHandlers.push(h); },
+    onCleanDecisionChange(h) { state.cleanDecisionChangeHandlers.push(h); },
+    onCleanAutoClean(h) { state.cleanAutoCleanHandlers.push(h); },
+    onCleanOverrideChange(h) { state.cleanOverrideChangeHandlers.push(h); },
+    onCleanFilterToggle(h) { state.cleanFilterToggleHandlers.push(h); },
+    onCleanLevelToggle(h) { state.cleanLevelToggleHandlers.push(h); },
+    onCleanSearch(h) { state.cleanSearchHandlers.push(h); },
+    onCleanSelectModeToggle(h) { state.cleanSelectModeToggleHandlers.push(h); },
+    onCleanCandidateSelect(h) { state.cleanCandidateSelectHandlers.push(h); },
   };
 }
 
@@ -308,7 +419,7 @@ function switchTab(state: InternalState, tab: TabKey): void {
 
 function renderActiveTab(state: InternalState): void {
   switch (state.activeTab) {
-    case "topology": renderTopologyTab(state); break;
+    case "clean": renderCleanTab(state); break;
     case "pathfinding": renderPathfindingTab(state); break;
     case "annotate": renderAnnotateTab(state); break;
     case "diagnostics": renderDiagnosticsTab(state); break;
@@ -316,82 +427,383 @@ function renderActiveTab(state: InternalState): void {
   }
 }
 
-// ── Topology tab ────────────────────────────────────────────
+function renderCleanTab(state: InternalState): void {
+  const body = bodyEl(state, "clean");
+  const { source, cleanOverrides, filterRules, activeFilters, activeLevels, searchQuery, selectMode, selectedCandidateFid, cleanPassFids } = state.input;
 
-function renderTopologyTab(state: InternalState): void {
-  const body = bodyEl(state, "topology");
-  const { topo } = state.input;
-  if (!topo) {
-    body.innerHTML = `<div class="lv-empty">No topology yet. Load demo or compile first.</div>`;
+  if (!source) {
+    body.innerHTML = `<div class="lv-empty">No source candidates loaded. Select a Company and Line in Left panel "Prepare" or "Clean" step and load the workspace source.</div>`;
     return;
   }
+
+  const allFeatures = source.features || [];
+  const keepSet = new Set(cleanOverrides?.keep || []);
+  const removeSet = new Set(cleanOverrides?.remove || []);
+  const overrideMeta = cleanOverrides?.meta || {};
+
+  // Count keeps / removes on this specific source line
+  const localKeepCount = allFeatures.filter(f => {
+    const props = f.properties || {};
+    const fid = `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
+    return keepSet.has(fid);
+  }).length;
+
+  const localRemoveCount = allFeatures.filter(f => {
+    const props = f.properties || {};
+    const fid = `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
+    return removeSet.has(fid);
+  }).length;
+
+  const levels = activeLevels || { high: true, medium: true, low: true };
+  const filters = activeFilters || {};
+  const rules = filterRules || [];
+  const query = searchQuery || "";
+  const isSelectMode = !!selectMode;
+
+  // 按 match_level 统计 4 档计数(供 head panel 显示)
+  const levelCounts = { high: 0, medium: 0, low: 0, unknown: 0 };
+  for (const f of allFeatures) {
+    const lv = ((f.properties || {}) as any).match_level;
+    if (lv === "high") levelCounts.high += 1;
+    else if (lv === "medium") levelCounts.medium += 1;
+    else if (lv === "low") levelCounts.low += 1;
+    else levelCounts.unknown += 1;
+  }
+
+  // Contract: caller (app.ts refreshViews) 必传 cleanPassFids; 没传就显示提示而不是回退跑自己的 filter
+  // (跨阶段 rule 在 list-view 内算不出正确结果, 故不再保留 fallback).
+  const filteredCandidates = cleanPassFids
+    ? allFeatures.filter(f => {
+        const props = f.properties || {};
+        const fid = (props as any)._fid
+          || `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
+        return cleanPassFids.has(fid);
+      })
+    : [];
+
+  const selectedCandidate = selectedCandidateFid
+    ? allFeatures.find(f => {
+        const props = f.properties || {};
+        const fid = `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
+        return fid === selectedCandidateFid;
+      })
+    : null;
+
+  const reportBlock = renderPipelineReportHtml(state.input.cleanPipelineReport);
+
   body.innerHTML = `
-    ${section("Stations", topo.stations, (s) => stationItem(s))}
-    ${section("Platforms", topo.platforms, (p) => platformItem(p))}
-    ${section("Edges", topo.edges, (e) => edgeItem(e))}
-    ${section("Bindings", topo.platformTrackBindings, (b) => bindingItem(b))}
-    ${section("Stopping Points", topo.stoppingPoints, (sp) => stoppingPointItem(sp))}
-    ${section("Double-track Pairs", topo.doubleTrackPairs, (pair) => doubleTrackItem(pair))}
-    ${section("Signals", topo.signals, (sig) => signalItem(sig))}
+    <div class="lv-clean-container" style="display:flex; flex-direction:column; height:100%; min-height:0; gap:8px;">
+      <!-- Head Panel -->
+      <div class="lv-clean-head-panel" style="display:flex; flex-direction:column; gap:6px; border-bottom:1px solid #cbd5e1; padding-bottom:8px; flex-shrink:0;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:700; font-size:13px; color:#0f172a;">Manual Cleaning Override</span>
+          <span class="lv-clean-stats" style="font-size:10.5px; color:#64748b; font-weight:600;">
+            Keep: <span style="color:#16a34a;">${localKeepCount}</span> | Remove: <span style="color:#dc2626;">${localRemoveCount}</span> (Total: ${allFeatures.length})
+          </span>
+        </div>
+
+        <!-- Confidence levels checkboxes -->
+        <div style="display:flex; gap:10px; font-size:10.5px; align-items:center; flex-wrap:wrap;">
+          <span style="color:#64748b; font-weight:600;">Confidence Levels:</span>
+          <label style="display:flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" class="lv-clean-lvl-chk" data-level="high" ${levels.high ? "checked" : ""}/> High <span style="color:#0a6b2b;">(${levelCounts.high})</span></label>
+          <label style="display:flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" class="lv-clean-lvl-chk" data-level="medium" ${levels.medium ? "checked" : ""}/> Med <span style="color:#946200;">(${levelCounts.medium})</span></label>
+          <label style="display:flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" class="lv-clean-lvl-chk" data-level="low" ${levels.low ? "checked" : ""}/> Low <span style="color:#8a1212;">(${levelCounts.low})</span></label>
+          ${levelCounts.unknown > 0 ? `<span style="color:#94a3b8;">unset: ${levelCounts.unknown}</span>` : ""}
+        </div>
+
+        ${reportBlock}
+
+        <!-- Search box & Select mode -->
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="text" class="lv-clean-search" placeholder="Search by name, ID or station..." value="${escapeAttr(query)}" style="flex:1; font-size:11px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; height:24px;" />
+          <button class="lv-clean-selmode-btn ${isSelectMode ? "active" : ""}" style="font-size:11px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer; font-weight:600; display:flex; align-items:center; justify-content:center; height:24px; gap:2px;">
+            ✏️ Select Mode
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter rules panel -->
+      <div class="lv-clean-rules-panel" style="display:flex; flex-direction:column; gap:4px; border-bottom:1px solid #cbd5e1; padding-bottom:8px; max-height:85px; overflow-y:auto; flex-shrink:0;">
+        <div style="font-size:11px; font-weight:600; color:#64748b; margin-bottom:1px;">Dynamic Filter Rules:</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; font-size:10.5px;">
+          ${rules.map(rule => `
+            <label title="${escapeAttr(rule.desc || '')}" style="display:flex; align-items:center; gap:4px; cursor:pointer; min-width:0;">
+              <input type="checkbox" class="lv-clean-rule-chk" data-rule-id="${escapeAttr(rule.id)}" ${filters[rule.id] ? "checked" : ""}/>
+              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(rule.label)}</span>
+            </label>
+          `).join("")}
+        </div>
+      </div>
+
+      <!-- Candidates list (Scrollable) -->
+      <div class="lv-clean-list-container" style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding-right:2px;">
+        ${filteredCandidates.length === 0 ? `
+          <div class="lv-empty">No candidates match filters.</div>
+        ` : filteredCandidates.map(c => {
+            const props = (c.properties || {}) as any;
+            const fid = `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
+            const isRemove = removeSet.has(fid);
+            const isKeep = keepSet.has(fid);
+            const meta = (overrideMeta as Record<string, any>)[fid] || {};
+            const reason = meta.reason || "";
+            const isSelected = selectedCandidateFid === fid;
+
+            let borderStyle = "border-left: 4px solid #cbd5e1;";
+            let bgStyle = "background:#fff;";
+            let textDecoration = "";
+            if (isRemove) {
+              borderStyle = "border-left: 4px solid #dc2626;";
+              bgStyle = "background:#fef2f2; opacity:0.75;";
+              textDecoration = "text-decoration: line-through; color:#94a3b8;";
+            } else if (isKeep) {
+              borderStyle = "border-left: 4px solid #16a34a;";
+              bgStyle = "background:#f0fdf4;";
+            }
+            if (isSelected) {
+              bgStyle = "background:#eff6ff; border-color:#3b82f6;";
+            }
+
+            return `
+              <div class="lv-clean-item-card" data-fid="${escapeAttr(fid)}" style="border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:11px; transition:all 100ms; ${borderStyle} ${bgStyle}">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                  <span style="font-weight:600; ${textDecoration}">${escapeHtml(props.name || props.osm_id || "unnamed")}</span>
+                  <span class="lv-clean-level-badge ${props.match_level || 'low'}">
+                    ${props.match_level || 'low'} (${(props.match_score || 0).toFixed(2)})
+                  </span>
+                </div>
+                <div style="font-size:10px; color:#64748b; margin-bottom:4px; display:grid; grid-template-columns:1fr; gap:1px;">
+                  <div>Class: <b style="color:#475569;">${escapeHtml(props.class_main || "—")}</b> · Osm: <span>${escapeHtml(props.osm_type || "—")}/${escapeHtml(props.osm_id || "—")}</span></div>
+                  <div>Station: <span>${escapeHtml(props.nearest_station || "—")}</span></div>
+                </div>
+                <!-- Action buttons -->
+                <div style="display:flex; gap:4px; align-items:center; margin-top:4px;">
+                  <button class="lv-clean-act-btn keep ${isKeep ? 'active' : ''}" data-fid="${escapeAttr(fid)}" data-action="keep">Keep</button>
+                  <button class="lv-clean-act-btn remove ${isRemove ? 'active' : ''}" data-fid="${escapeAttr(fid)}" data-action="remove">Remove</button>
+                  <button class="lv-clean-act-btn reset" data-fid="${escapeAttr(fid)}" data-action="reset">Reset</button>
+                  <input type="text" class="lv-clean-reason-input" data-fid="${escapeAttr(fid)}" placeholder="Reason/Justification..." value="${escapeAttr(reason)}" style="flex:1; min-width:0; font-size:10px; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px; height:18px;" />
+                </div>
+              </div>
+            `;
+          }).join("")}
+      </div>
+
+      <!-- Properties Inspector Table -->
+      <div class="lv-clean-inspector" style="border-top:1px solid #cbd5e1; padding-top:6px; display:flex; flex-direction:column; gap:4px; max-height:165px; overflow-y:auto; flex-shrink:0; font-size:10.5px;">
+        <div style="font-weight:700; color:#334155;">Candidate Properties Inspector</div>
+        ${selectedCandidate ? renderInspectorTable(selectedCandidate) : `<div class="lv-empty" style="padding:4px 0;">Select a candidate in list or map to view properties.</div>`}
+      </div>
+    </div>
   `;
-  bindItemEvents(state);
+
+  bindCleanTabEvents(state, body);
+
+  if (selectedCandidateFid) {
+    const card = body.querySelector<HTMLElement>(`.lv-clean-item-card[data-fid="${cssEscape(selectedCandidateFid)}"]`);
+    if (card) {
+      card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }
 }
 
-function section<T>(title: string, items: T[], render: (item: T) => string): string {
-  return `<section class="lv-section">
-    <h4>${escapeHtml(title)} (${items.length})</h4>
-    ${items.length === 0 ? `<div class="lv-empty">empty</div>` : items.map(render).join("")}
-  </section>`;
+function bindCleanTabEvents(state: InternalState, body: HTMLElement): void {
+  // Confidence level checkboxes
+  body.querySelectorAll<HTMLInputElement>(".lv-clean-lvl-chk").forEach(chk => {
+    chk.addEventListener("change", () => {
+      const level = chk.dataset.level!;
+      state.cleanLevelToggleHandlers.forEach(h => h(level, chk.checked));
+    });
+  });
+
+  // Filter rule checkboxes
+  body.querySelectorAll<HTMLInputElement>(".lv-clean-rule-chk").forEach(chk => {
+    chk.addEventListener("change", () => {
+      const rid = chk.dataset.ruleId!;
+      state.cleanFilterToggleHandlers.forEach(h => h(rid, chk.checked));
+    });
+  });
+
+  // Search input
+  const searchBox = body.querySelector<HTMLInputElement>(".lv-clean-search");
+  if (searchBox) {
+    searchBox.addEventListener("input", () => {
+      state.cleanSearchHandlers.forEach(h => h(searchBox.value));
+    });
+  }
+
+  // Select Mode toggle
+  const selmodeBtn = body.querySelector<HTMLButtonElement>(".lv-clean-selmode-btn");
+  if (selmodeBtn) {
+    selmodeBtn.addEventListener("click", () => {
+      state.cleanSelectModeToggleHandlers.forEach(h => h(!state.input.selectMode));
+    });
+  }
+
+  // Candidate items event triggers
+  body.querySelectorAll<HTMLElement>(".lv-clean-item-card").forEach(card => {
+    const fid = card.dataset.fid!;
+
+    // mouse hover link to map view highlights
+    card.addEventListener("mouseenter", () => {
+      state.hoverHandlers.forEach(h => h(fid as EntityRef));
+    });
+    card.addEventListener("mouseleave", () => {
+      state.hoverHandlers.forEach(h => h(null));
+    });
+
+    // select card triggers selection
+    card.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).closest("button, input")) return;
+      state.cleanCandidateSelectHandlers.forEach(h => h(fid));
+    });
+
+    // Buttons Keep/Remove/Reset
+    card.querySelectorAll<HTMLButtonElement>(".lv-clean-act-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const action = btn.dataset.action as "keep" | "remove" | "reset";
+        const reasonInput = card.querySelector<HTMLInputElement>(".lv-clean-reason-input");
+        const reason = reasonInput ? reasonInput.value : "";
+        state.cleanOverrideChangeHandlers.forEach(h => h(fid, action, reason));
+      });
+    });
+
+    // Reason input changes
+    const reasonInput = card.querySelector<HTMLInputElement>(".lv-clean-reason-input");
+    if (reasonInput) {
+      reasonInput.addEventListener("change", () => {
+        // auto fallback to keep/remove if entered reason
+        const isRemove = card.querySelector(".lv-clean-act-btn.remove")?.classList.contains("active");
+        const action = isRemove ? "remove" : "keep";
+        state.cleanOverrideChangeHandlers.forEach(h => h(fid, action, reasonInput.value));
+      });
+    }
+  });
 }
 
-function stationItem(s: Station): string {
-  return `<div class="lv-item" data-ref="${escapeAttr(s.id)}">
-    <strong>${escapeHtml(s.name)}</strong>
-    <div class="meta">${s.platformRefs.length} platforms · <code>${escapeHtml(s.id)}</code></div>
-  </div>`;
+// (featurePassesFilters / approxLength / pointToSegmentMeters / pointToPolylineMeters / isConnectedToAny
+//  原在此处, 已删除 — app.ts 的 runFilterPipeline + rule-handlers + spatial-helpers 接管。)
+
+function renderPipelineReportHtml(report: PipelineReport | undefined): string {
+  if (!report || report.phaseReports.length === 0) return "";
+  const ruleRows: string[] = [];
+  for (const phase of report.phaseReports) {
+    for (const r of phase.rules) {
+      const label = r.ruleLabel ? `${r.ruleId} <span style="color:#94a3b8;">(${escapeHtml(r.ruleLabel)})</span>` : r.ruleId;
+      const eliminated = r.eliminated;
+      const color = eliminated > 0 ? "#dc2626" : "#16a34a";
+      ruleRows.push(
+        `<div style="display:flex; justify-content:space-between; gap:8px; padding:1px 0;">`
+        + `<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">P${phase.phase} · ${label}</span>`
+        + `<span style="color:${color}; flex-shrink:0;">−${eliminated} <span style="color:#94a3b8;">(剩 ${r.outSize})</span> ref=${r.refSize} ${r.ms.toFixed(1)}ms</span>`
+        + `</div>`,
+      );
+    }
+  }
+  const summary = `Pipeline: ${report.totalIn} → ${report.totalOut} (${report.totalMs.toFixed(1)}ms)`;
+  return `
+    <details style="font-size:10.5px;">
+      <summary style="cursor:pointer; color:#475569; user-select:none;">▶ ${escapeHtml(summary)}</summary>
+      <div style="margin-top:4px; padding:6px 8px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; max-height:160px; overflow-y:auto;">
+        ${ruleRows.join("") || '<div style="color:#94a3b8;">(no rules active)</div>'}
+      </div>
+    </details>
+  `;
 }
 
-function platformItem(p: Platform): string {
-  return `<div class="lv-item" data-ref="${escapeAttr(p.id)}">
-    <strong>${escapeHtml(p.name ?? p.id)}</strong>
-    <div class="meta">type: ${p.type} · station: <code>${escapeHtml(p.stationRef)}</code></div>
-  </div>`;
+function renderInspectorTable(feature: any): string {
+  const p = feature.properties || {};
+  const geom = feature.geometry || {};
+  
+  const categories = [
+    {
+      name: "Basic",
+      keys: ["osm_type", "osm_id", "class_main", "class_sub", "railway", "name", "name:ja", "name:en"]
+    },
+    {
+      name: "Match",
+      keys: ["match_score", "match_level", "reason_codes", "distance_to_ref", "nearest_station", "nearest_station_distance", "overlap_ratio", "in_bbox", "in_buffer"]
+    },
+    {
+      name: "Infrastructure",
+      keys: ["gauge", "usage", "tunnel", "bridge", "layer", "level", "tracks"]
+    },
+    {
+      name: "Electrification",
+      keys: ["electrified", "voltage", "frequency"]
+    },
+    {
+      name: "Train Protection",
+      keys: ["train_protection", "safety_system"]
+    },
+    {
+      name: "Operator",
+      keys: ["operator", "source_company", "owner"]
+    },
+    {
+      name: "Platform",
+      keys: ["length", "width", "platform_edge", "height"]
+    },
+    {
+      name: "Signal",
+      keys: ["signal:type", "signal:direction", "signal:position"]
+    },
+    {
+      name: "References",
+      keys: ["wikidata", "wikipedia", "KSJ2:LIN", "source_line_uri"]
+    }
+  ];
+
+  let html = `<table style="width:100%; border-collapse:collapse; text-align:left; font-size:10px;">`;
+  
+  if (geom.coordinates) {
+    let geomVal = "";
+    if (geom.type === "Point") {
+      geomVal = `Point (${geom.coordinates[0].toFixed(6)}, ${geom.coordinates[1].toFixed(6)})`;
+    } else if (geom.type === "LineString") {
+      const len = polylineLengthMeters(geom.coordinates);
+      geomVal = `LineString (${geom.coordinates.length} pts, ~${len.toFixed(0)}m)`;
+    } else {
+      geomVal = `${geom.type}`;
+    }
+    html += `
+      <tr style="background:#f1f5f9; font-weight:600;"><td colspan="2" style="padding:2px 4px; border-bottom:1px solid #e2e8f0; color:#475569;">Geometry</td></tr>
+      <tr>
+        <td style="padding:2px 4px; color:#64748b; width:40%;">type</td>
+        <td style="padding:2px 4px; color:#0f172a; word-break:break-all;">${escapeHtml(geom.type)}</td>
+      </tr>
+      <tr>
+        <td style="padding:2px 4px; color:#64748b; width:40%;">info</td>
+        <td style="padding:2px 4px; color:#0f172a; word-break:break-all;">${escapeHtml(geomVal)}</td>
+      </tr>
+    `;
+  }
+
+  for (const cat of categories) {
+    const presentKeys = cat.keys.filter(k => p[k] !== undefined && p[k] !== null && p[k] !== "");
+    if (presentKeys.length === 0) continue;
+
+    html += `<tr style="background:#f1f5f9; font-weight:600;"><td colspan="2" style="padding:2px 4px; border-bottom:1px solid #e2e8f0; color:#475569;">${cat.name}</td></tr>`;
+    for (const k of presentKeys) {
+      let val = p[k];
+      if (typeof val === "number") {
+        if (k.includes("score") || k.includes("ratio") || k.includes("distance")) {
+          val = val.toFixed(4);
+        }
+      }
+      html += `
+        <tr>
+          <td style="padding:2px 4px; color:#64748b; width:40%;">${escapeHtml(k)}</td>
+          <td style="padding:2px 4px; color:#0f172a; word-break:break-all;">${escapeHtml(String(val))}</td>
+        </tr>
+      `;
+    }
+  }
+  
+  html += `</table>`;
+  return html;
 }
 
-function edgeItem(e: TopologyEdge): string {
-  return `<div class="lv-item" data-ref="${escapeAttr(e.id)}">
-    <strong>${escapeHtml(e.name ?? e.trackCode ?? e.id)}</strong>
-    <div class="meta">role: ${e.role} · dir: ${e.directionRole ?? "—"} · trav: ${e.traversal} · ${Math.round(e.lengthMeters)}m</div>
-  </div>`;
-}
 
-function bindingItem(b: PlatformTrackBinding): string {
-  return `<div class="lv-item" data-ref="${escapeAttr(b.platformRef)}" data-also-ref="${escapeAttr(b.edgeRef)}">
-    <strong>${shortId(b.platformRef)} → ${shortId(b.edgeRef)}</strong>
-    <div class="meta">side: ${b.side} · serving: ${b.servingDirection ?? "—"}</div>
-  </div>`;
-}
-
-function stoppingPointItem(sp: StoppingPoint): string {
-  return `<div class="lv-item" data-ref="${escapeAttr(sp.edgeRef)}" data-also-ref="${escapeAttr(sp.platformRef)}">
-    <strong>${shortId(sp.platformRef)} @ ${shortId(sp.edgeRef)}</strong>
-    <div class="meta">dir: ${sp.direction} · measure: ${sp.measure} · ${sp.confirmation}</div>
-  </div>`;
-}
-
-function doubleTrackItem(pair: { id: EntityRef; upEdgeRefs: EntityRef[]; downEdgeRefs: EntityRef[] }): string {
-  return `<div class="lv-item" data-ref="${escapeAttr(pair.id)}">
-    <strong>Pair</strong>
-    <div class="meta">up: ${pair.upEdgeRefs.length} · down: ${pair.downEdgeRefs.length}</div>
-  </div>`;
-}
-
-function signalItem(sig: Signal): string {
-  return `<div class="lv-item" data-ref="${escapeAttr(sig.id)}">
-    <strong>${escapeHtml(sig.name ?? sig.id)}</strong>
-    <div class="meta">edge: ${shortId(sig.edgeRef)} · m: ${sig.measure} · facing: ${sig.facing}</div>
-  </div>`;
-}
 
 // ── Pathfinding tab ─────────────────────────────────────────
 
@@ -483,6 +895,7 @@ function chainNodeIcon(kind: ResolvedIntentionNode["kind"]): string {
     case "reversal": return "↺";
     case "technical_stop": return "⏸";
     case "operation": return "🔧";
+    default: return "";
   }
 }
 
@@ -502,6 +915,8 @@ function chainNodeLabel(node: ResolvedIntentionNode): string {
       return `${shortId(node.at)}@${node.measure}`;
     case "operation":
       return `${shortId(node.at)} · ${node.opKind}`;
+    default:
+      return "";
   }
 }
 
@@ -1312,9 +1727,7 @@ function inferDirections(state: InternalState): void {
     for (const edge of topo.edges) {
       if (edge.role === "connector") continue;
       if (edge.directionRole !== undefined && edge.directionRole !== "bidirectional") continue;
-      // 排除已有显式 directionRole (up/down/reversible)
       const curRole = edge.directionRole; // undefined or "bidirectional"
-      if (curRole === "up" || curRole === "down" || curRole === "reversible") continue;
       // 仅推断 traversal=both 且未显式声明的边
       if (edge.traversal !== "both") continue;
 
@@ -1487,8 +1900,8 @@ function applyEntityHover(state: InternalState, ref: EntityRef | null): void {
   items.forEach((el) => {
     el.classList.add("hovered");
   });
-  // 滚动到第一个匹配项 (topology / annotate tabs 都启用)
-  if (items.length > 0 && (state.activeTab === "topology" || state.activeTab === "annotate")) {
+  // 滚动到第一个匹配项 (annotate tab 启用)
+  if (items.length > 0 && state.activeTab === "annotate") {
     items[0].scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 }
@@ -1510,7 +1923,8 @@ function shortId(ref: string): string {
 }
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (ch) => ({
+  const str = String(value ?? "");
+  return str.replace(/[&<>"']/g, (ch) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",

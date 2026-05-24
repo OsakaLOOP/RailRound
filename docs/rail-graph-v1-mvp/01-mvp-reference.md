@@ -393,3 +393,29 @@ npx tsc --noEmit -p tsconfig.json
 5. **PoC 扩展** — 加 2 面 3 線 (国铁岛+侧组合型) 用例, 验证混合 type 行为
 6. **switch 物理身份** — 单开 / 双开 / 复式 / 三开
 7. **岔位状态** — 定位 / 反位 等运用态 (这里已超出 Layer 1 范围)
+# 2026-05-24 Current MVP Workspace Sync
+
+This note overrides older workflow references in this file when they conflict
+with the current worktree. The MVP has expanded from the early two-station PoC
+into a local admin/dev workspace.
+
+- Entry: `rail-graph-mvp.html` and `src/rail-graph-v1-mvp/app.ts`.
+- Workspace and local pipeline model/client:
+  `src/rail-graph-v1-mvp/pipeline.ts`.
+- Vite dev task API: `scripts/rail-graph-mvp-server.js`, mounted from
+  `vite.config.js`.
+- Workflow steps:
+  `prepare -> clean -> annotate -> compile -> validate -> export`.
+- Pipeline stages:
+  `diagnose`, `extract`, `emitFast`, `postFix`, `match`, `manifest`,
+  `planBatches`, `mergeOverride`.
+- Local API routes:
+  `/api/rail-graph-mvp/tasks`, `/api/rail-graph-mvp/tasks/:id`,
+  `/api/rail-graph-mvp/tasks/:id/cancel`, `/api/rail-graph-mvp/artifacts`,
+  `/api/rail-graph-mvp/artifact/read`.
+
+These routes are Vite-only development glue around external `D:\GIS\scripts`,
+PBF/cache, matched-output, batch, decision, and override artifacts. They are not
+the final production API and do not replace the final Rail Graph runtime
+pipeline. When this note conflicts with older sections in this file, prefer this note
+and the current code.

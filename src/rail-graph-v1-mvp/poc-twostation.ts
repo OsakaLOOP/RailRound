@@ -43,6 +43,7 @@ import type {
   PlatformTrackBindingInput,
   StoppingPointInput,
 } from "../rail-graph-v1/editing.types";
+import type { EntityRef } from "../rail-graph-v1/primitives";
 
 // ---- 坐标常量 ----
 
@@ -439,34 +440,34 @@ export const STOP_PLAN: StoppingPointInput[] = [
 // ---- Exported IDs for pathfinding scenarios ----
 
 export const TwoStationRefs = {
-  STATION_A,
-  STATION_B,
-  PLATFORM_A,
-  PLATFORM_B,
-  PLATFORM_C,
-  PLATFORM_D,
-  TRACK_A1: buildEdgeId(TRACK_A1),
-  TRACK_A2: buildEdgeId(TRACK_A2),
-  TRACK_A3: buildEdgeId(TRACK_A3),
-  TRACK_A4: buildEdgeId(TRACK_A4),
-  TRACK_B1: buildEdgeId(TRACK_B1),
-  TRACK_B2: buildEdgeId(TRACK_B2),
-  TRACK_B3: buildEdgeId(TRACK_B3),
-  UP_LINK: buildEdgeId(UP_LINK),
-  DOWN_LINK: buildEdgeId(DOWN_LINK),
-  A1_WEST_EXT: buildEdgeId(A1_WEST_EXT),
-  A4_WEST_EXT: buildEdgeId(A4_WEST_EXT),
-  B1_EAST_EXT: buildEdgeId(B1_EAST_EXT),
-  B3_EAST_EXT: buildEdgeId(B3_EAST_EXT),
-  SIG_A1_HOME,
-  SIG_A4_START,
-  SIG_B1_START,
-  SIG_B3_HOME,
+  STATION_A: STATION_A as EntityRef,
+  STATION_B: STATION_B as EntityRef,
+  PLATFORM_A: PLATFORM_A as EntityRef,
+  PLATFORM_B: PLATFORM_B as EntityRef,
+  PLATFORM_C: PLATFORM_C as EntityRef,
+  PLATFORM_D: PLATFORM_D as EntityRef,
+  TRACK_A1: buildEdgeId(TRACK_A1) as EntityRef,
+  TRACK_A2: buildEdgeId(TRACK_A2) as EntityRef,
+  TRACK_A3: buildEdgeId(TRACK_A3) as EntityRef,
+  TRACK_A4: buildEdgeId(TRACK_A4) as EntityRef,
+  TRACK_B1: buildEdgeId(TRACK_B1) as EntityRef,
+  TRACK_B2: buildEdgeId(TRACK_B2) as EntityRef,
+  TRACK_B3: buildEdgeId(TRACK_B3) as EntityRef,
+  UP_LINK: buildEdgeId(UP_LINK) as EntityRef,
+  DOWN_LINK: buildEdgeId(DOWN_LINK) as EntityRef,
+  A1_WEST_EXT: buildEdgeId(A1_WEST_EXT) as EntityRef,
+  A4_WEST_EXT: buildEdgeId(A4_WEST_EXT) as EntityRef,
+  B1_EAST_EXT: buildEdgeId(B1_EAST_EXT) as EntityRef,
+  B3_EAST_EXT: buildEdgeId(B3_EAST_EXT) as EntityRef,
+  SIG_A1_HOME: SIG_A1_HOME as EntityRef,
+  SIG_A4_START: SIG_A4_START as EntityRef,
+  SIG_B1_START: SIG_B1_START as EntityRef,
+  SIG_B3_HOME: SIG_B3_HOME as EntityRef,
   // 4 个延伸段远端开放节点 (主线尽头) — 寻径的"线路入口/出口"
-  NODE_A1_WEST_EXT: buildNodeId(nodeA1WestExt),  // 上行起 (西远)
-  NODE_A4_WEST_EXT: buildNodeId(nodeA4WestExt),  // 下行终 (西远)
-  NODE_B1_EAST_EXT: buildNodeId(nodeB1EastExt),  // 上行终 (东远)
-  NODE_B3_EAST_EXT: buildNodeId(nodeB3EastExt),  // 下行起 (东远)
+  NODE_A1_WEST_EXT: buildNodeId(nodeA1WestExt) as EntityRef,  // 上行起 (西远)
+  NODE_A4_WEST_EXT: buildNodeId(nodeA4WestExt) as EntityRef,  // 下行终 (西远)
+  NODE_B1_EAST_EXT: buildNodeId(nodeB1EastExt) as EntityRef,  // 上行终 (东远)
+  NODE_B3_EAST_EXT: buildNodeId(nodeB3EastExt) as EntityRef,  // 下行起 (东远)
 } as const;
 
 if (typeof window !== "undefined") {

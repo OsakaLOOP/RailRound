@@ -462,7 +462,7 @@ export function runSensekiScenarios(topo: BaseTopologyLayer): SensekiScenarioRes
     const best = candidates[0];
     const hasTurnback = best.phases.some((p) => p.kind === "turnback");
     console.log(`[senseki-pf]   → ${candidates.length} candidates, best: ${Math.round(best.totalDistanceMeters)}m, turnback=${hasTurnback}`);
-    const requiresTurnback = scenario.pathGoal?.turnback?.count !== undefined && scenario.pathGoal.turnback.count > 0;
+    const requiresTurnback = (scenario.pathGoal as any)?.turnback?.count !== undefined && (scenario.pathGoal as any).turnback.count > 0;
     const passed = requiresTurnback ? hasTurnback : !hasTurnback;
     results.push({
       scenario,

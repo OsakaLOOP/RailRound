@@ -648,3 +648,25 @@ npx tsc --noEmit -p tsconfig.json
 - 不引入 leaflet-polylinedecorator 依赖
 - 起点 measure 仅允许 0 或 1 (不切分 edge)
 - 不做 multi-select / 拖拽编辑 / 地图导出
+# 2026-05-24 Current MVP Progress Sync
+
+This note updates the status of the older pending-work list in this file. The current
+MVP workspace has already implemented the local workflow/pipeline foundation:
+
+- `src/rail-graph-v1-mvp/pipeline.ts` defines project presets, workflow steps,
+  pipeline stages, task/artifact types, and localStorage workspace state.
+- `scripts/rail-graph-mvp-server.js` exposes the Vite dev task/artifact API.
+- `vite.config.js` mounts the MVP server plugin.
+- The UI now drives:
+  `prepare -> clean -> annotate -> compile -> validate -> export`.
+- The local stages are:
+  `diagnose`, `extract`, `emitFast`, `postFix`, `match`, `manifest`,
+  `planBatches`, `mergeOverride`.
+- Artifact refresh, selected artifact loading, task logs, task cancellation,
+  Senseki validation, and workflow snapshot export are part of the current
+  workspace shell.
+
+Treat this as completed workspace/pipeline foundation work. Remaining pending
+items should focus on domain behavior that is not yet implemented, such as
+signal compilation/rendering, direction arrows, path highlight refinements, and
+list/map detail parity.

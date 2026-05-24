@@ -8,22 +8,52 @@ This MVP validates the admin-facing base-topology workflow defined by
 Scope is intentionally narrow:
 
 - import unannotated GeoJSON;
+- run the local admin preparation pipeline from the Vite dev workspace;
+- review cleaning batches and merged override artifacts produced by external GIS scripts;
 - manually annotate features into `railGraph.kind`;
 - compile annotated geometry into fixed `BaseTopologyLayer`;
-- manually create and confirm stopping points;
-- export annotated GeoJSON, topo JSON, and diagnostics.
+- validate topology/pathfinding against the current Senseki scenarios;
+- export annotated GeoJSON, topo JSON, diagnostics, artifacts, and workflow snapshots.
 
 The MVP does not build service templates, runtime paths, events, timelines, or
-user-facing trip output.
+user-facing trip output. Its local pipeline is an admin/dev workflow used to
+prepare, clean, load, compile, validate, and export source data before the final
+Rail Graph runtime pipeline exists.
 
 ## Entry
 
 - Local entry: `rail-graph-mvp.html`
 - Logic: `src/rail-graph-v1-mvp/app.ts`
+- Workspace and pipeline model/client: `src/rail-graph-v1-mvp/pipeline.ts`
+- Vite local task API: `scripts/rail-graph-mvp-server.js`, mounted from
+  `vite.config.js`
 
 The entry is separate from the existing RailRound application. It does not use
 the app store, main routes, or i18next resources. If this tool later becomes an
 in-app admin route, UI text must be moved to the normal localization files.
+
+The current workspace exposes this admin workflow:
+
+1. `prepare` - run OSM extraction, post-fix, company/line matching, and manifest
+   refresh through local Python scripts.
+2. `clean` - plan review batches and merge keep/remove decisions into override
+   artifacts.
+3. `annotate` - load a selected artifact or bundled Senseki demo source and edit
+   annotations in the MVP inspector/map.
+4. `compile` - build `BaseTopologyLayer` and diagnostics from the current source.
+5. `validate` - run Senseki pathfinding scenarios and inspect map/list output.
+6. `export` - export snapshots, topology, annotated GeoJSON, and local artifacts.
+
+The Vite-only API exposes:
+
+- `POST /api/rail-graph-mvp/tasks`
+- `GET /api/rail-graph-mvp/tasks/:taskId`
+- `POST /api/rail-graph-mvp/tasks/:taskId/cancel`
+- `POST /api/rail-graph-mvp/artifacts`
+- `POST /api/rail-graph-mvp/artifact/read`
+
+These endpoints are local development glue only. They shell out to the configured
+`D:\GIS\scripts` project paths and are not part of a production API contract.
 
 ## Annotation Model
 
@@ -130,13 +160,15 @@ The MVP emits diagnostics for:
 
 ## Verification
 
-No unit tests are required for this MVP.
+No unit tests are required for the current docs-only synchronization.
 
 Integration coverage should exercise the whole local workflow:
 
-1. create a workspace from a small unannotated GeoJSON;
-2. annotate station, platform, and track features;
-3. add a platform-track binding;
-4. confirm a stopping point;
-5. compile and export topology;
-6. assert exported topology includes edges, nodes, binding, and confirmed stopping point.
+1. choose the Senseki workspace preset;
+2. refresh or run local preparation artifacts;
+3. plan/merge cleaning batches when external decision files exist;
+4. load a selected GeoJSON/JSON artifact or the bundled Senseki source;
+5. compile topology and inspect diagnostics;
+6. run Senseki validation/pathfinding;
+7. export a workflow snapshot and confirm the exported topology still includes
+   edges, nodes, bindings, stopping points, and diagnostics.

@@ -5,3 +5,6 @@
 ## 2024-04-15 - [Avoid O(N log N) Sorting on Massive Geographical Collections]
 **Learning:** In spatial queries like `findNearbyStations` where we scan `railwayData` containing thousands of stations to find the top K nearest points, allocating all elements to an array and running `Array.prototype.sort()` results in massive temporary object allocation and $O(N \log N)$ execution time (taking ~8.5ms in benchmarks).
 **Action:** Replace full array sorts with a bounded Top-K array using a simple $O(K)$ insertion sort during the $O(N)$ iteration phase. This brings the time complexity effectively down to $O(N)$, speeding up operations by ~36x (taking ~0.24ms). Remember to apply a final sort if total elements found are less than $K$.
+## 2024-05-20 - [Avoid turf.length Array Allocations in Hot Paths]
+**Learning:** In spatial queries calculating distances along coordinate lists, allocating GeoJSON `LineString` structures via Turf.js causes immense temporary object allocation and heavy GC pressure, slowing down the iteration. Wrapping coordinate data and invoking Turf creates measurable overhead.
+**Action:** Created `calcPolylineDist(coords)` in `tripCalculator.js` which relies strictly on native `[lat, lng]` iteration using O(N) looping, effectively bypassing Turf intermediate allocations and increasing execution speed for calculations.

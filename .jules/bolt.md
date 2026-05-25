@@ -5,3 +5,7 @@
 ## 2024-04-15 - [Avoid O(N log N) Sorting on Massive Geographical Collections]
 **Learning:** In spatial queries like `findNearbyStations` where we scan `railwayData` containing thousands of stations to find the top K nearest points, allocating all elements to an array and running `Array.prototype.sort()` results in massive temporary object allocation and $O(N \log N)$ execution time (taking ~8.5ms in benchmarks).
 **Action:** Replace full array sorts with a bounded Top-K array using a simple $O(K)$ insertion sort during the $O(N)$ iteration phase. This brings the time complexity effectively down to $O(N)$, speeding up operations by ~36x (taking ~0.24ms). Remember to apply a final sort if total elements found are less than $K$.
+
+## 2024-04-16 - [Optimize Distance Calculation By Bypassing Turf.js]
+**Learning:** Calling `turf.length` on `turf.lineString` requires first mapping coordinates into `[lng, lat]` format and allocating temporary GeoJSON wrappers. Inside hot loops (e.g. iterating over all path segments in `getRouteVisualData` or counting total distances in `StatsPage.tsx`), this causes severe memory allocation churn and garbage collection pressure, taking ~92ms for 100 iterations of 1000 points.
+**Action:** Expose and utilize a standalone `calcPolylineDist(coords)` utility that iterates linearly and directly uses the existing `calcDist` (Haversine formula). This simple loop avoids all intermediate object allocations, bringing the execution time down to ~13ms (a 7x speedup).

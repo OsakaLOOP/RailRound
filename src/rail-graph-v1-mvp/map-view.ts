@@ -156,7 +156,7 @@ export interface MapView {
   clearEntityHighlight(): void;
   clearPathHighlight(): void;
   onHover(handler: (ref: EntityRef | null) => void): void;
-  onClick(handler: (ref: EntityRef) => void): void;
+  onClick(handler: (ref: EntityRef, fid?: string) => void): void;
   setBaseLayer(kind: "positron" | "plain"): void;
   fitToData(): void;
   fitToEntities(refs: string[]): void;
@@ -198,7 +198,7 @@ interface InternalState {
   /** 被路径暗淡的 arrow edge.id (用于 clearPathHighlight 还原 opacity) */
   dimmedArrowKeys: Set<string>;
   hoverHandlers: Array<(ref: EntityRef | null) => void>;
-  clickHandlers: Array<(ref: EntityRef) => void>;
+  clickHandlers: Array<(ref: EntityRef, fid?: string) => void>;
   boxSelectHandlers: Array<(fids: string[]) => void>;
   boxHighlightGroup: L.LayerGroup;
   animationFrameId?: number;
@@ -251,42 +251,33 @@ export function createMapView(container: HTMLElement): MapView {
     map.dragging.disable();
     const start = e.latlng;
     let rect = L.rectangle(L.latLngBounds(start, start), { color: "#ff00aa", weight: 2, dashArray: "4,2" }).addTo(map);
-    
+
     const mm = (ev: L.LeafletMouseEvent) => {
       rect.setBounds(L.latLngBounds(start, ev.latlng));
     };
-    
+
     const mu = (ev: L.LeafletMouseEvent) => {
       map.off("mousemove", mm);
       map.off("mouseup", mu);
       map.removeLayer(rect);
       map.dragging.enable();
-      
+
       const finalBounds = L.latLngBounds(start, ev.latlng);
       const hits: string[] = [];
       state.entityLayers.forEach((entry) => {
         const layer = entry.layer;
         if (!map.hasLayer(layer)) return;
-        if (entry.fid) {
-          let hit = false;
-          if (typeof (layer as any).getLatLng === "function") {
-            const ll = (layer as any).getLatLng();
-            if (ll && finalBounds.contains(ll)) hit = true;
-          } else if (typeof (layer as any).getBounds === "function") {
-            const b = (layer as any).getBounds();
-            if (b && finalBounds.intersects(b)) hit = true;
-          }
-          if (hit) {
-            hits.push(entry.fid);
-          }
+        if (!entry.fid) return;
+        if (layerHitsBounds(layer, finalBounds, entry.kind)) {
+          hits.push(entry.fid);
         }
       });
-      
+
       if (hits.length > 0) {
         state.boxSelectHandlers.forEach((h) => h(hits));
       }
     };
-    
+
     map.on("mousemove", mm);
     map.on("mouseup", mu);
   });
@@ -793,7 +784,8 @@ function bindLayerEvents(state: InternalState, layer: L.Layer, ref: string): voi
   });
   layer.on("click", (e: L.LeafletEvent) => {
     L.DomEvent.stopPropagation(e as unknown as Event);
-    state.clickHandlers.forEach((h) => h(ref as EntityRef));
+    const entry = state.entityLayers.get(ref);
+    state.clickHandlers.forEach((h) => h(ref as EntityRef, entry?.fid));
   });
 }
 
@@ -1644,4 +1636,85 @@ function escapeHtml(value: string): string {
 
 function midpointAlong(coords: GeoJSONPosition[]): [number, number] {
   return interpolateAlong(coords, 0.5);
+}
+
+// Box-select hit test:
+//   - station / signal (CircleMarker, kind=station|signal): 点是否在 bounds 内
+//   - platform (Polygon, kind=platform): bbox 相交 (面积近似 bbox)
+//   - edge (Polyline, kind=edge): 任意 vertex 在 bounds 内, OR 任意线段穿过 bounds
+//     (避免直接 bbox 相交 — L 形/曲折 polyline bbox 比线大很多, 误命中严重)
+function layerHitsBounds(layer: L.Path, bounds: L.LatLngBounds, kind: LayerKind): boolean {
+  if (kind === "station" || kind === "signal") {
+    const ll = (layer as any).getLatLng?.();
+    return !!(ll && bounds.contains(ll));
+  }
+  if (kind === "platform") {
+    const b = (layer as any).getBounds?.();
+    return !!(b && bounds.intersects(b));
+  }
+  if (kind === "edge") {
+    const poly = layer as L.Polyline;
+    const latlngs = poly.getLatLngs() as L.LatLng[] | L.LatLng[][];
+    const rings: L.LatLng[][] = Array.isArray(latlngs[0])
+      ? (latlngs as L.LatLng[][])
+      : [latlngs as L.LatLng[]];
+    for (const ring of rings) {
+      for (const v of ring) {
+        if (bounds.contains(v)) return true;
+      }
+      for (let i = 0; i < ring.length - 1; i += 1) {
+        if (segmentIntersectsBounds(ring[i], ring[i + 1], bounds)) return true;
+      }
+    }
+    return false;
+  }
+  return false;
+}
+
+// Cohen-Sutherland line clipping: 判断线段 p1→p2 与矩形 bounds 是否相交。
+// 返回 true 当且仅当至少有一部分落在矩形内 (包括边界)。
+function segmentIntersectsBounds(p1: L.LatLng, p2: L.LatLng, b: L.LatLngBounds): boolean {
+  const xmin = b.getWest();
+  const xmax = b.getEast();
+  const ymin = b.getSouth();
+  const ymax = b.getNorth();
+  const INSIDE = 0, LEFT = 1, RIGHT = 2, BOTTOM = 4, TOP = 8;
+  const codeOf = (x: number, y: number): number => {
+    let c = INSIDE;
+    if (x < xmin) c |= LEFT;
+    else if (x > xmax) c |= RIGHT;
+    if (y < ymin) c |= BOTTOM;
+    else if (y > ymax) c |= TOP;
+    return c;
+  };
+
+  let x1 = p1.lng, y1 = p1.lat;
+  let x2 = p2.lng, y2 = p2.lat;
+  let c1 = codeOf(x1, y1);
+  let c2 = codeOf(x2, y2);
+  for (let i = 0; i < 8; i += 1) {
+    if (!(c1 | c2)) return true;          // 两端都在矩形内
+    if (c1 & c2) return false;            // 两端在同一侧外, 不可能穿过
+    const out = c1 || c2;
+    let x = 0, y = 0;
+    if (out & TOP) {
+      x = x1 + (x2 - x1) * (ymax - y1) / (y2 - y1);
+      y = ymax;
+    } else if (out & BOTTOM) {
+      x = x1 + (x2 - x1) * (ymin - y1) / (y2 - y1);
+      y = ymin;
+    } else if (out & RIGHT) {
+      y = y1 + (y2 - y1) * (xmax - x1) / (x2 - x1);
+      x = xmax;
+    } else if (out & LEFT) {
+      y = y1 + (y2 - y1) * (xmin - x1) / (x2 - x1);
+      x = xmin;
+    }
+    if (out === c1) {
+      x1 = x; y1 = y; c1 = codeOf(x1, y1);
+    } else {
+      x2 = x; y2 = y; c2 = codeOf(x2, y2);
+    }
+  }
+  return false;
 }

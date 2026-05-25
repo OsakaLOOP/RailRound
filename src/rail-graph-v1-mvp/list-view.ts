@@ -67,6 +67,8 @@ export interface ListViewInput {
   searchQuery?: string;
   selectMode?: boolean;
   selectedCandidateFid?: string | null;
+  /** Select Mode 队列中的 fid 集合; list 用它来给卡片打上"已入队"视觉标记。 */
+  selectionQueueFids?: Set<string>;
   activeTab?: TabKey;
   /** 由 app.ts 的 runFilterPipeline 算好的"经全部 active rules 后通过"的 fid 集合 — 优先用它过滤候选,
    *  避免 list-view 自己再跑一次 filter (尤其涉及跨阶段 rule 时 list-view 算不出正确结果). */
@@ -429,7 +431,7 @@ function renderActiveTab(state: InternalState): void {
 
 function renderCleanTab(state: InternalState): void {
   const body = bodyEl(state, "clean");
-  const { source, cleanOverrides, filterRules, activeFilters, activeLevels, searchQuery, selectMode, selectedCandidateFid, cleanPassFids } = state.input;
+  const { source, cleanOverrides, filterRules, activeFilters, activeLevels, searchQuery, selectMode, selectedCandidateFid, cleanPassFids, selectionQueueFids } = state.input;
 
   if (!source) {
     body.innerHTML = `<div class="lv-empty">No source candidates loaded. Select a Company and Line in Left panel "Prepare" or "Clean" step and load the workspace source.</div>`;
@@ -516,10 +518,11 @@ function renderCleanTab(state: InternalState): void {
         <!-- Search box & Select mode -->
         <div style="display:flex; gap:6px; align-items:center;">
           <input type="text" class="lv-clean-search" placeholder="Search by name, ID or station..." value="${escapeAttr(query)}" style="flex:1; font-size:11px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; height:24px;" />
-          <button class="lv-clean-selmode-btn ${isSelectMode ? "active" : ""}" style="font-size:11px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer; font-weight:600; display:flex; align-items:center; justify-content:center; height:24px; gap:2px;">
-            ✏️ Select Mode
+          <button class="lv-clean-selmode-btn ${isSelectMode ? "active" : ""}" style="font-size:11px; padding:4px 8px; border:1px solid ${isSelectMode ? "#f59e0b" : "#cbd5e1"}; border-radius:4px; cursor:pointer; font-weight:700; display:flex; align-items:center; justify-content:center; height:24px; gap:2px; background:${isSelectMode ? "#fef3c7" : "#fff"}; color:${isSelectMode ? "#92400e" : "#334155"};">
+            ✏️ ${isSelectMode ? "Exit Select" : "Select Mode"}
           </button>
         </div>
+        ${isSelectMode ? `<div style="font-size:10.5px; color:#92400e; background:#fffbeb; border:1px dashed #f59e0b; border-radius:4px; padding:4px 6px;">Click candidates or <b>Shift+drag</b> on map to queue. Use the floating bar to Remove / Keep / Cancel.</div>` : ``}
       </div>
 
       <!-- Filter rules panel -->
@@ -547,10 +550,12 @@ function renderCleanTab(state: InternalState): void {
             const meta = (overrideMeta as Record<string, any>)[fid] || {};
             const reason = meta.reason || "";
             const isSelected = selectedCandidateFid === fid;
+            const isQueued = !!selectionQueueFids?.has(fid);
 
             let borderStyle = "border-left: 4px solid #cbd5e1;";
             let bgStyle = "background:#fff;";
             let textDecoration = "";
+            let outline = "";
             if (isRemove) {
               borderStyle = "border-left: 4px solid #dc2626;";
               bgStyle = "background:#fef2f2; opacity:0.75;";
@@ -562,11 +567,15 @@ function renderCleanTab(state: InternalState): void {
             if (isSelected) {
               bgStyle = "background:#eff6ff; border-color:#3b82f6;";
             }
+            if (isQueued) {
+              outline = "outline:2px dashed #f59e0b; outline-offset:-2px;";
+              bgStyle = "background:#fffbeb;";
+            }
 
             return `
-              <div class="lv-clean-item-card" data-fid="${escapeAttr(fid)}" style="border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:11px; transition:all 100ms; ${borderStyle} ${bgStyle}">
+              <div class="lv-clean-item-card${isQueued ? ' queued' : ''}" data-fid="${escapeAttr(fid)}" style="border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:11px; transition:all 100ms; ${borderStyle} ${bgStyle} ${outline}">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
-                  <span style="font-weight:600; ${textDecoration}">${escapeHtml(props.name || props.osm_id || "unnamed")}</span>
+                  <span style="font-weight:600; ${textDecoration}">${isQueued ? '<span title="In select queue" style="color:#f59e0b; margin-right:3px;">●</span>' : ''}${escapeHtml(props.name || props.osm_id || "unnamed")}</span>
                   <span class="lv-clean-level-badge ${props.match_level || 'low'}">
                     ${props.match_level || 'low'} (${(props.match_score || 0).toFixed(2)})
                   </span>

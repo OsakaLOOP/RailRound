@@ -96,6 +96,10 @@ const cleanFilters: Record<string, boolean> = {};
 let cleanSearchQuery = "";
 let cleanSelectMode = false;
 let cleanSelectedCandidateFid: string | null = null;
+// Select Mode 队列: 用户进入 select mode 后通过 click / shift-drag 累加候选 fid
+// 末端 [Remove]/[Keep] 把整个集合批量写入 overrides; [Cancel] 清空丢弃。
+// 退出 select mode 即清空 (不持久化到 workspace ui)。
+const cleanSelectionQueue: Set<string> = new Set();
 let filterRules: any[] = [];
 
 const allCleanDecisions = new Map<string, "keep" | "remove">();
@@ -1840,11 +1844,15 @@ function render(): void {
           <button id="mvp-fit-data" style="font-size:11px">Fit</button>
         </div>
         <div id="mvp-map"></div>
-        <div id="mvp-box-select-bar" style="position:absolute; bottom:16px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.95); border:1px solid #cbd5e1; border-radius:8px; padding:8px 12px; display:none; gap:8px; align-items:center; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); z-index:1000;">
-          <span style="font-size:12px; font-weight:600; color:#1e293b;">Selected <span id="mvp-box-select-count">0</span> items:</span>
-          <button id="mvp-box-select-keep" style="font-size:11px; padding:3px 8px; background:#16a34a; border-color:#16a34a; color:#fff; font-weight:600;">Keep</button>
-          <button id="mvp-box-select-remove" class="danger" style="font-size:11px; padding:3px 8px; font-weight:600;">Remove</button>
-          <button id="mvp-box-select-cancel" style="font-size:11px; padding:3px 8px;">Cancel</button>
+        <div id="mvp-clean-select-bar" style="position:absolute; bottom:16px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.97); border:2px solid #f59e0b; border-radius:10px; padding:10px 14px; display:none; gap:10px; align-items:center; box-shadow:0 10px 20px -3px rgba(0,0,0,0.18); z-index:1000;">
+          <span style="font-size:12px; font-weight:700; color:#92400e;">
+            <span style="font-size:13px;">✏️</span> Select Mode · queued
+            <span id="mvp-clean-select-count" style="background:#f59e0b; color:#fff; padding:1px 7px; border-radius:10px; margin-left:4px; font-weight:700;">0</span>
+          </span>
+          <span style="color:#cbd5e1;">|</span>
+          <button id="mvp-clean-select-remove" class="danger" style="font-size:11px; padding:4px 10px; font-weight:700;">Remove queued</button>
+          <button id="mvp-clean-select-keep" style="font-size:11px; padding:4px 10px; background:#16a34a; border-color:#16a34a; color:#fff; font-weight:700;">Keep queued</button>
+          <button id="mvp-clean-select-cancel" style="font-size:11px; padding:4px 10px;">Cancel</button>
         </div>
       </section>
       <div class="panel-gutter" data-gutter="right"></div>
@@ -1917,12 +1925,31 @@ function initViews(): void {
       mapView?.clearEntityHighlight();
     }
   });
-  mapView.onClick(async (ref) => {
+  mapView.onClick(async (ref, hintFid) => {
+    // select mode 走专用快路: mapView 已经在 entityLayers 里存了 fid, 直接 toggle 队列,
+    // 不调 selectFeatureByRef / highlightEntity 避免覆盖队列高亮。
+    if (cleanSelectMode) {
+      let fid: string | null = hintFid ?? null;
+      if (!fid && state.source) {
+        const feature = state.source.features.find((f) => f.properties.railGraph?.id === ref);
+        if (feature) {
+          const p = feature.properties || {};
+          fid = `${p.osm_type || ""}:${p.osm_id || ""}:${p.class_main || ""}:${p.source_line_name || ""}`;
+        }
+      }
+      if (!fid) return;
+      if (cleanSelectionQueue.has(fid)) cleanSelectionQueue.delete(fid);
+      else cleanSelectionQueue.add(fid);
+      syncSelectModeBar();
+      refreshViews();
+      return;
+    }
+
     listView?.highlightEntity(ref);
     listView?.selectFeatureByRef(ref);
-    
-    let fid: string | null = null;
-    if (state.source) {
+
+    let fid: string | null = hintFid ?? null;
+    if (!fid && state.source) {
       const feature = state.source.features.find((f) => f.properties.railGraph?.id === ref);
       if (feature) {
         const p = feature.properties || {};
@@ -1962,22 +1989,8 @@ function initViews(): void {
     }
 
     if (fid) {
-      if (cleanSelectMode) {
-        const removeSet = new Set(cleanOverrides?.remove || []);
-        const keepSet = new Set(cleanOverrides?.keep || []);
-        
-        if (removeSet.has(fid)) {
-          removeSet.delete(fid);
-        } else {
-          removeSet.add(fid);
-          keepSet.delete(fid);
-        }
-
-        await updateCleanOverrides(Array.from(keepSet), Array.from(removeSet), cleanOverrides?.meta || {});
-      } else {
-        cleanSelectedCandidateFid = fid;
-        refreshViews();
-      }
+      cleanSelectedCandidateFid = fid;
+      refreshViews();
     }
   });
 
@@ -2158,11 +2171,20 @@ function initViews(): void {
 
   listView.onCleanSelectModeToggle((active) => {
     cleanSelectMode = active;
+    if (!active) cleanSelectionQueue.clear();
     persistWorkspaceCleanUiState();
+    syncSelectModeBar();
     refreshViews();
   });
 
   listView.onCleanCandidateSelect((fid) => {
+    // select mode 下点击 list 卡片视为 toggle 队列, 不再切换 inspector
+    if (cleanSelectMode && fid) {
+      if (cleanSelectionQueue.has(fid)) cleanSelectionQueue.delete(fid);
+      else cleanSelectionQueue.add(fid);
+      syncSelectModeBar();
+      return;
+    }
     cleanSelectedCandidateFid = fid;
     persistWorkspaceCleanUiState();
     if (fid) {
@@ -2191,70 +2213,68 @@ function initViews(): void {
     refreshViews();
   });
 
-  // Map box selection callback
+  // Map box selection (Shift+drag): 仅在 select mode 下生效, 把命中 fid 全部加入队列。
+  // 队列里的批量删除 / 保留 / 取消统一交给 select-mode 持久浮条按钮处理。
   mapView.onBoxSelect((fids) => {
-    if (!fids || fids.length === 0) return;
-    
-    mapView?.highlightBoxSelect(fids);
-
-    const bar = document.getElementById("mvp-box-select-bar");
-    const countEl = document.getElementById("mvp-box-select-count");
-    if (bar && countEl) {
-      countEl.textContent = String(fids.length);
-      bar.style.display = "flex";
-    }
-
-    const keepBtn = document.getElementById("mvp-box-select-keep");
-    const removeBtn = document.getElementById("mvp-box-select-remove");
-    const cancelBtn = document.getElementById("mvp-box-select-cancel");
-
-    const clearBar = () => {
-      bar!.style.display = "none";
-      mapView?.clearBoxSelectHighlight();
-      
-      keepBtn?.replaceWith(keepBtn.cloneNode(true));
-      removeBtn?.replaceWith(removeBtn.cloneNode(true));
-      cancelBtn?.replaceWith(cancelBtn.cloneNode(true));
-    };
-
-    const newKeepBtn = document.getElementById("mvp-box-select-keep")!;
-    const newRemoveBtn = document.getElementById("mvp-box-select-remove")!;
-    const newCancelBtn = document.getElementById("mvp-box-select-cancel")!;
-
-    newCancelBtn.addEventListener("click", () => {
-      clearBar();
-    });
-
-    newKeepBtn.addEventListener("click", async () => {
-      const keepSet = new Set(cleanOverrides?.keep || []);
-      const removeSet = new Set(cleanOverrides?.remove || []);
-      const meta = { ...(cleanOverrides?.meta || {}) };
-
-      for (const fid of fids) {
-        keepSet.add(fid);
-        removeSet.delete(fid);
-        meta[fid] = { ...(meta[fid] || {}), reason: "Bulk overrides: Keep" };
-      }
-
-      await updateCleanOverrides(Array.from(keepSet), Array.from(removeSet), meta);
-      clearBar();
-    });
-
-    newRemoveBtn.addEventListener("click", async () => {
-      const keepSet = new Set(cleanOverrides?.keep || []);
-      const removeSet = new Set(cleanOverrides?.remove || []);
-      const meta = { ...(cleanOverrides?.meta || {}) };
-
-      for (const fid of fids) {
-        removeSet.add(fid);
-        keepSet.delete(fid);
-        meta[fid] = { ...(meta[fid] || {}), reason: "Bulk overrides: Remove" };
-      }
-
-      await updateCleanOverrides(Array.from(keepSet), Array.from(removeSet), meta);
-      clearBar();
-    });
+    if (!cleanSelectMode || !fids || fids.length === 0) return;
+    for (const fid of fids) cleanSelectionQueue.add(fid);
+    syncSelectModeBar();
   });
+
+  bindSelectModeBarOnce();
+}
+
+// Select Mode 浮条 — 显示队列大小, 接管 Remove/Keep/Cancel 三按钮。
+// bindSelectModeBarOnce 只在 initViews 期间挂一次, 之后 syncSelectModeBar 只改文字 + display + 高亮。
+function syncSelectModeBar(): void {
+  const bar = document.getElementById("mvp-clean-select-bar");
+  const countEl = document.getElementById("mvp-clean-select-count");
+  if (!bar || !countEl) return;
+  if (cleanSelectMode) {
+    bar.style.display = "flex";
+    countEl.textContent = String(cleanSelectionQueue.size);
+    mapView?.highlightBoxSelect(Array.from(cleanSelectionQueue));
+  } else {
+    bar.style.display = "none";
+    mapView?.clearBoxSelectHighlight();
+  }
+}
+
+function bindSelectModeBarOnce(): void {
+  const removeBtn = document.getElementById("mvp-clean-select-remove");
+  const keepBtn = document.getElementById("mvp-clean-select-keep");
+  const cancelBtn = document.getElementById("mvp-clean-select-cancel");
+  if (!removeBtn || !keepBtn || !cancelBtn) return;
+
+  const exitMode = () => {
+    cleanSelectionQueue.clear();
+    cleanSelectMode = false;
+    persistWorkspaceCleanUiState();
+    syncSelectModeBar();
+    refreshViews();
+  };
+
+  const commit = async (action: "keep" | "remove") => {
+    if (cleanSelectionQueue.size === 0) {
+      exitMode();
+      return;
+    }
+    const keepSet = new Set(cleanOverrides?.keep || []);
+    const removeSet = new Set(cleanOverrides?.remove || []);
+    const meta = { ...(cleanOverrides?.meta || {}) };
+    const reason = action === "keep" ? "Select Mode: bulk Keep" : "Select Mode: bulk Remove";
+    for (const fid of cleanSelectionQueue) {
+      if (action === "keep") { keepSet.add(fid); removeSet.delete(fid); }
+      else                  { removeSet.add(fid); keepSet.delete(fid); }
+      meta[fid] = { ...(meta[fid] || {}), reason };
+    }
+    await updateCleanOverrides(Array.from(keepSet), Array.from(removeSet), meta);
+    exitMode();
+  };
+
+  removeBtn.addEventListener("click", () => { void commit("remove"); });
+  keepBtn.addEventListener("click", () => { void commit("keep"); });
+  cancelBtn.addEventListener("click", () => { exitMode(); });
 }
 
 async function updateCleanOverrides(keep: string[], remove: string[], meta: Record<string, any>): Promise<void> {
@@ -2476,6 +2496,7 @@ function refreshViews(): void {
       activeTab,
       cleanPassFids: passFids,
       cleanPipelineReport: report,
+      selectionQueueFids: cleanSelectMode ? new Set(cleanSelectionQueue) : undefined,
     });
   } else {
     listView.update({
@@ -2492,9 +2513,11 @@ function refreshViews(): void {
       selectMode: cleanSelectMode,
       selectedCandidateFid: cleanSelectedCandidateFid,
       activeTab,
+      selectionQueueFids: cleanSelectMode ? new Set(cleanSelectionQueue) : undefined,
     });
   }
   renderWorkflowChrome();
+  syncSelectModeBar();
 }
 
 let showLogs = true;

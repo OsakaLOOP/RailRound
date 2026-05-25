@@ -13,6 +13,7 @@
 import type { AnnotatedFeature } from "../rail-graph-v1/annotation.types";
 import type { GeoJSONPosition } from "../rail-graph-v1/geojson";
 import {
+  buildConnectedLineComponentIndex,
   lineDirectionVector,
   platformDirectionVector,
   pointToPolylineMeters,
@@ -58,6 +59,8 @@ export const RULE_HANDLERS: Record<string, RuleHandlerFn> = {
   dynamic_match: handleDynamicMatch,
   isolated_or_blank: handleIsolatedOrBlank,
   orphan_railway_node: handleOrphanRailwayNode,
+  single_connection_switch: handleSingleConnectionSwitch,
+  short_connected_line_component: handleShortConnectedLineComponent,
   platform_direction_match: handlePlatformDirectionMatch,
 };
 
@@ -146,6 +149,12 @@ export function handleIsolatedOrBlank(
   if (!g || (g.type !== "LineString" && g.type !== "MultiLineString")) return true;
   const props = (feature.properties || {}) as any;
   const maxLen = params?.max_length_m || 200;
+  const classMain = propString(feature, "class_main");
+  const railway = propString(feature, "railway");
+  const publicTransport = propString(feature, "public_transport");
+
+  if (classMain === "platform" || railway === "platform" || publicTransport === "platform") return true;
+  if (propString(feature, "source_line_name") && (classMain === "rail" || railway === "rail")) return true;
 
   if (params?.require_unnamed) {
     if (props.name || props["name:ja"] || props["name:en"] || props["KSJ2:LIN"]) return true;
@@ -189,8 +198,9 @@ export function handleOrphanRailwayNode(
 ): boolean {
   const g: any = (feature as any).geometry;
   if (!g || g.type !== "Point") return true;
-  const props = (feature.properties || {}) as any;
-  const railwayVal = String(props.railway || "");
+  const railwayVal = propString(feature, "railway");
+  const publicTransport = propString(feature, "public_transport");
+  if (publicTransport === "stop_position" || propString(feature, "name") || propString(feature, "name:ja")) return true;
   const targetVals: string[] = params?.railway_values || ["switch", "level_crossing", "stop"];
   if (!targetVals.includes(railwayVal)) return true;
   if (refPool.length === 0) return true;
@@ -212,6 +222,61 @@ export function handleOrphanRailwayNode(
     }
   }
   return false;
+}
+
+/** single_connection_switch: switch point 只连接到 0/1 条保留线路时剔除。
+ *  连接判据使用点到保留 LineString/MultiLineString 的米制距离, 默认 0.5m 对齐 MVP snapping。 */
+export function handleSingleConnectionSwitch(
+  feature: GeoJsonFeature,
+  params: any,
+  refPool: ReadonlyArray<GeoJsonFeature>,
+): boolean {
+  const g: any = (feature as any).geometry;
+  if (!g || g.type !== "Point") return true;
+  if (!isSwitchFeature(feature)) return true;
+  if (propString(feature, "railway") !== "switch") return true;
+  if (refPool.length === 0) return true;
+
+  const tolerance = params?.tolerance_m ?? 0.5;
+  const minConnections = params?.min_connections ?? 2;
+  const pt = g.coordinates as GeoJSONPosition;
+  if (!Array.isArray(pt) || pt.length < 2) return true;
+
+  let connected = 0;
+  const seen = new Set<string>();
+  for (const ref of refPool) {
+    if (!isRailLineFeature(ref)) continue;
+    const key = featureKey(ref);
+    if (seen.has(key)) continue;
+    const rg: any = (ref as any).geometry;
+    if (pointToGeometryMeters(pt, rg) <= tolerance) {
+      seen.add(key);
+      connected += 1;
+      if (connected >= minConnections) return true;
+    }
+  }
+  if (propString(feature, "source_line_name") && propString(feature, "nearest_station")) return true;
+  return false;
+}
+
+/** short_connected_line_component: 剔除总长度过短的连通 rail line 分量。
+ *  端点 key 默认 toFixed(6), 与 MVP endpoint topology 保持一致; 0.5m endpoint-to-line snapping 对齐 pathfinding。 */
+export function handleShortConnectedLineComponent(
+  feature: GeoJsonFeature,
+  params: any,
+  refPool: ReadonlyArray<GeoJsonFeature>,
+): boolean {
+  if (!isRailLineFeature(feature)) return true;
+  if (propString(feature, "source_line_name") && !propString(feature, "service")) return true;
+  if (refPool.length === 0) return true;
+  const minComponentLengthM = params?.min_component_length_m ?? 80;
+  const index = connectedLineComponentIndex(refPool, {
+    endpointPrecision: params?.endpoint_precision ?? 6,
+    snapToleranceM: params?.snap_tolerance_m ?? 0.5,
+  });
+  const componentLength = index.componentLengthByFeatureKey.get(featureKey(feature));
+  if (componentLength === undefined) return true;
+  return componentLength >= minComponentLengthM;
 }
 
 /** platform_direction_match: 多边形站台主方向应与附近保留轨道大致平行。
@@ -236,11 +301,26 @@ export function handlePlatformDirectionMatch(
   const sameStationBonusM = params?.same_station_bonus_m ?? 40;
   const minTrackConfidence = params?.min_track_confidence ?? 0.25;
   const requireSameStation = !!params?.require_same_nearest_station;
+  const requireTargetLineTrack = !!params?.require_target_line_track;
+  const removeIfNoTargetLineTrack = !!params?.remove_if_no_target_line_track;
+  const removeIfTargetLineAngleMismatch = params?.remove_if_target_line_angle_mismatch !== false;
+  const targetLineName = propString(feature, params?.target_line_field || "source_line_name");
+  const targetLineFields: string[] = params?.target_line_match_fields || ["name", "name:ja", "name:en", "KSJ2:LIN"];
+  const removeNearestStationMismatch = !!params?.remove_if_nearest_track_station_mismatch;
+  const nearestMismatchMaxDistanceM = params?.nearest_station_mismatch_max_distance_m ?? 25;
+  const nearestMismatchMarginM = params?.nearest_station_mismatch_margin_m ?? 20;
   const platformStation = propString(feature, "nearest_station");
 
   let sawNearbyTrack = false;
   let sawStationCompatibleTrack = false;
   let bestCompatibleAngle = Infinity;
+  let nearestTrackDistance = Infinity;
+  let nearestTrackStation = "";
+  let nearestTrackAngle = Infinity;
+  let bestSameStationDistance = Infinity;
+  let hasPassingSameStationTrack = false;
+  let sawTargetLineTrack = false;
+  let hasPassingTargetLineTrack = false;
 
   for (const ref of refPool) {
     if (!isRailLineFeature(ref)) continue;
@@ -252,17 +332,49 @@ export function handlePlatformDirectionMatch(
     const effectiveMaxDistance = maxDistanceM + (sameStation ? sameStationBonusM : 0);
     if (distanceM > effectiveMaxDistance) continue;
     sawNearbyTrack = true;
+    const isTargetLineTrack = !!targetLineName && trackMatchesTargetLine(ref, targetLineName, targetLineFields);
+    const trackVector = lineDirectionVector(ref);
+    const angleDiff = trackVector && trackVector.confidence >= minTrackConfidence
+      ? unorientedAngleDiffDeg(platformVector, trackVector)
+      : Infinity;
+    if (distanceM < nearestTrackDistance) {
+      nearestTrackDistance = distanceM;
+      nearestTrackStation = refStation;
+      nearestTrackAngle = angleDiff;
+    }
+    if (sameStation && angleDiff <= maxAngleDiffDeg && distanceM < bestSameStationDistance) {
+      bestSameStationDistance = distanceM;
+      hasPassingSameStationTrack = true;
+    }
+    if (isTargetLineTrack) {
+      sawTargetLineTrack = true;
+      if (angleDiff <= maxAngleDiffDeg) hasPassingTargetLineTrack = true;
+    }
+    if (requireTargetLineTrack && !isTargetLineTrack) continue;
     if (requireSameStation && platformStation && refStation && platformStation !== refStation) continue;
     sawStationCompatibleTrack = true;
-
-    const trackVector = lineDirectionVector(ref);
-    if (!trackVector || trackVector.confidence < minTrackConfidence) continue;
-    const angleDiff = unorientedAngleDiffDeg(platformVector, trackVector);
     if (angleDiff < bestCompatibleAngle) bestCompatibleAngle = angleDiff;
-    if (angleDiff <= maxAngleDiffDeg) return true;
+    if (angleDiff <= maxAngleDiffDeg && !removeNearestStationMismatch) return true;
   }
 
   if (!sawNearbyTrack) return params?.remove_if_no_nearby_track === true ? false : true;
+  if (
+    removeNearestStationMismatch
+    && platformStation
+    && nearestTrackStation
+    && nearestTrackStation !== platformStation
+    && nearestTrackDistance <= nearestMismatchMaxDistanceM
+    && nearestTrackAngle <= maxAngleDiffDeg
+    && (!hasPassingSameStationTrack || nearestTrackDistance + nearestMismatchMarginM < bestSameStationDistance)
+  ) {
+    return false;
+  }
+  if (requireTargetLineTrack && targetLineName) {
+    if (!sawTargetLineTrack) return removeIfNoTargetLineTrack ? false : true;
+    if (!hasPassingTargetLineTrack && removeIfTargetLineAngleMismatch) return false;
+    if (hasPassingTargetLineTrack) return true;
+  }
+  if (hasPassingSameStationTrack) return true;
   if (requireSameStation && platformStation && !sawStationCompatibleTrack) {
     return params?.remove_if_station_mismatch === true ? false : true;
   }
@@ -301,6 +413,33 @@ function isRailLineFeature(feature: GeoJsonFeature): boolean {
   return kind === "track_geometry" || classMain === "rail" || railway === "rail";
 }
 
+function isSwitchFeature(feature: GeoJsonFeature): boolean {
+  const props = (feature.properties || {}) as any;
+  const kind = props.railGraph?.kind;
+  const classMain = propString(feature, "class_main");
+  const railway = propString(feature, "railway");
+  return kind === "switch_point" || classMain === "switch" || railway === "switch";
+}
+
+function trackMatchesTargetLine(feature: GeoJsonFeature, lineName: string, fields: string[]): boolean {
+  const needle = normalizeLineName(lineName);
+  if (!needle) return false;
+  for (const field of fields) {
+    const value = normalizeLineName(propString(feature, field));
+    if (!value) continue;
+    if (value.includes(needle) || needle.includes(value)) return true;
+  }
+  return false;
+}
+
+function normalizeLineName(value: string): string {
+  return value
+    .replace(/^JR/, "")
+    .replace(/^ＪＲ/, "")
+    .replace(/[()\[\]（）\s・･]/g, "")
+    .trim();
+}
+
 function pointToGeometryMeters(point: GeoJSONPosition, g: any): number {
   if (!g) return Infinity;
   if (g.type === "LineString") {
@@ -316,6 +455,40 @@ function pointToGeometryMeters(point: GeoJSONPosition, g: any): number {
     return best;
   }
   return Infinity;
+}
+
+interface ComponentBuildOptions {
+  endpointPrecision: number;
+  snapToleranceM: number;
+}
+
+const componentIndexCache = new WeakMap<ReadonlyArray<GeoJsonFeature>, Map<string, ReturnType<typeof buildConnectedLineComponentIndex<GeoJsonFeature>>>>();
+
+function connectedLineComponentIndex(
+  refPool: ReadonlyArray<GeoJsonFeature>,
+  options: ComponentBuildOptions,
+): ReturnType<typeof buildConnectedLineComponentIndex<GeoJsonFeature>> {
+  const cacheKey = `${options.endpointPrecision}|${options.snapToleranceM}`;
+  let perPool = componentIndexCache.get(refPool);
+  if (!perPool) {
+    perPool = new Map();
+    componentIndexCache.set(refPool, perPool);
+  }
+  const hit = perPool.get(cacheKey);
+  if (hit) return hit;
+
+  const index = buildConnectedLineComponentIndex(refPool.filter(isRailLineFeature), featureKey, {
+    endpointPrecision: options.endpointPrecision,
+    snapToleranceM: options.snapToleranceM,
+  });
+  perPool.set(cacheKey, index);
+  return index;
+}
+
+function featureKey(feature: GeoJsonFeature): string {
+  const props = (feature.properties || {}) as any;
+  if (typeof props._fid === "string" && props._fid.length > 0) return props._fid;
+  return `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
 }
 
 function endpointsOf(g: any): GeoJSONPosition[] {

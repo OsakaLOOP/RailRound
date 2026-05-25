@@ -31,6 +31,18 @@ export interface DirectionVector {
   segmentCount: number;
 }
 
+export interface ConnectedLineComponentOptions {
+  /** Coordinate precision used by MVP endpoint topology. Defaults to 6. */
+  endpointPrecision?: number;
+  /** Endpoint-to-polyline snapping tolerance in meters. Defaults to 0.5m. */
+  snapToleranceM?: number;
+}
+
+export interface ConnectedLineComponentIndex {
+  componentLengthByFeatureKey: Map<string, number>;
+  componentIdByFeatureKey: Map<string, number>;
+}
+
 // ── 距离 ───────────────────────────────────────────────────────
 
 /** 点到线段最短距离 (米)。平面投影近似, 自动用中点纬度修正 cos 因子。 */
@@ -92,6 +104,135 @@ export function polylineLengthMeters(coords: ReadonlyArray<GeoJSONPosition | Pt>
     total += Math.sqrt(dx * dx + dy * dy);
   }
   return total;
+}
+
+/** Build connected LineString/MultiLineString components using MVP endpoint topology semantics.
+ *  Direct endpoint equality uses coordinate.toFixed(precision); optional endpoint-to-line snapping
+ *  mirrors MVP pathfinding crossover snapping tolerance. */
+export function buildConnectedLineComponentIndex<T extends { geometry?: any }>(
+  features: ReadonlyArray<T>,
+  featureKey: (feature: T, index: number) => string,
+  options: ConnectedLineComponentOptions = {},
+): ConnectedLineComponentIndex {
+  const endpointPrecision = options.endpointPrecision ?? 6;
+  const snapToleranceM = options.snapToleranceM ?? 0.5;
+  const entries = features
+    .map((feature, sourceIndex) => ({
+      feature,
+      sourceIndex,
+      key: featureKey(feature, sourceIndex),
+      lines: geometryLineStrings(feature.geometry),
+      lengthM: geometryLineStrings(feature.geometry).reduce((sum, line) => sum + polylineLengthMeters(line), 0),
+    }))
+    .filter((entry) => entry.lines.length > 0);
+
+  const dsu = new DisjointSet(entries.length);
+  const byEndpointKey = new Map<string, number>();
+
+  for (let i = 0; i < entries.length; i++) {
+    for (const endpoint of geometryLineEndpoints(entries[i].feature.geometry)) {
+      const key = fixedCoordinateKey(endpoint, endpointPrecision);
+      const other = byEndpointKey.get(key);
+      if (other === undefined) byEndpointKey.set(key, i);
+      else dsu.union(i, other);
+    }
+  }
+
+  if (snapToleranceM > 0) {
+    for (let i = 0; i < entries.length; i++) {
+      const endpointsI = geometryLineEndpoints(entries[i].feature.geometry);
+      for (let j = i + 1; j < entries.length; j++) {
+        if (
+          endpointsSnapToLines(endpointsI, entries[j].lines, snapToleranceM)
+          || endpointsSnapToLines(geometryLineEndpoints(entries[j].feature.geometry), entries[i].lines, snapToleranceM)
+        ) {
+          dsu.union(i, j);
+        }
+      }
+    }
+  }
+
+  const lengthByRoot = new Map<number, number>();
+  for (let i = 0; i < entries.length; i++) {
+    const root = dsu.find(i);
+    lengthByRoot.set(root, (lengthByRoot.get(root) ?? 0) + entries[i].lengthM);
+  }
+
+  const componentLengthByFeatureKey = new Map<string, number>();
+  const componentIdByFeatureKey = new Map<string, number>();
+  for (let i = 0; i < entries.length; i++) {
+    const root = dsu.find(i);
+    componentLengthByFeatureKey.set(entries[i].key, lengthByRoot.get(root) ?? entries[i].lengthM);
+    componentIdByFeatureKey.set(entries[i].key, root);
+  }
+
+  return { componentLengthByFeatureKey, componentIdByFeatureKey };
+}
+
+function geometryLineStrings(g: any): GeoJSONPosition[][] {
+  if (!g) return [];
+  if (g.type === "LineString") return (g.coordinates?.length ?? 0) >= 2 ? [g.coordinates as GeoJSONPosition[]] : [];
+  if (g.type === "MultiLineString") {
+    return (g.coordinates as GeoJSONPosition[][]).filter((line) => line && line.length >= 2);
+  }
+  return [];
+}
+
+function geometryLineEndpoints(g: any): GeoJSONPosition[] {
+  const out: GeoJSONPosition[] = [];
+  for (const line of geometryLineStrings(g)) {
+    out.push(line[0], line[line.length - 1]);
+  }
+  return out;
+}
+
+function fixedCoordinateKey(point: GeoJSONPosition, precision: number): string {
+  return `${Number(point[0]).toFixed(precision)},${Number(point[1]).toFixed(precision)}`;
+}
+
+function endpointsSnapToLines(
+  endpoints: ReadonlyArray<GeoJSONPosition>,
+  lines: ReadonlyArray<ReadonlyArray<GeoJSONPosition>>,
+  toleranceM: number,
+): boolean {
+  for (const endpoint of endpoints) {
+    for (const line of lines) {
+      if (pointToPolylineMeters(endpoint, line) <= toleranceM) return true;
+    }
+  }
+  return false;
+}
+
+class DisjointSet {
+  private parent: number[];
+  private rank: number[];
+
+  constructor(size: number) {
+    this.parent = Array.from({ length: size }, (_v, i) => i);
+    this.rank = Array.from({ length: size }, () => 0);
+  }
+
+  find(value: number): number {
+    const parent = this.parent[value];
+    if (parent === value) return value;
+    const root = this.find(parent);
+    this.parent[value] = root;
+    return root;
+  }
+
+  union(a: number, b: number): void {
+    const rootA = this.find(a);
+    const rootB = this.find(b);
+    if (rootA === rootB) return;
+    if (this.rank[rootA] < this.rank[rootB]) {
+      this.parent[rootA] = rootB;
+    } else if (this.rank[rootA] > this.rank[rootB]) {
+      this.parent[rootB] = rootA;
+    } else {
+      this.parent[rootB] = rootA;
+      this.rank[rootA] += 1;
+    }
+  }
 }
 
 // ── Direction vectors ────────────────────────────────────────
@@ -202,16 +343,17 @@ function polygonCentroid(rings: ReadonlyArray<ReadonlyArray<GeoJSONPosition>>): 
   if (lat0 === null) return null;
   const kx = 111320 * Math.max(Math.cos(lat0 * Math.PI / 180), 1e-6);
   const ky = 111320;
+  const origin = as2d(outer[0]);
   let twiceArea = 0;
   let cx = 0;
   let cy = 0;
   for (let i = 0; i < outer.length; i++) {
     const a = as2d(outer[i]);
     const b = as2d(outer[(i + 1) % outer.length]);
-    const ax = a[0] * kx;
-    const ay = a[1] * ky;
-    const bx = b[0] * kx;
-    const by = b[1] * ky;
+    const ax = (a[0] - origin[0]) * kx;
+    const ay = (a[1] - origin[1]) * ky;
+    const bx = (b[0] - origin[0]) * kx;
+    const by = (b[1] - origin[1]) * ky;
     const cross = ax * by - bx * ay;
     twiceArea += cross;
     cx += (ax + bx) * cross;
@@ -219,7 +361,7 @@ function polygonCentroid(rings: ReadonlyArray<ReadonlyArray<GeoJSONPosition>>): 
   }
   if (Math.abs(twiceArea) <= 1e-9) return meanPoint([outer]);
   const scale = 1 / (3 * twiceArea);
-  return [cx * scale / kx, cy * scale / ky];
+  return [origin[0] + (cx * scale / kx), origin[1] + (cy * scale / ky)];
 }
 
 function multiPolygonCentroid(polygons: ReadonlyArray<ReadonlyArray<ReadonlyArray<GeoJSONPosition>>>): GeoJSONPosition | null {
@@ -247,11 +389,13 @@ function ringSignedAreaMeters(ring: ReadonlyArray<GeoJSONPosition>): number {
   if (lat0 === null || ring.length < 3) return 0;
   const kx = 111320 * Math.max(Math.cos(lat0 * Math.PI / 180), 1e-6);
   const ky = 111320;
+  const origin = as2d(ring[0]);
   let area2 = 0;
   for (let i = 0; i < ring.length; i++) {
     const a = as2d(ring[i]);
     const b = as2d(ring[(i + 1) % ring.length]);
-    area2 += (a[0] * kx) * (b[1] * ky) - (b[0] * kx) * (a[1] * ky);
+    area2 += ((a[0] - origin[0]) * kx) * ((b[1] - origin[1]) * ky)
+      - ((b[0] - origin[0]) * kx) * ((a[1] - origin[1]) * ky);
   }
   return area2 / 2;
 }

@@ -80,6 +80,13 @@ export interface LineWorkspaceState {
   currentStep: WorkflowStep;
   recommendedStep: WorkflowStep;
   progress: Record<WorkflowStep, WorkflowStepProgress>;
+  ui?: {
+    cleanFilters?: Record<string, boolean>;
+    cleanLevels?: Record<string, boolean>;
+    cleanSearchQuery?: string;
+    cleanSelectMode?: boolean;
+    cleanSelectedCandidateFid?: string | null;
+  };
   lastTaskId?: string;
   updatedAt: string;
 }

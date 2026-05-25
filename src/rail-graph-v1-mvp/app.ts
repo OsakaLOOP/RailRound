@@ -223,10 +223,15 @@ async function loadAllCleanDecisions(): Promise<void> {
     const rulesPath = `${project.scriptsRoot}\\filter_rules.json`;
     filterRules = await readPipelineArtifact(rulesPath) as any[];
     // Populate default checkbox status if not set
+    let initializedFilterDefaults = false;
     for (const rule of filterRules) {
       if (cleanFilters[rule.id] === undefined) {
         cleanFilters[rule.id] = !!rule.default;
+        initializedFilterDefaults = true;
       }
+    }
+    if (initializedFilterDefaults) {
+      persistWorkspaceCleanUiState();
     }
   } catch (err) {
     console.error("[clean] Failed to load filter rules:", err);
@@ -668,7 +673,7 @@ export function exportSensekiSnapshot(): SensekiDemoSnapshot {
     compileTopology();
   }
   const topo = state.topo!;
-  const overrides = loadAnnotationOverrides();
+  const overrides = loadAnnotationOverrides({ includeLegacy: shouldIncludeLegacyAnnotationOverrides() });
 
   const diagnosticCounts: Record<DiagnosticLevel, number> = { fatal: 0, error: 0, warn: 0, info: 0 };
   const diagnosticCountsByCode: Record<string, number> = {};
@@ -738,7 +743,7 @@ export function importSensekiSnapshot(snapshot: SensekiDemoSnapshot): ImportSnap
   //    overrides 仍是权威备份, 供下次刷新或重新 Import 仙石線 时复用).
   if (typeof localStorage !== "undefined") {
     try {
-      localStorage.setItem(ANNOTATION_OVERRIDES_KEY, JSON.stringify(snapshot.overrides ?? {}));
+      saveAnnotationOverrides(snapshot.overrides ?? {}, { saveLegacy: shouldIncludeLegacyAnnotationOverrides() });
     } catch {
       // quota / privacy mode — silent, source 已含 annotation 仍可用
     }
@@ -749,7 +754,7 @@ export function importSensekiSnapshot(snapshot: SensekiDemoSnapshot): ImportSnap
 
   // 3. 重放 overrides (idempotent — snapshot.source 应已合并, 但这一步确保
   //    任何 ID 漂移情况下 overrides 仍尽力打回去).
-  const { applied, total } = applyAnnotationOverrides();
+  const { applied, total } = applyAnnotationOverrides({ includeLegacy: shouldIncludeLegacyAnnotationOverrides() });
 
   // 4. 还原 bindings / stoppingPoints (loadGeoJson 已重置, 直接覆盖)
   state.bindings = (snapshot.bindings ?? []).map((b) => ({ ...b }));
@@ -1856,10 +1861,7 @@ function render(): void {
   renderWorkflowChrome();
   bindUi();
   bindPipelineUi();
-  void loadAllCleanDecisions().then(() => {
-    refreshViews();
-    mapView?.fitToData();
-  });
+  void loadWorkspaceDataAndCompile();
 }
 
 // 将 candidateId 映射到拓扑层 ID 列表 / Map candidate ID to topology layer IDs
@@ -2099,32 +2101,70 @@ function initViews(): void {
 
   listView.onCleanFilterToggle((ruleId, checked) => {
     cleanFilters[ruleId] = checked;
+    persistWorkspaceCleanUiState();
     compileCleanDecisions();
     try {
       compileTopology();
     } catch (err) {
       handleError(err);
     }
+    setStepProgress("clean", {
+      status: "done",
+      summary: "Clean filters changed. Annotate, compile, validation, and exports are now stale.",
+      completedActions: dedupe([...(activeWorkspace().progress.clean.completedActions ?? []), "loadWorkspaceSource"]),
+      diagnostics: diagnosticSummaries(),
+    });
+    invalidateDownstream("clean", "Clean filters changed after this step. Re-run from annotate.");
     refreshViews();
   });
 
   listView.onCleanLevelToggle((level, checked) => {
     cleanLevels[level] = checked;
+    persistWorkspaceCleanUiState();
+    compileCleanDecisions();
+    try {
+      compileTopology();
+    } catch (err) {
+      handleError(err);
+    }
+    setStepProgress("clean", {
+      status: "done",
+      summary: "Clean level visibility changed. Annotate, compile, validation, and exports are now stale.",
+      completedActions: dedupe([...(activeWorkspace().progress.clean.completedActions ?? []), "loadWorkspaceSource"]),
+      diagnostics: diagnosticSummaries(),
+    });
+    invalidateDownstream("clean", "Clean level visibility changed after this step. Re-run from annotate.");
     refreshViews();
   });
 
   listView.onCleanSearch((query) => {
     cleanSearchQuery = query;
+    persistWorkspaceCleanUiState();
+    compileCleanDecisions();
+    try {
+      compileTopology();
+    } catch (err) {
+      handleError(err);
+    }
+    setStepProgress("clean", {
+      status: "done",
+      summary: "Clean search changed. Annotate, compile, validation, and exports are now stale.",
+      completedActions: dedupe([...(activeWorkspace().progress.clean.completedActions ?? []), "loadWorkspaceSource"]),
+      diagnostics: diagnosticSummaries(),
+    });
+    invalidateDownstream("clean", "Clean search changed after this step. Re-run from annotate.");
     refreshViews();
   });
 
   listView.onCleanSelectModeToggle((active) => {
     cleanSelectMode = active;
+    persistWorkspaceCleanUiState();
     refreshViews();
   });
 
   listView.onCleanCandidateSelect((fid) => {
     cleanSelectedCandidateFid = fid;
+    persistWorkspaceCleanUiState();
     if (fid) {
       let ref: EntityRef | null = null;
       if (state.source) {
@@ -2236,6 +2276,13 @@ async function updateCleanOverrides(keep: string[], remove: string[], meta: Reco
     } catch (err) {
       handleError(err);
     }
+    setStepProgress("clean", {
+      status: "done",
+      summary: "Clean decisions changed. Annotate, compile, validation, and exports are now stale.",
+      completedActions: dedupe([...(activeWorkspace().progress.clean.completedActions ?? []), "loadWorkspaceSource"]),
+      diagnostics: diagnosticSummaries(),
+    });
+    invalidateDownstream("clean", "Clean decisions changed after this step. Re-run from annotate.");
     refreshViews();
   } catch (err) {
     handleError(err);
@@ -2245,13 +2292,36 @@ async function updateCleanOverrides(keep: string[], remove: string[], meta: Reco
 // ── localStorage 持久化: annotation overrides ────────────────
 
 const ANNOTATION_OVERRIDES_KEY = "railround:senseki:annotation-overrides:v1";
+const ANNOTATION_OVERRIDES_WORKSPACE_PREFIX = "railround:mvp:annotation-overrides:v1:";
 
-function loadAnnotationOverrides(): Record<string, RailGraphAnnotation> {
+function annotationOverridesKey(): string {
+  return `${ANNOTATION_OVERRIDES_WORKSPACE_PREFIX}${activeWorkspace().key}`;
+}
+
+function shouldIncludeLegacyAnnotationOverrides(): boolean {
+  const project = activeProject();
+  return project.selectedPresetId === "senseki" || project.lineName.includes("仙石線");
+}
+
+function loadAnnotationOverrides(options: { includeLegacy?: boolean } = {}): Record<string, RailGraphAnnotation> {
   if (typeof localStorage === "undefined") return {};
   try {
-    const raw = localStorage.getItem(ANNOTATION_OVERRIDES_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw) as Record<string, RailGraphAnnotation>;
+    const workspaceRaw = localStorage.getItem(annotationOverridesKey());
+    const workspaceOverrides = workspaceRaw
+      ? JSON.parse(workspaceRaw) as Record<string, RailGraphAnnotation>
+      : {};
+
+    if (!options.includeLegacy) return workspaceOverrides;
+
+    const legacyRaw = localStorage.getItem(ANNOTATION_OVERRIDES_KEY);
+    const legacyOverrides = legacyRaw
+      ? JSON.parse(legacyRaw) as Record<string, RailGraphAnnotation>
+      : {};
+
+    return {
+      ...legacyOverrides,
+      ...workspaceOverrides,
+    };
   } catch {
     return {};
   }
@@ -2260,17 +2330,29 @@ function loadAnnotationOverrides(): Record<string, RailGraphAnnotation> {
 function saveAnnotationOverride(id: string, annotation: RailGraphAnnotation): void {
   if (typeof localStorage === "undefined") return;
   try {
-    const overrides = loadAnnotationOverrides();
+    const overrides = loadAnnotationOverrides({ includeLegacy: shouldIncludeLegacyAnnotationOverrides() });
     overrides[id] = annotation;
-    localStorage.setItem(ANNOTATION_OVERRIDES_KEY, JSON.stringify(overrides));
+    saveAnnotationOverrides(overrides, { saveLegacy: shouldIncludeLegacyAnnotationOverrides() });
   } catch {
     // quota / privacy mode — silent
   }
 }
 
-function applyAnnotationOverrides(): { applied: number; total: number } {
+function saveAnnotationOverrides(overrides: Record<string, RailGraphAnnotation>, options: { saveLegacy?: boolean } = {}): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(annotationOverridesKey(), JSON.stringify(overrides));
+    if (options.saveLegacy) {
+      localStorage.setItem(ANNOTATION_OVERRIDES_KEY, JSON.stringify(overrides));
+    }
+  } catch {
+    // quota / privacy mode — silent
+  }
+}
+
+function applyAnnotationOverrides(options: { includeLegacy?: boolean } = {}): { applied: number; total: number } {
   if (!state.source) return { applied: 0, total: 0 };
-  const overrides = loadAnnotationOverrides();
+  const overrides = loadAnnotationOverrides(options);
   const total = Object.keys(overrides).length;
   if (total === 0) return { applied: 0, total: 0 };
   let applied = 0;
@@ -2311,7 +2393,10 @@ function applyAnnotationOverrides(): { applied: number; total: number } {
 
 function clearAnnotationOverrides(): void {
   if (typeof localStorage === "undefined") return;
-  try { localStorage.removeItem(ANNOTATION_OVERRIDES_KEY); } catch { }
+  try {
+    localStorage.removeItem(annotationOverridesKey());
+    localStorage.removeItem(ANNOTATION_OVERRIDES_KEY);
+  } catch { }
 }
 
 function computeRelatedRefs(ref: EntityRef): EntityRef[] {
@@ -2648,6 +2733,33 @@ function persistWorkspace(): void {
   saveWorkspaceState(workspaceState);
 }
 
+function restoreWorkspaceCleanUiState(): void {
+  const ui = activeWorkspace().ui;
+
+  for (const key of Object.keys(cleanFilters)) delete cleanFilters[key];
+  if (ui?.cleanFilters) Object.assign(cleanFilters, ui.cleanFilters);
+
+  for (const key of Object.keys(cleanLevels)) delete cleanLevels[key];
+  Object.assign(cleanLevels, { high: true, medium: true, low: true }, ui?.cleanLevels ?? {});
+
+  cleanSearchQuery = ui?.cleanSearchQuery ?? "";
+  cleanSelectMode = ui?.cleanSelectMode ?? false;
+  cleanSelectedCandidateFid = ui?.cleanSelectedCandidateFid ?? null;
+}
+
+function persistWorkspaceCleanUiState(): void {
+  updateActiveWorkspace((workspace) => {
+    workspace.ui = {
+      ...(workspace.ui ?? {}),
+      cleanFilters: { ...cleanFilters },
+      cleanLevels: { ...cleanLevels },
+      cleanSearchQuery,
+      cleanSelectMode,
+      cleanSelectedCandidateFid,
+    };
+  });
+}
+
 function updateActiveWorkspace(mutator: (workspace: LineWorkspaceState) => void): LineWorkspaceState {
   const workspace = activeWorkspace();
   mutator(workspace);
@@ -2741,6 +2853,76 @@ function stepHasRequiredActions(workspace: LineWorkspaceState, step: WorkflowSte
 function missingRequiredActions(workspace: LineWorkspaceState, step: WorkflowStep): WorkflowAction[] {
   const completed = workspace.progress[step].completedActions ?? [];
   return REQUIRED_ACTIONS[step].filter((action) => !completed.includes(action));
+}
+
+function actionBlockedReason(action: WorkflowAction): string | null {
+  const workspace = activeWorkspace();
+  const progress = workspace.progress;
+
+  switch (action) {
+    case "extractAndMatch":
+    case "refreshArtifacts":
+      return null;
+    case "loadWorkspaceSource":
+      if (progress.prepare.status !== "done" || !stepHasRequiredActions(workspace, "prepare")) {
+        return "Prepare data before loading a workspace source.";
+      }
+      return null;
+    case "compileTopology":
+      if (!state.source || state.source.features.length === 0) {
+        return "Load a source before compiling topology.";
+      }
+      if (progress.annotate.status !== "done" || !stepHasRequiredActions(workspace, "annotate")) {
+        return "Finish or reload the annotation step before compiling.";
+      }
+      return null;
+    case "runSensekiValidation":
+      if (progress.compile.status !== "done" || !stepHasRequiredActions(workspace, "compile")) {
+        return "Compile topology before validation.";
+      }
+      if (diagnosticsHaveErrors()) {
+        return "Resolve compile errors before validation.";
+      }
+      return null;
+    case "exportSnapshot":
+      if (progress.validate.status !== "done" || !stepHasRequiredActions(workspace, "validate")) {
+        return "Run validation before exporting a workflow snapshot.";
+      }
+      return null;
+  }
+}
+
+function actionDisabledAttr(action: WorkflowAction): string {
+  if (activePipelineTask?.status === "running") {
+    return `disabled title="A local task is running."`;
+  }
+  const reason = actionBlockedReason(action);
+  return reason ? `disabled title="${escapeAttr(reason)}"` : "";
+}
+
+function directExportBlockedReason(kind: "geojson" | "topology"): string | null {
+  const workspace = activeWorkspace();
+  if (kind === "geojson") {
+    if (!state.source || state.source.features.length === 0) {
+      return "Load a source before exporting GeoJSON.";
+    }
+    if (workspace.progress.annotate.status !== "done" || !stepHasRequiredActions(workspace, "annotate")) {
+      return "Load or finish annotation before exporting GeoJSON.";
+    }
+    return null;
+  }
+  if (workspace.progress.compile.status !== "done" || !stepHasRequiredActions(workspace, "compile")) {
+    return "Compile topology before exporting topology.";
+  }
+  return null;
+}
+
+function directExportDisabledAttr(kind: "geojson" | "topology"): string {
+  if (activePipelineTask?.status === "running") {
+    return `disabled title="A local task is running."`;
+  }
+  const reason = directExportBlockedReason(kind);
+  return reason ? `disabled title="${escapeAttr(reason)}"` : "";
 }
 
 function markStepActionDone(step: WorkflowStep, action: WorkflowAction): void {
@@ -2883,7 +3065,7 @@ function getStepBodyHtml(stepKey: WorkflowStep, progress: any, workspace: LineWo
           ${pipelineBlock}
         </div>
         <div class="row">
-          <button class="step-action-btn primary strong" id="mvp-load-clean-source" style="font-size:11px;">Load Candidate Source</button>
+          <button class="step-action-btn primary strong" id="mvp-load-clean-source" style="font-size:11px;" ${actionDisabledAttr("loadWorkspaceSource")}>Load Candidate Source</button>
         </div>
       `;
     }
@@ -2903,7 +3085,7 @@ function getStepBodyHtml(stepKey: WorkflowStep, progress: any, workspace: LineWo
           </select>
         </div>
         <div class="row">
-          <button id="mvp-load-artifact" class="primary strong" ${activePipelineTask?.status === "running" ? "disabled" : ""}>Load Selected Source</button>
+          <button id="mvp-load-artifact" class="primary strong" ${actionDisabledAttr("loadWorkspaceSource")}>Load Selected Source</button>
           <button class="step-action-btn" data-action="refreshArtifacts">Refresh</button>
         </div>
       `;
@@ -2911,21 +3093,21 @@ function getStepBodyHtml(stepKey: WorkflowStep, progress: any, workspace: LineWo
     case "compile":
       return `
         <div class="row">
-          <button class="step-action-btn primary strong" data-action="compileTopology" ${activePipelineTask?.status === "running" ? "disabled" : ""}>Compile Topology</button>
+          <button class="step-action-btn primary strong" data-action="compileTopology" ${actionDisabledAttr("compileTopology")}>Compile Topology</button>
         </div>
       `;
     case "validate":
       return `
         <div class="row">
-          <button class="step-action-btn primary strong" data-action="runSensekiValidation" ${activePipelineTask?.status === "running" ? "disabled" : ""}>Run Pathfinding</button>
+          <button class="step-action-btn primary strong" data-action="runSensekiValidation" ${actionDisabledAttr("runSensekiValidation")}>Run Pathfinding</button>
         </div>
       `;
     case "export":
       return `
         <div class="row" style="gap:4px;">
-          <button class="step-action-btn primary strong" data-action="exportSnapshot" ${activePipelineTask?.status === "running" ? "disabled" : ""}>Export Snapshot</button>
-          <button id="mvp-export-geojson" class="strong">GeoJSON</button>
-          <button id="mvp-export-topo" class="strong">Topology</button>
+          <button class="step-action-btn primary strong" data-action="exportSnapshot" ${actionDisabledAttr("exportSnapshot")}>Export Snapshot</button>
+          <button id="mvp-export-geojson" class="strong" ${directExportDisabledAttr("geojson")}>GeoJSON</button>
+          <button id="mvp-export-topo" class="strong" ${directExportDisabledAttr("topology")}>Topology</button>
         </div>
       `;
     default:
@@ -3116,30 +3298,61 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function bindPipelineUi(): void {
-  // workspace 切换或加载时:先按 lineDir 真相同步 prepare/clean status,然后(若 prepare 已 done)拉
-  // source/overrides/rules 并 compile + render
-  async function loadWorkspaceDataAndCompile(): Promise<void> {
-    await syncProgressFromLineArtifacts();
-    if (activeWorkspace().progress.prepare.status !== "done") {
-      // 没有匹配产物,卡在 prepare;UI 让用户去跑 Ingest & Match
-      refreshViews();
-      return;
-    }
-    try {
-      await loadWorkspaceSource();
-    } catch (err) {
-      console.error("Failed to load workspace source geojson:", err);
-    }
-    await loadAllCleanDecisions();
-    try {
-      compileTopology();
-    } catch (err) {
-      handleError(err);
-    }
+// workspace 切换或打开页面时:先按 lineDir 真相同步 prepare/clean status,
+// 然后恢复上次选定 source、clean overrides/rules,并重新 compile 到内存。
+async function loadWorkspaceDataAndCompile(): Promise<void> {
+  restoreWorkspaceCleanUiState();
+  await syncProgressFromLineArtifacts();
+  await refreshPipelineArtifacts(false);
+
+  if (activeWorkspace().progress.prepare.status !== "done") {
+    // 没有匹配产物,卡在 prepare;UI 让用户去跑 Ingest & Match
     refreshViews();
-    mapView?.fitToData();
+    return;
   }
+
+  try {
+    await loadWorkspaceSource({ markLoaded: false });
+  } catch (err) {
+    console.error("Failed to load workspace source geojson:", err);
+    setStepProgress("clean", {
+      status: "stale",
+      summary: "Workspace source could not be restored automatically. Load the candidate source again.",
+      diagnostics: diagnosticSummaries(),
+    });
+    setStepProgress("annotate", {
+      status: "stale",
+      summary: "Workspace source could not be restored automatically. Load the source again before editing annotations.",
+      diagnostics: diagnosticSummaries(),
+    });
+    refreshViews();
+    return;
+  }
+  if (!state.source || state.source.features.length === 0) {
+    setStepProgress("clean", {
+      status: "stale",
+      summary: "Workspace restored without source features. Load the candidate source again.",
+      diagnostics: diagnosticSummaries(),
+    });
+    setStepProgress("annotate", {
+      status: "stale",
+      summary: "Workspace restored without source features. Load the source again before editing annotations.",
+      diagnostics: diagnosticSummaries(),
+    });
+    refreshViews();
+    return;
+  }
+  await loadAllCleanDecisions();
+  try {
+    compileTopology();
+  } catch (err) {
+    handleError(err);
+  }
+  refreshViews();
+  mapView?.fitToData();
+}
+
+function bindPipelineUi(): void {
 
   // Active Workspace change
   document.getElementById("mvp-workspace-select")?.addEventListener("change", (event) => {
@@ -3159,6 +3372,7 @@ function bindPipelineUi(): void {
       state.topo = null;
       state.diagnostics = [];
       lastPathfindingResults = undefined;
+      lastCurrentStep = null;
       mapView?.update(cloneTopo(EMPTY_TOPO), { type: "FeatureCollection", features: [] });
       persistWorkspace();
       renderWorkflowChrome();
@@ -3231,6 +3445,7 @@ function bindPipelineUi(): void {
     state.topo = null;
     state.diagnostics = [];
     lastPathfindingResults = undefined;
+    lastCurrentStep = null;
 
     mapView?.update(cloneTopo(EMPTY_TOPO), { type: "FeatureCollection", features: [] });
     persistWorkspace();
@@ -3261,7 +3476,7 @@ function bindPipelineUi(): void {
       updateActiveWorkspace((workspace) => {
         workspace.currentStep = step;
       });
-      renderWorkflowChrome();
+      refreshViews();
     }
   });
 
@@ -3284,6 +3499,8 @@ function bindPipelineUi(): void {
     const btn = (event.target as HTMLButtonElement).closest<HTMLButtonElement>("#mvp-load-artifact");
     if (!btn) return;
     try {
+      const blockedReason = actionBlockedReason("loadWorkspaceSource");
+      if (blockedReason) throw new Error(blockedReason);
       await loadSelectedArtifact();
     } catch (error) {
       handleError(error);
@@ -3360,6 +3577,11 @@ function bindPipelineUi(): void {
 }
 
 async function runWorkflowAction(action: WorkflowAction): Promise<void> {
+  const blockedReason = actionBlockedReason(action);
+  if (blockedReason) {
+    throw new Error(blockedReason);
+  }
+
   switch (action) {
     case "extractAndMatch":
       await runPipelineSequence("extract", "prepare", "Matched rail assets are ready.");
@@ -3372,7 +3594,7 @@ async function runWorkflowAction(action: WorkflowAction): Promise<void> {
       await refreshPipelineArtifacts();
       break;
     case "loadWorkspaceSource":
-      await loadWorkspaceSource();
+      await loadWorkspaceSource({ markLoaded: true });
       // 读取磁盘上的 .override.json (keep/remove + filter rules), 让用户之前保存的清洗决策生效;
       // 然后再 compile 一次, 让 allCleanDecisions 真正过滤进 topology.
       await loadAllCleanDecisions();
@@ -3422,6 +3644,7 @@ async function runWorkflowAction(action: WorkflowAction): Promise<void> {
           lastAction: action,
           diagnostics: diagnosticSummaries(),
         });
+        invalidateDownstream("compile", "Compile failed. Re-run validation and export after topology compiles cleanly.");
         renderFeatures();
         refreshViews();
         break;
@@ -3622,37 +3845,40 @@ async function refreshPipelineArtifacts(updateStep = true): Promise<void> {
 async function loadSelectedArtifact(): Promise<void> {
   const path = (document.getElementById("mvp-artifact-select") as HTMLSelectElement | null)?.value;
   if (!path) throw new Error("Select a JSON or GeoJSON artifact first.");
-  await loadArtifactPath(path);
+  await loadArtifactPath(path, { markLoaded: true });
 }
 
-async function loadArtifactPath(path: string): Promise<void> {
+async function loadArtifactPath(path: string, options: { markLoaded?: boolean } = {}): Promise<void> {
   const artifact = pipelineArtifacts.find((item) => item.path === path);
   if (artifact && artifact.kind !== "geojson" && artifact.kind !== "json") {
     throw new Error("Selected artifact is not JSON/GeoJSON.");
   }
   const parsed = await readPipelineArtifact(path);
   loadGeoJson(parsed as GeoJsonFeatureCollection);
+  applyAnnotationOverrides({ includeLegacy: shouldIncludeLegacyAnnotationOverrides() });
   lastPathfindingResults = undefined;
   compileTopology();
   updateActiveWorkspace((workspace) => {
     workspace.project.selectedArtifactPath = path;
     workspace.project.sourceGeoJsonPath = path;
   });
-  setStepProgress("annotate", {
-    status: "done",
-    summary: `Loaded ${state.source?.features.length ?? 0} features from selected artifact.`,
-    completedActions: dedupe([...(activeWorkspace().progress.annotate.completedActions ?? []), "loadWorkspaceSource"]),
-    artifacts: dedupe([...activeWorkspace().progress.annotate.artifacts, path]),
-    diagnostics: diagnosticSummaries(),
-  });
-  invalidateDownstream("annotate", "Source data changed after this step. Re-run from compile.");
-  unlockStep("compile", "Source is loaded. Compile topology next.");
+  if (options.markLoaded) {
+    setStepProgress("annotate", {
+      status: "done",
+      summary: `Loaded ${state.source?.features.length ?? 0} features from selected artifact.`,
+      completedActions: dedupe([...(activeWorkspace().progress.annotate.completedActions ?? []), "loadWorkspaceSource"]),
+      artifacts: dedupe([...activeWorkspace().progress.annotate.artifacts, path]),
+      diagnostics: diagnosticSummaries(),
+    });
+    invalidateDownstream("annotate", "Source data changed after this step. Re-run from compile.");
+    unlockStep("compile", "Source is loaded. Compile topology next.");
+  }
   renderFeatures();
   refreshViews();
   mapView?.fitToData();
 }
 
-async function loadWorkspaceSource(): Promise<void> {
+async function loadWorkspaceSource(options: { markLoaded?: boolean } = {}): Promise<void> {
   const project = activeProject();
   const lineArtifacts = await fetchLineArtifacts(project);
 
@@ -3701,7 +3927,7 @@ async function loadWorkspaceSource(): Promise<void> {
     );
   }
 
-  await loadArtifactPath(chosenPath);
+  await loadArtifactPath(chosenPath, options);
 }
 
 async function runSensekiValidationAction(): Promise<void> {
@@ -3890,7 +4116,7 @@ function bindUi(): void {
     try {
       loadGeoJson(SENSEKI_RAIL);
       importGeoJson(SENSEKI_STATIONS);
-      const { applied, total } = applyAnnotationOverrides();
+      const { applied, total } = applyAnnotationOverrides({ includeLegacy: shouldIncludeLegacyAnnotationOverrides() });
       compileTopology();
       if (total > 0) {
         console.log(`[senseki] applied ${applied}/${total} persisted annotation overrides`);
@@ -3990,8 +4216,22 @@ function bindUi(): void {
     refreshViews();
   });
 
-  document.getElementById("mvp-export-geojson")?.addEventListener("click", () => writeExportToInput(exportAnnotatedGeoJson()));
-  document.getElementById("mvp-export-topo")?.addEventListener("click", () => writeExportToInput(exportTopology()));
+  document.getElementById("mvp-export-geojson")?.addEventListener("click", () => {
+    const blockedReason = directExportBlockedReason("geojson");
+    if (blockedReason) {
+      handleError(new Error(blockedReason));
+      return;
+    }
+    writeExportToInput(exportAnnotatedGeoJson());
+  });
+  document.getElementById("mvp-export-topo")?.addEventListener("click", () => {
+    const blockedReason = directExportBlockedReason("topology");
+    if (blockedReason) {
+      handleError(new Error(blockedReason));
+      return;
+    }
+    writeExportToInput(exportTopology());
+  });
 
   document.getElementById("mvp-export-snapshot")?.addEventListener("click", () => {
     try {
@@ -4119,7 +4359,7 @@ function bindUi(): void {
       console.log(`[senseki-pf] saved ${saved} annotation overrides to localStorage`);
 
       // 3. 应用所有 overrides + 编译
-      const { applied, total } = applyAnnotationOverrides();
+      const { applied, total } = applyAnnotationOverrides({ includeLegacy: shouldIncludeLegacyAnnotationOverrides() });
       console.log(`[senseki-pf] applied ${applied}/${total} annotation overrides`);
       compileTopology();
       renderFeatures();

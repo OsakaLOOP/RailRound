@@ -49,5 +49,8 @@ public/assets/geojson_logos/*
 packages/route-slice-preview/src/*
 !packages/route-slice-preview/src/index.ts
 
+# Rail graph MVP verification reports
+src/rail-graph-v1-mvp/.verify/
+
 # CDN bundle
 public/bundle/

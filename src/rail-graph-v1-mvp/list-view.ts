@@ -44,7 +44,8 @@ import type { SensekiScenarioResult } from "./poc-senseki-pathfinding";
 import type { MvpOverrideState } from "./pipeline";
 import type { PipelineReport } from "./rule-handlers";
 import { polylineLengthMeters } from "./spatial-helpers";
-import { renderCleanHead, renderCleanRules, renderCleanCandidates, renderCleanDetail } from "./clean-tab-renderer";
+import { renderCleanHead, renderCleanRules, renderCleanCandidates, renderCleanDetail, getRuleHandlerType } from "./clean-tab-renderer";
+import { RULE_PARAM_SCHEMAS } from "./rule-param-schema";
 
 // ── Public API ──────────────────────────────────────────────
 
@@ -77,6 +78,7 @@ export interface ListViewInput {
   cleanPassFids?: Set<string>;
   /** 同一份 runFilterPipeline 的 per-rule 报告 — 渲染「规则剔除详情」可展开区. */
   cleanPipelineReport?: PipelineReport;
+  ruleParamOverrides?: Record<string, Record<string, any>>;
 }
 
 /** 路径 hover/click 时传给外部的对象 — 同时携带 edgeSequence 与 turnbackEdgeIndices, 避免 app.ts 反向反查 */
@@ -113,6 +115,7 @@ export interface ListView {
   onCleanSelectModeToggle(handler: (active: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via") => void): void;
   onCleanCandidateSelect(handler: (fid: string | null) => void): void;
   onCleanStagingAction?(handler: (action: string, data?: any) => void): void;
+  onCleanRuleParamChange?(handler: (ruleId: string, params: Record<string, any> | null) => void): void;
 }
 
 export type TabKey = "clean" | "pathfinding" | "annotate" | "diagnostics" | "raw";
@@ -136,6 +139,8 @@ interface InternalState {
   cleanSelectModeToggleHandlers: Array<(active: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via") => void>;
   cleanCandidateSelectHandlers: Array<(fid: string | null) => void>;
   cleanStagingActionHandlers: Array<(action: string, data?: any) => void>;
+  cleanRuleParamChangeHandlers: Array<(ruleId: string, params: Record<string, any> | null) => void>;
+  expandedRuleParams: Set<string>;
   selectedEntity: EntityRef | null;
   selectedScenarioIdx: number | null;
   selectedCandidateIdx: number | null;
@@ -347,6 +352,8 @@ export function createListView(container: HTMLElement): ListView {
     cleanSelectModeToggleHandlers: [],
     cleanCandidateSelectHandlers: [],
     cleanStagingActionHandlers: [],
+    cleanRuleParamChangeHandlers: [],
+    expandedRuleParams: new Set(),
     selectedEntity: null,
     selectedScenarioIdx: null,
     selectedCandidateIdx: null,
@@ -402,6 +409,7 @@ export function createListView(container: HTMLElement): ListView {
     onCleanSelectModeToggle(h) { state.cleanSelectModeToggleHandlers.push(h); },
     onCleanCandidateSelect(h) { state.cleanCandidateSelectHandlers.push(h); },
     onCleanStagingAction(h) { state.cleanStagingActionHandlers.push(h); },
+    onCleanRuleParamChange(h) { state.cleanRuleParamChangeHandlers.push(h); },
   };
 }
 
@@ -520,6 +528,37 @@ function bindCleanTabEventsDelegated(state: InternalState, container: HTMLElemen
       const action = isRemove ? "remove" : "keep";
       state.cleanOverrideChangeHandlers.forEach(h => h(fid, action, input.value));
     }
+    if (target.classList.contains("lv-rule-param-input")) {
+      const input = target as HTMLInputElement | HTMLSelectElement;
+      const ruleId = input.dataset.ruleId!;
+      const paramKey = input.dataset.paramKey!;
+      const currentOverrides = state.input.ruleParamOverrides?.[ruleId] || {};
+      const newOverrides = { ...currentOverrides };
+
+      if (input.type === "checkbox") {
+        newOverrides[paramKey] = (input as HTMLInputElement).checked;
+      } else if (input.type === "number") {
+        newOverrides[paramKey] = Number(input.value);
+      } else if (input.tagName === "SELECT") {
+        newOverrides[paramKey] = input.value;
+      } else {
+        const ruleObj = state.input.filterRules?.find((r: any) => r.id === ruleId);
+        const handlerType = ruleObj ? getRuleHandlerType(ruleObj) : undefined;
+        const schema = handlerType ? RULE_PARAM_SCHEMAS[handlerType] : undefined;
+        const field = schema?.fields.find(f => f.key === paramKey);
+
+        if (field?.type === "string[]") {
+          newOverrides[paramKey] = input.value.split(",").map(s => s.trim()).filter(Boolean);
+        } else if (field?.type === "number") {
+          newOverrides[paramKey] = Number(input.value);
+        } else if (field?.type === "boolean") {
+          newOverrides[paramKey] = input.value === "true";
+        } else {
+          newOverrides[paramKey] = input.value;
+        }
+      }
+      state.cleanRuleParamChangeHandlers.forEach(h => h(ruleId, newOverrides));
+    }
   });
 
   // 2. Search input event
@@ -589,6 +628,30 @@ function bindCleanTabEventsDelegated(state: InternalState, container: HTMLElemen
     const exportBtn = target.closest(".lv-clean-staging-export");
     if (exportBtn) {
       state.cleanStagingActionHandlers.forEach(h => h("export"));
+      return;
+    }
+
+    // Rule gear button
+    const gearBtn = target.closest(".lv-clean-rule-gear-btn") as HTMLElement | null;
+    if (gearBtn) {
+      const ruleId = gearBtn.dataset.ruleId!;
+      if (state.expandedRuleParams.has(ruleId)) {
+        state.expandedRuleParams.delete(ruleId);
+      } else {
+        state.expandedRuleParams.add(ruleId);
+      }
+      const rulesPanel = container.querySelector(".lv-clean-rules-panel") as HTMLElement;
+      if (rulesPanel) {
+        renderCleanRules(state, rulesPanel);
+      }
+      return;
+    }
+
+    // Rule param reset button
+    const resetBtn = target.closest(".lv-rule-param-reset") as HTMLElement | null;
+    if (resetBtn) {
+      const ruleId = resetBtn.dataset.ruleId!;
+      state.cleanRuleParamChangeHandlers.forEach(h => h(ruleId, null));
       return;
     }
 

@@ -1,5 +1,23 @@
 import type { InternalState } from "./list-view";
 import { polylineLengthMeters } from "./spatial-helpers";
+import { RULE_PARAM_SCHEMAS } from "./rule-param-schema";
+
+/* 仅对规则处理器类型获取函数添加简短中英注释 / Helper to determine rule handler type from rule object. */
+export function getRuleHandlerType(rule: any): string | undefined {
+  if (rule.handler && typeof rule.handler.type === "string") {
+    return rule.handler.type;
+  }
+  if (rule.post_filter && typeof rule.post_filter.type === "string") {
+    return rule.post_filter.type;
+  }
+  if (rule.dynamic) {
+    return "dynamic_match";
+  }
+  if (Array.isArray(rule.exclude_if)) {
+    return "exclude_if";
+  }
+  return undefined;
+}
 
 /* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Helper utility for escaping HTML characters to prevent XSS. */
 function escapeHtml(value: string): string {
@@ -323,23 +341,99 @@ export function renderCleanHead(state: InternalState, headContainer: HTMLElement
   }
 }
 
-/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Render the dynamic filter rules checkboxes panel of Clean tab. */
+/* 仅对过滤规则面板渲染添加简短中英注释 / Render the dynamic filter rules checkboxes and inline setting panel. */
 export function renderCleanRules(state: InternalState, rulesContainer: HTMLElement): void {
-  const { filterRules, activeFilters } = state.input;
+  const { filterRules, activeFilters, ruleParamOverrides } = state.input;
   const rules = filterRules || [];
   const filters = activeFilters || {};
 
-  rulesContainer.innerHTML = `
-    <div style="font-size:11px; font-weight:600; color:#64748b; margin-bottom:1px;">Dynamic Filter Rules:</div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; font-size:10.5px;">
-      ${rules.map(rule => `
-        <label title="${escapeAttr(rule.desc || '')}" style="display:flex; align-items:center; gap:4px; cursor:pointer; min-width:0;">
-          <input type="checkbox" class="lv-clean-rule-chk" data-rule-id="${escapeAttr(rule.id)}" ${filters[rule.id] ? "checked" : ""}/>
-          <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(rule.label)}</span>
-        </label>
-      `).join("")}
-    </div>
-  `;
+  let html = `<div style="font-size:11px; font-weight:600; color:#64748b; margin-bottom:4px;">Dynamic Filter Rules:</div>`;
+  html += `<div style="display:flex; flex-direction:column; gap:4px; font-size:10.5px;">`;
+
+  for (const rule of rules) {
+    const handlerType = getRuleHandlerType(rule);
+    const schema = handlerType ? RULE_PARAM_SCHEMAS[handlerType] : undefined;
+    const overrides = ruleParamOverrides?.[rule.id] || {};
+    const hasOverrides = Object.keys(overrides).length > 0;
+    const isExpanded = state.expandedRuleParams?.has(rule.id);
+
+    html += `
+      <div style="border:1px solid #e2e8f0; border-radius:4px; padding:4px 6px; background:${hasOverrides ? '#fffbeb' : '#fff'}; border-color:${hasOverrides ? '#fef08a' : '#e2e8f0'};">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px;">
+          <label title="${escapeAttr(rule.desc || '')}" style="display:flex; align-items:center; gap:4px; cursor:pointer; min-width:0; flex:1;">
+            <input type="checkbox" class="lv-clean-rule-chk" data-rule-id="${escapeAttr(rule.id)}" ${filters[rule.id] ? "checked" : ""}/>
+            <span style="font-weight:600; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(rule.label)}</span>
+            ${hasOverrides ? `<span style="font-size:9px; background:#fef08a; color:#854d0e; padding:1px 3px; border-radius:3px; font-weight:700; scale:0.9;">overridden</span>` : ''}
+          </label>
+          ${schema ? `
+            <button class="lv-clean-rule-gear-btn" data-rule-id="${escapeAttr(rule.id)}" style="border:1px solid #cbd5e1; background:#fff; border-radius:3px; padding:1px 4px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:10px; color:#475569; ${isExpanded ? 'background:#f1f5f9;' : ''}" title="Configure Rule Parameters">
+              ⚙️
+            </button>
+          ` : ''}
+        </div>
+    `;
+
+    if (schema && isExpanded) {
+      html += `
+        <div style="margin-top:6px; border-top:1px dashed #cbd5e1; padding-top:6px; display:flex; flex-direction:column; gap:4px; background:#f8fafc; padding:6px; border-radius:4px;">
+          <div style="font-weight:700; color:#475569; margin-bottom:2px; font-size:10px;">Rule Overrides (${escapeHtml(rule.id)}):</div>
+      `;
+
+      for (const field of schema.fields) {
+        const currentVal = overrides[field.key] !== undefined
+          ? overrides[field.key]
+          : (rule.handler?.params?.[field.key] !== undefined
+            ? rule.handler.params[field.key]
+            : (rule.post_filter?.[field.key] !== undefined
+              ? rule.post_filter[field.key]
+              : (rule.dynamic?.[field.key] !== undefined
+                ? rule.dynamic[field.key]
+                : field.defaultValue)));
+
+        let inputHtml = "";
+        if (field.type === "boolean") {
+          inputHtml = `<input type="checkbox" class="lv-rule-param-input" data-rule-id="${escapeAttr(rule.id)}" data-param-key="${escapeAttr(field.key)}" ${currentVal ? "checked" : ""} style="cursor:pointer;" />`;
+        } else if (field.type === "number") {
+          inputHtml = `<input type="number" class="lv-rule-param-input" data-rule-id="${escapeAttr(rule.id)}" data-param-key="${escapeAttr(field.key)}" value="${currentVal}" style="width: 60px; font-size:10px; padding:2px 4px; border:1px solid #cbd5e1; border-radius:3px;" />`;
+        } else if (field.type === "string[]") {
+          const valStr = Array.isArray(currentVal) ? currentVal.join(", ") : String(currentVal || "");
+          inputHtml = `<input type="text" class="lv-rule-param-input" data-rule-id="${escapeAttr(rule.id)}" data-param-key="${escapeAttr(field.key)}" value="${escapeAttr(valStr)}" style="flex:1; font-size:10px; padding:2px 4px; border:1px solid #cbd5e1; border-radius:3px;" title="Comma separated list" />`;
+        } else if (field.type === "string") {
+          if (field.key === "target_line_field") {
+            inputHtml = `
+              <select class="lv-rule-param-input" data-rule-id="${escapeAttr(rule.id)}" data-param-key="${escapeAttr(field.key)}" style="font-size:10px; padding:2px 4px; border:1px solid #cbd5e1; border-radius:3px;">
+                <option value="source_line_name" ${currentVal === "source_line_name" ? "selected" : ""}>source_line_name</option>
+                <option value="name" ${currentVal === "name" ? "selected" : ""}>name</option>
+              </select>
+            `;
+          } else {
+            inputHtml = `<input type="text" class="lv-rule-param-input" data-rule-id="${escapeAttr(rule.id)}" data-param-key="${escapeAttr(field.key)}" value="${escapeAttr(String(currentVal || ''))}" style="flex:1; font-size:10px; padding:2px 4px; border:1px solid #cbd5e1; border-radius:3px;" />`;
+          }
+        }
+
+        html += `
+          <div style="display:flex; align-items:center; gap:6px; font-size:10px;">
+            <span style="width:110px; color:#64748b; font-weight:600; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;" title="${escapeAttr(field.description || '')}">${escapeHtml(field.label)}:</span>
+            ${inputHtml}
+          </div>
+        `;
+      }
+
+      html += `
+          <div style="display:flex; justify-content:flex-end; margin-top:2px;">
+            <button class="lv-rule-param-reset" data-rule-id="${escapeAttr(rule.id)}" style="font-size:9.5px; padding:2px 6px; cursor:pointer; border:1px solid #cbd5e1; background:#fff; border-radius:3px; color:#ef4444; font-weight:700;">
+              Reset to defaults
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  rulesContainer.innerHTML = html;
 }
 
 /* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Render and reconcile the scrollable candidates list using keyed DOM nodes. */

@@ -119,6 +119,7 @@ let pendingLoadToken = 0;
 let lastPipelineRun: { passFids: Set<string>; passFeatures: GeoJsonFeature[]; report: PipelineReport; sig: string } | null = null;
 
 function currentPipelineSig(): string {
+  const ws = activeWorkspace();
   return [
     state.source ? state.source.features.length : 0,                  // source identity proxy (length 变化即换;_fid 不变 length 不变)
     JSON.stringify(cleanFilters),
@@ -127,6 +128,7 @@ function currentPipelineSig(): string {
     cleanOverrides?.keep?.length ?? 0,
     cleanOverrides?.remove?.length ?? 0,
     (filterRules || []).length,
+    JSON.stringify(ws.ui?.ruleParamOverrides || {}),
   ].join("|");
 }
 
@@ -136,7 +138,45 @@ function getOrRunPipeline(): { passFids: Set<string>; passFeatures: GeoJsonFeatu
   }
   const sig = currentPipelineSig();
   if (lastPipelineRun && lastPipelineRun.sig === sig) return lastPipelineRun;
-  const result = runFilterPipeline(state.source.features, filterRules || [], cleanFilters, cleanLevels, cleanSearchQuery);
+
+  // Merge workspace rule param overrides into filterRules
+  const overrides = activeWorkspace().ui?.ruleParamOverrides || {};
+  const effectiveRules = (filterRules || []).map((rule) => {
+    if (overrides[rule.id]) {
+      const mergedParams = {
+        ...(rule.handler?.params || rule.post_filter || rule.dynamic || {}),
+        ...overrides[rule.id],
+      };
+      if (rule.handler) {
+        return {
+          ...rule,
+          handler: {
+            ...rule.handler,
+            params: mergedParams,
+          },
+        };
+      } else if (rule.post_filter) {
+        return {
+          ...rule,
+          post_filter: {
+            ...rule.post_filter,
+            ...overrides[rule.id],
+          },
+        };
+      } else if (rule.dynamic) {
+        return {
+          ...rule,
+          dynamic: {
+            ...rule.dynamic,
+            ...overrides[rule.id],
+          },
+        };
+      }
+    }
+    return rule;
+  });
+
+  const result = runFilterPipeline(state.source.features, effectiveRules, cleanFilters, cleanLevels, cleanSearchQuery);
   lastPipelineRun = { passFids: result.passFids, passFeatures: result.passFeatures, report: result.report, sig };
   console.log("[clean] PipelineReport", result.report);
   return lastPipelineRun;
@@ -2381,6 +2421,21 @@ function initViews(): void {
     }
   });
 
+  listView.onCleanRuleParamChange?.((ruleId, params) => {
+    updateActiveWorkspace((workspace) => {
+      workspace.ui = workspace.ui || {};
+      workspace.ui.ruleParamOverrides = workspace.ui.ruleParamOverrides || {};
+      if (params === null) {
+        delete workspace.ui.ruleParamOverrides[ruleId];
+      } else {
+        workspace.ui.ruleParamOverrides[ruleId] = params;
+      }
+    });
+    persistWorkspace();
+    invalidatePipelineCache();
+    refreshViews();
+  });
+
   // Map box selection (Shift+drag): 仅在 select mode 下生效, 把命中 fid 全部加入队列。
   // 队列里的批量删除 / 保留 / 取消统一交给 select-mode 持久浮条按钮处理。
   mapView.onBoxSelect((fids) => {
@@ -2665,6 +2720,7 @@ function refreshViews(): void {
       cleanPipelineReport: report,
       selectionQueueFids: cleanSelectMode ? new Set(cleanSelectionQueue) : undefined,
       staging: activeWorkspace().staging || { via: [], stagedWayFids: [] },
+      ruleParamOverrides: activeWorkspace().ui?.ruleParamOverrides || {},
     });
   } else {
     listView.update({
@@ -2683,6 +2739,7 @@ function refreshViews(): void {
       activeTab,
       selectionQueueFids: cleanSelectMode ? new Set(cleanSelectionQueue) : undefined,
       staging: activeWorkspace().staging || { via: [], stagedWayFids: [] },
+      ruleParamOverrides: activeWorkspace().ui?.ruleParamOverrides || {},
     });
   }
   renderWorkflowChrome();

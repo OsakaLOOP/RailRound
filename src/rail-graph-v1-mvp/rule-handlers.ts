@@ -20,6 +20,7 @@ import {
   polylineLengthMeters,
   unorientedAngleDiffDeg,
 } from "./spatial-helpers";
+import { RULE_PARAM_SCHEMAS } from "./rule-param-schema";
 
 type GeoJsonFeature = AnnotatedFeature;
 
@@ -68,7 +69,37 @@ export function registerRuleHandler(type: string, fn: RuleHandlerFn): void {
   RULE_HANDLERS[type] = fn;
 }
 
-/** dispatchRule: 取出 rule 的 handler type + params, 找 handler 跑。
+/* 仅对规则参数校验和清洗添加简短中英注释 / Clean and validate rule parameters against the white-list schema. */
+export function validateRuleParams(handlerType: string, params: any): Record<string, any> {
+  const schema = RULE_PARAM_SCHEMAS[handlerType];
+  if (!schema) return params;
+  const validated: Record<string, any> = { ...params };
+  for (const field of schema.fields) {
+    const val = params[field.key];
+    if (val === undefined || val === null) {
+      continue;
+    }
+    if (field.type === "number") {
+      const num = Number(val);
+      if (!isNaN(num)) {
+        validated[field.key] = num;
+      }
+    } else if (field.type === "boolean") {
+      validated[field.key] = !!val;
+    } else if (field.type === "string[]") {
+      if (Array.isArray(val)) {
+        validated[field.key] = val.map(String);
+      } else if (typeof val === "string") {
+        validated[field.key] = val.split(",").map(s => s.trim()).filter(Boolean);
+      }
+    } else if (field.type === "string") {
+      validated[field.key] = String(val);
+    }
+  }
+  return validated;
+}
+
+/** dispatchRule: 取出 rule 的 handler type + params, 找 handler 跑并进行参数校验。
  *  新 schema:   rule.handler = { type, params }
  *  旧 schema:   rule.exclude_if / rule.dynamic / rule.post_filter (后者用 post_filter.type 作 handler type)
  *  无识别字段:  默认通过 (避免噪音, 后续可换成 throw)。
@@ -99,7 +130,8 @@ export function dispatchRule(
     console.warn(`[rule-handlers] unknown handler type "${type}" (rule ${rule.id ?? "?"})`);
     return true;
   }
-  return fn(feature, params, refPool);
+  const validatedParams = validateRuleParams(type, params);
+  return fn(feature, validatedParams, refPool);
 }
 
 // ── Handlers ───────────────────────────────────────────────────

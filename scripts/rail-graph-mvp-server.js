@@ -487,6 +487,27 @@ export function railGraphMvpServerPlugin() {
             json(res, 200, { remove: [], keep: [], meta: {} })
             return
           }
+          if (req.method === 'POST' && pathname === '/workspace/seed-source') {
+            const body = await readBody(req)
+            const { projectKey, sourceGeoJsonPath, featureCollection, geojsonSourceDir } = body
+            
+            if (!sourceGeoJsonPath || !featureCollection) {
+              json(res, 400, { error: 'Missing sourceGeoJsonPath or featureCollection' })
+              return
+            }
+            
+            const resolvedPath = path.resolve(sourceGeoJsonPath)
+            const resolvedDir = path.resolve(geojsonSourceDir || 'D:\\GIS\\geojson_source')
+            if (!resolvedPath.startsWith(resolvedDir)) {
+              json(res, 403, { error: 'Access denied: Target path must be within geojsonSourceDir' })
+              return
+            }
+            
+            fs.mkdirSync(path.dirname(resolvedPath), { recursive: true })
+            fs.writeFileSync(resolvedPath, JSON.stringify(featureCollection, null, 2), 'utf8')
+            json(res, 200, { ok: true })
+            return
+          }
           json(res, 404, { error: 'Unknown rail graph MVP API route' })
         } catch (error) {
           json(res, 500, { error: error instanceof Error ? error.message : String(error) })

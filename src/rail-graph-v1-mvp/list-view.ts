@@ -66,8 +66,9 @@ export interface ListViewInput {
   activeFilters?: Record<string, boolean>;
   activeLevels?: Record<string, boolean>;
   searchQuery?: string;
-  selectMode?: boolean;
+  selectMode?: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via";
   selectedCandidateFid?: string | null;
+  staging?: any;
   /** Select Mode 队列中的 fid 集合; list 用它来给卡片打上"已入队"视觉标记。 */
   selectionQueueFids?: Set<string>;
   activeTab?: TabKey;
@@ -109,8 +110,9 @@ export interface ListView {
   onCleanFilterToggle(handler: (ruleId: string, checked: boolean) => void): void;
   onCleanLevelToggle(handler: (level: string, checked: boolean) => void): void;
   onCleanSearch(handler: (query: string) => void): void;
-  onCleanSelectModeToggle(handler: (active: boolean) => void): void;
+  onCleanSelectModeToggle(handler: (active: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via") => void): void;
   onCleanCandidateSelect(handler: (fid: string | null) => void): void;
+  onCleanStagingAction?(handler: (action: string, data?: any) => void): void;
 }
 
 export type TabKey = "clean" | "pathfinding" | "annotate" | "diagnostics" | "raw";
@@ -131,8 +133,9 @@ interface InternalState {
   cleanFilterToggleHandlers: Array<(ruleId: string, checked: boolean) => void>;
   cleanLevelToggleHandlers: Array<(level: string, checked: boolean) => void>;
   cleanSearchHandlers: Array<(query: string) => void>;
-  cleanSelectModeToggleHandlers: Array<(active: boolean) => void>;
+  cleanSelectModeToggleHandlers: Array<(active: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via") => void>;
   cleanCandidateSelectHandlers: Array<(fid: string | null) => void>;
+  cleanStagingActionHandlers: Array<(action: string, data?: any) => void>;
   selectedEntity: EntityRef | null;
   selectedScenarioIdx: number | null;
   selectedCandidateIdx: number | null;
@@ -343,6 +346,7 @@ export function createListView(container: HTMLElement): ListView {
     cleanSearchHandlers: [],
     cleanSelectModeToggleHandlers: [],
     cleanCandidateSelectHandlers: [],
+    cleanStagingActionHandlers: [],
     selectedEntity: null,
     selectedScenarioIdx: null,
     selectedCandidateIdx: null,
@@ -397,6 +401,7 @@ export function createListView(container: HTMLElement): ListView {
     onCleanSearch(h) { state.cleanSearchHandlers.push(h); },
     onCleanSelectModeToggle(h) { state.cleanSelectModeToggleHandlers.push(h); },
     onCleanCandidateSelect(h) { state.cleanCandidateSelectHandlers.push(h); },
+    onCleanStagingAction(h) { state.cleanStagingActionHandlers.push(h); },
   };
 }
 
@@ -533,7 +538,57 @@ function bindCleanTabEventsDelegated(state: InternalState, container: HTMLElemen
     // Select Mode button
     const selmodeBtn = target.closest(".lv-clean-selmode-btn");
     if (selmodeBtn) {
-      state.cleanSelectModeToggleHandlers.forEach(h => h(!state.input.selectMode));
+      state.cleanSelectModeToggleHandlers.forEach(h => h(state.input.selectMode ? false : "select-queue"));
+      return;
+    }
+
+    // Staging Pick buttons
+    const pickOriginBtn = target.closest(".lv-clean-staging-pick-origin");
+    if (pickOriginBtn) {
+      state.cleanSelectModeToggleHandlers.forEach(h => h(state.input.selectMode === "staging-origin" ? false : "staging-origin"));
+      return;
+    }
+    const pickTerminusBtn = target.closest(".lv-clean-staging-pick-terminus");
+    if (pickTerminusBtn) {
+      state.cleanSelectModeToggleHandlers.forEach(h => h(state.input.selectMode === "staging-terminus" ? false : "staging-terminus"));
+      return;
+    }
+    const pickAddViaBtn = target.closest(".lv-clean-staging-pick-add-via");
+    if (pickAddViaBtn) {
+      state.cleanSelectModeToggleHandlers.forEach(h => h(state.input.selectMode === "staging-via" ? false : "staging-via"));
+      return;
+    }
+
+    // Staging action buttons
+    const stagingDeleteViaBtn = target.closest(".lv-clean-staging-delete-via") as HTMLElement | null;
+    if (stagingDeleteViaBtn) {
+      const idx = parseInt(stagingDeleteViaBtn.dataset.index || "0", 10);
+      state.cleanStagingActionHandlers.forEach(h => h("remove-via", idx));
+      return;
+    }
+    const findPathBtn = target.closest(".lv-clean-staging-find-path");
+    if (findPathBtn) {
+      state.cleanStagingActionHandlers.forEach(h => h("find-path"));
+      return;
+    }
+    const clearAllBtn = target.closest(".lv-clean-staging-clear-all");
+    if (clearAllBtn) {
+      state.cleanStagingActionHandlers.forEach(h => h("clear"));
+      return;
+    }
+    const prevBtn = target.closest(".lv-clean-staging-prev-candidate");
+    if (prevBtn) {
+      state.cleanStagingActionHandlers.forEach(h => h("prev-candidate"));
+      return;
+    }
+    const nextBtn = target.closest(".lv-clean-staging-next-candidate");
+    if (nextBtn) {
+      state.cleanStagingActionHandlers.forEach(h => h("next-candidate"));
+      return;
+    }
+    const exportBtn = target.closest(".lv-clean-staging-export");
+    if (exportBtn) {
+      state.cleanStagingActionHandlers.forEach(h => h("export"));
       return;
     }
 

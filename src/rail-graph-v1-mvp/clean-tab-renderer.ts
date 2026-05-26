@@ -55,7 +55,7 @@ function renderPipelineReportHtml(report: any): string {
   `;
 }
 
-/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Render the inspector table showing detailed feature properties. */
+/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Render the properties inspector table. */
 export function renderInspectorTable(feature: any): string {
   const p = feature.properties || {};
   const geom = feature.geometry || {};
@@ -149,9 +149,106 @@ export function renderInspectorTable(feature: any): string {
   return html;
 }
 
-/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Render the upper head panel (confidence checkbox, reports, search, select-mode) of Clean tab. */
+/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Render the staging extraction panel with origin, terminus, via points, BFS candidates and export button. */
+function renderStagingPanelHtml(state: InternalState): string {
+  const staging = state.input.staging || { via: [], stagedWayFids: [] };
+  const origin = staging.origin || "";
+  const terminus = staging.terminus || "";
+  const via = staging.via || [];
+  const candidates = staging.candidates || [];
+  const activeCandidateIndex = staging.activeCandidateIndex ?? 0;
+  const isSelectMode = state.input.selectMode;
+  
+  const pickOriginActive = isSelectMode === "staging-origin";
+  const pickTerminusActive = isSelectMode === "staging-terminus";
+  const pickViaActive = isSelectMode === "staging-via";
+
+  let viaListHtml = "";
+  if (via.length > 0) {
+    viaListHtml = `
+      <div style="display:flex; flex-direction:column; gap:2px; margin-left:12px; margin-top:2px; margin-bottom:2px;">
+        ${via.map((v: string, idx: number) => `
+          <div style="display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:2px 6px; border-radius:3px; font-size:10px;">
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:85%;">Via ${idx + 1}: <b>${escapeHtml(v.split(":")[1] || v)}</b></span>
+            <button class="lv-clean-staging-delete-via" data-index="${idx}" style="border:none; background:transparent; cursor:pointer; color:#dc2626; padding:0 2px; font-weight:700;">×</button>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  let candidatesHtml = "";
+  if (candidates.length > 0) {
+    candidatesHtml = `
+      <div style="display:flex; align-items:center; gap:6px; font-size:10.5px; margin-top:4px; padding:3px 6px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:4px;">
+        <button class="lv-clean-staging-prev-candidate lv-clean-act-btn" style="padding:2px 4px; font-size:9.5px;" ${activeCandidateIndex <= 0 ? "disabled" : ""}>◀◀ Prev</button>
+        <span style="flex:1; text-align:center; font-weight:600; color:#16a34a;">Candidate ${activeCandidateIndex + 1} / ${candidates.length}</span>
+        <button class="lv-clean-staging-next-candidate lv-clean-act-btn" style="padding:2px 4px; font-size:9.5px;" ${activeCandidateIndex >= candidates.length - 1 ? "disabled" : ""}>Next ▶▶</button>
+      </div>
+      <div style="font-size:10px; color:#64748b; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Staged ways (${staging.stagedWayFids.length}): <span style="font-family:ui-monospace,monospace; color:#334155;">${staging.stagedWayFids.map((f: string) => f.split(":")[1] || f).join(", ")}</span></div>
+    `;
+  }
+
+  return `
+    <details style="font-size:10.5px; border:1px solid #cbd5e1; border-radius:4px; padding:4px 6px; margin-top:2px;" open>
+      <summary style="cursor:pointer; color:#334155; font-weight:700; user-select:none;">📍 Staging Line Extraction</summary>
+      <div style="margin-top:4px; display:flex; flex-direction:column; gap:4px;">
+        
+        <!-- Origin slot -->
+        <div style="display:flex; align-items:center; gap:4px;">
+          <span style="width:50px; color:#64748b;">Origin:</span>
+          <span style="flex:1; border:1px solid #e2e8f0; background:#f8fafc; padding:2px 4px; border-radius:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeAttr(origin)}">
+            ${origin ? `<b>${escapeHtml(origin.split(":")[1] || origin)}</b>` : `<span style="color:#94a3b8;">Not selected</span>`}
+          </span>
+          <button class="lv-clean-staging-pick-origin lv-clean-act-btn ${pickOriginActive ? "active" : ""}" style="padding:2px 6px; ${pickOriginActive ? "background:#f59e0b; color:#fff;" : ""}">
+            ${pickOriginActive ? "Click Map..." : "Pick"}
+          </button>
+        </div>
+
+        <!-- Terminus slot -->
+        <div style="display:flex; align-items:center; gap:4px;">
+          <span style="width:50px; color:#64748b;">Terminus:</span>
+          <span style="flex:1; border:1px solid #e2e8f0; background:#f8fafc; padding:2px 4px; border-radius:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeAttr(terminus)}">
+            ${terminus ? `<b>${escapeHtml(terminus.split(":")[1] || terminus)}</b>` : `<span style="color:#94a3b8;">Not selected</span>`}
+          </span>
+          <button class="lv-clean-staging-pick-terminus lv-clean-act-btn ${pickTerminusActive ? "active" : ""}" style="padding:2px 6px; ${pickTerminusActive ? "background:#f59e0b; color:#fff;" : ""}">
+            ${pickTerminusActive ? "Click Map..." : "Pick"}
+          </button>
+        </div>
+
+        <!-- Via list -->
+        <div style="display:flex; align-items:center; gap:4px;">
+          <span style="width:50px; color:#64748b;">Via (${via.length}):</span>
+          <span style="flex:1;"></span>
+          <button class="lv-clean-staging-pick-add-via lv-clean-act-btn ${pickViaActive ? "active" : ""}" style="padding:2px 6px; ${pickViaActive ? "background:#f59e0b; color:#fff;" : ""}">
+            ${pickViaActive ? "Click Map..." : "Pick Add"}
+          </button>
+        </div>
+        ${viaListHtml}
+
+        <!-- Actions -->
+        <div style="display:flex; gap:4px; margin-top:4px;">
+          <button class="lv-clean-staging-find-path primary strong" style="flex:1; font-size:10px; padding:3px 6px;" ${(!origin || !terminus) ? "disabled" : ""}>Find Path</button>
+          <button class="lv-clean-staging-clear-all" style="font-size:10px; padding:3px 6px; border:1px solid #cbd5e1; background:#fff; border-radius:4px; cursor:pointer;">Clear All</button>
+        </div>
+
+        ${candidatesHtml}
+
+        ${candidates.length > 0 ? `
+          <div style="margin-top:4px; border-top:1px dashed #e2e8f0; padding-top:4px;">
+            <button class="lv-clean-staging-export primary strong" style="width:100%; font-size:10.5px; padding:4px 8px; background:#16a34a; border-color:#16a34a; color:#fff; cursor:pointer;">
+              Export Staged → New Workspace
+            </button>
+          </div>
+        ` : ""}
+      </div>
+    </details>
+  `;
+}
+
+/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Render the upper head panel of Clean tab. */
 export function renderCleanHead(state: InternalState, headContainer: HTMLElement): void {
-  const { source, cleanOverrides, activeLevels, searchQuery, selectMode, selectionQueueFids, cleanPipelineReport } = state.input;
+  const { source, cleanOverrides, activeLevels, searchQuery, selectMode, cleanPipelineReport } = state.input;
   if (!source) return;
 
   const allFeatures = source.features || [];
@@ -182,10 +279,7 @@ export function renderCleanHead(state: InternalState, headContainer: HTMLElement
   const selectionStart = isSearchFocused ? searchBox.selectionStart : null;
   const selectionEnd = isSearchFocused ? searchBox.selectionEnd : null;
 
-  // Staging area HTML helper (to be implemented in PR-B)
-  const stagingHtml = (state.input as any).renderStagingPanelHtml
-    ? (state.input as any).renderStagingPanelHtml(state)
-    : "";
+  const stagingHtml = renderStagingPanelHtml(state);
 
   headContainer.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -229,7 +323,7 @@ export function renderCleanHead(state: InternalState, headContainer: HTMLElement
   }
 }
 
-/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Render the dynamic filter rules configuration checkboxes panel of Clean tab. */
+/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Render the dynamic filter rules checkboxes panel of Clean tab. */
 export function renderCleanRules(state: InternalState, rulesContainer: HTMLElement): void {
   const { filterRules, activeFilters } = state.input;
   const rules = filterRules || [];
@@ -259,7 +353,6 @@ export function renderCleanCandidates(state: InternalState, candidates: any[], l
     state.cleanCardByFid = new Map();
   }
 
-  // 1. Reconcile deleted nodes
   const currentFids = new Set(candidates.map(c => fidOf(c)));
   state.cleanCardByFid.forEach((card, fid) => {
     if (!currentFids.has(fid)) {
@@ -273,11 +366,9 @@ export function renderCleanCandidates(state: InternalState, candidates: any[], l
     return;
   }
 
-  // Remove empty placeholder div if it exists
   const emptyDiv = listContainer.querySelector(".lv-empty");
   if (emptyDiv) emptyDiv.remove();
 
-  // 2. Add or update remaining nodes and position them in order
   candidates.forEach((c, index) => {
     const fid = fidOf(c);
     let card = state.cleanCardByFid.get(fid);

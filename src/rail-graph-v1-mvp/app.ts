@@ -89,12 +89,14 @@ import {
   type CompanyMetadata,
   type MvpOverrideState,
 } from "./pipeline";
+import { findPaths } from "./way-graph-pathfinder";
+import { exportStagedToNewWorkspace } from "./staging-store";
 
 let cleanOverrides: MvpOverrideState | null = null;
 const cleanLevels: Record<string, boolean> = { high: true, medium: true, low: true };
 const cleanFilters: Record<string, boolean> = {};
 let cleanSearchQuery = "";
-let cleanSelectMode = false;
+let cleanSelectMode: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via" = false;
 let cleanSelectedCandidateFid: string | null = null;
 // Select Mode 队列: 用户进入 select mode 后通过 click / shift-drag 累加候选 fid
 // 末端 [Remove]/[Keep] 把整个集合批量写入 overrides; [Cancel] 清空丢弃。
@@ -1953,9 +1955,34 @@ function initViews(): void {
         }
       }
       if (!fid) return;
-      if (cleanSelectionQueue.has(fid)) cleanSelectionQueue.delete(fid);
-      else cleanSelectionQueue.add(fid);
-      syncSelectModeBar();
+
+      if (cleanSelectMode === "select-queue") {
+        if (cleanSelectionQueue.has(fid)) cleanSelectionQueue.delete(fid);
+        else cleanSelectionQueue.add(fid);
+        syncSelectModeBar();
+      } else if (cleanSelectMode === "staging-origin") {
+        updateActiveWorkspace((workspace) => {
+          workspace.staging = workspace.staging || { via: [], stagedWayFids: [] };
+          workspace.staging.origin = fid!;
+        });
+        cleanSelectMode = false;
+      } else if (cleanSelectMode === "staging-terminus") {
+        updateActiveWorkspace((workspace) => {
+          workspace.staging = workspace.staging || { via: [], stagedWayFids: [] };
+          workspace.staging.terminus = fid!;
+        });
+        cleanSelectMode = false;
+      } else if (cleanSelectMode === "staging-via") {
+        updateActiveWorkspace((workspace) => {
+          workspace.staging = workspace.staging || { via: [], stagedWayFids: [] };
+          if (!workspace.staging.via.includes(fid!)) {
+            workspace.staging.via.push(fid!);
+          }
+        });
+        cleanSelectMode = false;
+      }
+      persistWorkspace();
+      persistWorkspaceCleanUiState();
       refreshViews();
       return;
     }
@@ -2226,6 +2253,132 @@ function initViews(): void {
       }
     }
     refreshViews();
+  });
+
+  listView.onCleanStagingAction?.(async (action, data) => {
+    const ws = activeWorkspace();
+    if (action === "clear") {
+      updateActiveWorkspace((workspace) => {
+        workspace.staging = { via: [], stagedWayFids: [] };
+      });
+      persistWorkspace();
+      refreshViews();
+    } else if (action === "remove-via") {
+      updateActiveWorkspace((workspace) => {
+        if (workspace.staging && workspace.staging.via) {
+          workspace.staging.via.splice(data, 1);
+          workspace.staging.candidates = undefined;
+          workspace.staging.activeCandidateIndex = undefined;
+        }
+      });
+      persistWorkspace();
+      refreshViews();
+    } else if (action === "find-path") {
+      const staging = ws.staging;
+      if (!staging || !staging.origin || !staging.terminus) return;
+      if (!state.source) return;
+      const pipelineResult = getOrRunPipeline();
+      const passFids = pipelineResult.passFids;
+      
+      const { candidates, error } = findPaths(
+        state.source.features,
+        passFids,
+        staging.origin,
+        staging.via,
+        staging.terminus,
+        5
+      );
+      
+      updateActiveWorkspace((workspace) => {
+        workspace.staging = workspace.staging || { via: [], stagedWayFids: [] };
+        if (error) {
+          workspace.staging.candidates = [];
+          workspace.staging.stagedWayFids = [];
+          workspace.staging.activeCandidateIndex = undefined;
+          alert(`Pathfinding error: ${error}`);
+        } else {
+          workspace.staging.candidates = candidates;
+          workspace.staging.activeCandidateIndex = 0;
+          workspace.staging.stagedWayFids = candidates[0] || [];
+        }
+      });
+      persistWorkspace();
+      refreshViews();
+    } else if (action === "prev-candidate") {
+      updateActiveWorkspace((workspace) => {
+        if (workspace.staging && workspace.staging.candidates) {
+          const idx = (workspace.staging.activeCandidateIndex ?? 0) - 1;
+          if (idx >= 0) {
+            workspace.staging.activeCandidateIndex = idx;
+            workspace.staging.stagedWayFids = workspace.staging.candidates[idx] || [];
+          }
+        }
+      });
+      persistWorkspace();
+      refreshViews();
+    } else if (action === "next-candidate") {
+      updateActiveWorkspace((workspace) => {
+        if (workspace.staging && workspace.staging.candidates) {
+          const idx = (workspace.staging.activeCandidateIndex ?? 0) + 1;
+          if (idx < workspace.staging.candidates.length) {
+            workspace.staging.activeCandidateIndex = idx;
+            workspace.staging.stagedWayFids = workspace.staging.candidates[idx] || [];
+          }
+        }
+      });
+      persistWorkspace();
+      refreshViews();
+    } else if (action === "export") {
+      const staging = ws.staging;
+      if (!staging || staging.stagedWayFids.length === 0 || !state.source) return;
+      
+      const keepStaging = confirm("Export to new workspace successfully created! Keep staging in the current workspace?");
+      
+      try {
+        const newWs = await exportStagedToNewWorkspace(ws, staging, globalSettings, state.source.features);
+        
+        workspaceState.workspaces[newWs.key] = newWs;
+        workspaceState.activeKey = newWs.key;
+        
+        if (!keepStaging) {
+          ws.staging = undefined;
+        }
+        
+        pipelineArtifacts = [];
+        activePipelineTask = null;
+        state.source = null;
+        state.bindings = [];
+        state.stoppingPoints = [];
+        state.topo = null;
+        state.diagnostics = [];
+        lastPathfindingResults = undefined;
+        lastCurrentStep = null;
+        lastPipelineRun = null;
+        allCleanDecisions.clear();
+        cleanDecisionsVersion++;
+        cleanSelectionQueue.clear();
+        if (mapView) mapView.lastRefs = null;
+        
+        mapView?.update(cloneTopo(EMPTY_TOPO), { type: "FeatureCollection", features: [] }, allCleanDecisions, cleanDecisionsVersion);
+        persistWorkspace();
+        renderWorkflowChrome();
+        
+        const myToken = ++pendingLoadToken;
+        requestAnimationFrame(async () => {
+          if (myToken !== pendingLoadToken) return;
+          try {
+            await startPipelineTask("match", newWs.project);
+            await loadWorkspaceDataAndCompile(myToken);
+          } catch (err) {
+            console.error("Failed to run match task after export:", err);
+            alert(`New workspace created, but match run failed: ${err}`);
+          }
+        });
+      } catch (err) {
+        console.error("Export staged failed:", err);
+        alert(`Export failed: ${err}`);
+      }
+    }
   });
 
   // Map box selection (Shift+drag): 仅在 select mode 下生效, 把命中 fid 全部加入队列。
@@ -2511,6 +2664,7 @@ function refreshViews(): void {
       cleanPassFids: passFids,
       cleanPipelineReport: report,
       selectionQueueFids: cleanSelectMode ? new Set(cleanSelectionQueue) : undefined,
+      staging: activeWorkspace().staging || { via: [], stagedWayFids: [] },
     });
   } else {
     listView.update({
@@ -2528,6 +2682,7 @@ function refreshViews(): void {
       selectedCandidateFid: cleanSelectedCandidateFid,
       activeTab,
       selectionQueueFids: cleanSelectMode ? new Set(cleanSelectionQueue) : undefined,
+      staging: activeWorkspace().staging || { via: [], stagedWayFids: [] },
     });
   }
   renderWorkflowChrome();
@@ -2780,7 +2935,8 @@ function restoreWorkspaceCleanUiState(): void {
   Object.assign(cleanLevels, { high: true, medium: true, low: true }, ui?.cleanLevels ?? {});
 
   cleanSearchQuery = ui?.cleanSearchQuery ?? "";
-  cleanSelectMode = ui?.cleanSelectMode ?? false;
+  const mode = ui?.cleanSelectMode;
+  cleanSelectMode = mode === true ? "select-queue" : (mode || false);
   cleanSelectedCandidateFid = ui?.cleanSelectedCandidateFid ?? null;
 }
 

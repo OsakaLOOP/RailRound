@@ -84,10 +84,18 @@ export interface LineWorkspaceState {
     cleanFilters?: Record<string, boolean>;
     cleanLevels?: Record<string, boolean>;
     cleanSearchQuery?: string;
-    cleanSelectMode?: boolean;
+    cleanSelectMode?: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via";
     cleanSelectedCandidateFid?: string | null;
   };
   lastTaskId?: string;
+  staging?: {
+    origin?: string;
+    terminus?: string;
+    via: string[];
+    stagedWayFids: string[];
+    candidates?: string[][];
+    activeCandidateIndex?: number;
+  };
   updatedAt: string;
 }
 

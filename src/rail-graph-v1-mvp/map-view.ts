@@ -149,7 +149,11 @@ const POSITRON_ATTR = "&copy; OpenStreetMap contributors &copy; CARTO";
 // ── 2. Public API ───────────────────────────────────────────
 
 export interface MapView {
-  update(topo: BaseTopologyLayer, geoJson: AnnotatedFeatureCollection, cleanDecisions?: Map<string, string>): void;
+  /**
+   * 增量更新地图. decisionsVersion 与 (topoRef, geoJsonRef) 三者全等时, update 早返回 (避免全量重绘).
+   * @param decisionsVersion cleanDecisions 内容版本号; caller 自增, 避免 mapView 重算 Map 内容
+   */
+  update(topo: BaseTopologyLayer, geoJson: AnnotatedFeatureCollection, cleanDecisions?: Map<string, string>, decisionsVersion?: number): void;
   highlightEntities(primaryRefs: EntityRef[], relatedRefs?: EntityRef[]): void;
   highlightPath(edgeSequence: EntityRef[], turnbackEdgeIndices?: number[], resolvedChain?: ResolvedChain): void;
   clearHighlight(): void;
@@ -282,8 +286,22 @@ export function createMapView(container: HTMLElement): MapView {
     map.on("mouseup", mu);
   });
 
-  return {
-    update(topo, geoJson, cleanDecisions) {
+  const mapViewInstance: MapView = {
+    lastRefs: null,
+    update(topo, geoJson, cleanDecisions, decisionsVersion) {
+      if (
+        mapViewInstance.lastRefs &&
+        mapViewInstance.lastRefs.topoRef === topo &&
+        mapViewInstance.lastRefs.geoJsonRef === geoJson &&
+        mapViewInstance.lastRefs.decisionsVersion === decisionsVersion
+      ) {
+        return;
+      }
+      mapViewInstance.lastRefs = {
+        topoRef: topo,
+        geoJsonRef: geoJson,
+        decisionsVersion: decisionsVersion ?? null,
+      };
       rebuildLayers(state, topo, geoJson, cleanDecisions);
     },
     highlightEntities(primary, related) {
@@ -377,6 +395,7 @@ export function createMapView(container: HTMLElement): MapView {
       map.remove();
     },
   };
+  return mapViewInstance;
 }
 
 // ── 5. Base layer ───────────────────────────────────────────

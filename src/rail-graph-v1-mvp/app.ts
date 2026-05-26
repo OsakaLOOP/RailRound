@@ -104,9 +104,17 @@ let filterRules: any[] = [];
 
 const allCleanDecisions = new Map<string, "keep" | "remove">();
 
+// allCleanDecisions 内容变更计数器: mapView.update 通过 ref/value 不变 + version 不变 早返回, 避免全量重绘.
+// 单一自增点: compileCleanDecisions 末尾 (任何 keep/remove/pipeline 重算都过这里).
+let cleanDecisionsVersion = 0;
+
+// Workspace switch race-guard: 切 workspace 时 pendingLoadToken++ 并把当前值传给整条 load chain.
+// 每个 async 边界检查 token, 不匹配则 abort. 防止"快速切两次 workspace, 第一次 load 完成后覆盖第二次的状态".
+let pendingLoadToken = 0;
+
 // 单次 pipeline 共享 cache: refreshViews / compileCleanDecisions 命中 sig 即复用.
 // 触发失效的位置: source 重载, rule/filter/level/search/overrides 变更.
-let lastPipelineRun: { passFids: Set<string>; report: PipelineReport; sig: string } | null = null;
+let lastPipelineRun: { passFids: Set<string>; passFeatures: GeoJsonFeature[]; report: PipelineReport; sig: string } | null = null;
 
 function currentPipelineSig(): string {
   return [
@@ -120,14 +128,14 @@ function currentPipelineSig(): string {
   ].join("|");
 }
 
-function getOrRunPipeline(): { passFids: Set<string>; report: PipelineReport } {
+function getOrRunPipeline(): { passFids: Set<string>; passFeatures: GeoJsonFeature[]; report: PipelineReport } {
   if (!state.source) {
-    return { passFids: new Set(), report: { totalIn: 0, totalOut: 0, totalMs: 0, phaseReports: [] } };
+    return { passFids: new Set(), passFeatures: [], report: { totalIn: 0, totalOut: 0, totalMs: 0, phaseReports: [] } };
   }
   const sig = currentPipelineSig();
   if (lastPipelineRun && lastPipelineRun.sig === sig) return lastPipelineRun;
   const result = runFilterPipeline(state.source.features, filterRules || [], cleanFilters, cleanLevels, cleanSearchQuery);
-  lastPipelineRun = { passFids: result.passFids, report: result.report, sig };
+  lastPipelineRun = { passFids: result.passFids, passFeatures: result.passFeatures, report: result.report, sig };
   console.log("[clean] PipelineReport", result.report);
   return lastPipelineRun;
 }
@@ -249,7 +257,10 @@ async function loadAllCleanDecisions(): Promise<void> {
 function compileCleanDecisions(passFidsHint?: Set<string>): void {
   allCleanDecisions.clear();
 
-  if (!state.source) return;
+  if (!state.source) {
+    cleanDecisionsVersion++;
+    return;
+  }
 
   const keepSet = new Set(cleanOverrides?.keep || []);
   const removeSet = new Set(cleanOverrides?.remove || []);
@@ -268,6 +279,8 @@ function compileCleanDecisions(passFidsHint?: Set<string>): void {
     }
     allCleanDecisions.set(fid, passFids.has(fid) ? "keep" : "remove");
   }
+
+  cleanDecisionsVersion++;
 }
 
 /** fidOf: 优先返回 feature.properties._fid 缓存; 没有就现算并写回。
@@ -290,9 +303,11 @@ function fidOfFeature(f: GeoJsonFeature): string { return fidOf(f); }
 //       geometry_types 进一步过滤参考集 (例如 orphan_railway_node 只关心 LineString/MultiLineString)
 //   - 每条 rule 派发给 rule-handlers 的 dispatchRule (新 rule.handler.type / 旧 exclude_if|dynamic|post_filter 都支持)
 //   - 同 phase 内 refPool same-source/geometry_types 只算一次 (cache by signature)
-//   - 返回 { passFids, report }; report 含 per-rule eliminated/refSize/ms 供 console + UI 展示
+//   - 返回 { passFids, passFeatures, report }; report 含 per-rule eliminated/refSize/ms 供 console + UI 展示
 export interface PipelineResult {
   passFids: Set<string>;
+  /** 与 passFids 同集合的 features 数组, 顺序与原 source.features 一致。 */
+  passFeatures: GeoJsonFeature[];
   report: PipelineReport;
 }
 
@@ -373,7 +388,7 @@ export function runFilterPipeline(
     phaseReports,
   };
 
-  return { passFids: new Set(passed.map(fidOf)), report };
+  return { passFids: new Set(passed.map(fidOf)), passFeatures: passed, report };
 }
 
 function resolveRuleInputCached(
@@ -2473,13 +2488,12 @@ function refreshViews(): void {
 
   if (state.source) {
     // 单次共享: getOrRunPipeline 命中 sig 即复用, 不会重复跑.
-    const { passFids, report } = getOrRunPipeline();
-    const filteredFeatures = state.source.features.filter((f) => passFids.has(fidOf(f)));
+    const { passFids, passFeatures, report } = getOrRunPipeline();
     const filteredSource = {
       type: "FeatureCollection" as const,
-      features: filteredFeatures,
+      features: passFeatures,
     };
-    mapView.update(state.topo || EMPTY_TOPO, filteredSource, allCleanDecisions);
+    mapView.update(state.topo || EMPTY_TOPO, filteredSource, allCleanDecisions, cleanDecisionsVersion);
     listView.update({
       topo: state.topo,
       diagnostics: state.diagnostics,
@@ -3323,10 +3337,17 @@ function formatBytes(bytes: number): string {
 
 // workspace 切换或打开页面时:先按 lineDir 真相同步 prepare/clean status,
 // 然后恢复上次选定 source、clean overrides/rules,并重新 compile 到内存。
-async function loadWorkspaceDataAndCompile(): Promise<void> {
+//
+// loadToken: 用于 race-guard. 切 workspace 时 pendingLoadToken++ 后把新值传入,
+// 各 await 边界检查 token 是否过期 (用户在 await 中又切了一次), 过期则 abort.
+async function loadWorkspaceDataAndCompile(loadToken: number = pendingLoadToken): Promise<void> {
+  const stale = () => loadToken !== pendingLoadToken;
+
   restoreWorkspaceCleanUiState();
   await syncProgressFromLineArtifacts();
+  if (stale()) return;
   await refreshPipelineArtifacts(false);
+  if (stale()) return;
 
   if (activeWorkspace().progress.prepare.status !== "done") {
     // 没有匹配产物,卡在 prepare;UI 让用户去跑 Ingest & Match
@@ -3337,6 +3358,7 @@ async function loadWorkspaceDataAndCompile(): Promise<void> {
   try {
     await loadWorkspaceSource({ markLoaded: false });
   } catch (err) {
+    if (stale()) return;
     console.error("Failed to load workspace source geojson:", err);
     setStepProgress("clean", {
       status: "stale",
@@ -3351,6 +3373,7 @@ async function loadWorkspaceDataAndCompile(): Promise<void> {
     refreshViews();
     return;
   }
+  if (stale()) return;
   if (!state.source || state.source.features.length === 0) {
     setStepProgress("clean", {
       status: "stale",
@@ -3366,11 +3389,13 @@ async function loadWorkspaceDataAndCompile(): Promise<void> {
     return;
   }
   await loadAllCleanDecisions();
+  if (stale()) return;
   try {
     compileTopology();
   } catch (err) {
     handleError(err);
   }
+  if (stale()) return;
   refreshViews();
   mapView?.fitToData();
 }
@@ -3396,11 +3421,24 @@ function bindPipelineUi(): void {
       state.diagnostics = [];
       lastPathfindingResults = undefined;
       lastCurrentStep = null;
-      mapView?.update(cloneTopo(EMPTY_TOPO), { type: "FeatureCollection", features: [] });
+      // PR-A: invalidate 整条 cache 链 (pipeline cache + decisions + selection queue 等内存状态),
+      // 防止上一 workspace 的 cache 错配新 workspace 的 source.
+      lastPipelineRun = null;
+      allCleanDecisions.clear();
+      cleanDecisionsVersion++;
+      cleanSelectionQueue.clear();
+      if (mapView) mapView.lastRefs = null;
+      mapView?.update(cloneTopo(EMPTY_TOPO), { type: "FeatureCollection", features: [] }, allCleanDecisions, cleanDecisionsVersion);
       persistWorkspace();
       renderWorkflowChrome();
-      
-      void loadWorkspaceDataAndCompile();
+
+      // PR-A: 双相切换 — 同步先空 UI, RAF 后才跑加载链. 让浏览器有机会先 paint 空状态,
+      // 不阻塞主线程一次完成全部 load+compile+render.
+      const myToken = ++pendingLoadToken;
+      requestAnimationFrame(() => {
+        if (myToken !== pendingLoadToken) return;
+        void loadWorkspaceDataAndCompile(myToken);
+      });
     }
   });
 
@@ -3457,7 +3495,7 @@ function bindPipelineUi(): void {
     const workspace = createLineWorkspace(project);
     workspaceState.workspaces[workspace.key] = workspace;
     workspaceState.activeKey = workspace.key;
-    
+
     // Clear forms and state
     showNewWorkspace = false;
     pipelineArtifacts = [];
@@ -3469,12 +3507,22 @@ function bindPipelineUi(): void {
     state.diagnostics = [];
     lastPathfindingResults = undefined;
     lastCurrentStep = null;
+    // PR-A: invalidate cache 链 + RAF 双相, 与 workspace switch handler 一致.
+    lastPipelineRun = null;
+    allCleanDecisions.clear();
+    cleanDecisionsVersion++;
+    cleanSelectionQueue.clear();
+    if (mapView) mapView.lastRefs = null;
 
-    mapView?.update(cloneTopo(EMPTY_TOPO), { type: "FeatureCollection", features: [] });
+    mapView?.update(cloneTopo(EMPTY_TOPO), { type: "FeatureCollection", features: [] }, allCleanDecisions, cleanDecisionsVersion);
     persistWorkspace();
     renderWorkflowChrome();
-    
-    void loadWorkspaceDataAndCompile();
+
+    const myToken = ++pendingLoadToken;
+    requestAnimationFrame(() => {
+      if (myToken !== pendingLoadToken) return;
+      void loadWorkspaceDataAndCompile(myToken);
+    });
   });
 
   // Load clean source button click

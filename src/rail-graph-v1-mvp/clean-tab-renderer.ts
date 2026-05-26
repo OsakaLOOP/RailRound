@@ -20,8 +20,9 @@ export function getRuleHandlerType(rule: any): string | undefined {
 }
 
 /* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Helper utility for escaping HTML characters to prevent XSS. */
-function escapeHtml(value: string): string {
-  return value
+function escapeHtml(value: any): string {
+  const str = (value === undefined || value === null) ? "" : String(value);
+  return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -29,7 +30,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function escapeAttr(value: string): string {
+function escapeAttr(value: any): string {
   return escapeHtml(value);
 }
 

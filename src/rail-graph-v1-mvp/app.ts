@@ -4820,7 +4820,7 @@ function sampleGeoJson(): GeoJsonFeatureCollection {
   };
 }
 
-function escapeHtml(value: string): string {
+function escapeHtml(value: any): string {
   const str = String(value ?? "");
   return str.replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
@@ -4831,7 +4831,7 @@ function escapeHtml(value: string): string {
   }[char] ?? char));
 }
 
-function escapeAttr(value: string): string {
+function escapeAttr(value: any): string {
   return escapeHtml(value);
 }
 

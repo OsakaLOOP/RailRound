@@ -2262,11 +2262,36 @@ function initViews(): void {
   });
 
   listView.onCleanCandidateSelect((fid) => {
-    // select mode 下点击 list 卡片视为 toggle 队列, 不再切换 inspector
     if (cleanSelectMode && fid) {
-      if (cleanSelectionQueue.has(fid)) cleanSelectionQueue.delete(fid);
-      else cleanSelectionQueue.add(fid);
-      syncSelectModeBar();
+      if (cleanSelectMode === "select-queue") {
+        if (cleanSelectionQueue.has(fid)) cleanSelectionQueue.delete(fid);
+        else cleanSelectionQueue.add(fid);
+        syncSelectModeBar();
+        return;
+      } else if (cleanSelectMode === "staging-origin") {
+        updateActiveWorkspace((workspace) => {
+          workspace.staging = workspace.staging || { via: [], stagedWayFids: [] };
+          workspace.staging.origin = fid;
+        });
+        cleanSelectMode = false;
+      } else if (cleanSelectMode === "staging-terminus") {
+        updateActiveWorkspace((workspace) => {
+          workspace.staging = workspace.staging || { via: [], stagedWayFids: [] };
+          workspace.staging.terminus = fid;
+        });
+        cleanSelectMode = false;
+      } else if (cleanSelectMode === "staging-via") {
+        updateActiveWorkspace((workspace) => {
+          workspace.staging = workspace.staging || { via: [], stagedWayFids: [] };
+          if (!workspace.staging.via.includes(fid)) {
+            workspace.staging.via.push(fid);
+          }
+        });
+        cleanSelectMode = false;
+      }
+      persistWorkspace();
+      persistWorkspaceCleanUiState();
+      refreshViews();
       return;
     }
     cleanSelectedCandidateFid = fid;

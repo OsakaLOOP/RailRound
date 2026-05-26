@@ -1999,6 +1999,11 @@ function initViews(): void {
       if (cleanSelectMode === "select-queue") {
         if (cleanSelectionQueue.has(fid)) cleanSelectionQueue.delete(fid);
         else cleanSelectionQueue.add(fid);
+        updateActiveWorkspace((workspace) => {
+          if (workspace.staging) {
+            workspace.staging.stagedWayFids = Array.from(cleanSelectionQueue);
+          }
+        });
         syncSelectModeBar();
       } else if (cleanSelectMode === "staging-origin") {
         updateActiveWorkspace((workspace) => {
@@ -2253,7 +2258,14 @@ function initViews(): void {
 
   listView.onCleanSelectModeToggle((active) => {
     cleanSelectMode = active;
-    if (!active) cleanSelectionQueue.clear();
+    if (!active) {
+      cleanSelectionQueue.clear();
+      updateActiveWorkspace((workspace) => {
+        if (workspace.staging) {
+          workspace.staging.stagedWayFids = [];
+        }
+      });
+    }
     persistWorkspaceCleanUiState();
     syncSelectModeBar();
     refreshViews();
@@ -2264,6 +2276,11 @@ function initViews(): void {
     if (cleanSelectMode && fid) {
       if (cleanSelectionQueue.has(fid)) cleanSelectionQueue.delete(fid);
       else cleanSelectionQueue.add(fid);
+      updateActiveWorkspace((workspace) => {
+        if (workspace.staging) {
+          workspace.staging.stagedWayFids = Array.from(cleanSelectionQueue);
+        }
+      });
       syncSelectModeBar();
       return;
     }
@@ -2441,6 +2458,11 @@ function initViews(): void {
   mapView.onBoxSelect((fids) => {
     if (!cleanSelectMode || !fids || fids.length === 0) return;
     for (const fid of fids) cleanSelectionQueue.add(fid);
+    updateActiveWorkspace((workspace) => {
+      if (workspace.staging) {
+        workspace.staging.stagedWayFids = Array.from(cleanSelectionQueue);
+      }
+    });
     syncSelectModeBar();
   });
 
@@ -2472,6 +2494,11 @@ function bindSelectModeBarOnce(): void {
   const exitMode = () => {
     cleanSelectionQueue.clear();
     cleanSelectMode = false;
+    updateActiveWorkspace((workspace) => {
+      if (workspace.staging) {
+        workspace.staging.stagedWayFids = [];
+      }
+    });
     persistWorkspaceCleanUiState();
     syncSelectModeBar();
     refreshViews();
@@ -2983,7 +3010,8 @@ function persistWorkspace(): void {
 }
 
 function restoreWorkspaceCleanUiState(): void {
-  const ui = activeWorkspace().ui;
+  const ws = activeWorkspace();
+  const ui = ws.ui;
 
   for (const key of Object.keys(cleanFilters)) delete cleanFilters[key];
   if (ui?.cleanFilters) Object.assign(cleanFilters, ui.cleanFilters);
@@ -2995,6 +3023,16 @@ function restoreWorkspaceCleanUiState(): void {
   const mode = ui?.cleanSelectMode;
   cleanSelectMode = mode === true ? "select-queue" : (mode || false);
   cleanSelectedCandidateFid = ui?.cleanSelectedCandidateFid ?? null;
+
+  cleanSelectionQueue.clear();
+  if (ws.staging?.stagedWayFids) {
+    for (const fid of ws.staging.stagedWayFids) {
+      cleanSelectionQueue.add(fid);
+    }
+    if (ws.staging.stagedWayFids.length > 0) {
+      cleanSelectMode = "select-queue";
+    }
+  }
 }
 
 function persistWorkspaceCleanUiState(): void {

@@ -195,15 +195,20 @@ function renderStagingPanelHtml(state: InternalState): string {
     `;
   }
 
+  const queueFids = Array.from(state.input.selectionQueueFids || []);
   let candidatesHtml = "";
-  if (candidates.length > 0) {
-    candidatesHtml = `
+  if (candidates.length > 0 || queueFids.length > 0) {
+    const candidateNav = candidates.length > 0 ? `
       <div style="display:flex; align-items:center; gap:6px; font-size:10.5px; margin-top:4px; padding:3px 6px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:4px;">
         <button class="lv-clean-staging-prev-candidate lv-clean-act-btn" style="padding:2px 4px; font-size:9.5px;" ${activeCandidateIndex <= 0 ? "disabled" : ""}>◀◀ Prev</button>
         <span style="flex:1; text-align:center; font-weight:600; color:#16a34a;">Candidate ${activeCandidateIndex + 1} / ${candidates.length}</span>
         <button class="lv-clean-staging-next-candidate lv-clean-act-btn" style="padding:2px 4px; font-size:9.5px;" ${activeCandidateIndex >= candidates.length - 1 ? "disabled" : ""}>Next ▶▶</button>
       </div>
-      <div style="font-size:10px; color:#64748b; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Staged ways (${staging.stagedWayFids.length}): <span style="font-family:ui-monospace,monospace; color:#334155;">${staging.stagedWayFids.map((f: string) => f.split(":")[1] || f).join(", ")}</span></div>
+    ` : "";
+
+    candidatesHtml = `
+      ${candidateNav}
+      <div style="font-size:10px; color:#64748b; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Staged ways (${queueFids.length}): <span style="font-family:ui-monospace,monospace; color:#334155;">${queueFids.map((f: string) => f.split(":")[1] || f).join(", ")}</span></div>
     `;
   }
 
@@ -252,7 +257,7 @@ function renderStagingPanelHtml(state: InternalState): string {
 
         ${candidatesHtml}
 
-        ${candidates.length > 0 ? `
+        ${queueFids.length > 0 ? `
           <div style="margin-top:4px; border-top:1px dashed #e2e8f0; padding-top:4px;">
             <button class="lv-clean-staging-export primary strong" style="width:100%; font-size:10.5px; padding:4px 8px; background:#16a34a; border-color:#16a34a; color:#fff; cursor:pointer;">
               Export Staged → New Workspace

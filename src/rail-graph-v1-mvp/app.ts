@@ -1999,11 +1999,6 @@ function initViews(): void {
       if (cleanSelectMode === "select-queue") {
         if (cleanSelectionQueue.has(fid)) cleanSelectionQueue.delete(fid);
         else cleanSelectionQueue.add(fid);
-        updateActiveWorkspace((workspace) => {
-          if (workspace.staging) {
-            workspace.staging.stagedWayFids = Array.from(cleanSelectionQueue);
-          }
-        });
         syncSelectModeBar();
       } else if (cleanSelectMode === "staging-origin") {
         updateActiveWorkspace((workspace) => {
@@ -2260,11 +2255,6 @@ function initViews(): void {
     cleanSelectMode = active;
     if (!active) {
       cleanSelectionQueue.clear();
-      updateActiveWorkspace((workspace) => {
-        if (workspace.staging) {
-          workspace.staging.stagedWayFids = [];
-        }
-      });
     }
     persistWorkspaceCleanUiState();
     syncSelectModeBar();
@@ -2276,11 +2266,6 @@ function initViews(): void {
     if (cleanSelectMode && fid) {
       if (cleanSelectionQueue.has(fid)) cleanSelectionQueue.delete(fid);
       else cleanSelectionQueue.add(fid);
-      updateActiveWorkspace((workspace) => {
-        if (workspace.staging) {
-          workspace.staging.stagedWayFids = Array.from(cleanSelectionQueue);
-        }
-      });
       syncSelectModeBar();
       return;
     }
@@ -2386,13 +2371,21 @@ function initViews(): void {
       persistWorkspace();
       refreshViews();
     } else if (action === "export") {
-      const staging = ws.staging;
-      if (!staging || staging.stagedWayFids.length === 0 || !state.source) return;
+      const staging = ws.staging || { via: [], stagedWayFids: [] };
+      const unionFids = Array.from(new Set([
+        ...cleanSelectionQueue,
+        ...(staging.stagedWayFids || [])
+      ]));
+      if (unionFids.length === 0 || !state.source) return;
       
       const keepStaging = confirm("Export to new workspace successfully created! Keep staging in the current workspace?");
       
       try {
-        const newWs = await exportStagedToNewWorkspace(ws, staging, globalSettings, state.source.features);
+        const exportStaging = {
+          ...staging,
+          stagedWayFids: unionFids
+        };
+        const newWs = await exportStagedToNewWorkspace(ws, exportStaging, globalSettings, state.source.features);
         
         workspaceState.workspaces[newWs.key] = newWs;
         workspaceState.activeKey = newWs.key;
@@ -2458,11 +2451,6 @@ function initViews(): void {
   mapView.onBoxSelect((fids) => {
     if (!cleanSelectMode || !fids || fids.length === 0) return;
     for (const fid of fids) cleanSelectionQueue.add(fid);
-    updateActiveWorkspace((workspace) => {
-      if (workspace.staging) {
-        workspace.staging.stagedWayFids = Array.from(cleanSelectionQueue);
-      }
-    });
     syncSelectModeBar();
   });
 
@@ -2475,12 +2463,22 @@ function syncSelectModeBar(): void {
   const bar = document.getElementById("mvp-clean-select-bar");
   const countEl = document.getElementById("mvp-clean-select-count");
   if (!bar || !countEl) return;
+
+  const unionFids = new Set([
+    ...cleanSelectionQueue,
+    ...(activeWorkspace().staging?.stagedWayFids || [])
+  ]);
+
   if (cleanSelectMode) {
     bar.style.display = "flex";
     countEl.textContent = String(cleanSelectionQueue.size);
-    mapView?.highlightBoxSelect(Array.from(cleanSelectionQueue));
   } else {
     bar.style.display = "none";
+  }
+
+  if (unionFids.size > 0) {
+    mapView?.highlightBoxSelect(Array.from(unionFids));
+  } else {
     mapView?.clearBoxSelectHighlight();
   }
 }
@@ -2494,11 +2492,6 @@ function bindSelectModeBarOnce(): void {
   const exitMode = () => {
     cleanSelectionQueue.clear();
     cleanSelectMode = false;
-    updateActiveWorkspace((workspace) => {
-      if (workspace.staging) {
-        workspace.staging.stagedWayFids = [];
-      }
-    });
     persistWorkspaceCleanUiState();
     syncSelectModeBar();
     refreshViews();
@@ -2745,7 +2738,7 @@ function refreshViews(): void {
       activeTab,
       cleanPassFids: passFids,
       cleanPipelineReport: report,
-      selectionQueueFids: cleanSelectMode ? new Set(cleanSelectionQueue) : undefined,
+      selectionQueueFids: new Set(cleanSelectionQueue),
       staging: activeWorkspace().staging || { via: [], stagedWayFids: [] },
       ruleParamOverrides: activeWorkspace().ui?.ruleParamOverrides || {},
     });
@@ -2764,7 +2757,7 @@ function refreshViews(): void {
       selectMode: cleanSelectMode,
       selectedCandidateFid: cleanSelectedCandidateFid,
       activeTab,
-      selectionQueueFids: cleanSelectMode ? new Set(cleanSelectionQueue) : undefined,
+      selectionQueueFids: new Set(cleanSelectionQueue),
       staging: activeWorkspace().staging || { via: [], stagedWayFids: [] },
       ruleParamOverrides: activeWorkspace().ui?.ruleParamOverrides || {},
     });
@@ -3025,14 +3018,6 @@ function restoreWorkspaceCleanUiState(): void {
   cleanSelectedCandidateFid = ui?.cleanSelectedCandidateFid ?? null;
 
   cleanSelectionQueue.clear();
-  if (ws.staging?.stagedWayFids) {
-    for (const fid of ws.staging.stagedWayFids) {
-      cleanSelectionQueue.add(fid);
-    }
-    if (ws.staging.stagedWayFids.length > 0) {
-      cleanSelectMode = "select-queue";
-    }
-  }
 }
 
 function persistWorkspaceCleanUiState(): void {

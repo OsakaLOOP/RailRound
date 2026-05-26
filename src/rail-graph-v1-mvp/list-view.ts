@@ -44,6 +44,7 @@ import type { SensekiScenarioResult } from "./poc-senseki-pathfinding";
 import type { MvpOverrideState } from "./pipeline";
 import type { PipelineReport } from "./rule-handlers";
 import { polylineLengthMeters } from "./spatial-helpers";
+import { renderCleanHead, renderCleanRules, renderCleanCandidates, renderCleanDetail } from "./clean-tab-renderer";
 
 // ── Public API ──────────────────────────────────────────────
 
@@ -142,6 +143,7 @@ interface InternalState {
   /** Annotate tab functionalUse 格式刷: 空数组 = off, 否则点击 track 时整体替换为该集合 */
   functionalUseBrush: TrackFunctionalUse[];
   cleanFilter: "all" | "undecided" | "keep" | "remove";
+  cleanCardByFid?: Map<string, HTMLElement>;
 }
 
 const STYLE_ID = "mvp-list-view-styles";
@@ -349,6 +351,7 @@ export function createListView(container: HTMLElement): ListView {
     dirRoleBrush: null,
     functionalUseBrush: [],
     cleanFilter: "all",
+    cleanCardByFid: new Map(),
   };
 
   bindTabClicks(state);
@@ -431,7 +434,7 @@ function renderActiveTab(state: InternalState): void {
 
 function renderCleanTab(state: InternalState): void {
   const body = bodyEl(state, "clean");
-  const { source, cleanOverrides, filterRules, activeFilters, activeLevels, searchQuery, selectMode, selectedCandidateFid, cleanPassFids, selectionQueueFids } = state.input;
+  const { source, selectedCandidateFid, cleanPassFids } = state.input;
 
   if (!source) {
     body.innerHTML = `<div class="lv-empty">No source candidates loaded. Select a Company and Line in Left panel "Prepare" or "Clean" step and load the workspace source.</div>`;
@@ -439,41 +442,7 @@ function renderCleanTab(state: InternalState): void {
   }
 
   const allFeatures = source.features || [];
-  const keepSet = new Set(cleanOverrides?.keep || []);
-  const removeSet = new Set(cleanOverrides?.remove || []);
-  const overrideMeta = cleanOverrides?.meta || {};
 
-  // Count keeps / removes on this specific source line
-  const localKeepCount = allFeatures.filter(f => {
-    const props = f.properties || {};
-    const fid = `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
-    return keepSet.has(fid);
-  }).length;
-
-  const localRemoveCount = allFeatures.filter(f => {
-    const props = f.properties || {};
-    const fid = `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
-    return removeSet.has(fid);
-  }).length;
-
-  const levels = activeLevels || { high: true, medium: true, low: true };
-  const filters = activeFilters || {};
-  const rules = filterRules || [];
-  const query = searchQuery || "";
-  const isSelectMode = !!selectMode;
-
-  // 按 match_level 统计 4 档计数(供 head panel 显示)
-  const levelCounts = { high: 0, medium: 0, low: 0, unknown: 0 };
-  for (const f of allFeatures) {
-    const lv = ((f.properties || {}) as any).match_level;
-    if (lv === "high") levelCounts.high += 1;
-    else if (lv === "medium") levelCounts.medium += 1;
-    else if (lv === "low") levelCounts.low += 1;
-    else levelCounts.unknown += 1;
-  }
-
-  // Contract: caller (app.ts refreshViews) 必传 cleanPassFids; 没传就显示提示而不是回退跑自己的 filter
-  // (跨阶段 rule 在 list-view 内算不出正确结果, 故不再保留 fallback).
   const filteredCandidates = cleanPassFids
     ? allFeatures.filter(f => {
         const props = f.properties || {};
@@ -491,325 +460,127 @@ function renderCleanTab(state: InternalState): void {
       })
     : null;
 
-  const reportBlock = renderPipelineReportHtml(state.input.cleanPipelineReport);
-
-  body.innerHTML = `
-    <div class="lv-clean-container" style="display:flex; flex-direction:column; height:100%; min-height:0; gap:8px;">
-      <!-- Head Panel -->
-      <div class="lv-clean-head-panel" style="display:flex; flex-direction:column; gap:6px; border-bottom:1px solid #cbd5e1; padding-bottom:8px; flex-shrink:0;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-weight:700; font-size:13px; color:#0f172a;">Manual Cleaning Override</span>
-          <span class="lv-clean-stats" style="font-size:10.5px; color:#64748b; font-weight:600;">
-            Keep: <span style="color:#16a34a;">${localKeepCount}</span> | Remove: <span style="color:#dc2626;">${localRemoveCount}</span> (Total: ${allFeatures.length})
-          </span>
-        </div>
-
-        <!-- Confidence levels checkboxes -->
-        <div style="display:flex; gap:10px; font-size:10.5px; align-items:center; flex-wrap:wrap;">
-          <span style="color:#64748b; font-weight:600;">Confidence Levels:</span>
-          <label style="display:flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" class="lv-clean-lvl-chk" data-level="high" ${levels.high ? "checked" : ""}/> High <span style="color:#0a6b2b;">(${levelCounts.high})</span></label>
-          <label style="display:flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" class="lv-clean-lvl-chk" data-level="medium" ${levels.medium ? "checked" : ""}/> Med <span style="color:#946200;">(${levelCounts.medium})</span></label>
-          <label style="display:flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" class="lv-clean-lvl-chk" data-level="low" ${levels.low ? "checked" : ""}/> Low <span style="color:#8a1212;">(${levelCounts.low})</span></label>
-          ${levelCounts.unknown > 0 ? `<span style="color:#94a3b8;">unset: ${levelCounts.unknown}</span>` : ""}
-        </div>
-
-        ${reportBlock}
-
-        <!-- Search box & Select mode -->
-        <div style="display:flex; gap:6px; align-items:center;">
-          <input type="text" class="lv-clean-search" placeholder="Search by name, ID or station..." value="${escapeAttr(query)}" style="flex:1; font-size:11px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; height:24px;" />
-          <button class="lv-clean-selmode-btn ${isSelectMode ? "active" : ""}" style="font-size:11px; padding:4px 8px; border:1px solid ${isSelectMode ? "#f59e0b" : "#cbd5e1"}; border-radius:4px; cursor:pointer; font-weight:700; display:flex; align-items:center; justify-content:center; height:24px; gap:2px; background:${isSelectMode ? "#fef3c7" : "#fff"}; color:${isSelectMode ? "#92400e" : "#334155"};">
-            ✏️ ${isSelectMode ? "Exit Select" : "Select Mode"}
-          </button>
-        </div>
-        ${isSelectMode ? `<div style="font-size:10.5px; color:#92400e; background:#fffbeb; border:1px dashed #f59e0b; border-radius:4px; padding:4px 6px;">Click candidates or <b>Shift+drag</b> on map to queue. Use the floating bar to Remove / Keep / Cancel.</div>` : ``}
+  let container = body.querySelector(".lv-clean-container") as HTMLElement | null;
+  if (!container) {
+    body.innerHTML = `
+      <div class="lv-clean-container" style="display:flex; flex-direction:column; height:100%; min-height:0; gap:8px;">
+        <div class="lv-clean-head-panel" style="display:flex; flex-direction:column; gap:6px; border-bottom:1px solid #cbd5e1; padding-bottom:8px; flex-shrink:0;"></div>
+        <div class="lv-clean-rules-panel" style="display:flex; flex-direction:column; gap:4px; border-bottom:1px solid #cbd5e1; padding-bottom:8px; max-height:85px; overflow-y:auto; flex-shrink:0;"></div>
+        <div class="lv-clean-list-container" style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding-right:2px;"></div>
+        <div class="lv-clean-inspector" style="border-top:1px solid #cbd5e1; padding-top:6px; display:flex; flex-direction:column; gap:4px; max-height:165px; overflow-y:auto; flex-shrink:0; font-size:10.5px;"></div>
       </div>
+    `;
+    container = body.querySelector(".lv-clean-container") as HTMLElement;
+    bindCleanTabEventsDelegated(state, container);
+  }
 
-      <!-- Filter rules panel -->
-      <div class="lv-clean-rules-panel" style="display:flex; flex-direction:column; gap:4px; border-bottom:1px solid #cbd5e1; padding-bottom:8px; max-height:85px; overflow-y:auto; flex-shrink:0;">
-        <div style="font-size:11px; font-weight:600; color:#64748b; margin-bottom:1px;">Dynamic Filter Rules:</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; font-size:10.5px;">
-          ${rules.map(rule => `
-            <label title="${escapeAttr(rule.desc || '')}" style="display:flex; align-items:center; gap:4px; cursor:pointer; min-width:0;">
-              <input type="checkbox" class="lv-clean-rule-chk" data-rule-id="${escapeAttr(rule.id)}" ${filters[rule.id] ? "checked" : ""}/>
-              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(rule.label)}</span>
-            </label>
-          `).join("")}
-        </div>
-      </div>
+  const headPanel = container.querySelector(".lv-clean-head-panel") as HTMLElement;
+  const rulesPanel = container.querySelector(".lv-clean-rules-panel") as HTMLElement;
+  const listContainer = container.querySelector(".lv-clean-list-container") as HTMLElement;
+  const inspectorPanel = container.querySelector(".lv-clean-inspector") as HTMLElement;
 
-      <!-- Candidates list (Scrollable) -->
-      <div class="lv-clean-list-container" style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding-right:2px;">
-        ${filteredCandidates.length === 0 ? `
-          <div class="lv-empty">No candidates match filters.</div>
-        ` : filteredCandidates.map(c => {
-            const props = (c.properties || {}) as any;
-            const fid = `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
-            const isRemove = removeSet.has(fid);
-            const isKeep = keepSet.has(fid);
-            const meta = (overrideMeta as Record<string, any>)[fid] || {};
-            const reason = meta.reason || "";
-            const isSelected = selectedCandidateFid === fid;
-            const isQueued = !!selectionQueueFids?.has(fid);
-
-            let borderStyle = "border-left: 4px solid #cbd5e1;";
-            let bgStyle = "background:#fff;";
-            let textDecoration = "";
-            let outline = "";
-            if (isRemove) {
-              borderStyle = "border-left: 4px solid #dc2626;";
-              bgStyle = "background:#fef2f2; opacity:0.75;";
-              textDecoration = "text-decoration: line-through; color:#94a3b8;";
-            } else if (isKeep) {
-              borderStyle = "border-left: 4px solid #16a34a;";
-              bgStyle = "background:#f0fdf4;";
-            }
-            if (isSelected) {
-              bgStyle = "background:#eff6ff; border-color:#3b82f6;";
-            }
-            if (isQueued) {
-              outline = "outline:2px dashed #f59e0b; outline-offset:-2px;";
-              bgStyle = "background:#fffbeb;";
-            }
-
-            return `
-              <div class="lv-clean-item-card${isQueued ? ' queued' : ''}" data-fid="${escapeAttr(fid)}" style="border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:11px; transition:all 100ms; ${borderStyle} ${bgStyle} ${outline}">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
-                  <span style="font-weight:600; ${textDecoration}">${isQueued ? '<span title="In select queue" style="color:#f59e0b; margin-right:3px;">●</span>' : ''}${escapeHtml(props.name || props.osm_id || "unnamed")}</span>
-                  <span class="lv-clean-level-badge ${props.match_level || 'low'}">
-                    ${props.match_level || 'low'} (${(props.match_score || 0).toFixed(2)})
-                  </span>
-                </div>
-                <div style="font-size:10px; color:#64748b; margin-bottom:4px; display:grid; grid-template-columns:1fr; gap:1px;">
-                  <div>Class: <b style="color:#475569;">${escapeHtml(props.class_main || "—")}</b> · Osm: <span>${escapeHtml(props.osm_type || "—")}/${escapeHtml(props.osm_id || "—")}</span></div>
-                  <div>Station: <span>${escapeHtml(props.nearest_station || "—")}</span></div>
-                </div>
-                <!-- Action buttons -->
-                <div style="display:flex; gap:4px; align-items:center; margin-top:4px;">
-                  <button class="lv-clean-act-btn keep ${isKeep ? 'active' : ''}" data-fid="${escapeAttr(fid)}" data-action="keep">Keep</button>
-                  <button class="lv-clean-act-btn remove ${isRemove ? 'active' : ''}" data-fid="${escapeAttr(fid)}" data-action="remove">Remove</button>
-                  <button class="lv-clean-act-btn reset" data-fid="${escapeAttr(fid)}" data-action="reset">Reset</button>
-                  <input type="text" class="lv-clean-reason-input" data-fid="${escapeAttr(fid)}" placeholder="Reason/Justification..." value="${escapeAttr(reason)}" style="flex:1; min-width:0; font-size:10px; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px; height:18px;" />
-                </div>
-              </div>
-            `;
-          }).join("")}
-      </div>
-
-      <!-- Properties Inspector Table -->
-      <div class="lv-clean-inspector" style="border-top:1px solid #cbd5e1; padding-top:6px; display:flex; flex-direction:column; gap:4px; max-height:165px; overflow-y:auto; flex-shrink:0; font-size:10.5px;">
-        <div style="font-weight:700; color:#334155;">Candidate Properties Inspector</div>
-        ${selectedCandidate ? renderInspectorTable(selectedCandidate) : `<div class="lv-empty" style="padding:4px 0;">Select a candidate in list or map to view properties.</div>`}
-      </div>
-    </div>
-  `;
-
-  bindCleanTabEvents(state, body);
+  renderCleanHead(state, headPanel);
+  renderCleanRules(state, rulesPanel);
+  renderCleanCandidates(state, filteredCandidates, listContainer);
+  renderCleanDetail(state, selectedCandidate, inspectorPanel);
 
   if (selectedCandidateFid) {
-    const card = body.querySelector<HTMLElement>(`.lv-clean-item-card[data-fid="${cssEscape(selectedCandidateFid)}"]`);
+    const card = state.cleanCardByFid?.get(selectedCandidateFid);
     if (card) {
       card.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }
 }
 
-function bindCleanTabEvents(state: InternalState, body: HTMLElement): void {
-  // Confidence level checkboxes
-  body.querySelectorAll<HTMLInputElement>(".lv-clean-lvl-chk").forEach(chk => {
-    chk.addEventListener("change", () => {
+/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Bind DOM events for the Clean tab using event delegation on the container element. */
+function bindCleanTabEventsDelegated(state: InternalState, container: HTMLElement): void {
+  // 1. Level & Rule checkboxes and Reason inputs
+  container.addEventListener("change", (e) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains("lv-clean-lvl-chk")) {
+      const chk = target as HTMLInputElement;
       const level = chk.dataset.level!;
       state.cleanLevelToggleHandlers.forEach(h => h(level, chk.checked));
-    });
-  });
-
-  // Filter rule checkboxes
-  body.querySelectorAll<HTMLInputElement>(".lv-clean-rule-chk").forEach(chk => {
-    chk.addEventListener("change", () => {
+    }
+    if (target.classList.contains("lv-clean-rule-chk")) {
+      const chk = target as HTMLInputElement;
       const rid = chk.dataset.ruleId!;
       state.cleanFilterToggleHandlers.forEach(h => h(rid, chk.checked));
-    });
+    }
+    if (target.classList.contains("lv-clean-reason-input")) {
+      const input = target as HTMLInputElement;
+      const fid = input.dataset.fid!;
+      const card = input.closest(".lv-clean-item-card") as HTMLElement;
+      const isRemove = card?.querySelector(".lv-clean-act-btn.remove")?.classList.contains("active");
+      const action = isRemove ? "remove" : "keep";
+      state.cleanOverrideChangeHandlers.forEach(h => h(fid, action, input.value));
+    }
   });
 
-  // Search input
-  const searchBox = body.querySelector<HTMLInputElement>(".lv-clean-search");
-  if (searchBox) {
-    searchBox.addEventListener("input", () => {
+  // 2. Search input event
+  container.addEventListener("input", (e) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains("lv-clean-search")) {
+      const searchBox = target as HTMLInputElement;
       state.cleanSearchHandlers.forEach(h => h(searchBox.value));
-    });
-  }
-
-  // Select Mode toggle
-  const selmodeBtn = body.querySelector<HTMLButtonElement>(".lv-clean-selmode-btn");
-  if (selmodeBtn) {
-    selmodeBtn.addEventListener("click", () => {
-      state.cleanSelectModeToggleHandlers.forEach(h => h(!state.input.selectMode));
-    });
-  }
-
-  // Candidate items event triggers
-  body.querySelectorAll<HTMLElement>(".lv-clean-item-card").forEach(card => {
-    const fid = card.dataset.fid!;
-
-    // mouse hover link to map view highlights
-    card.addEventListener("mouseenter", () => {
-      state.hoverHandlers.forEach(h => h(fid as EntityRef));
-    });
-    card.addEventListener("mouseleave", () => {
-      state.hoverHandlers.forEach(h => h(null));
-    });
-
-    // select card triggers selection
-    card.addEventListener("click", (e) => {
-      if ((e.target as HTMLElement).closest("button, input")) return;
-      state.cleanCandidateSelectHandlers.forEach(h => h(fid));
-    });
-
-    // Buttons Keep/Remove/Reset
-    card.querySelectorAll<HTMLButtonElement>(".lv-clean-act-btn").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const action = btn.dataset.action as "keep" | "remove" | "reset";
-        const reasonInput = card.querySelector<HTMLInputElement>(".lv-clean-reason-input");
-        const reason = reasonInput ? reasonInput.value : "";
-        state.cleanOverrideChangeHandlers.forEach(h => h(fid, action, reason));
-      });
-    });
-
-    // Reason input changes
-    const reasonInput = card.querySelector<HTMLInputElement>(".lv-clean-reason-input");
-    if (reasonInput) {
-      reasonInput.addEventListener("change", () => {
-        // auto fallback to keep/remove if entered reason
-        const isRemove = card.querySelector(".lv-clean-act-btn.remove")?.classList.contains("active");
-        const action = isRemove ? "remove" : "keep";
-        state.cleanOverrideChangeHandlers.forEach(h => h(fid, action, reasonInput.value));
-      });
     }
   });
-}
 
-// (featurePassesFilters / approxLength / pointToSegmentMeters / pointToPolylineMeters / isConnectedToAny
-//  原在此处, 已删除 — app.ts 的 runFilterPipeline + rule-handlers + spatial-helpers 接管。)
+  // 3. Click events
+  container.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
 
-function renderPipelineReportHtml(report: PipelineReport | undefined): string {
-  if (!report || report.phaseReports.length === 0) return "";
-  const ruleRows: string[] = [];
-  for (const phase of report.phaseReports) {
-    for (const r of phase.rules) {
-      const label = r.ruleLabel ? `${r.ruleId} <span style="color:#94a3b8;">(${escapeHtml(r.ruleLabel)})</span>` : r.ruleId;
-      const eliminated = r.eliminated;
-      const color = eliminated > 0 ? "#dc2626" : "#16a34a";
-      ruleRows.push(
-        `<div style="display:flex; justify-content:space-between; gap:8px; padding:1px 0;">`
-        + `<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">P${phase.phase} · ${label}</span>`
-        + `<span style="color:${color}; flex-shrink:0;">−${eliminated} <span style="color:#94a3b8;">(剩 ${r.outSize})</span> ref=${r.refSize} ${r.ms.toFixed(1)}ms</span>`
-        + `</div>`,
-      );
+    // Select Mode button
+    const selmodeBtn = target.closest(".lv-clean-selmode-btn");
+    if (selmodeBtn) {
+      state.cleanSelectModeToggleHandlers.forEach(h => h(!state.input.selectMode));
+      return;
     }
-  }
-  const summary = `Pipeline: ${report.totalIn} → ${report.totalOut} (${report.totalMs.toFixed(1)}ms)`;
-  return `
-    <details style="font-size:10.5px;">
-      <summary style="cursor:pointer; color:#475569; user-select:none;">▶ ${escapeHtml(summary)}</summary>
-      <div style="margin-top:4px; padding:6px 8px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; max-height:160px; overflow-y:auto;">
-        ${ruleRows.join("") || '<div style="color:#94a3b8;">(no rules active)</div>'}
-      </div>
-    </details>
-  `;
-}
 
-function renderInspectorTable(feature: any): string {
-  const p = feature.properties || {};
-  const geom = feature.geometry || {};
-  
-  const categories = [
-    {
-      name: "Basic",
-      keys: ["osm_type", "osm_id", "class_main", "class_sub", "railway", "name", "name:ja", "name:en"]
-    },
-    {
-      name: "Match",
-      keys: ["match_score", "match_level", "reason_codes", "distance_to_ref", "nearest_station", "nearest_station_distance", "overlap_ratio", "in_bbox", "in_buffer"]
-    },
-    {
-      name: "Infrastructure",
-      keys: ["gauge", "usage", "tunnel", "bridge", "layer", "level", "tracks"]
-    },
-    {
-      name: "Electrification",
-      keys: ["electrified", "voltage", "frequency"]
-    },
-    {
-      name: "Train Protection",
-      keys: ["train_protection", "safety_system"]
-    },
-    {
-      name: "Operator",
-      keys: ["operator", "source_company", "owner"]
-    },
-    {
-      name: "Platform",
-      keys: ["length", "width", "platform_edge", "height"]
-    },
-    {
-      name: "Signal",
-      keys: ["signal:type", "signal:direction", "signal:position"]
-    },
-    {
-      name: "References",
-      keys: ["wikidata", "wikipedia", "KSJ2:LIN", "source_line_uri"]
+    // Keep/Remove/Reset buttons inside card
+    const actBtn = target.closest(".lv-clean-act-btn") as HTMLButtonElement | null;
+    if (actBtn) {
+      e.stopPropagation();
+      const fid = actBtn.dataset.fid!;
+      const action = actBtn.dataset.action as "keep" | "remove" | "reset";
+      const card = actBtn.closest(".lv-clean-item-card");
+      const reasonInput = card?.querySelector(".lv-clean-reason-input") as HTMLInputElement | null;
+      const reason = reasonInput ? reasonInput.value : "";
+      state.cleanOverrideChangeHandlers.forEach(h => h(fid, action, reason));
+      return;
     }
-  ];
 
-  let html = `<table style="width:100%; border-collapse:collapse; text-align:left; font-size:10px;">`;
-  
-  if (geom.coordinates) {
-    let geomVal = "";
-    if (geom.type === "Point") {
-      geomVal = `Point (${geom.coordinates[0].toFixed(6)}, ${geom.coordinates[1].toFixed(6)})`;
-    } else if (geom.type === "LineString") {
-      const len = polylineLengthMeters(geom.coordinates);
-      geomVal = `LineString (${geom.coordinates.length} pts, ~${len.toFixed(0)}m)`;
-    } else {
-      geomVal = `${geom.type}`;
+    // Candidate card click (for selection)
+    const card = target.closest(".lv-clean-item-card") as HTMLElement | null;
+    if (card && container.querySelector(".lv-clean-list-container")?.contains(card)) {
+      if (target.closest("button, input")) return;
+      const fid = card.dataset.fid!;
+      state.cleanCandidateSelectHandlers.forEach(h => h(fid));
+      return;
     }
-    html += `
-      <tr style="background:#f1f5f9; font-weight:600;"><td colspan="2" style="padding:2px 4px; border-bottom:1px solid #e2e8f0; color:#475569;">Geometry</td></tr>
-      <tr>
-        <td style="padding:2px 4px; color:#64748b; width:40%;">type</td>
-        <td style="padding:2px 4px; color:#0f172a; word-break:break-all;">${escapeHtml(geom.type)}</td>
-      </tr>
-      <tr>
-        <td style="padding:2px 4px; color:#64748b; width:40%;">info</td>
-        <td style="padding:2px 4px; color:#0f172a; word-break:break-all;">${escapeHtml(geomVal)}</td>
-      </tr>
-    `;
-  }
+  });
 
-  for (const cat of categories) {
-    const presentKeys = cat.keys.filter(k => p[k] !== undefined && p[k] !== null && p[k] !== "");
-    if (presentKeys.length === 0) continue;
-
-    html += `<tr style="background:#f1f5f9; font-weight:600;"><td colspan="2" style="padding:2px 4px; border-bottom:1px solid #e2e8f0; color:#475569;">${cat.name}</td></tr>`;
-    for (const k of presentKeys) {
-      let val = p[k];
-      if (typeof val === "number") {
-        if (k.includes("score") || k.includes("ratio") || k.includes("distance")) {
-          val = val.toFixed(4);
-        }
-      }
-      html += `
-        <tr>
-          <td style="padding:2px 4px; color:#64748b; width:40%;">${escapeHtml(k)}</td>
-          <td style="padding:2px 4px; color:#0f172a; word-break:break-all;">${escapeHtml(String(val))}</td>
-        </tr>
-      `;
+  // 4. Hover events (with relatedTarget check to avoid flicker inside card)
+  container.addEventListener("mouseover", (e) => {
+    const target = e.target as HTMLElement;
+    const card = target.closest(".lv-clean-item-card") as HTMLElement | null;
+    if (card && container.querySelector(".lv-clean-list-container")?.contains(card)) {
+      const related = e.relatedTarget as HTMLElement | null;
+      if (related && card.contains(related)) return; // Still inside the same card
+      const fid = card.dataset.fid!;
+      state.hoverHandlers.forEach(h => h(fid as EntityRef));
     }
-  }
-  
-  html += `</table>`;
-  return html;
+  });
+
+  container.addEventListener("mouseout", (e) => {
+    const target = e.target as HTMLElement;
+    const card = target.closest(".lv-clean-item-card") as HTMLElement | null;
+    if (card && container.querySelector(".lv-clean-list-container")?.contains(card)) {
+      const related = e.relatedTarget as HTMLElement | null;
+      if (related && card.contains(related)) return; // Still inside the same card
+      state.hoverHandlers.forEach(h => h(null));
+    }
+  });
 }
 
 

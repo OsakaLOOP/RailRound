@@ -2370,6 +2370,28 @@ function initViews(): void {
       });
       persistWorkspace();
       refreshViews();
+    } else if (action === "commit-queue") {
+      const staging = ws.staging;
+      if (!staging || !staging.stagedWayFids || staging.stagedWayFids.length === 0) return;
+
+      for (const fid of staging.stagedWayFids) {
+        cleanSelectionQueue.add(fid);
+      }
+
+      updateActiveWorkspace((workspace) => {
+        workspace.staging = {
+          via: [],
+          stagedWayFids: [],
+          origin: undefined,
+          terminus: undefined,
+          candidates: undefined,
+          activeCandidateIndex: undefined
+        };
+      });
+
+      persistWorkspace();
+      syncSelectModeBar();
+      refreshViews();
     } else if (action === "export") {
       const staging = ws.staging || { via: [], stagedWayFids: [] };
       const unionFids = Array.from(new Set([

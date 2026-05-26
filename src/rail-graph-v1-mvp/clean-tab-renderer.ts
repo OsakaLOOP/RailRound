@@ -208,6 +208,11 @@ function renderStagingPanelHtml(state: InternalState): string {
         <span style="flex:1; text-align:center; font-weight:600; color:#16a34a;">Candidate ${activeCandidateIndex + 1} / ${candidates.length}</span>
         <button class="lv-clean-staging-next-candidate lv-clean-act-btn" style="padding:2px 4px; font-size:9.5px;" ${activeCandidateIndex >= candidates.length - 1 ? "disabled" : ""}>Next ▶▶</button>
       </div>
+      <div style="margin-top: 4px;">
+        <button class="lv-clean-staging-commit-queue primary" style="width:100%; font-size:10px; padding:4px 6px; background:#4f46e5; border-color:#4f46e5; color:#fff; cursor:pointer; font-weight:700;">
+          📥 Solidify Path & Add to Queue
+        </button>
+      </div>
     ` : "";
 
     candidatesHtml = `

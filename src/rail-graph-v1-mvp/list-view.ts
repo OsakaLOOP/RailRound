@@ -625,6 +625,11 @@ function bindCleanTabEventsDelegated(state: InternalState, container: HTMLElemen
       state.cleanStagingActionHandlers.forEach(h => h("next-candidate"));
       return;
     }
+    const commitQueueBtn = target.closest(".lv-clean-staging-commit-queue");
+    if (commitQueueBtn) {
+      state.cleanStagingActionHandlers.forEach(h => h("commit-queue"));
+      return;
+    }
     const exportBtn = target.closest(".lv-clean-staging-export");
     if (exportBtn) {
       state.cleanStagingActionHandlers.forEach(h => h("export"));

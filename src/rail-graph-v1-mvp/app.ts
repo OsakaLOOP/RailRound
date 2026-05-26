@@ -118,6 +118,79 @@ let pendingLoadToken = 0;
 // 触发失效的位置: source 重载, rule/filter/level/search/overrides 变更.
 let lastPipelineRun: { passFids: Set<string>; passFeatures: GeoJsonFeature[]; report: PipelineReport; sig: string } | null = null;
 
+let activePipelineRunToken = 0;
+let isPipelineRunning = false;
+
+const yieldToMain = () => new Promise((resolve) => {
+  if (typeof MessageChannel !== "undefined") {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => resolve(null);
+    channel.port2.postMessage(null);
+  } else {
+    setTimeout(resolve, 0);
+  }
+});
+
+async function ensurePipelinePrepared(): Promise<void> {
+  if (!state.source) return;
+  const sig = currentPipelineSig();
+  if (lastPipelineRun && lastPipelineRun.sig === sig) return;
+
+  const myToken = ++activePipelineRunToken;
+  isPipelineRunning = true;
+  
+  const statusEl = document.getElementById("mvp-workspace-status");
+  if (statusEl) {
+    statusEl.textContent = "running rule pipeline...";
+    statusEl.style.background = "#e0f2fe";
+    statusEl.style.color = "#0369a1";
+  }
+
+  try {
+    const overrides = activeWorkspace().ui?.ruleParamOverrides || {};
+    const effectiveRules = (filterRules || []).map((rule) => {
+      if (overrides[rule.id]) {
+        const mergedParams = {
+          ...(rule.handler?.params || rule.post_filter || rule.dynamic || {}),
+          ...overrides[rule.id],
+        };
+        if (rule.handler) {
+          return {
+            ...rule,
+            handler: { ...rule.handler, params: mergedParams },
+          };
+        } else if (rule.post_filter) {
+          return {
+            ...rule,
+            post_filter: { ...rule.post_filter, ...overrides[rule.id] },
+          };
+        } else if (rule.dynamic) {
+          return {
+            ...rule,
+            dynamic: { ...rule.dynamic, ...overrides[rule.id] },
+          };
+        }
+      }
+      return rule;
+    });
+
+    const result = await runFilterPipelineAsync(state.source.features, effectiveRules, cleanFilters, cleanLevels, cleanSearchQuery, myToken);
+    if (myToken === activePipelineRunToken) {
+      lastPipelineRun = { passFids: result.passFids, passFeatures: result.passFeatures, report: result.report, sig };
+      console.log("[clean] PipelineReport (async)", result.report);
+    }
+  } finally {
+    if (myToken === activePipelineRunToken) {
+      isPipelineRunning = false;
+      if (statusEl) {
+        statusEl.textContent = "ready";
+        statusEl.style.background = "";
+        statusEl.style.color = "";
+      }
+    }
+  }
+}
+
 function currentPipelineSig(): string {
   const ws = activeWorkspace();
   return [
@@ -293,6 +366,15 @@ async function loadAllCleanDecisions(): Promise<void> {
 
   // 3. Compile rules & overrides into in-memory map
   invalidatePipelineCache();  // overrides 和 rules 可能都变了, 强制下次跑
+  try {
+    await ensurePipelinePrepared();
+  } catch (err: any) {
+    if (err.message === "Pipeline run aborted by a newer run.") {
+      console.log("[clean] loadAllCleanDecisions aborted by newer pipeline run");
+      return;
+    }
+    throw err;
+  }
   compileCleanDecisions();
 }
 
@@ -417,6 +499,93 @@ export function runFilterPipeline(
         refSize: refPool.length,
         ms,
       });
+    }
+
+    phaseReports.push({ phase, inSize: phaseInSize, outSize: passed.length, rules: ruleReports });
+  }
+
+  const totalMs = performance.now() - t0;
+  const report: PipelineReport = {
+    totalIn,
+    totalOut: passed.length,
+    totalMs,
+    phaseReports,
+  };
+
+  return { passFids: new Set(passed.map(fidOf)), passFeatures: passed, report };
+}
+
+export async function runFilterPipelineAsync(
+  features: GeoJsonFeature[],
+  rules: any[],
+  activeFilters: Record<string, boolean>,
+  activeLevels: Record<string, boolean>,
+  searchQuery: string,
+  token: number,
+): Promise<PipelineResult> {
+  const t0 = performance.now();
+
+  await yieldToMain();
+
+  let passed: GeoJsonFeature[] = features.filter((f) => {
+    const props = (f.properties || {}) as any;
+    const lv = props.match_level || "low";
+    if (activeLevels && activeLevels[lv] === false) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchName = String(props.name || "").toLowerCase().includes(q)
+        || String(props.nearest_station || "").toLowerCase().includes(q)
+        || String(props.osm_id || "").includes(q);
+      if (!matchName) return false;
+    }
+    return true;
+  });
+
+  const totalIn = features.length;
+  const phaseReports: PipelineReport["phaseReports"] = [];
+
+  const phaseMap = new Map<number, any[]>();
+  for (const rule of rules) {
+    if (!activeFilters[rule.id]) continue;
+    const p = typeof rule.phase === "number" ? rule.phase : 1;
+    if (!phaseMap.has(p)) phaseMap.set(p, []);
+    phaseMap.get(p)!.push(rule);
+  }
+  for (const list of phaseMap.values()) {
+    list.sort((a, b) => (typeof a.order === "number" ? a.order : 0) - (typeof b.order === "number" ? b.order : 0));
+  }
+  const sortedPhases = [...phaseMap.keys()].sort((a, b) => a - b);
+
+  for (const phase of sortedPhases) {
+    if (token !== activePipelineRunToken) {
+      throw new Error("Pipeline run aborted by a newer run.");
+    }
+    const phaseRules = phaseMap.get(phase)!;
+    const phaseInSize = passed.length;
+
+    const refCache = new Map<string, GeoJsonFeature[]>();
+    const ruleReports: RuleReport[] = [];
+
+    for (const rule of phaseRules) {
+      if (token !== activePipelineRunToken) {
+        throw new Error("Pipeline run aborted by a newer run.");
+      }
+      const refPool = resolveRuleInputCached(rule, features, passed, refCache);
+      const inSize = passed.length;
+      const tRule = performance.now();
+      passed = passed.filter((f) => dispatchRule(rule, f, refPool));
+      const ms = performance.now() - tRule;
+      ruleReports.push({
+        ruleId: rule.id ?? "?",
+        ruleLabel: rule.label,
+        phase,
+        inSize,
+        outSize: passed.length,
+        ms,
+        refSize: refPool.length,
+      });
+
+      await yieldToMain();
     }
 
     phaseReports.push({ phase, inSize: phaseInSize, outSize: passed.length, rules: ruleReports });
@@ -2194,9 +2363,15 @@ function initViews(): void {
     await updateCleanOverrides(Array.from(keepSet), Array.from(removeSet), meta);
   });
 
-  listView.onCleanFilterToggle((ruleId, checked) => {
+  listView.onCleanFilterToggle(async (ruleId, checked) => {
     cleanFilters[ruleId] = checked;
     persistWorkspaceCleanUiState();
+    try {
+      await ensurePipelinePrepared();
+    } catch (err: any) {
+      if (err.message === "Pipeline run aborted by a newer run.") return;
+      throw err;
+    }
     compileCleanDecisions();
     try {
       compileTopology();
@@ -2213,9 +2388,15 @@ function initViews(): void {
     refreshViews();
   });
 
-  listView.onCleanLevelToggle((level, checked) => {
+  listView.onCleanLevelToggle(async (level, checked) => {
     cleanLevels[level] = checked;
     persistWorkspaceCleanUiState();
+    try {
+      await ensurePipelinePrepared();
+    } catch (err: any) {
+      if (err.message === "Pipeline run aborted by a newer run.") return;
+      throw err;
+    }
     compileCleanDecisions();
     try {
       compileTopology();
@@ -2232,9 +2413,15 @@ function initViews(): void {
     refreshViews();
   });
 
-  listView.onCleanSearch((query) => {
+  listView.onCleanSearch(async (query) => {
     cleanSearchQuery = query;
     persistWorkspaceCleanUiState();
+    try {
+      await ensurePipelinePrepared();
+    } catch (err: any) {
+      if (err.message === "Pipeline run aborted by a newer run.") return;
+      throw err;
+    }
     compileCleanDecisions();
     try {
       compileTopology();
@@ -2478,7 +2665,7 @@ function initViews(): void {
     }
   });
 
-  listView.onCleanRuleParamChange?.((ruleId, params) => {
+  listView.onCleanRuleParamChange?.(async (ruleId, params) => {
     updateActiveWorkspace((workspace) => {
       workspace.ui = workspace.ui || {};
       workspace.ui.ruleParamOverrides = workspace.ui.ruleParamOverrides || {};
@@ -2490,6 +2677,12 @@ function initViews(): void {
     });
     persistWorkspace();
     invalidatePipelineCache();
+    try {
+      await ensurePipelinePrepared();
+    } catch (err: any) {
+      if (err.message === "Pipeline run aborted by a newer run.") return;
+      throw err;
+    }
     refreshViews();
   });
 
@@ -2580,6 +2773,12 @@ async function updateCleanOverrides(keep: string[], remove: string[], meta: Reco
 
   try {
     await saveOverrides(project.overridePath, nextOverride);
+    try {
+      await ensurePipelinePrepared();
+    } catch (err: any) {
+      if (err.message === "Pipeline run aborted by a newer run.") return;
+      throw err;
+    }
     compileCleanDecisions();
     try {
       compileTopology();

@@ -67,7 +67,7 @@ export const Header: React.FC<{
                 ) : (
                    <button
                        onClick={() => setModalState({ isLoginOpen: true })}
-                       className="rl-header-button bg-blue-600 hover:bg-blue-700 border-blue-600/50 text-white"
+                       className="rl-header-button rl-header-button-blue"
                        title={t('header.loginRegister', '登录 / 注册')}
                        aria-label={t('header.loginRegister', '登录 / 注册')}
                    >
@@ -79,7 +79,7 @@ export const Header: React.FC<{
                 <div id="header-actions" className="flex gap-2 border-l border-slate-700/70 pl-2">
                    <button
                        onClick={handleExportKML}
-                       className="rl-header-button bg-emerald-600 hover:bg-emerald-700 border-emerald-600/50 text-white cursor-pointer"
+                       className="rl-header-button rl-header-button-emerald cursor-pointer"
                        title={t('header.exportKML', '导出 KML')}
                        aria-label={t('header.exportKML', '导出 KML')}
                    >
@@ -87,14 +87,14 @@ export const Header: React.FC<{
                    </button>
                     <button
                         onClick={handleExportUserData}
-                        className="rl-header-button bg-emerald-600 hover:bg-emerald-700 border-emerald-600/50 text-white cursor-pointer w-9 h-9 p-0 justify-center items-center"
+                        className="rl-header-button rl-header-button-emerald cursor-pointer w-9 p-0"
                         title={t('header.exportData', 'Export backup')}
                         aria-label={t('header.exportData', 'Export backup')}
                     >
                         <Download size={18}/>
                     </button>
                     <label
-                        className="rl-header-button bg-emerald-600 hover:bg-emerald-700 border-emerald-600/50 text-white cursor-pointer w-9 h-9 p-0 justify-center items-center"
+                        className="rl-header-button rl-header-button-emerald cursor-pointer w-9 p-0"
                         title={t('header.importData', 'Import backup')}
                         aria-label={t('header.importData', 'Import backup')}
                     >

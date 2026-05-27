@@ -155,9 +155,10 @@
 }
 
 .rl-header-button:hover {
-  border-color: rgba(100, 116, 139, 0.6);
+  border-color: var(--rl-brand-ring);
   background: rgba(51, 65, 85, 0.95);
   color: #fff;
+  box-shadow: 0 0 10px var(--rl-brand-ring);
 }
 
 .rl-header-button-primary {
@@ -170,30 +171,33 @@
   border-color: rgba(239, 68, 68, 0.5);
   background: rgba(185, 28, 28, 0.85);
   color: #fff;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
 }
 
 .rl-header-button-blue {
-  border-color: rgba(37, 99, 235, 0.4);
-  background: #2563eb;
-  color: #fff;
-}
-
-.rl-header-button-blue:hover {
-  border-color: rgba(29, 78, 216, 0.6);
+  border-color: rgba(29, 78, 216, 0.5);
   background: #1d4ed8;
   color: #fff;
 }
 
+.rl-header-button-blue:hover {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: #1e40af;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.35);
+}
+
 .rl-header-button-emerald {
-  border-color: rgba(5, 150, 105, 0.4);
-  background: #059669;
+  border-color: rgba(4, 120, 87, 0.5);
+  background: #047857;
   color: #fff;
 }
 
 .rl-header-button-emerald:hover {
-  border-color: rgba(4, 120, 87, 0.6);
-  background: #047857;
+  border-color: rgba(52, 211, 153, 0.6);
+  background: #065f46;
   color: #fff;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);
 }
 
 .rl-primary-action {

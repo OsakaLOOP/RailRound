@@ -15,7 +15,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
-        railGraphMvp: path.resolve(__dirname, 'rail-graph-mvp.html')
+        railGraphMvp: path.resolve(__dirname, 'rail-graph-mvp.html'),
+        railGraphAggregate: path.resolve(__dirname, 'rail-graph-aggregate.html')
       }
     }
   },

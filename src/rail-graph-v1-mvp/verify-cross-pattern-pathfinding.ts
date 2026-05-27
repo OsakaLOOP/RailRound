@@ -76,7 +76,12 @@ async function main(): Promise<void> {
   let aggregate: AggregateState;
   let patterns: StoredServicePattern[];
   try {
-    aggregate = await loadAggregate({ aggregateKey: AGGREGATE_KEY, memberWorkspaceKeys: MEMBER_WORKSPACES });
+    aggregate = await loadAggregate({
+      aggregateKey: AGGREGATE_KEY,
+      memberWorkspaceKeys: MEMBER_WORKSPACES,
+      allowNoDirection: true,
+      noDirectionReason: "verify",
+    });
     patterns = await loadServicePatterns({ aggregateKey: AGGREGATE_KEY, path: PATTERNS_JSON_PATH });
   } catch (e) {
     dataNotReady(`PR1 资源加载失败: ${(e as Error).message}`, "先确认 PR1 verify PASS, 再跑 PR2 verify");

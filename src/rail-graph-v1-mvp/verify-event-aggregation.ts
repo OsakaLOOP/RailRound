@@ -80,7 +80,12 @@ async function main(): Promise<void> {
   let patterns: StoredServicePattern[];
   let events: UserEvent[];
   try {
-    aggregate = await loadAggregate({ aggregateKey: AGGREGATE_KEY, memberWorkspaceKeys: MEMBER_WORKSPACES });
+    aggregate = await loadAggregate({
+      aggregateKey: AGGREGATE_KEY,
+      memberWorkspaceKeys: MEMBER_WORKSPACES,
+      allowNoDirection: true,
+      noDirectionReason: "verify",
+    });
     patterns = await loadServicePatterns({ aggregateKey: AGGREGATE_KEY, path: PATTERNS_JSON_PATH });
     events = await loadUserEvents({ aggregateKey: AGGREGATE_KEY, path: EVENTS_JSON_PATH });
   } catch (e) {

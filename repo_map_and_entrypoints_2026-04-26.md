@@ -30,6 +30,12 @@
   - map/list interaction: src/rail-graph-v1-mvp/map-view.ts, src/rail-graph-v1-mvp/list-view.ts
   - local pipeline model/API client: src/rail-graph-v1-mvp/pipeline.ts
   - Vite dev local task API: scripts/rail-graph-mvp-server.js + vite.config.js plugin
+- rail graph aggregate 工作台:
+  - standalone HTML: rail-graph-aggregate.html
+  - browser shell: src/rail-graph-aggregate/app.ts
+  - aggregate storage/import boundary: src/rail-graph-aggregate/aggregate-state.ts, src/rail-graph-aggregate/storage.ts
+  - ServicePattern / Cross-Pattern / UserEvent modules: src/rail-graph-aggregate/{service-pattern,cross-pattern,user-event}/
+  - verify scripts: npm run rail:aggregate:verify:{patterns,cross-pf,events}
 - mileage-centric UserEvent 层:
   - public types/API: src/rail-graph-v1/mileage-event.types.ts, src/rail-graph-v1/mileage-events.ts
   - aggregate compatibility: src/rail-graph-aggregate/user-event/mileage-*.ts
@@ -118,6 +124,34 @@
 - companion:
   - docs/rail-graph-v1/\*
   - rail-graph-mvp.html
+
+### D2b. Rail Graph Aggregate workspace / ServicePattern
+
+- primary:
+  - rail-graph-aggregate.html
+  - src/rail-graph-aggregate/app.ts
+  - src/rail-graph-aggregate/aggregate-state.ts
+  - src/rail-graph-aggregate/storage.ts
+  - scripts/rail-graph-mvp-server.js
+  - vite.config.js
+- ServicePattern:
+  - src/rail-graph-aggregate/service-pattern/store.ts
+  - src/rail-graph-aggregate/service-pattern/chain-editor.ts
+  - src/rail-graph-aggregate/service-pattern/adapter.ts
+  - src/rail-graph-aggregate/service-pattern/render-plan.ts
+- Cross-pattern route query:
+  - src/rail-graph-aggregate/cross-pattern/transfer-graph.ts
+  - src/rail-graph-aggregate/cross-pattern/resolver.ts
+  - src/rail-graph-aggregate/cross-pattern/types.ts
+- UserEvent L4:
+  - src/rail-graph-aggregate/user-event/types.ts
+  - src/rail-graph-aggregate/user-event/store.ts
+  - src/rail-graph-aggregate/user-event/aggregation.ts
+- docs / verification:
+  - docs/rail-graph-aggregate/notes.md
+  - src/rail-graph-v1-mvp/verify-aggregate-patterns.ts
+  - src/rail-graph-v1-mvp/verify-cross-pattern-pathfinding.ts
+  - src/rail-graph-v1-mvp/verify-event-aggregation.ts
 
 ### D3. Mileage UserEvent / user-facing event layer
 

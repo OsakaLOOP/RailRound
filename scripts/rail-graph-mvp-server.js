@@ -37,6 +37,20 @@ function readBody(req) {
   })
 }
 
+function safeAggregatePath(aggregateKey, file) {
+  const safeKey = String(aggregateKey || 'default').replace(/[\\/:<>"|?*\x00-\x1f]/g, '_').slice(0, 120) || 'default'
+  const safeFile = String(file || '').replace(/\\/g, '/')
+  if (!safeFile || safeFile.includes('..') || safeFile.startsWith('/') || safeFile.includes('\x00')) {
+    throw new Error('Invalid aggregate file')
+  }
+  const root = path.resolve('aggregates', safeKey)
+  const target = path.resolve(root, safeFile)
+  if (!target.startsWith(root + path.sep) && target !== root) {
+    throw new Error('Aggregate path escapes aggregate root')
+  }
+  return target
+}
+
 function script(project, name) {
   return path.join(project.scriptsRoot, name)
 }
@@ -532,6 +546,33 @@ export function railGraphMvpServerPlugin() {
             return
           }
           json(res, 404, { error: 'Unknown rail graph MVP API route' })
+        } catch (error) {
+          json(res, 500, { error: error instanceof Error ? error.message : String(error) })
+        }
+      })
+      server.middlewares.use('/api/rail-graph-aggregate', async (req, res) => {
+        try {
+          const url = new URL(req.url || '/', 'http://localhost')
+          const pathname = url.pathname
+          if (req.method === 'POST' && pathname === '/read') {
+            const body = await readBody(req)
+            const filePath = safeAggregatePath(body.aggregateKey, body.file)
+            if (!fs.existsSync(filePath)) {
+              json(res, 404, { error: 'Aggregate file not found' })
+              return
+            }
+            json(res, 200, JSON.parse(fs.readFileSync(filePath, 'utf8')))
+            return
+          }
+          if (req.method === 'POST' && pathname === '/write') {
+            const body = await readBody(req)
+            const filePath = safeAggregatePath(body.aggregateKey, body.file)
+            fs.mkdirSync(path.dirname(filePath), { recursive: true })
+            fs.writeFileSync(filePath, JSON.stringify(body.data, null, 2), 'utf8')
+            json(res, 200, { ok: true, path: filePath })
+            return
+          }
+          json(res, 404, { error: 'Unknown rail graph aggregate API route' })
         } catch (error) {
           json(res, 500, { error: error instanceof Error ? error.message : String(error) })
         }

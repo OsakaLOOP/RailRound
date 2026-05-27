@@ -91,6 +91,8 @@ async function main(): Promise<void> {
     aggregate = await loadAggregate({
       aggregateKey: DEFAULT_AGGREGATE_KEY,
       memberWorkspaceKeys: DEFAULT_MEMBER_WORKSPACES,
+      allowNoDirection: true,
+      noDirectionReason: "verify",
     });
   } catch (e) {
     dataNotReady(

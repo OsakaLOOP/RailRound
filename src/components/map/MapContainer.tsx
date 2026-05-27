@@ -14,9 +14,17 @@ import { cachedTileLayer } from "../../utils/CachedTileLayer";
 import { useShallow } from "zustand/react/shallow";
 import toast from "react-hot-toast";
 import { useAppRouteState } from "../../hooks/useAppRouteState";
+import { boundMileageEventsForDisplay } from "../../utils/mileageUserEvents";
+import i18next from "i18next";
 
 // 记录各域名最后一次报错的时间，用于节流
 const lastTileErrorTime: Record<string, number> = {};
+
+type FlyToLocationDetail = {
+  lat: number;
+  lng: number;
+  zoom?: number;
+};
 
 interface Props {
   setStationMenu: (menu: StationMenuData | null) => void;
@@ -35,8 +43,11 @@ export const MapContainer: React.FC<Props> = ({
   const geoDataRef = useRef<CustomFeatureCollection | null>(null);
   const visitedStationsRef = useRef<Set<string>>(new Set());
   const routeLayer = useRef<L.LayerGroup | null>(null);
+  const mileageEventsLayer = useRef<L.LayerGroup | null>(null);
   const railLayerRef = useRef<L.TileLayer | null>(null);
   const rubberBandLayerRef = useRef<L.LayerGroup | null>(null);
+  const pendingFlyToLocationRef = useRef<FlyToLocationDetail | null>(null);
+  const locateFlyingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Explicit SVG Renderers for pointer-events passthrough
   const baseLinesRendererRef = useRef<L.Renderer | null>(null);
@@ -64,7 +75,37 @@ export const MapContainer: React.FC<Props> = ({
   const wasDraggingRef = useRef(false);
 
   const [isMapInitialized, setIsMapInitialized] = React.useState(false);
+  const [selectedMileageEventId, setSelectedMileageEventId] = React.useState<string | null>(null);
   const { tab: activeTab } = useAppRouteState();
+
+  const flyToLocation = (detail: Partial<FlyToLocationDetail> | null | undefined) => {
+    if (typeof detail?.lat !== "number" || typeof detail.lng !== "number") return;
+    const next: FlyToLocationDetail = {
+      lat: detail.lat,
+      lng: detail.lng,
+      zoom: typeof detail.zoom === "number" ? detail.zoom : undefined,
+    };
+    const map = mapInstance.current;
+    if (!map) {
+      pendingFlyToLocationRef.current = next;
+      return;
+    }
+
+    if (locateFlyingTimerRef.current) {
+      clearTimeout(locateFlyingTimerRef.current);
+    }
+    (map as any)._isLocateFlying = true;
+    map.flyTo([next.lat, next.lng], next.zoom ?? map.getZoom(), {
+      animate: true,
+      duration: 1,
+    });
+    locateFlyingTimerRef.current = setTimeout(() => {
+      if (mapInstance.current) {
+        (mapInstance.current as any)._isLocateFlying = false;
+      }
+      locateFlyingTimerRef.current = null;
+    }, 1100);
+  };
 
   const animateRubberRetract = (
     polyline: L.Polyline,
@@ -109,6 +150,7 @@ export const MapContainer: React.FC<Props> = ({
     editingPin,
     pinMode,
     railwayData,
+    mileageUserEvents,
     setEditingPin,
     setPinMode,
     visitedStations,
@@ -124,6 +166,7 @@ export const MapContainer: React.FC<Props> = ({
       editingPin: state.editingPin,
       pinMode: state.pinMode,
       railwayData: state.railwayData,
+      mileageUserEvents: state.mileageUserEvents,
       setEditingPin: state.setEditingPin,
       setPinMode: state.setPinMode,
       visitedStations: state.visitedStations,
@@ -169,6 +212,12 @@ export const MapContainer: React.FC<Props> = ({
   }, [pins, editingPin, pinMode, leafletReady, isMapInitialized]);
 
   useEffect(() => {
+    if (isMapInitialized && leafletReady) {
+      renderMileageEvents();
+    }
+  }, [mileageUserEvents, railwayData, mapZoom, selectedMileageEventId, leafletReady, isMapInitialized]);
+
+  useEffect(() => {
     const handleCreateTempPin = () => {
       if (!mapInstance.current) return;
       const c = mapInstance.current.getCenter();
@@ -183,25 +232,26 @@ export const MapContainer: React.FC<Props> = ({
       mapInstance.current.panBy([0, 150]);
     };
 
-    const handleFlyToLocation = (e: Event) => {
+    const handleRequestMapCenter = () => {
       if (!mapInstance.current) return;
-      const customEvent = e as CustomEvent;
-      const { lat, lng, zoom } = customEvent.detail;
+      const center = mapInstance.current.getCenter();
+      window.dispatchEvent(
+        new CustomEvent("mileage-events:map-point", {
+          detail: { lat: center.lat, lng: center.lng },
+        }),
+      );
+    };
 
-      // Set a flag on the map instance to distinguish programmatic moves
-      (mapInstance.current as any)._isLocateFlying = true;
+    const handleMileageEventSelect = (event: Event) => {
+      const customEvent = event as CustomEvent<{ eventId?: string }>;
+      if (customEvent.detail?.eventId) {
+        setSelectedMileageEventId(customEvent.detail.eventId);
+      }
+    };
 
-      mapInstance.current.flyTo([lat, lng], zoom, {
-        animate: true,
-        duration: 1,
-      });
-
-      // Clear flag after animation
-      setTimeout(() => {
-        if (mapInstance.current) {
-          (mapInstance.current as any)._isLocateFlying = false;
-        }
-      }, 1100);
+    const handleFlyToLocation = (e: Event) => {
+      const customEvent = e as CustomEvent<FlyToLocationDetail>;
+      flyToLocation(customEvent.detail);
     };
 
       const handleShowNearbyStations = (e: Event) => {
@@ -230,10 +280,14 @@ export const MapContainer: React.FC<Props> = ({
       };
 
     window.addEventListener("map:create-temp-pin", handleCreateTempPin);
+    window.addEventListener("mileage-events:request-map-center", handleRequestMapCenter);
+    window.addEventListener("mileage-event:select", handleMileageEventSelect);
     window.addEventListener("map:fly-to-location", handleFlyToLocation);
       window.addEventListener("map:show-nearby-stations", handleShowNearbyStations);
     return () => {
       window.removeEventListener("map:create-temp-pin", handleCreateTempPin);
+      window.removeEventListener("mileage-events:request-map-center", handleRequestMapCenter);
+      window.removeEventListener("mileage-event:select", handleMileageEventSelect);
       window.removeEventListener("map:fly-to-location", handleFlyToLocation);
         window.removeEventListener("map:show-nearby-stations", handleShowNearbyStations);
     };
@@ -355,6 +409,11 @@ export const MapContainer: React.FC<Props> = ({
     visitedStationsPane.style.zIndex = "420";
     visitedStationsPane.style.pointerEvents = "none";
 
+    map.createPane("mileageEventsPane");
+    const mileageEventsPane = map.getPane("mileageEventsPane")!;
+    mileageEventsPane.style.zIndex = "430";
+    mileageEventsPane.style.pointerEvents = "auto";
+
     mapInstance.current = map;
 
     baseLinesRendererRef.current = L.svg({ pane: "baseLinesPane" });
@@ -366,6 +425,7 @@ export const MapContainer: React.FC<Props> = ({
     baseStationsLayer.current = L.layerGroup().addTo(map);
     routeLayer.current = L.layerGroup().addTo(map);
     pinsLayer.current = L.layerGroup().addTo(map);
+    mileageEventsLayer.current = L.layerGroup().addTo(map);
     rubberBandLayerRef.current = L.layerGroup().addTo(map);
 
     const updateLayerVisibility = () => {
@@ -392,6 +452,10 @@ export const MapContainer: React.FC<Props> = ({
       const visitedStationsPane = map.getPane("visitedStationsPane");
       if (visitedStationsPane) {
         visitedStationsPane.style.display = z <= 7 ? "none" : "";
+      }
+      const mileageEventsPane = map.getPane("mileageEventsPane");
+      if (mileageEventsPane) {
+        mileageEventsPane.style.display = z <= 7 ? "none" : "";
       }
 
       setMapZoom(z);
@@ -446,6 +510,11 @@ export const MapContainer: React.FC<Props> = ({
         setEditingPin({ ...currentEditingPin, ...newPos });
       } else {
         setStationMenu(null);
+        window.dispatchEvent(
+          new CustomEvent("mileage-events:map-point", {
+            detail: { lat: e.latlng.lat, lng: e.latlng.lng },
+          }),
+        );
       }
     });
 
@@ -841,10 +910,18 @@ export const MapContainer: React.FC<Props> = ({
     };
 
     setIsMapInitialized(true);
+    if (pendingFlyToLocationRef.current) {
+      const pending = pendingFlyToLocationRef.current;
+      pendingFlyToLocationRef.current = null;
+      requestAnimationFrame(() => flyToLocation(pending));
+    }
   };
 
   useEffect(() => {
     return () => {
+      if (locateFlyingTimerRef.current) {
+        clearTimeout(locateFlyingTimerRef.current);
+      }
       if (
         mapInstance.current &&
         (mapInstance.current as any)._customDragCleanup
@@ -1408,6 +1485,170 @@ export const MapContainer: React.FC<Props> = ({
         }
       },
     );
+  };
+
+  const renderMileageEvents = () => {
+    if (!mileageEventsLayer.current || !mapInstance.current) return;
+
+    const map = mapInstance.current;
+    const zoom = map.getZoom() ?? mapZoom;
+    const cellPx = zoom < 9 ? 132 : zoom < 11 ? 104 : zoom < 13 ? 76 : zoom < 15 ? 52 : 1;
+    const projected = boundMileageEventsForDisplay(mileageUserEvents, railwayData)
+      .filter((entry) => entry.bound.coordinates);
+
+    type EventMarkerItem = {
+      id: string;
+      lat: number;
+      lng: number;
+      color: string;
+      eventIds: string[];
+      titles: string[];
+      lineKeys: Set<string>;
+      selected: boolean;
+      sumLat: number;
+      sumLng: number;
+    };
+
+    const grouped = new Map<string, EventMarkerItem>();
+    projected.forEach((entry) => {
+      const coordinates = entry.bound.coordinates;
+      if (!coordinates) return;
+      const rawColor = entry.lineContext.line.meta.color || "#059669";
+      const lineColor = /^#[0-9a-f]{3,8}$/i.test(rawColor) ? rawColor : "#059669";
+      const layerPoint = map.latLngToLayerPoint([coordinates[1], coordinates[0]]);
+      const key = zoom >= 15
+        ? [
+            "exact",
+            entry.lineContext.lineKey,
+            Math.round(entry.bound.event.mileage.distanceMeters / 10),
+          ].join(":")
+        : [
+            "grid",
+            Math.floor(layerPoint.x / cellPx),
+            Math.floor(layerPoint.y / cellPx),
+          ].join(":");
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.eventIds.push(entry.bound.event.id);
+        existing.titles.push(entry.bound.event.title);
+        existing.lineKeys.add(entry.lineContext.lineKey);
+        existing.selected = existing.selected || entry.bound.event.id === selectedMileageEventId;
+        existing.sumLat += coordinates[1];
+        existing.sumLng += coordinates[0];
+        existing.lat = existing.sumLat / existing.eventIds.length;
+        existing.lng = existing.sumLng / existing.eventIds.length;
+      } else {
+        grouped.set(key, {
+          id: key,
+          lat: coordinates[1],
+          lng: coordinates[0],
+          color: lineColor,
+          eventIds: [entry.bound.event.id],
+          titles: [entry.bound.event.title],
+          lineKeys: new Set([entry.lineContext.lineKey]),
+          selected: entry.bound.event.id === selectedMileageEventId,
+          sumLat: coordinates[1],
+          sumLng: coordinates[0],
+        });
+      }
+    });
+
+    syncLeafletLayerGroup<EventMarkerItem>(
+      mileageEventsLayer.current,
+      Array.from(grouped.values()),
+      (item) => item.id,
+      (item) => {
+        const layer = L.marker([item.lat, item.lng], {
+          pane: "mileageEventsPane",
+          icon: createMileageEventIcon(item),
+          zIndexOffset: item.selected ? 1200 : item.eventIds.length > 1 ? 900 : 800,
+        });
+
+        const title = item.eventIds.length > 1
+          ? i18next.t("mileageEvents.markerCluster", "{{count}} events", { count: item.eventIds.length })
+          : item.titles[0];
+        layer.bindTooltip(title, { className: "mileage-event-tooltip", direction: "top", offset: [0, -10] });
+        layer.on("click", (event) => {
+          L.DomEvent.stopPropagation(event);
+          setSelectedMileageEventId(item.eventIds[0]);
+          window.dispatchEvent(
+            new CustomEvent("mileage-event:select", {
+              detail: { eventId: item.eventIds[0] },
+            }),
+          );
+        });
+        (layer as any)._cachedLat = item.lat;
+        (layer as any)._cachedLng = item.lng;
+        (layer as any)._cachedColor = item.color;
+        (layer as any)._cachedCount = item.eventIds.length;
+        (layer as any)._cachedSelected = item.selected;
+        (layer as any)._cachedMultiLine = item.lineKeys.size > 1;
+        (layer as any)._cachedTitle = title;
+        return layer;
+      },
+      (layer, item) => {
+        const marker = layer as L.Marker & {
+          _cachedLat?: number;
+          _cachedLng?: number;
+          _cachedColor?: string;
+          _cachedCount?: number;
+          _cachedSelected?: boolean;
+          _cachedMultiLine?: boolean;
+          _cachedTitle?: string;
+        };
+        const count = item.eventIds.length;
+        const title = count > 1
+          ? i18next.t("mileageEvents.markerCluster", "{{count}} events", { count })
+          : item.titles[0];
+        if (marker._cachedLat !== item.lat || marker._cachedLng !== item.lng) {
+          marker.setLatLng([item.lat, item.lng]);
+          marker._cachedLat = item.lat;
+          marker._cachedLng = item.lng;
+        }
+        if (
+          marker._cachedColor !== item.color ||
+          marker._cachedCount !== count ||
+          marker._cachedSelected !== item.selected ||
+          marker._cachedMultiLine !== item.lineKeys.size > 1
+        ) {
+          marker.setIcon(createMileageEventIcon(item));
+          marker.setZIndexOffset(item.selected ? 1200 : count > 1 ? 900 : 800);
+          marker._cachedColor = item.color;
+          marker._cachedCount = count;
+          marker._cachedSelected = item.selected;
+          marker._cachedMultiLine = item.lineKeys.size > 1;
+        }
+        if (marker._cachedTitle !== title) {
+          marker.unbindTooltip();
+          marker.bindTooltip(title, { className: "mileage-event-tooltip", direction: "top", offset: [0, -10] });
+          marker._cachedTitle = title;
+        }
+      },
+    );
+  };
+
+  const createMileageEventIcon = (item: {
+    color: string;
+    eventIds: string[];
+    lineKeys: Set<string>;
+    selected: boolean;
+  }) => {
+    const count = item.eventIds.length;
+    const size = item.selected ? 38 : count > 1 ? Math.min(38, 26 + Math.log2(count + 1) * 6) : 24;
+    const clusterClass = count > 1 ? "is-cluster" : "is-single";
+    const selectedClass = item.selected ? "is-selected" : "";
+    const mixedClass = item.lineKeys.size > 1 ? "is-mixed" : "";
+    const html = `
+      <div class="mileage-event-marker ${clusterClass} ${selectedClass} ${mixedClass}" style="--event-color:${item.color}; --event-size:${size}px">
+        <span class="mileage-event-marker-core">${count > 1 ? count : ""}</span>
+      </div>
+    `;
+    return L.divIcon({
+      className: "mileage-event-marker-shell",
+      html,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+    });
   };
 
   return <div ref={mapRef} style={{ width: "100%", height: "100%" }} />;

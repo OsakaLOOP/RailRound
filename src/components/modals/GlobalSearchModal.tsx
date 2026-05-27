@@ -1,19 +1,57 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, X, Map as MapIcon, MapPin, Building2, Train, ListFilter } from 'lucide-react';
+import {
+    CalendarDays,
+    Building2,
+    Clock,
+    ListFilter,
+    Map as MapIcon,
+    MapPin,
+    Route,
+    Search,
+    Tag,
+    Train,
+    X,
+} from 'lucide-react';
 import { useStore } from '../../store';
 import { useTranslation } from 'react-i18next';
 import { LineLogo } from '../LineLogo';
+import {
+    boundMileageEventsForDisplay,
+    lineLabel,
+    searchMileageEvents,
+} from '../../utils/mileageUserEvents';
+import {
+    eventKindLabel,
+    eventLineLabel,
+    eventMileageLabel,
+    eventStationLabel,
+    timestampLabel,
+} from '../mileage-events/display';
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
     onSelect: (lineKey: string, stationId?: string) => void;
+    onSelectTrip?: (tripId: string | number) => void;
+    onSelectEvent?: (eventId: string) => void;
     onSwitchMode?: () => void;
     isEmbedded?: boolean;
 }
 
-export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect, onSwitchMode, isEmbedded }) => {
-    const railwayData = useStore(state => state.railwayData);
+export const GlobalSearchModal: React.FC<Props> = ({
+    isOpen,
+    onClose,
+    onSelect,
+    onSelectTrip,
+    onSelectEvent,
+    onSwitchMode,
+    isEmbedded,
+}) => {
+    const { railwayData, trips, mileageUserEvents } = useStore(state => ({
+        railwayData: state.railwayData,
+        trips: state.trips,
+        mileageUserEvents: state.mileageUserEvents,
+    }));
     const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
@@ -35,11 +73,12 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect, 
     }, [isOpen, onClose]);
 
     const results = useMemo(() => {
-        if (!query.trim()) return { lines: [], stations: [] };
+        if (!query.trim()) return { lines: [], stations: [], trips: [], events: [], tags: [] };
 
         const lowerQuery = query.toLowerCase();
         const matchedLines: any[] = [];
         const matchedStations: any[] = [];
+        const normalizedQuery = lowerQuery.replace(/^#/, '');
 
         Object.entries(railwayData).forEach(([lineKey, lineData]) => {
             const displayName = lineKey.includes(':') ? lineKey.split(':').slice(1).join(':') : lineKey;
@@ -77,14 +116,57 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect, 
             });
         });
 
-        // (the code up there already populated `matchedLines` and `matchedStations` so no need to do performSearch here)
+        const matchedTrips = trips
+            .filter((trip) => {
+                const segments = trip.segments?.length
+                    ? trip.segments
+                    : [{ lineKey: trip.lineKey || '', fromId: trip.fromId || '', toId: trip.toId || '' }];
+                const segmentText = segments.map((segment) => {
+                    const line = railwayData[segment.lineKey];
+                    const from = line?.stations.find((station) => station.id === segment.fromId)?.name_ja || segment.fromId;
+                    const to = line?.stations.find((station) => station.id === segment.toId)?.name_ja || segment.toId;
+                    return `${lineLabel(segment.lineKey)} ${from} ${to} ${line?.meta?.company || ''}`;
+                }).join(' ');
+                return [trip.date, trip.memo || '', String(trip.id), segmentText]
+                    .join(' ')
+                    .toLowerCase()
+                    .includes(lowerQuery);
+            })
+            .slice(0, 50);
+
+        const matchedEventEntries = boundMileageEventsForDisplay(
+            searchMileageEvents(mileageUserEvents, railwayData, { query: normalizedQuery }),
+            railwayData,
+        ).slice(0, 50);
+
+        const tagCounts = new Map<string, number>();
+        mileageUserEvents.forEach((event) => {
+            (event.tags || []).forEach((tag) => {
+                if (!tag.toLowerCase().includes(normalizedQuery)) return;
+                tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+            });
+        });
+
         return {
             lines: matchedLines.slice(0, 50), // Limit results for performance
-            stations: matchedStations.slice(0, 100)
+            stations: matchedStations.slice(0, 100),
+            trips: matchedTrips,
+            events: matchedEventEntries,
+            tags: Array.from(tagCounts.entries())
+                .map(([tag, count]) => ({ tag, count }))
+                .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+                .slice(0, 40),
         };
-    }, [query, railwayData]);
+    }, [mileageUserEvents, query, railwayData, trips]);
 
     if (!isOpen && !isEmbedded) return null;
+
+    const hasResults =
+        results.lines.length > 0 ||
+        results.stations.length > 0 ||
+        results.trips.length > 0 ||
+        results.events.length > 0 ||
+        results.tags.length > 0;
 
     const content = (
         <div className="flex flex-col h-full w-full bg-white">
@@ -124,14 +206,134 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect, 
                     {!query.trim() ? (
                         <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
                             <Search size={48} className="text-gray-200" />
-                            <p>{t('search.instruction', '输入线路名或车站名进行搜索')}</p>
+                            <p>{t('search.instruction', '输入线路、车站、行程、事件或标签进行搜索')}</p>
                         </div>
-                    ) : results.lines.length === 0 && results.stations.length === 0 ? (
+                    ) : !hasResults ? (
                         <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
                             <p>{t('search.noResult', '没有找到相关结果')}</p>
                         </div>
                     ) : (
                         <div className="p-4 space-y-6">
+                            {/* Event Results */}
+                            {results.events.length > 0 && (
+                                <div>
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
+                                        <MapPin size={14} /> {t('search.events', '事件')} ({results.events.length})
+                                    </h4>
+                                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-50">
+                                        {results.events.map(({ bound, lineContext }) => (
+                                            <button
+                                                key={`event-${bound.event.id}`}
+                                                onClick={() => {
+                                                    if (onSelectEvent) {
+                                                        onSelectEvent(bound.event.id);
+                                                        onClose();
+                                                    }
+                                                }}
+                                                className="w-full text-left px-4 py-3 hover:bg-emerald-50 transition-colors flex items-start gap-3 text-sm text-gray-700 group"
+                                            >
+                                                <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 transition-colors">
+                                                    <MapPin size={12} className="text-emerald-600" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                                            {eventKindLabel(bound.event.kind, t)}
+                                                        </span>
+                                                        <div className="truncate font-bold text-gray-800">{bound.event.title}</div>
+                                                    </div>
+                                                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                                                        <span>{eventMileageLabel(bound)}</span>
+                                                        {eventStationLabel(bound, lineContext) && <span>{eventStationLabel(bound, lineContext)}</span>}
+                                                        {eventLineLabel(bound, lineContext) && (
+                                                            <span className="inline-flex items-center gap-1">
+                                                                <Route size={11} />
+                                                                {eventLineLabel(bound, lineContext)}
+                                                            </span>
+                                                        )}
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <Clock size={11} />
+                                                            {timestampLabel(bound.timestampInference, bound.timestamp, t)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Trip Results */}
+                            {results.trips.length > 0 && (
+                                <div>
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
+                                        <CalendarDays size={14} /> {t('search.trips', '行程')} ({results.trips.length})
+                                    </h4>
+                                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-50">
+                                        {results.trips.map((trip) => {
+                                            const segments = trip.segments?.length
+                                                ? trip.segments
+                                                : [{ lineKey: trip.lineKey || '', fromId: trip.fromId || '', toId: trip.toId || '' }];
+                                            const firstSegment = segments[0];
+                                            const line = railwayData[firstSegment?.lineKey || ''];
+                                            const from = line?.stations.find((station) => station.id === firstSegment?.fromId)?.name_ja || firstSegment?.fromId || '';
+                                            const to = line?.stations.find((station) => station.id === firstSegment?.toId)?.name_ja || firstSegment?.toId || '';
+                                            return (
+                                                <button
+                                                    key={`trip-${trip.id}`}
+                                                    onClick={() => {
+                                                        if (onSelectTrip) {
+                                                            onSelectTrip(trip.id);
+                                                            onClose();
+                                                        }
+                                                    }}
+                                                    className="w-full text-left px-4 py-3 hover:bg-sky-50 transition-colors flex items-center gap-3 text-sm text-gray-700 group"
+                                                >
+                                                    <div className="w-6 h-6 rounded-full bg-sky-100 flex items-center justify-center shrink-0 group-hover:bg-sky-200 transition-colors">
+                                                        <CalendarDays size={12} className="text-sky-600" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="font-bold text-gray-800">{trip.date}</div>
+                                                        <div className="text-xs text-gray-500 truncate">
+                                                            {lineLabel(firstSegment?.lineKey || '')} {from && to ? `${from} → ${to}` : String(trip.id)}
+                                                            {segments.length > 1 ? ` +${segments.length - 1}` : ''}
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Tag Results */}
+                            {results.tags.length > 0 && (
+                                <div>
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
+                                        <Tag size={14} /> {t('search.tags', '标签')} ({results.tags.length})
+                                    </h4>
+                                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-50">
+                                        {results.tags.map((item) => (
+                                            <button
+                                                key={`tag-${item.tag}`}
+                                                onClick={() => setQuery(item.tag)}
+                                                className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3 text-sm text-gray-700 group"
+                                            >
+                                                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center shrink-0 group-hover:bg-slate-200 transition-colors">
+                                                    <Tag size={12} className="text-slate-600" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="font-bold text-gray-800">#{item.tag}</div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {t('search.tagCount', '{{count}} 个事件', { count: item.count })}
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Line Results */}
                             {results.lines.length > 0 && (
                                 <div>

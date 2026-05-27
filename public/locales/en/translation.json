@@ -110,7 +110,23 @@
     "topLines": "Top Ridden Lines",
     "footerStats": "Loaded {{companies}} companies, {{lines}} lines, {{stations}} stations.",
     "moreDetails": "For more details, see ",
-    "userGuide": "User Guide"
+    "userGuide": "User Guide",
+    "eventStats": {
+      "title": "Mileage event stats",
+      "total": "Events",
+      "quality": "Quality issues",
+      "tags": "Tags",
+      "noTags": "No tags yet",
+      "topPlaces": "Common lines",
+      "noLines": "No line-bound events",
+      "types": "Types",
+      "visibility": "Visibility",
+      "qualityHints": "Record quality hints",
+      "noTagsCount": "No tags",
+      "unlinkedTripCount": "No trip link",
+      "estimatedTimeCount": "Estimated time",
+      "unstableProjectionCount": "Projection issue"
+    }
   },
   "tripsPage": {
     "noPreview": "No Preview",
@@ -145,15 +161,48 @@
       "service_class_switch": "Service class/destination switch",
       "other": "Operational event",
       "autoCompleted": "Auto-completed event"
+    },
+    "eventCenter": {
+      "summary": "{{count}} events",
+      "filteredCount": "{{count}} shown",
+      "noEvents": "No mileage events",
+      "trip": "Trip",
+      "lines": "Lines",
+      "add": "Add event",
+      "copy": "Copy summary",
+      "empty": "No events on this trip",
+      "replay": "Trip replay",
+      "sortedByMileage": "Sorted by trip mileage",
+      "departure": "Departure",
+      "transfer": "Transfer",
+      "arrival": "Arrival"
+    },
+    "eventFilters": {
+      "title": "Trip event filters",
+      "desc": "Filter trips by event, line, date, tag and quality",
+      "dateFrom": "Date from",
+      "dateTo": "Date to",
+      "company": "Company",
+      "allCompanies": "All companies",
+      "presence": "Event status",
+      "allTrips": "All trips",
+      "withEvents": "With events",
+      "withoutEvents": "Without events",
+      "incompleteOnly": "Only incomplete records"
     }
   },
   "search": {
     "close": "Close",
-    "placeholder": "Search lines or stations...",
-    "instruction": "Enter line or station name to search",
+    "open": "Open search",
+    "placeholder": "Search lines, stations, trips, events or tags...",
+    "instruction": "Enter a line, station, trip, event or tag to search",
     "noResult": "No results found",
     "lines": "Lines",
-    "stations": "Stations"
+    "stations": "Stations",
+    "events": "Events",
+    "trips": "Trips",
+    "tags": "Tags",
+    "tagCount": "{{count}} events"
   },
   "walk": {
     "noStartEnd": "Missing start/end point",
@@ -342,22 +391,136 @@
   "mileageEvents": {
     "open": "Mileage events",
     "title": "Mileage events",
+    "panelSubtitle": "Search, project and edit events on the mileage axis",
     "timeline": "Line",
     "place": "Place",
     "time": "Time",
+    "create": "Create",
     "line": "Line",
     "station": "Station",
+    "radius": "Radius",
     "distanceKm": "Mileage km",
     "fromTime": "From",
     "toTime": "To",
+    "fromKm": "From km",
+    "toKm": "To km",
     "titlePlaceholder": "Title",
     "bodyPlaceholder": "Note",
     "addAtStation": "Add by place",
     "addAtMileage": "Add by mileage",
     "empty": "No matching mileage events",
+    "emptyPlace": "No events near this place",
+    "emptyTime": "No events in this time window",
     "defaultTitle": "Mileage event",
     "timeUnknown": "No time bound",
-    "linear": "estimated"
+    "linear": "estimated",
+    "type": "Type",
+    "visibilityLabel": "Visibility",
+    "tags": "Tags",
+    "tagsPlaceholder": "Tags, separated by comma",
+    "mediaPlaceholder": "Photo URL or attachment placeholder",
+    "linkedTrip": "Linked trip",
+    "noLinkedTrip": "No linked trip",
+    "trip": "Trip",
+    "latestTrip": "Latest trip",
+    "position": "Position",
+    "totalMileage": "Line range",
+    "mapPointReady": "Current map point will be projected to mileage.",
+    "mapPointMissing": "Click the map or use the current map center first.",
+    "searchPlaceholder": "Search events, trips, lines, stations, tags",
+    "advancedFilters": "Advanced filters",
+    "searchCount": "{{count}} events",
+    "selectedEmpty": "Use the event list or a marker on the map to open a synchronized detail panel.",
+    "markerCluster": "{{count}} events",
+    "useMapCenter": "Use map center",
+    "convertPins": "Convert pins",
+    "legacyPinTitle": "Imported map pin",
+    "unknown": "Unknown",
+    "deleteConfirm": "Delete this mileage event?",
+    "kind": {
+      "user_note": "Note",
+      "scenic": "Scenic",
+      "warning": "Reminder",
+      "operation_hint": "Operation",
+      "custom": "Custom"
+    },
+    "visibility": {
+      "private": "Private",
+      "shared": "Shared",
+      "public": "Public"
+    },
+    "filter": {
+      "allLines": "All lines",
+      "allTypes": "All types",
+      "allVisibility": "All visibility"
+    },
+    "bulk": {
+      "title": "Batch actions",
+      "selectEvent": "Select event",
+      "selectVisible": "Select visible",
+      "clearVisible": "Clear visible",
+      "selectedCount": "{{count}} selected",
+      "tagsPlaceholder": "Add tags to selected",
+      "addTags": "Add tags",
+      "applyVisibility": "Apply visibility",
+      "mergeDuplicates": "Merge duplicates"
+    },
+    "createSource": {
+      "station": "Station",
+      "map": "Map",
+      "mileage": "Mileage",
+      "trip": "Trip"
+    },
+    "action": {
+      "create": "Create event",
+      "save": "Save",
+      "edit": "Edit",
+      "delete": "Delete",
+      "viewMap": "View map",
+      "viewRecords": "View records",
+      "copyLink": "Copy link",
+      "exportJson": "Export JSON",
+      "importJson": "Import JSON",
+      "toggleVisibility": "Toggle visibility",
+      "unlinkTrip": "Unlink trip"
+    },
+    "inspector": {
+      "empty": "Select an event to inspect",
+      "edit": "Edit event",
+      "mileage": "Mileage",
+      "station": "Nearby station",
+      "line": "Line",
+      "time": "Time",
+      "source": "Source",
+      "media": "Media",
+      "createdAt": "Created",
+      "updatedAt": "Updated",
+      "diagnostics": "Diagnostics"
+    },
+    "quality": {
+      "noTags": "No tags yet"
+    },
+    "source": {
+      "station": "Station",
+      "mileage": "Mileage",
+      "map_point": "Map point",
+      "trip_position": "Trip position"
+    },
+    "projection": {
+      "failedTitle": "Projection needs attention",
+      "warningTitle": "Projection warning",
+      "linearTime": "No timetable is bound, so the event time is estimated from mileage.",
+      "unknownTime": "No timetable or fallback time range is available for this event.",
+      "missingLine": "The saved line cannot be found in current railway data.",
+      "missingLineData": "The saved line has no usable stations or mileage data.",
+      "unsupportedScope": "The event mileage belongs to a system or pattern that is not loaded here.",
+      "outOfRange": "The saved mileage {{distance}} is outside the loaded line range {{range}}.",
+      "unresolved": "The event mileage could not be matched to the selected run path.",
+      "context": "Line {{line}} · mileage {{distance}}"
+    }
+  },
+  "premium": {
+    "subscribe": "Subscribe to Premium"
   },
   "map": {
     "loadFail": "Map load failed ({{domain}})\nPlease check network or VPN",

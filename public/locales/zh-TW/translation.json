@@ -110,7 +110,23 @@
     "topLines": "常乘路線排行",
     "footerStats": "加載了 {{companies}} 家公司，{{lines}} 條路線，{{stations}} 個站點。",
     "moreDetails": "更多詳情, 參見",
-    "userGuide": "用戶指南"
+    "userGuide": "用戶指南",
+    "eventStats": {
+      "title": "里程事件統計",
+      "total": "事件",
+      "quality": "品質問題",
+      "tags": "標籤",
+      "noTags": "暫無標籤",
+      "topPlaces": "常用路線",
+      "noLines": "暫無路線事件",
+      "types": "類型",
+      "visibility": "可見性",
+      "qualityHints": "記錄品質提示",
+      "noTagsCount": "無標籤",
+      "unlinkedTripCount": "未關聯行程",
+      "estimatedTimeCount": "估算時間",
+      "unstableProjectionCount": "投影問題"
+    }
   },
   "tripsPage": {
     "noPreview": "無預覽",
@@ -131,15 +147,62 @@
     "allExist": "解析完成。{{count}} 條記錄均已存在，無需重複匯入。",
     "noImport": "未找到可匯入的行程，或者解析失敗。",
     "readError": "讀取或解析檔案出錯。",
-    "parsingSuica": "解析 Suica CSV 資料..."
+    "parsingSuica": "解析 Suica CSV 資料...",
+    "destination": "行先",
+    "event": {
+      "transfer": {
+        "alight": "下車轉乘",
+        "through": "不下車接續",
+        "required": "需轉乘",
+        "notRequired": "無需轉乘"
+      },
+      "reverse_operation": "換向作業",
+      "formation_operation": "編組作業",
+      "service_class_switch": "車種行先切換",
+      "other": "運行事件",
+      "autoCompleted": "自動補全事件"
+    },
+    "eventCenter": {
+      "summary": "{{count}} 個事件",
+      "filteredCount": "顯示 {{count}} 個",
+      "noEvents": "沒有里程事件",
+      "trip": "行程",
+      "lines": "路線",
+      "add": "新增事件",
+      "copy": "複製摘要",
+      "empty": "本次行程沒有事件",
+      "replay": "行程回放",
+      "sortedByMileage": "按行程里程排序",
+      "departure": "出發",
+      "transfer": "換乘",
+      "arrival": "抵達"
+    },
+    "eventFilters": {
+      "title": "行程事件篩選",
+      "desc": "按事件、路線、日期、標籤和品質篩選行程",
+      "dateFrom": "開始日期",
+      "dateTo": "結束日期",
+      "company": "公司",
+      "allCompanies": "全部公司",
+      "presence": "事件狀態",
+      "allTrips": "全部行程",
+      "withEvents": "有事件",
+      "withoutEvents": "無事件",
+      "incompleteOnly": "僅待補全記錄"
+    }
   },
   "search": {
     "close": "關閉",
-    "placeholder": "搜索路線或車站...",
-    "instruction": "輸入路線名或車站名進行搜索",
+    "open": "開啟搜尋",
+    "placeholder": "搜尋路線、車站、行程、事件或標籤...",
+    "instruction": "輸入路線、車站、行程、事件或標籤進行搜尋",
     "noResult": "沒有找到相關結果",
     "lines": "路線",
-    "stations": "車站"
+    "stations": "車站",
+    "events": "事件",
+    "trips": "行程",
+    "tags": "標籤",
+    "tagCount": "{{count}} 個事件"
   },
   "walk": {
     "noStartEnd": "缺少起止點",
@@ -170,6 +233,7 @@
     "fixedInterestDesc": "選擇一個心儀的城市<br/>作為每次探索的預設大本營",
     "followLatest": "跟隨最新",
     "followLatestDesc": "總是從上一次旅行的終點<br/>繼續你的未竟之旅",
+    "followLatestSummary": "已準備就緒！每次啟動應用將自動定位到上一次記錄的終點。",
     "backToMode": "返回選擇模式",
     "chooseCountry": "選擇國家或地區",
     "china": "中國",
@@ -187,7 +251,8 @@
     "allRegions": "全部地域",
     "noRegion": "無地域分類",
     "noResult": "無符合條件的路線",
-    "cnMainlandEnt": "中國大陸入口"
+    "cnMainlandEnt": "中國大陸入口",
+    "systemsLabel": "系統"
   },
   "githubReg": {
     "title": "完成註冊",
@@ -258,7 +323,8 @@
     "saveFail": "雲端保存失敗: ",
     "disconnected": "連接中斷",
     "disconnectTitle": "連接錯誤",
-    "disconnectMsg": "段落之間未連通，請檢查起止站點。"
+    "disconnectMsg": "段落之間未連通，請檢查起止站點。",
+    "autoTransferFilled": "已自動補全換乘事件：{{count}} 處"
   },
   "app": {
     "fetchRemote": "正在取得遠端資料... (10%)",
@@ -325,22 +391,136 @@
   "mileageEvents": {
     "open": "里程事件",
     "title": "里程事件",
+    "panelSubtitle": "沿里程軸搜尋、投影和編輯事件",
     "timeline": "沿線",
     "place": "地點",
     "time": "時間",
+    "create": "建立",
     "line": "路線",
     "station": "車站",
+    "radius": "半徑",
     "distanceKm": "里程 km",
     "fromTime": "開始",
     "toTime": "結束",
+    "fromKm": "起點 km",
+    "toKm": "終點 km",
     "titlePlaceholder": "標題",
     "bodyPlaceholder": "備註",
     "addAtStation": "按地點新增",
     "addAtMileage": "按里程新增",
     "empty": "沒有符合的里程事件",
+    "emptyPlace": "這個地點附近沒有事件",
+    "emptyTime": "這個時間窗口內沒有事件",
     "defaultTitle": "里程事件",
     "timeUnknown": "時間未綁定",
-    "linear": "估算"
+    "linear": "估算",
+    "type": "類型",
+    "visibilityLabel": "可見性",
+    "tags": "標籤",
+    "tagsPlaceholder": "標籤，用逗號分隔",
+    "mediaPlaceholder": "照片 URL 或附件佔位",
+    "linkedTrip": "關聯行程",
+    "noLinkedTrip": "未關聯行程",
+    "trip": "行程",
+    "latestTrip": "最近行程",
+    "position": "位置",
+    "totalMileage": "路線範圍",
+    "mapPointReady": "目前地圖點將投影到里程。",
+    "mapPointMissing": "請先點擊地圖或使用目前地圖中心。",
+    "searchPlaceholder": "搜尋事件、行程、路線、車站、標籤",
+    "advancedFilters": "進階篩選",
+    "searchCount": "{{count}} 個事件",
+    "selectedEmpty": "從事件列表或地圖標記選擇事件，即可開啟同步詳情面板。",
+    "markerCluster": "{{count}} 個事件",
+    "useMapCenter": "使用地圖中心",
+    "convertPins": "轉換圖釘",
+    "legacyPinTitle": "匯入的地圖圖釘",
+    "unknown": "未知",
+    "deleteConfirm": "刪除這個里程事件？",
+    "kind": {
+      "user_note": "備註",
+      "scenic": "風景",
+      "warning": "提醒",
+      "operation_hint": "營運提示",
+      "custom": "自訂"
+    },
+    "visibility": {
+      "private": "私有",
+      "shared": "共享",
+      "public": "公開"
+    },
+    "filter": {
+      "allLines": "全部路線",
+      "allTypes": "全部類型",
+      "allVisibility": "全部可見性"
+    },
+    "bulk": {
+      "title": "批量操作",
+      "selectEvent": "選擇事件",
+      "selectVisible": "選擇目前結果",
+      "clearVisible": "取消目前結果",
+      "selectedCount": "已選擇 {{count}} 個",
+      "tagsPlaceholder": "給已選事件新增標籤",
+      "addTags": "新增標籤",
+      "applyVisibility": "套用可見性",
+      "mergeDuplicates": "合併重複事件"
+    },
+    "createSource": {
+      "station": "車站",
+      "map": "地圖",
+      "mileage": "里程",
+      "trip": "行程"
+    },
+    "action": {
+      "create": "建立事件",
+      "save": "儲存",
+      "edit": "編輯",
+      "delete": "刪除",
+      "viewMap": "在地圖查看",
+      "viewRecords": "在記錄查看",
+      "copyLink": "複製連結",
+      "exportJson": "匯出 JSON",
+      "importJson": "匯入 JSON",
+      "toggleVisibility": "切換可見性",
+      "unlinkTrip": "取消關聯行程"
+    },
+    "inspector": {
+      "empty": "選擇一個事件查看詳情",
+      "edit": "編輯事件",
+      "mileage": "里程",
+      "station": "附近車站",
+      "line": "路線",
+      "time": "時間",
+      "source": "來源",
+      "media": "媒體",
+      "createdAt": "建立時間",
+      "updatedAt": "更新時間",
+      "diagnostics": "診斷資訊"
+    },
+    "quality": {
+      "noTags": "還沒有標籤"
+    },
+    "source": {
+      "station": "車站",
+      "mileage": "里程",
+      "map_point": "地圖點",
+      "trip_position": "行程位置"
+    },
+    "projection": {
+      "failedTitle": "投影需要處理",
+      "warningTitle": "投影提示",
+      "linearTime": "未綁定時刻表，事件時間按里程線性估算。",
+      "unknownTime": "這個事件沒有可用的時刻表或備用時間範圍。",
+      "missingLine": "目前鐵路資料中找不到事件儲存的路線。",
+      "missingLineData": "事件儲存的路線缺少可用車站或里程資料。",
+      "unsupportedScope": "事件里程屬於目前未載入的 system 或 pattern。",
+      "outOfRange": "儲存的里程 {{distance}} 超出目前路線範圍 {{range}}。",
+      "unresolved": "事件里程無法匹配到目前行程路徑。",
+      "context": "路線 {{line}} · 里程 {{distance}}"
+    }
+  },
+  "premium": {
+    "subscribe": "訂閱 Premium"
   },
   "map": {
     "loadFail": "地圖加載失敗 ({{domain}})\n請檢查網絡或切換 VPN 節點",
@@ -380,6 +560,11 @@
     "blog": "日誌",
     "detail": "詳情"
   },
+  "routeNotFound": "無法找到可達路線: {{key}}",
+  "routeSlicePreview": "路線預覽切片",
+  "loadingRoute": "載入路線資料中: {{key}} ({{start}} - {{end}})...",
+  "parseFail": "渲染路線切片失敗",
+  "resetView": "返回初始",
   "exportRoute": {
     "title": "匯出路線預覽",
     "preview": "預覽",

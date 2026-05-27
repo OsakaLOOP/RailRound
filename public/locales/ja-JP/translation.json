@@ -110,7 +110,23 @@
     "topLines": "よく乗る路線ランキング",
     "footerStats": "{{companies}}社の運営会社、{{lines}}本の路線、{{stations}}個の停車駅を読み込みました。",
     "moreDetails": "詳細は、",
-    "userGuide": "ユーザーガイド"
+    "userGuide": "ユーザーガイド",
+    "eventStats": {
+      "title": "キロ程イベント統計",
+      "total": "イベント",
+      "quality": "品質問題",
+      "tags": "タグ",
+      "noTags": "タグはまだありません",
+      "topPlaces": "よく使う路線",
+      "noLines": "路線に紐づくイベントはありません",
+      "types": "種類",
+      "visibility": "公開範囲",
+      "qualityHints": "記録品質のヒント",
+      "noTagsCount": "タグなし",
+      "unlinkedTripCount": "旅程未連携",
+      "estimatedTimeCount": "推定時刻",
+      "unstableProjectionCount": "投影問題"
+    }
   },
   "tripsPage": {
     "noPreview": "プレビューなし",
@@ -131,15 +147,62 @@
     "allExist": "解析完了。すべての記録（{{count}}件）は既に存在するため、インポートは不要です。",
     "noImport": "インポート可能な旅が見つからないか、解析に失敗しました。",
     "readError": "ファイルの読み込みまたは解析でエラーが発生しました。",
-    "parsingSuica": "Suica CSV データを解析中..."
+    "parsingSuica": "Suica CSV データを解析中...",
+    "destination": "行先",
+    "event": {
+      "transfer": {
+        "alight": "下車して乗換",
+        "through": "直通運転（下車なし）",
+        "required": "乗換必要",
+        "notRequired": "乗換不要"
+      },
+      "reverse_operation": "方向転換",
+      "formation_operation": "編成作業",
+      "service_class_switch": "種別・行先切替",
+      "other": "運行イベント",
+      "autoCompleted": "自動補完イベント"
+    },
+    "eventCenter": {
+      "summary": "{{count}} 件のイベント",
+      "filteredCount": "{{count}} 件を表示",
+      "noEvents": "キロ程イベントはありません",
+      "trip": "旅程",
+      "lines": "路線",
+      "add": "イベントを追加",
+      "copy": "概要をコピー",
+      "empty": "この旅程にはイベントがありません",
+      "replay": "旅程リプレイ",
+      "sortedByMileage": "旅程キロ程順",
+      "departure": "出発",
+      "transfer": "乗換",
+      "arrival": "到着"
+    },
+    "eventFilters": {
+      "title": "旅程イベントフィルター",
+      "desc": "イベント、路線、日付、タグ、品質で旅程を絞り込みます",
+      "dateFrom": "開始日",
+      "dateTo": "終了日",
+      "company": "会社",
+      "allCompanies": "すべての会社",
+      "presence": "イベント状態",
+      "allTrips": "すべての旅程",
+      "withEvents": "イベントあり",
+      "withoutEvents": "イベントなし",
+      "incompleteOnly": "未補完記録のみ"
+    }
   },
   "search": {
     "close": "閉じる",
-    "placeholder": "路線や駅を検索...",
-    "instruction": "検索する路線名や駅名を入力してください",
+    "open": "検索を開く",
+    "placeholder": "路線、駅、旅程、イベント、タグを検索...",
+    "instruction": "路線、駅、旅程、イベント、タグを入力して検索",
     "noResult": "結果が見つかりません",
     "lines": "路線",
-    "stations": "駅"
+    "stations": "駅",
+    "events": "イベント",
+    "trips": "旅程",
+    "tags": "タグ",
+    "tagCount": "{{count}} 件のイベント"
   },
   "walk": {
     "noStartEnd": "起終点がありません",
@@ -188,7 +251,8 @@
     "allRegions": "全地域",
     "noRegion": "地域分類なし",
     "noResult": "条件に一致する路線がありません",
-    "cnMainlandEnt": "中国大陸ポータル"
+    "cnMainlandEnt": "中国大陸ポータル",
+    "systemsLabel": "系統"
   },
   "githubReg": {
     "title": "登録完了",
@@ -259,7 +323,8 @@
     "disconnected": "出発駅が直前の到着駅と連続していません",
     "disconnectTitle": "接続切断の警告",
     "disconnectMsg": "接続されていない区間が検出されました。このまま保存すると構造が壊れる可能性があります。保存しますか？",
-    "saveFail": "クラウド保存に失敗しました: "
+    "saveFail": "クラウド保存に失敗しました: ",
+    "autoTransferFilled": "乗換イベントを自動補完しました: {{count}} 件"
   },
   "app": {
     "fetchRemote": "リモートデータを取得中... (10%)",
@@ -326,22 +391,136 @@
   "mileageEvents": {
     "open": "キロ程イベント",
     "title": "キロ程イベント",
+    "panelSubtitle": "キロ程軸上でイベントを検索、投影、編集",
     "timeline": "沿線",
     "place": "場所",
     "time": "時間",
+    "create": "作成",
     "line": "路線",
     "station": "駅",
+    "radius": "半径",
     "distanceKm": "キロ程 km",
     "fromTime": "開始",
     "toTime": "終了",
+    "fromKm": "開始 km",
+    "toKm": "終了 km",
     "titlePlaceholder": "タイトル",
     "bodyPlaceholder": "メモ",
     "addAtStation": "場所から追加",
     "addAtMileage": "キロ程で追加",
     "empty": "一致するキロ程イベントはありません",
+    "emptyPlace": "この場所の近くにイベントはありません",
+    "emptyTime": "この時間帯にイベントはありません",
     "defaultTitle": "キロ程イベント",
     "timeUnknown": "時刻未設定",
-    "linear": "推定"
+    "linear": "推定",
+    "type": "種類",
+    "visibilityLabel": "公開範囲",
+    "tags": "タグ",
+    "tagsPlaceholder": "タグ（カンマ区切り）",
+    "mediaPlaceholder": "写真 URL または添付プレースホルダー",
+    "linkedTrip": "連携旅程",
+    "noLinkedTrip": "連携旅程なし",
+    "trip": "旅程",
+    "latestTrip": "最新の旅程",
+    "position": "位置",
+    "totalMileage": "路線範囲",
+    "mapPointReady": "現在の地図ポイントをキロ程へ投影します。",
+    "mapPointMissing": "先に地図をクリックするか、現在の地図中心を使用してください。",
+    "searchPlaceholder": "イベント、旅程、路線、駅、タグを検索",
+    "advancedFilters": "詳細フィルター",
+    "searchCount": "{{count}} 件のイベント",
+    "selectedEmpty": "イベント一覧または地図マーカーからイベントを選択すると、同期された詳細パネルが開きます。",
+    "markerCluster": "{{count}} 件のイベント",
+    "useMapCenter": "地図中心を使用",
+    "convertPins": "ピンを変換",
+    "legacyPinTitle": "インポートした地図ピン",
+    "unknown": "不明",
+    "deleteConfirm": "このキロ程イベントを削除しますか？",
+    "kind": {
+      "user_note": "メモ",
+      "scenic": "風景",
+      "warning": "リマインダー",
+      "operation_hint": "運行情報",
+      "custom": "カスタム"
+    },
+    "visibility": {
+      "private": "非公開",
+      "shared": "共有",
+      "public": "公開"
+    },
+    "filter": {
+      "allLines": "すべての路線",
+      "allTypes": "すべての種類",
+      "allVisibility": "すべての公開範囲"
+    },
+    "bulk": {
+      "title": "一括操作",
+      "selectEvent": "イベントを選択",
+      "selectVisible": "表示中を選択",
+      "clearVisible": "表示中を解除",
+      "selectedCount": "{{count}} 件を選択中",
+      "tagsPlaceholder": "選択したイベントにタグを追加",
+      "addTags": "タグを追加",
+      "applyVisibility": "公開範囲を適用",
+      "mergeDuplicates": "重複イベントを統合"
+    },
+    "createSource": {
+      "station": "駅",
+      "map": "地図",
+      "mileage": "キロ程",
+      "trip": "旅程"
+    },
+    "action": {
+      "create": "イベントを作成",
+      "save": "保存",
+      "edit": "編集",
+      "delete": "削除",
+      "viewMap": "地図で見る",
+      "viewRecords": "記録で見る",
+      "copyLink": "リンクをコピー",
+      "exportJson": "JSON をエクスポート",
+      "importJson": "JSON をインポート",
+      "toggleVisibility": "公開範囲を切替",
+      "unlinkTrip": "旅程連携を解除"
+    },
+    "inspector": {
+      "empty": "イベントを選択して詳細を表示",
+      "edit": "イベントを編集",
+      "mileage": "キロ程",
+      "station": "近くの駅",
+      "line": "路線",
+      "time": "時刻",
+      "source": "作成元",
+      "media": "メディア",
+      "createdAt": "作成日時",
+      "updatedAt": "更新日時",
+      "diagnostics": "診断情報"
+    },
+    "quality": {
+      "noTags": "タグはまだありません"
+    },
+    "source": {
+      "station": "駅",
+      "mileage": "キロ程",
+      "map_point": "地図ポイント",
+      "trip_position": "旅程位置"
+    },
+    "projection": {
+      "failedTitle": "投影の確認が必要です",
+      "warningTitle": "投影の注意",
+      "linearTime": "時刻表が紐づいていないため、イベント時刻はキロ程から線形推定しています。",
+      "unknownTime": "このイベントには利用できる時刻表または代替時間範囲がありません。",
+      "missingLine": "保存された路線が現在の鉄道データに見つかりません。",
+      "missingLineData": "保存された路線に利用可能な駅またはキロ程データがありません。",
+      "unsupportedScope": "イベントのキロ程は、ここで読み込まれていない system または pattern に属しています。",
+      "outOfRange": "保存されたキロ程 {{distance}} は読み込み済み路線範囲 {{range}} の外です。",
+      "unresolved": "イベントのキロ程を選択中の旅程パスに一致させられませんでした。",
+      "context": "路線 {{line}} · キロ程 {{distance}}"
+    }
+  },
+  "premium": {
+    "subscribe": "Premium に登録"
   },
   "map": {
     "loadFail": "マップの読み込みに失敗しました ({{domain}})\nネットワークまたは VPN を確認してください",
@@ -381,6 +560,11 @@
     "blog": "ブログ",
     "detail": "詳細"
   },
+  "routeNotFound": "到達可能なルートが見つかりません: {{key}}",
+  "routeSlicePreview": "ルート区間プレビュー",
+  "loadingRoute": "ルートデータを読み込み中: {{key}} ({{start}} - {{end}})...",
+  "parseFail": "ルート区間の描画に失敗しました",
+  "resetView": "表示をリセット",
   "exportRoute": {
     "title": "ルートプレビューをエクスポート",
     "preview": "プレビュー",

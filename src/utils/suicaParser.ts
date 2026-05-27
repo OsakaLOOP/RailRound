@@ -166,8 +166,11 @@ export const processSuicaCSV = async (csvStr: string, railwayData: RailwayMap, e
             let segments: TripSegment[] = [];
             const routeResult = findRoute(inMatch.lineKey, inMatch.stationId, outMatch.lineKey, outMatch.stationId, railwayData, 6);
 
-            if (routeResult && !routeResult.error && routeResult.path) {
-                segments = routeResult.path.map((p: any) => ({
+            const routeSegments = routeResult && !routeResult.error
+                ? (routeResult.segments ?? (routeResult as any).path)
+                : null;
+            if (routeSegments) {
+                segments = routeSegments.map((p: any) => ({
                     id: Date.now().toString() + Math.random().toString(),
                     lineKey: p.lineKey,
                     fromId: p.fromId,

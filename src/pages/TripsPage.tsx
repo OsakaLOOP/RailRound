@@ -12,6 +12,15 @@ import {
   GitMerge,
   Split,
   Repeat,
+  ChevronDown,
+  ChevronUp,
+  Clipboard,
+  Download,
+  Eye,
+  Filter,
+  FileJson,
+  MapPinned,
+  Tag,
 } from "lucide-react";
 import { useStore } from "../store";
 import { DropZone } from "../components/DragContext";
@@ -20,11 +29,27 @@ import { computeLoopVia, getLandmarks } from "../core/railwayRouting";
 import { isMobile } from "react-device-detect";
 import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
+import { useAppNavigation } from "../hooks/useAppNavigation";
 import { LineLogo } from "../components/LineLogo";
 import {
   buildNetworkDisplayModel,
   NetworkMetaEvent,
 } from "../utils/networkDisplay";
+import type { MileageUserEventKind, MileageUserEventVisibility } from "../rail-graph-v1/mileage-event.types";
+import {
+  appStationRef,
+  boundMileageEventForDisplay,
+  buildAppMileageLineContext,
+  formatKm,
+  lineLabel,
+  projectEventsToTrip,
+  searchMileageEvents,
+  tagsFromInput,
+} from "../utils/mileageUserEvents";
+import { EventComposer } from "../components/mileage-events/EventComposer";
+import { EventInspector } from "../components/mileage-events/EventInspector";
+import type { MileageEventListEntry } from "../components/mileage-events/EventList";
+import { eventKindLabel, eventVisibilityLabel, mileageEventKinds, mileageEventVisibilities, timestampLabel } from "../components/mileage-events/display";
 
 const RouteSlice = React.memo(
   ({ segments }: { segments: any[] }) => {
@@ -148,6 +173,7 @@ export const TripsPage: React.FC = () => {
     pins,
     folders,
     badgeSettings,
+    mileageUserEvents,
   } = useStore(
     useShallow((state) => ({
       trips: state.trips,
@@ -157,6 +183,7 @@ export const TripsPage: React.FC = () => {
       pins: state.pins,
       folders: state.folders,
       badgeSettings: state.badgeSettings,
+      mileageUserEvents: state.mileageUserEvents,
     })),
   );
   const setModalState = useStore((state) => state.setModalState);
@@ -165,14 +192,106 @@ export const TripsPage: React.FC = () => {
   const addTrip = useStore((state) => state.addTrip);
   const { saveData } = useUserData();
   const { t } = useTranslation();
+  const { goToTab } = useAppNavigation();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [eventFiltersOpen, setEventFiltersOpen] = useState(false);
+  const [eventDateFrom, setEventDateFrom] = useState("");
+  const [eventDateTo, setEventDateTo] = useState("");
+  const [eventLineKey, setEventLineKey] = useState("");
+  const [eventCompany, setEventCompany] = useState("");
+  const [eventPresence, setEventPresence] = useState<"all" | "with" | "without">("all");
+  const [eventTags, setEventTags] = useState("");
+  const [eventVisibility, setEventVisibility] = useState<MileageUserEventVisibility | "all">("all");
+  const [eventKind, setEventKind] = useState<MileageUserEventKind | "all">("all");
+  const [eventIncompleteOnly, setEventIncompleteOnly] = useState(false);
+  const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
+  const [addingEventTripId, setAddingEventTripId] = useState<string | null>(null);
+  const [selectedTripEventId, setSelectedTripEventId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleRecordEventSelect = (event: Event) => {
+      const customEvent = event as CustomEvent<{ eventId?: string; tripId?: string | number }>;
+      if (!customEvent.detail?.eventId) return;
+      if (customEvent.detail.tripId !== undefined) {
+        setExpandedTripId(String(customEvent.detail.tripId));
+      }
+      setSelectedTripEventId(customEvent.detail.eventId);
+    };
+    window.addEventListener("records:mileage-event:select", handleRecordEventSelect);
+    return () => window.removeEventListener("records:mileage-event:select", handleRecordEventSelect);
+  }, []);
+
+  const lineOptions = useMemo(() => Object.keys(railwayData).sort(), [railwayData]);
+  const companyOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          Object.values(railwayData)
+            .map((line) => line.meta?.company)
+            .filter((company): company is string => Boolean(company)),
+        ),
+      ).sort(),
+    [railwayData],
+  );
+
+  const tripEventEntriesMap = useMemo(() => {
+    const map = new Map<string, MileageEventListEntry[]>();
+    trips.forEach((trip) => {
+      const entries = projectEventsToTrip(mileageUserEvents, railwayData, trip).map((bound) => ({
+        bound,
+        lineContext: boundMileageEventForDisplay(bound.event, railwayData)?.lineContext ?? null,
+      }));
+      map.set(String(trip.id), entries);
+    });
+    return map;
+  }, [mileageUserEvents, railwayData, trips]);
+
+  const filteredEventIds = useMemo(() => {
+    const hasEventSpecificFilters =
+      eventTags.trim() ||
+      eventLineKey ||
+      eventVisibility !== "all" ||
+      eventKind !== "all";
+    if (!hasEventSpecificFilters) return null;
+    return new Set(
+      searchMileageEvents(mileageUserEvents, railwayData, {
+        tags: tagsFromInput(eventTags),
+        lineKey: eventLineKey || undefined,
+        visibility: eventVisibility,
+        kind: eventKind,
+      }).map((event) => event.id),
+    );
+  }, [eventKind, eventLineKey, eventTags, eventVisibility, mileageUserEvents, railwayData]);
 
   // ── Year-month grouping ──
   const yearMonthGroups = useMemo(() => {
     const groups: Record<string, typeof trips> = {};
     trips.forEach((t) => {
+      const tripDate = t.date.slice(0, 10);
+      if (eventDateFrom && tripDate < eventDateFrom) return;
+      if (eventDateTo && tripDate > eventDateTo) return;
+
+      const segments = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
+      if (eventLineKey && !segments.some((seg: any) => seg.lineKey === eventLineKey)) return;
+      if (
+        eventCompany &&
+        !segments.some((seg: any) => railwayData[seg.lineKey]?.meta?.company === eventCompany)
+      ) return;
+
+      const tripEntries = tripEventEntriesMap.get(String(t.id)) ?? [];
+      const matchingEntries = filteredEventIds
+        ? tripEntries.filter((entry) => filteredEventIds.has(entry.bound.event.id))
+        : tripEntries;
+      if (eventPresence === "with" && matchingEntries.length === 0) return;
+      if (eventPresence === "without" && tripEntries.length > 0) return;
+      if (filteredEventIds && matchingEntries.length === 0) return;
+      if (eventIncompleteOnly) {
+        const hasIncompleteSegment = segments.some((seg: any) => !seg.lineKey || !seg.fromId || !seg.toId);
+        if (!hasIncompleteSegment && tripEntries.length > 0) return;
+      }
+
       const ym = t.date.slice(0, 7);
       if (!groups[ym]) groups[ym] = [];
       groups[ym].push(t);
@@ -187,7 +306,18 @@ export const TripsPage: React.FC = () => {
         trips: g,
       }))
       .sort((a, b) => b.yearMonth.localeCompare(a.yearMonth));
-  }, [trips]);
+  }, [
+    eventCompany,
+    eventDateFrom,
+    eventDateTo,
+    eventIncompleteOnly,
+    eventLineKey,
+    eventPresence,
+    filteredEventIds,
+    railwayData,
+    tripEventEntriesMap,
+    trips,
+  ]);
 
   // ── Scroll-spy shared state ──
   const [currentYearMonth, setCurrentYearMonth] = useState<string | null>(null);
@@ -427,6 +557,563 @@ export const TripsPage: React.FC = () => {
     return <ArrowRightLeft size={12} className="text-gray-400" />;
   };
 
+  const tripLineSummary = (trip: (typeof trips)[number]) => {
+    const segments = trip.segments || [
+      { lineKey: trip.lineKey, fromId: trip.fromId, toId: trip.toId },
+    ];
+    const names = Array.from(
+      new Set(
+        segments
+          .map((segment: any) => segment.lineKey)
+          .filter(Boolean)
+          .map((key: string) => lineLabel(key)),
+      ),
+    );
+    if (names.length === 0) return t("mileageEvents.unknown", "Unknown");
+    return names.length > 2 ? `${names.slice(0, 2).join(" / ")} +${names.length - 2}` : names.join(" / ");
+  };
+
+  const tripEventEntries = (trip: (typeof trips)[number]) => {
+    const entries = tripEventEntriesMap.get(String(trip.id)) ?? [];
+    return filteredEventIds
+      ? entries.filter((entry) => filteredEventIds.has(entry.bound.event.id))
+      : entries;
+  };
+
+  const copyTripEventSummary = async (trip: (typeof trips)[number], entries: MileageEventListEntry[]) => {
+    const lines = [
+      `# ${trip.date} ${tripLineSummary(trip)}`,
+      "",
+      ...entries.map(
+        (entry) =>
+          `- ${formatKm(entry.bound.distanceMetersFromRunStart)} ${entry.bound.event.title}${
+            entry.bound.event.tags?.length ? ` #${entry.bound.event.tags.join(" #")}` : ""
+          }`,
+      ),
+    ];
+    await navigator.clipboard?.writeText(lines.join("\n")).catch(() => undefined);
+  };
+
+  const exportTripEvents = (trip: (typeof trips)[number], entries: MileageEventListEntry[], format: "json" | "mdx") => {
+    const baseName = `railloop_trip_events_${String(trip.id).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
+    const content =
+      format === "json"
+        ? JSON.stringify({ trip, mileageEvents: entries.map((entry) => entry.bound.event) }, null, 2)
+        : [
+            `# ${trip.date} ${tripLineSummary(trip)}`,
+            "",
+            ...entries.map(
+              (entry) =>
+                `- **${formatKm(entry.bound.distanceMetersFromRunStart)}** ${entry.bound.event.title}${
+                  entry.bound.event.body ? `: ${entry.bound.event.body}` : ""
+                }`,
+            ),
+            "",
+          ].join("\n");
+    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${baseName}.${format === "json" ? "json" : "mdx"}`;
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 0);
+  };
+
+  const selectTripEvent = (eventId: string) => {
+    setSelectedTripEventId(eventId);
+    window.dispatchEvent(
+      new CustomEvent("mileage-event:select", {
+        detail: { eventId },
+      }),
+    );
+  };
+
+  const focusTripEventOnMap = (entry: MileageEventListEntry) => {
+    selectTripEvent(entry.bound.event.id);
+    goToTab("map");
+    window.setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent("mileage-event:select", {
+          detail: { eventId: entry.bound.event.id },
+        }),
+      );
+      if (!entry.bound.coordinates) return;
+      window.dispatchEvent(
+        new CustomEvent("map:fly-to-location", {
+          detail: {
+            lat: entry.bound.coordinates[1],
+            lng: entry.bound.coordinates[0],
+            zoom: 15,
+          },
+        }),
+      );
+    }, 150);
+  };
+
+  const tripReplayItems = (trip: (typeof trips)[number], entries: MileageEventListEntry[]) => {
+    const segments = trip.segments?.length
+      ? trip.segments
+      : [{ id: "legacy", lineKey: trip.lineKey || "", fromId: trip.fromId || "", toId: trip.toId || "" }];
+    const items: Array<
+      | {
+          id: string;
+          kind: "boundary";
+          role: "departure" | "transfer" | "arrival";
+          distanceMeters: number;
+          stationName: string;
+          lineName: string;
+        }
+      | {
+          id: string;
+          kind: "event";
+          distanceMeters: number;
+          entry: MileageEventListEntry;
+        }
+    > = [];
+    let cursor = 0;
+
+    segments.forEach((segment: any, index: number) => {
+      const line = railwayData[segment.lineKey];
+      const fromStation = line?.stations.find((station) => station.id === segment.fromId);
+      const toStation = line?.stations.find((station) => station.id === segment.toId);
+      const lineName = segment.lineKey ? lineLabel(segment.lineKey) : "-";
+      const fromName = fromStation?.name_ja || segment.fromId || t("mileageEvents.unknown", "Unknown");
+      const toName = toStation?.name_ja || segment.toId || t("mileageEvents.unknown", "Unknown");
+      const lineContext = segment.lineKey ? buildAppMileageLineContext(railwayData, segment.lineKey) : null;
+      const fromMileage = lineContext?.context.stationMileage[appStationRef(segment.lineKey, segment.fromId)];
+      const toMileage = lineContext?.context.stationMileage[appStationRef(segment.lineKey, segment.toId)];
+      const segmentMeters = fromMileage && toMileage ? Math.abs(toMileage.distanceMeters - fromMileage.distanceMeters) : 0;
+
+      items.push({
+        id: `boundary:${index}:start`,
+        kind: "boundary",
+        role: index === 0 ? "departure" : "transfer",
+        distanceMeters: cursor,
+        stationName: fromName,
+        lineName,
+      });
+
+      cursor += segmentMeters;
+
+      if (index === segments.length - 1) {
+        items.push({
+          id: `boundary:${index}:end`,
+          kind: "boundary",
+          role: "arrival",
+          distanceMeters: cursor,
+          stationName: toName,
+          lineName,
+        });
+      }
+    });
+
+    entries.forEach((entry) => {
+      items.push({
+        id: `event:${entry.bound.event.id}`,
+        kind: "event",
+        distanceMeters: entry.bound.distanceMetersFromRunStart,
+        entry,
+      });
+    });
+
+    const order = { departure: 0, transfer: 1, event: 2, arrival: 3 };
+    return items.sort((left, right) => {
+      const leftOrder = left.kind === "boundary" ? order[left.role] : order.event;
+      const rightOrder = right.kind === "boundary" ? order[right.role] : order.event;
+      return left.distanceMeters - right.distanceMeters || leftOrder - rightOrder || left.id.localeCompare(right.id);
+    });
+  };
+
+  const boundaryRoleLabel = (role: "departure" | "transfer" | "arrival") => {
+    if (role === "departure") return t("tripsPage.eventCenter.departure", "Departure");
+    if (role === "arrival") return t("tripsPage.eventCenter.arrival", "Arrival");
+    return t("tripsPage.eventCenter.transfer", "Transfer");
+  };
+
+  const renderTripEventCenter = (trip: (typeof trips)[number]) => {
+    const tripId = String(trip.id);
+    const entries = tripEventEntries(trip);
+    const allEntries = tripEventEntriesMap.get(tripId) ?? [];
+    const replayItems = tripReplayItems(trip, entries);
+    const isExpanded = expandedTripId === tripId;
+    const selectedEvent =
+      selectedTripEventId && entries.some((entry) => entry.bound.event.id === selectedTripEventId)
+        ? mileageUserEvents.find((event) => event.id === selectedTripEventId) ?? null
+        : null;
+
+    return (
+      <div className="mt-3 border-t border-gray-100 pt-3" onClick={(event) => event.stopPropagation()}>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-3 rounded-md bg-slate-50 px-2 py-2 text-left hover:bg-slate-100"
+          onClick={() => setExpandedTripId(isExpanded ? null : tripId)}
+        >
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+              <MapPinned size={14} className="text-emerald-600" />
+              {t("tripsPage.eventCenter.summary", "{{count}} events", { count: allEntries.length })}
+              {filteredEventIds && allEntries.length !== entries.length && (
+                <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700">
+                  {t("tripsPage.eventCenter.filteredCount", "{{count}} shown", { count: entries.length })}
+                </span>
+              )}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {entries.slice(0, 3).map((entry) => (
+                <span
+                  key={entry.bound.event.id}
+                  className="max-w-[12rem] truncate rounded bg-white px-1.5 py-0.5 text-[10px] text-slate-500"
+                >
+                  {formatKm(entry.bound.distanceMetersFromRunStart)} · {entry.bound.event.title}
+                </span>
+              ))}
+              {entries.length === 0 && (
+                <span className="text-[11px] text-slate-400">
+                  {t("tripsPage.eventCenter.noEvents", "No mileage events")}
+                </span>
+              )}
+            </div>
+          </div>
+          {isExpanded ? <ChevronUp size={16} className="shrink-0 text-slate-400" /> : <ChevronDown size={16} className="shrink-0 text-slate-400" />}
+        </button>
+
+        {isExpanded && (
+          <div className="mt-3 space-y-3 rounded-md border border-slate-200 bg-white p-3">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded bg-slate-50 p-2">
+                <div className="text-[10px] font-semibold uppercase text-slate-400">
+                  {t("tripsPage.eventCenter.trip", "Trip")}
+                </div>
+                <div className="mt-0.5 font-medium text-slate-700">{trip.date}</div>
+              </div>
+              <div className="rounded bg-slate-50 p-2">
+                <div className="text-[10px] font-semibold uppercase text-slate-400">
+                  {t("tripsPage.eventCenter.lines", "Lines")}
+                </div>
+                <div className="mt-0.5 truncate font-medium text-slate-700">{tripLineSummary(trip)}</div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              {(trip.segments || [{ lineKey: trip.lineKey, fromId: trip.fromId, toId: trip.toId }]).map((segment: any, index: number) => {
+                const line = railwayData[segment.lineKey];
+                const from = line?.stations.find((station) => station.id === segment.fromId)?.name_ja || segment.fromId;
+                const to = line?.stations.find((station) => station.id === segment.toId)?.name_ja || segment.toId;
+                return (
+                  <div key={`${segment.lineKey}_${segment.fromId}_${segment.toId}_${index}`} className="flex items-center gap-2 text-[11px] text-slate-500">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <span className="font-semibold text-slate-600">{segment.lineKey ? lineLabel(segment.lineKey) : "-"}</span>
+                    <span>{from}</span>
+                    <span className="text-slate-300">→</span>
+                    <span>{to}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                onClick={() => setAddingEventTripId(addingEventTripId === tripId ? null : tripId)}
+              >
+                <Plus size={13} />
+                {t("tripsPage.eventCenter.add", "Add event")}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                onClick={() => copyTripEventSummary(trip, entries)}
+              >
+                <Clipboard size={13} />
+                {t("tripsPage.eventCenter.copy", "Copy summary")}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                onClick={() => exportTripEvents(trip, entries, "json")}
+              >
+                <FileJson size={13} />
+                JSON
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                onClick={() => exportTripEvents(trip, entries, "mdx")}
+              >
+                <Download size={13} />
+                MDX
+              </button>
+            </div>
+
+            {addingEventTripId === tripId && (
+              <div className="rounded-md border border-emerald-100 bg-emerald-50/40 p-2">
+                <EventComposer
+                  defaultSource="trip"
+                  defaultTripId={trip.id}
+                  compact
+                  onSaved={(event) => {
+                    setAddingEventTripId(null);
+                    selectTripEvent(event.id);
+                  }}
+                  onCancel={() => setAddingEventTripId(null)}
+                />
+              </div>
+            )}
+
+            <div className="rounded-md border border-slate-200 bg-slate-50/60 p-2">
+              <div className="mb-2 flex items-center justify-between gap-2 px-1 text-xs">
+                <div className="font-semibold text-slate-700">
+                  {t("tripsPage.eventCenter.replay", "Trip replay")}
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  {t("tripsPage.eventCenter.sortedByMileage", "Sorted by trip mileage")}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {replayItems.map((item) => {
+                  if (item.kind === "boundary") {
+                    return (
+                      <div key={item.id} className="grid grid-cols-[4.5rem_1rem_minmax(0,1fr)] gap-2 text-xs">
+                        <div className="pt-1 text-right font-mono text-[11px] text-slate-400">
+                          {formatKm(item.distanceMeters)}
+                        </div>
+                        <div className="flex justify-center pt-1">
+                          <span className="h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm" />
+                        </div>
+                        <div className="rounded-md border border-slate-200 bg-white px-2 py-1.5">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                              {boundaryRoleLabel(item.role)}
+                            </span>
+                            <span className="truncate font-semibold text-slate-700">{item.stationName}</span>
+                          </div>
+                          <div className="mt-0.5 truncate text-[11px] text-slate-400">{item.lineName}</div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const event = item.entry.bound.event;
+                  const selected = selectedTripEventId === event.id;
+                  return (
+                    <div key={item.id} className="grid grid-cols-[4.5rem_1rem_minmax(0,1fr)] gap-2 text-xs">
+                      <div className="pt-2 text-right font-mono text-[11px] text-slate-500">
+                        {formatKm(item.distanceMeters)}
+                      </div>
+                      <div className="flex justify-center pt-2">
+                        <span className={`h-2.5 w-2.5 rounded-full border-2 border-white shadow-sm ${selected ? "bg-emerald-600" : "bg-slate-400"}`} />
+                      </div>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className={`min-w-0 rounded-md border px-2 py-1.5 text-left transition ${
+                          selected
+                            ? "border-emerald-300 bg-emerald-50"
+                            : "border-slate-200 bg-white hover:border-slate-300"
+                        }`}
+                        onClick={() => selectTripEvent(event.id)}
+                        onKeyDown={(keyEvent) => {
+                          if (keyEvent.key === "Enter" || keyEvent.key === " ") {
+                            keyEvent.preventDefault();
+                            selectTripEvent(event.id);
+                          }
+                        }}
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="shrink-0 rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                            {eventKindLabel(event.kind, t)}
+                          </span>
+                          <span className="truncate font-semibold text-slate-800">{event.title}</span>
+                          <button
+                            type="button"
+                            className="ml-auto shrink-0 rounded p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-700"
+                            onClick={(clickEvent) => {
+                              clickEvent.stopPropagation();
+                              focusTripEventOnMap(item.entry);
+                            }}
+                            title={t("mileageEvents.action.viewMap", "View map")}
+                          >
+                            <MapPinned size={13} />
+                          </button>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+                          <span>{timestampLabel(item.entry.bound.timestampInference, item.entry.bound.timestamp, t)}</span>
+                          {event.tags?.slice(0, 3).map((tag) => (
+                            <span key={tag} className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                              <Tag size={10} />
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                        {event.body && <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-slate-600">{event.body}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {selectedEvent && (
+              <EventInspector
+                event={selectedEvent}
+                onClose={() => setSelectedTripEventId(null)}
+                onDeleted={() => setSelectedTripEventId(null)}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderTripEventFilters = () => (
+    <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Filter size={15} className="shrink-0 text-emerald-600" />
+          <div className="min-w-0">
+            <div className="text-xs font-bold text-slate-700">
+              {t("tripsPage.eventFilters.title", "Trip event filters")}
+            </div>
+            <div className="truncate text-[11px] text-slate-400">
+              {t("tripsPage.eventFilters.desc", "Filter trips by event, line, date, tag and quality")}
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="rounded-md border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+          onClick={() => setEventFiltersOpen((value) => !value)}
+        >
+          {eventFiltersOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+      </div>
+
+      {eventFiltersOpen && (
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          <label className="block text-xs font-medium text-slate-600">
+            {t("tripsPage.eventFilters.dateFrom", "Date from")}
+            <input
+              type="date"
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              value={eventDateFrom}
+              onChange={(event) => setEventDateFrom(event.target.value)}
+            />
+          </label>
+          <label className="block text-xs font-medium text-slate-600">
+            {t("tripsPage.eventFilters.dateTo", "Date to")}
+            <input
+              type="date"
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              value={eventDateTo}
+              onChange={(event) => setEventDateTo(event.target.value)}
+            />
+          </label>
+          <label className="block text-xs font-medium text-slate-600">
+            {t("mileageEvents.line", "Line")}
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              value={eventLineKey}
+              onChange={(event) => setEventLineKey(event.target.value)}
+            >
+              <option value="">{t("mileageEvents.filter.allLines", "All lines")}</option>
+              {lineOptions.map((key) => (
+                <option key={key} value={key}>
+                  {lineLabel(key)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-xs font-medium text-slate-600">
+            {t("tripsPage.eventFilters.company", "Company")}
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              value={eventCompany}
+              onChange={(event) => setEventCompany(event.target.value)}
+            >
+              <option value="">{t("tripsPage.eventFilters.allCompanies", "All companies")}</option>
+              {companyOptions.map((company) => (
+                <option key={company} value={company}>
+                  {company}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-xs font-medium text-slate-600">
+            {t("tripsPage.eventFilters.presence", "Event status")}
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              value={eventPresence}
+              onChange={(event) => setEventPresence(event.target.value as typeof eventPresence)}
+            >
+              <option value="all">{t("tripsPage.eventFilters.allTrips", "All trips")}</option>
+              <option value="with">{t("tripsPage.eventFilters.withEvents", "With events")}</option>
+              <option value="without">{t("tripsPage.eventFilters.withoutEvents", "Without events")}</option>
+            </select>
+          </label>
+          <label className="block text-xs font-medium text-slate-600">
+            <span className="inline-flex items-center gap-1">
+              <Tag size={12} />
+              {t("mileageEvents.tags", "Tags")}
+            </span>
+            <input
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              value={eventTags}
+              onChange={(event) => setEventTags(event.target.value)}
+              placeholder={t("mileageEvents.tagsPlaceholder", "Tags, separated by comma")}
+            />
+          </label>
+          <label className="block text-xs font-medium text-slate-600">
+            {t("mileageEvents.type", "Type")}
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              value={eventKind}
+              onChange={(event) => setEventKind(event.target.value as typeof eventKind)}
+            >
+              <option value="all">{t("mileageEvents.filter.allTypes", "All types")}</option>
+              {mileageEventKinds.map((kind) => (
+                <option key={kind} value={kind}>
+                  {eventKindLabel(kind, t)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-xs font-medium text-slate-600">
+            <span className="inline-flex items-center gap-1">
+              <Eye size={12} />
+              {t("mileageEvents.visibilityLabel", "Visibility")}
+            </span>
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              value={eventVisibility}
+              onChange={(event) => setEventVisibility(event.target.value as typeof eventVisibility)}
+            >
+              <option value="all">{t("mileageEvents.filter.allVisibility", "All visibility")}</option>
+              {mileageEventVisibilities.map((visibility) => (
+                <option key={visibility} value={visibility}>
+                  {eventVisibilityLabel(visibility, t)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-xs font-medium text-slate-600">
+            <input
+              type="checkbox"
+              checked={eventIncompleteOnly}
+              onChange={(event) => setEventIncompleteOnly(event.target.checked)}
+            />
+            {t("tripsPage.eventFilters.incompleteOnly", "Only incomplete records")}
+          </label>
+        </div>
+      )}
+    </div>
+  );
+
   const renderTripCard = (
     trip: (typeof trips)[number],
     isFirstInMonth: boolean,
@@ -472,7 +1159,7 @@ export const TripsPage: React.FC = () => {
       return (
         <div
           key={trip.id}
-
+          id={`trip-${String(trip.id)}`}
           data-year-month={isFirstInMonth ? trip.date.slice(0, 7) : undefined}
           className={`${cls.bg} p-4 rounded-lg border ${cls.border} shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-pointer`}
           onClick={() => useStore.getState().startEditingWalkTrip(trip)}
@@ -535,6 +1222,7 @@ export const TripsPage: React.FC = () => {
     return (
       <div
         key={trip.id}
+        id={`trip-${String(trip.id)}`}
         data-year-month={isFirstInMonth ? trip.date.slice(0, 7) : undefined}
         className="bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1"
       >
@@ -738,6 +1426,7 @@ export const TripsPage: React.FC = () => {
             {trip.memo}
           </div>
         )}
+        {renderTripEventCenter(trip)}
       </div>
     );
   };
@@ -751,6 +1440,7 @@ export const TripsPage: React.FC = () => {
       >
         {/* Top spacer — provides initial visual padding; scrolled away when header freezes */}
         <div className="h-4 shrink-0" />
+        {trips.length > 0 && renderTripEventFilters()}
         {trips.length === 0 ? (
           <div className="text-center text-gray-400 py-10 flex flex-col items-center justify-center flex-1">
             <Train size={48} className="opacity-20 mb-4" />
@@ -879,7 +1569,7 @@ export const TripsPage: React.FC = () => {
 import { ArrowUp, ArrowDown } from "lucide-react";
 
 export const FloatingActionButtons: React.FC<{
-  fileInputRef: React.RefObject<HTMLInputElement>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   handleImportSuica: (event: React.ChangeEvent<HTMLInputElement>) => void;
   startEditingTrip: (data?: any) => void;
   alwaysVisible?: boolean;

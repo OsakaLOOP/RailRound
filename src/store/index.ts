@@ -144,6 +144,8 @@ export interface TripSegment {
     lineKey: LineKey;
     fromId: StationId;
     toId: StationId;
+    line?: string;
+    destination?: string;
     direction?: 'up' | 'down';
     loopVia?: 'up' | 'down' | 'auto';
     isAlt?: boolean;
@@ -345,6 +347,7 @@ export interface GlobalStore {
     currentTripForExport: Trip | null;
     githubRegToken: string | null;
     isSubscribeOpen: boolean;
+    isGlobalSearchOpen: boolean;
   };
   setModalState: (updates: Partial<GlobalStore['modals']>) => void;
 }
@@ -497,6 +500,7 @@ export const useStore = create<GlobalStore>()(
         currentTripForExport: null,
         githubRegToken: null,
         isSubscribeOpen: false,
+        isGlobalSearchOpen: false,
       },
       setModalState: (updates) => set((state) => ({ modals: { ...state.modals, ...updates } })),
     }),

@@ -18,3 +18,13 @@
 - ✅ place query projects place to mileage before matching
 - ✅ time query projects time range to mileage range
 - ✅ time query exposes inference diagnostics or timestamps
+- ✅ app wrapper fixture builds line context
+- ✅ app create wrappers produce mileage-only events
+- ✅ app create wrappers do not persist station anchor as primary event state
+- ✅ app queryEventsByMileage wrapper returns line events
+- ✅ app queryEventsNearPlace wrapper resolves place before matching
+- ✅ app queryEventsByTime wrapper uses linear fallback
+- ✅ app queryEventsByTime wrapper exposes timestamp inference
+- ✅ app projectEventsToTrip wrapper keeps trip mileage order
+- ✅ app queryEventsByTrip aliases trip projection
+- ✅ app queryEventsByText wrapper supports text and tag filters

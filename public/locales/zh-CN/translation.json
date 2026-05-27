@@ -110,7 +110,23 @@
     "topLines": "常乘路线排行",
     "footerStats": "加载了 {{companies}} 家公司，{{lines}} 条线路，{{stations}} 个站点。",
     "moreDetails": "更多详情, 参见",
-    "userGuide": "用户指南"
+    "userGuide": "用户指南",
+    "eventStats": {
+      "title": "里程事件统计",
+      "total": "事件",
+      "quality": "质量问题",
+      "tags": "标签",
+      "noTags": "暂无标签",
+      "topPlaces": "常用线路",
+      "noLines": "暂无线路事件",
+      "types": "类型",
+      "visibility": "可见性",
+      "qualityHints": "记录质量提示",
+      "noTagsCount": "无标签",
+      "unlinkedTripCount": "未关联行程",
+      "estimatedTimeCount": "估算时间",
+      "unstableProjectionCount": "投影问题"
+    }
   },
   "tripsPage": {
     "noPreview": "无预览",
@@ -131,15 +147,62 @@
     "allExist": "解析完成，但所有记录（{{count}}条）已存在，无需重复导入。",
     "noImport": "未找到可导入的行程，或者解析失败。",
     "readError": "读取或解析文件出错。",
-    "parsingSuica": "解析 Suica CSV 数据..."
+    "parsingSuica": "解析 Suica CSV 数据...",
+    "destination": "行先",
+    "event": {
+      "transfer": {
+        "alight": "下车换乘",
+        "through": "不下车接续",
+        "required": "需换乘",
+        "notRequired": "无需换乘"
+      },
+      "reverse_operation": "换向作业",
+      "formation_operation": "编组作业",
+      "service_class_switch": "车种行先切换",
+      "other": "运行事件",
+      "autoCompleted": "自动补全事件"
+    },
+    "eventCenter": {
+      "summary": "{{count}} 个事件",
+      "filteredCount": "显示 {{count}} 个",
+      "noEvents": "没有里程事件",
+      "trip": "行程",
+      "lines": "线路",
+      "add": "添加事件",
+      "copy": "复制摘要",
+      "empty": "本次行程没有事件",
+      "replay": "行程回放",
+      "sortedByMileage": "按行程里程排序",
+      "departure": "出发",
+      "transfer": "换乘",
+      "arrival": "到达"
+    },
+    "eventFilters": {
+      "title": "行程事件筛选",
+      "desc": "按事件、线路、日期、标签和质量筛选行程",
+      "dateFrom": "开始日期",
+      "dateTo": "结束日期",
+      "company": "公司",
+      "allCompanies": "全部公司",
+      "presence": "事件状态",
+      "allTrips": "全部行程",
+      "withEvents": "有事件",
+      "withoutEvents": "无事件",
+      "incompleteOnly": "仅待补全记录"
+    }
   },
   "search": {
     "close": "关闭",
-    "placeholder": "搜索线路或车站...",
-    "instruction": "输入线路名或车站名进行搜索",
+    "open": "打开搜索",
+    "placeholder": "搜索线路、车站、行程、事件或标签...",
+    "instruction": "输入线路、车站、行程、事件或标签进行搜索",
     "noResult": "没有找到相关结果",
     "lines": "线路",
-    "stations": "车站"
+    "stations": "车站",
+    "events": "事件",
+    "trips": "行程",
+    "tags": "标签",
+    "tagCount": "{{count}} 个事件"
   },
   "walk": {
     "noStartEnd": "缺少起止点",
@@ -188,7 +251,8 @@
     "allRegions": "全部地域",
     "noRegion": "无地域分类",
     "noResult": "无符合条件的线路",
-    "cnMainlandEnt": "中国大陆入口"
+    "cnMainlandEnt": "中国大陆入口",
+    "systemsLabel": "系统"
   },
   "githubReg": {
     "title": "完成注册",
@@ -259,7 +323,8 @@
     "saveFail": "云端保存失败: ",
     "disconnected": "起始站与上一程终点不相连",
     "disconnectTitle": "行程断连提示",
-    "disconnectMsg": "检测到中间存在不相连的独立行程段，强行保存可能会破坏结构。确定要保存吗？"
+    "disconnectMsg": "检测到中间存在不相连的独立行程段，强行保存可能会破坏结构。确定要保存吗？",
+    "autoTransferFilled": "已自动补全换乘事件：{{count}} 处"
   },
   "app": {
     "fetchRemote": "正在获取远端数据... (10%)",
@@ -326,22 +391,136 @@
   "mileageEvents": {
     "open": "里程事件",
     "title": "里程事件",
+    "panelSubtitle": "沿里程轴搜索、投影和编辑事件",
     "timeline": "沿线",
     "place": "地点",
     "time": "时间",
+    "create": "创建",
     "line": "线路",
     "station": "车站",
+    "radius": "半径",
     "distanceKm": "里程 km",
     "fromTime": "开始",
     "toTime": "结束",
+    "fromKm": "起点 km",
+    "toKm": "终点 km",
     "titlePlaceholder": "标题",
     "bodyPlaceholder": "备注",
     "addAtStation": "按地点添加",
     "addAtMileage": "按里程添加",
     "empty": "没有匹配的里程事件",
+    "emptyPlace": "这个地点附近没有事件",
+    "emptyTime": "这个时间窗口内没有事件",
     "defaultTitle": "里程事件",
     "timeUnknown": "时间未绑定",
-    "linear": "估算"
+    "linear": "估算",
+    "type": "类型",
+    "visibilityLabel": "可见性",
+    "tags": "标签",
+    "tagsPlaceholder": "标签，用逗号分隔",
+    "mediaPlaceholder": "照片 URL 或附件占位",
+    "linkedTrip": "关联行程",
+    "noLinkedTrip": "未关联行程",
+    "trip": "行程",
+    "latestTrip": "最近行程",
+    "position": "位置",
+    "totalMileage": "线路范围",
+    "mapPointReady": "当前地图点将投影到里程。",
+    "mapPointMissing": "请先点击地图或使用当前地图中心。",
+    "searchPlaceholder": "搜索事件、行程、线路、车站、标签",
+    "advancedFilters": "高级筛选",
+    "searchCount": "{{count}} 个事件",
+    "selectedEmpty": "从事件列表或地图标记选择事件，即可打开同步详情面板。",
+    "markerCluster": "{{count}} 个事件",
+    "useMapCenter": "使用地图中心",
+    "convertPins": "转换图钉",
+    "legacyPinTitle": "导入的地图图钉",
+    "unknown": "未知",
+    "deleteConfirm": "删除这个里程事件？",
+    "kind": {
+      "user_note": "备注",
+      "scenic": "风景",
+      "warning": "提醒",
+      "operation_hint": "运营提示",
+      "custom": "自定义"
+    },
+    "visibility": {
+      "private": "私有",
+      "shared": "共享",
+      "public": "公开"
+    },
+    "filter": {
+      "allLines": "全部线路",
+      "allTypes": "全部类型",
+      "allVisibility": "全部可见性"
+    },
+    "bulk": {
+      "title": "批量操作",
+      "selectEvent": "选择事件",
+      "selectVisible": "选择当前结果",
+      "clearVisible": "取消当前结果",
+      "selectedCount": "已选择 {{count}} 个",
+      "tagsPlaceholder": "给已选事件添加标签",
+      "addTags": "添加标签",
+      "applyVisibility": "应用可见性",
+      "mergeDuplicates": "合并重复事件"
+    },
+    "createSource": {
+      "station": "车站",
+      "map": "地图",
+      "mileage": "里程",
+      "trip": "行程"
+    },
+    "action": {
+      "create": "创建事件",
+      "save": "保存",
+      "edit": "编辑",
+      "delete": "删除",
+      "viewMap": "在地图查看",
+      "viewRecords": "在记录查看",
+      "copyLink": "复制链接",
+      "exportJson": "导出 JSON",
+      "importJson": "导入 JSON",
+      "toggleVisibility": "切换可见性",
+      "unlinkTrip": "取消关联行程"
+    },
+    "inspector": {
+      "empty": "选择一个事件查看详情",
+      "edit": "编辑事件",
+      "mileage": "里程",
+      "station": "附近车站",
+      "line": "线路",
+      "time": "时间",
+      "source": "来源",
+      "media": "媒体",
+      "createdAt": "创建时间",
+      "updatedAt": "更新时间",
+      "diagnostics": "诊断信息"
+    },
+    "quality": {
+      "noTags": "还没有标签"
+    },
+    "source": {
+      "station": "车站",
+      "mileage": "里程",
+      "map_point": "地图点",
+      "trip_position": "行程位置"
+    },
+    "projection": {
+      "failedTitle": "投影需要处理",
+      "warningTitle": "投影提示",
+      "linearTime": "未绑定时刻表，事件时间按里程线性估算。",
+      "unknownTime": "这个事件没有可用的时刻表或兜底时间范围。",
+      "missingLine": "当前铁路数据中找不到事件保存的线路。",
+      "missingLineData": "事件保存的线路缺少可用站点或里程数据。",
+      "unsupportedScope": "事件里程属于当前未加载的系统或 pattern。",
+      "outOfRange": "保存的里程 {{distance}} 超出当前线路范围 {{range}}。",
+      "unresolved": "事件里程无法匹配到当前行程路径。",
+      "context": "线路 {{line}} · 里程 {{distance}}"
+    }
+  },
+  "premium": {
+    "subscribe": "订阅 Premium"
   },
   "map": {
     "loadFail": "地图加载失败 ({{domain}})\n请检查网络或切换 VPN 节点",

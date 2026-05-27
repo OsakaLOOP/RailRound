@@ -203,8 +203,9 @@ export const TripEditor: React.FC = () => {
                 }
             }
             else {
-                if (result.segments.length > 20) { setIsRouteSearching(false); showAlert(t("tripEdit.pathTooLong", "路径过长"), '', 'warning'); return; }
-                setForm({ segments: result.segments });
+                const resultSegments = result.segments ?? [];
+                if (resultSegments.length > 20) { setIsRouteSearching(false); showAlert(t("tripEdit.pathTooLong", "路径过长"), '', 'warning'); return; }
+                setForm({ segments: resultSegments });
                 setEditorMode(EditorMode.Manual);
                 setTimeout(() => setIsRouteSearching(false), 200);
             }
@@ -287,7 +288,7 @@ export const TripEditor: React.FC = () => {
             }
         }
 
-        const newSegs = [...currentSegments, { id: Date.now().toString(), lineKey: '', fromId: '', toId: '', loopVia: 'auto' }];
+        const newSegs = [...currentSegments, { id: Date.now().toString(), lineKey: '', fromId: '', toId: '', loopVia: 'auto' as const }];
         setForm({ segments: newSegs });
 
         // Auto open the line selector for the newly added segment

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Train, LogOut, User, Download, Upload, Building2, FilePlus, Star } from 'lucide-react';
+import { Train, LogOut, User, Download, Upload, Building2, FilePlus, Star, Search } from 'lucide-react';
 import { useStore } from '../../store';
 import { VersionBadge } from '../VersionBadge';
 import { PremiumBadge } from '../PremiumBadge';
@@ -32,6 +32,13 @@ export const Header: React.FC<{
                 <VersionBadge version={CURRENT_VERSION} />
             </div>
             <div className="flex items-center gap-2">
+                <button
+                    onClick={() => setModalState({ isGlobalSearchOpen: true })}
+                    className="bg-slate-800 hover:bg-slate-700 p-2 rounded text-xs flex items-center gap-1 transition"
+                    title={t('search.open', 'Search')}
+                >
+                    <Search size={14}/><span className="hidden sm:inline">{t('common.search', 'Search')}</span>
+                </button>
                 {user ? (
                    <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-300 hidden sm:inline">{t('header.welcome', '欢迎, {{name}}', { name: user.username })}</span>

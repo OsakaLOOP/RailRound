@@ -132,6 +132,137 @@
 .pin-content.dragging { transform: rotate(45deg) scale(1.2); box-shadow: 4px 4px 12px rgba(0,0,0,0.5); cursor: grabbing; }
 .pin-icon { transform: rotate(-45deg); color: white; }
 
+.mileage-event-marker-shell {
+  background: transparent;
+  border: none;
+}
+
+.mileage-event-marker {
+  --event-size: 24px;
+  --event-color: #059669;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--event-size);
+  height: var(--event-size);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.9), transparent 32%),
+    var(--event-color);
+  border: 2px solid rgba(255,255,255,0.96);
+  box-shadow:
+    0 10px 24px rgba(15,23,42,0.22),
+    0 0 0 1px rgba(15,23,42,0.08);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  transform: translateZ(0) scale(1);
+  transition:
+    transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 160ms ease,
+    filter 160ms ease;
+  animation: mileage-marker-enter 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mileage-event-marker::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--event-color) 25%, transparent);
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.mileage-event-marker::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--event-color) 45%, white);
+  opacity: 0.7;
+}
+
+.mileage-event-marker-core {
+  position: relative;
+  z-index: 1;
+  min-width: 1ch;
+}
+
+.mileage-event-marker.is-single .mileage-event-marker-core {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.35);
+}
+
+.mileage-event-marker.is-cluster {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--event-color) 90%, white), color-mix(in srgb, var(--event-color) 78%, #0f172a)),
+    var(--event-color);
+}
+
+.mileage-event-marker.is-mixed {
+  background:
+    repeating-linear-gradient(135deg, var(--event-color) 0 7px, color-mix(in srgb, var(--event-color) 62%, #0f172a) 7px 14px);
+}
+
+.mileage-event-marker.is-selected {
+  transform: translateZ(0) scale(1.18);
+  box-shadow:
+    0 14px 30px rgba(15,23,42,0.28),
+    0 0 0 4px rgba(16,185,129,0.22),
+    0 0 0 1px rgba(255,255,255,0.96);
+}
+
+.mileage-event-marker.is-selected::before {
+  opacity: 1;
+  transform: scale(1);
+  animation: mileage-marker-pulse 1.6s ease-out infinite;
+}
+
+.mileage-event-marker:hover {
+  filter: saturate(1.08);
+  transform: translateZ(0) scale(1.14);
+  box-shadow:
+    0 16px 34px rgba(15,23,42,0.3),
+    0 0 0 4px rgba(255,255,255,0.58);
+}
+
+.mileage-event-tooltip {
+  border: 1px solid rgba(15,23,42,0.08);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(15,23,42,0.16);
+  color: #0f172a;
+  font-weight: 700;
+}
+
+@keyframes mileage-marker-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes mileage-marker-pulse {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.82);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.75);
+  }
+}
+
 .company-logo-sm { height: 1.5em; width: auto; object-fit: contain; margin-right: 6px; }
 
 /* 新干线过场动画 - 极速通过版 */

@@ -28,9 +28,22 @@ import {
   resolvePlaceToMileage,
   type MileageQueryResult,
 } from "../rail-graph-v1/mileage-events";
+import {
+  appStationRef,
+  buildAppMileageLineContext,
+  createMileageEventFromPlace,
+  createMileageEventFromTripPosition,
+  projectEventsToTrip,
+  queryEventsByMileage as queryAppEventsByMileage,
+  queryEventsByText,
+  queryEventsByTime as queryAppEventsByTime,
+  queryEventsByTrip,
+  queryEventsNearPlace as queryAppEventsNearPlace,
+} from "../utils/mileageUserEvents";
 import type { AggregateState } from "../rail-graph-aggregate/aggregate-state";
 import type { BoundMileageEvent, UserEventV2 } from "../rail-graph-v1/mileage-event.types";
 import type { EntityRef } from "../rail-graph-v1/primitives";
+import type { RailwayMap, Trip } from "../store";
 
 const OUT_DIR = path.resolve("src", "rail-graph-aggregate", ".verify");
 const PHASE = "mileage-events";
@@ -174,6 +187,8 @@ async function main(): Promise<void> {
     "Every time query result must carry timestampInference.",
   );
 
+  runAppWrapperChecks();
+
   writeReport(`${PHASE}-summary.md`, renderSummary({
     aggregate,
     patterns,
@@ -214,6 +229,120 @@ function pickCrossPath(aggregate: AggregateState, patterns: StoredServicePattern
     if (resolved) return resolved;
   }
   return null;
+}
+
+function runAppWrapperChecks(): void {
+  const lineKey = "app:test-line";
+  const railwayData: RailwayMap = {
+    [lineKey]: {
+      meta: {
+        company: "Test Railway",
+        region: "test",
+        type: "fixture",
+        logo: null,
+        icon: null,
+        color: "#10b981",
+      },
+      stations: [
+        { id: "a", name_ja: "Alpha", lat: 35.0, lng: 139.0, transfers: [], distToNext: 5 },
+        { id: "b", name_ja: "Beta", lat: 35.0, lng: 139.05, transfers: [], distToNext: 5 },
+        { id: "c", name_ja: "Gamma", lat: 35.0, lng: 139.1, transfers: [] },
+      ],
+    },
+  };
+  const lineContext = buildAppMileageLineContext(railwayData, lineKey);
+  assert("app wrapper fixture builds line context", lineContext !== null, "Expected test line context.");
+  if (!lineContext) return;
+
+  const trip: Trip = {
+    id: "trip-app-wrapper",
+    date: "2026-01-01",
+    segments: [
+      { id: "seg-app-wrapper", lineKey, fromId: "a", toId: "c" },
+    ],
+  };
+  const stationEvent = createMileageEventFromPlace({
+    lineContext,
+    place: { stationRef: appStationRef(lineKey, "b") },
+    title: "Bridge view",
+    kind: "scenic",
+    tags: ["bridge"],
+    tripId: trip.id,
+  });
+  const coordinateEvent = createMileageEventFromPlace({
+    lineContext,
+    place: { coordinates: [139.1, 35.0] },
+    title: "Map point",
+    tags: ["map"],
+  });
+  const tripEvent = createMileageEventFromTripPosition({
+    railwayData,
+    trip,
+    ratio: 0.5,
+    title: "Trip midpoint",
+    tags: ["midpoint"],
+  });
+  const appEvents = [stationEvent, coordinateEvent, tripEvent].filter((event): event is UserEventV2 => event !== null);
+
+  assert("app create wrappers produce mileage-only events", appEvents.length === 3, `events=${appEvents.length}`);
+  assert(
+    "app create wrappers do not persist station anchor as primary event state",
+    appEvents.every((event) => event.schemaVersion === "mileage-user-event-v1" && Number.isFinite(event.mileage.distanceMeters)),
+    "Expected created events to keep mileage.distanceMeters as the stable anchor.",
+  );
+
+  const mileageQuery = queryAppEventsByMileage({
+    events: appEvents,
+    lineContext,
+    fromMeters: 0,
+    toMeters: lineContext.totalMeters,
+  });
+  assert("app queryEventsByMileage wrapper returns line events", mileageQuery.items.length === appEvents.length, `events=${mileageQuery.items.length}`);
+
+  const placeQuery = queryAppEventsNearPlace({
+    events: appEvents,
+    lineContext,
+    place: { stationRef: appStationRef(lineKey, "b") },
+    radiusMeters: 100,
+  });
+  assert("app queryEventsNearPlace wrapper resolves place before matching", placeQuery.items.length >= 1, `events=${placeQuery.items.length}`);
+
+  const timeQuery = queryAppEventsByTime({
+    events: appEvents,
+    lineContext,
+    fromTime: "08:00",
+    toTime: "09:00",
+  });
+  assert("app queryEventsByTime wrapper uses linear fallback", timeQuery.items.length === appEvents.length, `events=${timeQuery.items.length}`);
+  assert(
+    "app queryEventsByTime wrapper exposes timestamp inference",
+    timeQuery.items.every((event) => event.timestampInference === "linear" || event.timestampInference === "timeline" || event.timestampInference === "unknown"),
+    "Every app time query result must carry timestampInference.",
+  );
+
+  const tripProjection = projectEventsToTrip(appEvents, railwayData, trip);
+  const tripQuery = queryEventsByTrip(appEvents, railwayData, trip);
+  assert("app projectEventsToTrip wrapper keeps trip mileage order", tripProjection.length >= 2 && isSorted(tripProjection), eventOrder(tripProjection));
+  assert("app queryEventsByTrip aliases trip projection", tripQuery.length === tripProjection.length, `query=${tripQuery.length}, projection=${tripProjection.length}`);
+
+  const textQuery = queryEventsByText(appEvents, railwayData, "bridge", { tags: ["bridge"] });
+  assert("app queryEventsByText wrapper supports text and tag filters", textQuery.length === 1 && textQuery[0].id === stationEvent?.id, `events=${textQuery.map((event) => event.id).join(", ")}`);
+
+  writeReport(`${PHASE}-06-app-wrappers.json`, {
+    events: appEvents.map((event) => ({
+      id: event.id,
+      title: event.title,
+      distanceMeters: event.mileage.distanceMeters,
+      lineRef: event.mileage.lineRef,
+      createdFrom: event.payload?.createdFrom,
+      tags: event.tags ?? [],
+    })),
+    mileageQuery: mileageQuery.items.length,
+    placeQuery: summarizeBoundEvents(placeQuery.items),
+    timeQuery: summarizeBoundEvents(timeQuery.items),
+    tripProjection: summarizeBoundEvents(tripProjection),
+    textQuery: textQuery.map((event) => event.id),
+  });
 }
 
 function runPlaceQuery(

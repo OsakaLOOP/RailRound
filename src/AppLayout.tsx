@@ -12,6 +12,7 @@ import { ExportRouteModal } from "./components/modals/ExportRouteModal";
 import { FeedbackModal } from "./components/modals/FeedbackModal";
 import { SubscribeModal } from "./components/modals/SubscribeModal";
 import { FeedbackAdminModal } from "./components/modals/FeedbackAdminModal";
+import { GlobalSearchModal } from "./components/modals/GlobalSearchModal";
 import { TripEditor } from "./components/modals/TripEditor";
 import { WalkTripEditor } from "./components/modals/WalkTripEditor";
 import { MapContainer } from "./components/map/MapContainer";
@@ -45,6 +46,7 @@ import DistanceWorker from "./workers/distance.worker.js?worker";
 import { useMeta } from "./contexts";
 import { useTranslation } from "react-i18next";
 import { showAlert, showConfirm } from "./utils/alerts";
+import { boundMileageEventForDisplay } from "./utils/mileageUserEvents";
 import { useLocation } from "react-router-dom";
 import { useAppRouteState } from "./hooks/useAppRouteState";
 import { useAppNavigation } from "./hooks/useAppNavigation";
@@ -82,6 +84,7 @@ export const AppLayout: React.FC = () => {
     isLoginOpen,
     isHydrated,
     isTripEditing,
+    isGlobalSearchOpen,
     pinMode,
     editorMode,
   } = useStore(
@@ -109,6 +112,7 @@ export const AppLayout: React.FC = () => {
       isLoginOpen: state.modals.isLoginOpen,
       isHydrated: state.isHydrated,
       isTripEditing: state.isTripEditing,
+      isGlobalSearchOpen: state.modals.isGlobalSearchOpen,
       pinMode: state.pinMode,
       editorMode: state.editorMode,
     })),
@@ -261,7 +265,7 @@ export const AppLayout: React.FC = () => {
 
   // --- Auth & URL Parsing ---
   useEffect(() => {
-    const getCookie = (name) => {
+    const getCookie = (name: string) => {
       const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
       return match ? decodeURIComponent(match[1]) : null;
     };
@@ -831,7 +835,7 @@ export const AppLayout: React.FC = () => {
                   fileName: rawCompanyName,
                   hash,
                 };
-                db.set(db.STORE_FILES, rawCompanyName, dataItem).catch((e) =>
+                db.set(db.STORE_FILES, rawCompanyName, dataItem).catch((e: unknown) =>
                   console.warn("Cache write failed", e),
                 );
                 return dataItem;
@@ -986,7 +990,7 @@ export const AppLayout: React.FC = () => {
             // Immediately persist the computed distances into our precompiled cache
             // so they survive the next refresh/fast-path boot.
             db.set(db.STORE_FILES, "__precompiled_railwaydata", next).catch(
-              (e) =>
+              (e: unknown) =>
                 console.warn("Failed to persist precompiled distances:", e),
             );
           }
@@ -1718,6 +1722,58 @@ export const AppLayout: React.FC = () => {
     }
   };
 
+  const handleGlobalSearchSelect = (lineKey: string, stationId?: string) => {
+    setModalState({ isGlobalSearchOpen: false });
+    goToTab("map");
+    const station = stationId
+      ? railwayData[lineKey]?.stations.find((candidate: any) => candidate.id === stationId)
+      : railwayData[lineKey]?.stations[0];
+    if (!station) return;
+    window.setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent("map:fly-to-location", {
+          detail: { lat: station.lat, lng: station.lng, zoom: stationId ? 14 : 11 },
+        }),
+      );
+    }, 150);
+  };
+
+  const handleGlobalSearchTripSelect = (tripId: string | number) => {
+    setModalState({ isGlobalSearchOpen: false });
+    goToTab("records");
+    window.setTimeout(() => {
+      document.getElementById(`trip-${String(tripId)}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 150);
+  };
+
+  const handleGlobalSearchEventSelect = (eventId: string) => {
+    setModalState({ isGlobalSearchOpen: false });
+    const event = mileageUserEvents.find((candidate) => candidate.id === eventId);
+    const projected = event ? boundMileageEventForDisplay(event, railwayData) : null;
+    goToTab("map");
+    window.setTimeout(() => {
+      if (projected?.bound.coordinates) {
+        window.dispatchEvent(
+          new CustomEvent("map:fly-to-location", {
+            detail: {
+              lat: projected.bound.coordinates[1],
+              lng: projected.bound.coordinates[0],
+              zoom: 14,
+            },
+          }),
+        );
+      }
+      window.dispatchEvent(
+        new CustomEvent("mileage-event:select", {
+          detail: { eventId },
+        }),
+      );
+    }, 150);
+  };
+
   return (
     <DragProvider>
       <AppSEO routeState={routeState} />
@@ -1777,6 +1833,13 @@ export const AppLayout: React.FC = () => {
         <AddToFolderModal />
         <SubscribeModal />
         <ExportRouteModal />
+        <GlobalSearchModal
+          isOpen={isGlobalSearchOpen}
+          onClose={() => setModalState({ isGlobalSearchOpen: false })}
+          onSelect={handleGlobalSearchSelect}
+          onSelectTrip={handleGlobalSearchTripSelect}
+          onSelectEvent={handleGlobalSearchEventSelect}
+        />
 
         <Tutorial
           activeTab={routeState.tab}

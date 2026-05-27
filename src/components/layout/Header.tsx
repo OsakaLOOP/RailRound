@@ -34,7 +34,7 @@ export const Header: React.FC<{
             <div className="flex items-center gap-2 min-w-0">
                 <button
                     onClick={() => setModalState({ isGlobalSearchOpen: true })}
-                    className="rl-header-button bg-slate-800 hover:bg-slate-700 border-slate-700/30 text-white"
+                    className="rl-header-button"
                     title={t('search.open', 'Search')}
                     aria-label={t('search.open', 'Search')}
                 >
@@ -47,7 +47,7 @@ export const Header: React.FC<{
                       {(!userProfile?.tier || userProfile.tier === 'free') && (
                         <button
                           onClick={() => setModalState({ isSubscribeOpen: true })}
-                          className="rl-header-button bg-amber-600/90 hover:bg-amber-500 border-amber-500/30 text-white"
+                          className="rl-header-button bg-amber-600/90 hover:bg-amber-500"
                           title={t('premium.subscribe', 'Subscribe to Premium')}
                           aria-label={t('premium.subscribe', 'Subscribe to Premium')}
                         >
@@ -57,17 +57,17 @@ export const Header: React.FC<{
                       <button
                           id="btn-login-user"
                           onClick={logout}
-                          className="rl-header-button bg-slate-700 hover:bg-red-900 border-slate-600/30 text-white"
+                          className="rl-header-button rl-header-button-danger"
                           title={t('header.logout', '退出')}
                           aria-label={t('header.logout', '退出')}
                       >
                           <LogOut size={14}/><span className="hidden sm:inline">{t('header.logout', '退出')}</span>
                       </button>
                    </div>
-                 ) : (
+                ) : (
                    <button
                        onClick={() => setModalState({ isLoginOpen: true })}
-                       className="rl-header-button bg-blue-600 hover:bg-blue-500 border-blue-500/30 text-white"
+                       className="rl-header-button bg-blue-600 hover:bg-blue-700 border-blue-600/50 text-white"
                        title={t('header.loginRegister', '登录 / 注册')}
                        aria-label={t('header.loginRegister', '登录 / 注册')}
                    >
@@ -76,10 +76,10 @@ export const Header: React.FC<{
                 )}
 
                 {activeTab !== 'map' ? (
-                <div id="header-actions" className="flex gap-2 ml-1 sm:ml-2 border-l border-slate-700/70 pl-2">
+                <div id="header-actions" className="flex gap-2 border-l border-slate-700/70 pl-2">
                    <button
                        onClick={handleExportKML}
-                       className="rl-header-button bg-emerald-700 hover:bg-emerald-600 border-emerald-600/30 text-white cursor-pointer"
+                       className="rl-header-button bg-emerald-600 hover:bg-emerald-700 border-emerald-600/50 text-white cursor-pointer"
                        title={t('header.exportKML', '导出 KML')}
                        aria-label={t('header.exportKML', '导出 KML')}
                    >
@@ -87,25 +87,25 @@ export const Header: React.FC<{
                    </button>
                     <button
                         onClick={handleExportUserData}
-                        className="rl-header-button !rounded-md bg-emerald-900/50 hover:bg-emerald-800 border-emerald-800/30 text-white cursor-pointer"
+                        className="rl-header-button bg-emerald-600 hover:bg-emerald-700 border-emerald-600/50 text-white cursor-pointer w-9 h-9 p-0 justify-center items-center"
                         title={t('header.exportData', 'Export backup')}
                         aria-label={t('header.exportData', 'Export backup')}
                     >
-                        <Download size={16}/>
+                        <Download size={18}/>
                     </button>
                     <label
-                        className="rl-header-button !rounded-md bg-slate-800/50 hover:bg-slate-700 border-slate-700/30 text-white cursor-pointer"
+                        className="rl-header-button bg-emerald-600 hover:bg-emerald-700 border-emerald-600/50 text-white cursor-pointer w-9 h-9 p-0 justify-center items-center"
                         title={t('header.importData', 'Import backup')}
                         aria-label={t('header.importData', 'Import backup')}
                     >
-                        <Upload size={16}/>
+                        <Upload size={18}/>
                         <input type="file" accept=".json" className="hidden" onChange={handleImportUserData}/>
                     </label>
                 </div>
                 ) : (
-                <div id="header-actions" className="flex gap-2 ml-1 sm:ml-2 border-l border-slate-700/70 pl-2">
-                    <label className="rl-header-button bg-slate-800 hover:bg-slate-700 border-slate-700/30 text-white cursor-pointer" title={t('header.data', '数据')} aria-label={t('header.data', '数据')}><Building2 size={14}/><span className="hidden sm:inline">{t('header.data', '数据')}</span><input type="file" accept=".json" className="hidden" onChange={handleCompanyUpload}/></label>
-                    <label className="rl-header-button bg-slate-800 hover:bg-slate-700 border-slate-700/30 text-white cursor-pointer" title={t('header.mapData', '地图')} aria-label={t('header.mapData', '地图')}><MapIcon size={14}/><span className="hidden sm:inline">{t('header.mapData', '地图')}</span><input type="file" multiple accept=".geojson,.json" className="hidden" onChange={handleFileUpload}/></label>
+                <div id="header-actions" className="flex gap-2 border-l border-slate-700/70 pl-2">
+                    <label className="rl-header-button cursor-pointer" title={t('header.data', '数据')} aria-label={t('header.data', '数据')}><Building2 size={14}/><span className="hidden sm:inline">{t('header.data', '数据')}</span><input type="file" accept=".json" className="hidden" onChange={handleCompanyUpload}/></label>
+                    <label className="rl-header-button cursor-pointer" title={t('header.mapData', '地图')} aria-label={t('header.mapData', '地图')}><MapIcon size={14}/><span className="hidden sm:inline">{t('header.mapData', '地图')}</span><input type="file" multiple accept=".geojson,.json" className="hidden" onChange={handleFileUpload}/></label>
                 </div>
                 )}
             </div>

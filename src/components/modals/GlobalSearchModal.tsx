@@ -13,6 +13,7 @@ import {
     X,
 } from 'lucide-react';
 import { useStore } from '../../store';
+import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
 import { LineLogo } from '../LineLogo';
 import {
@@ -47,11 +48,13 @@ export const GlobalSearchModal: React.FC<Props> = ({
     onSwitchMode,
     isEmbedded,
 }) => {
-    const { railwayData, trips, mileageUserEvents } = useStore(state => ({
-        railwayData: state.railwayData,
-        trips: state.trips,
-        mileageUserEvents: state.mileageUserEvents,
-    }));
+    const { railwayData, trips, mileageUserEvents } = useStore(
+        useShallow(state => ({
+            railwayData: state.railwayData,
+            trips: state.trips,
+            mileageUserEvents: state.mileageUserEvents,
+        }))
+    );
     const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);

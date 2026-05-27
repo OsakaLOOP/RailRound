@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../../store";
+import { useShallow } from "zustand/react/shallow";
 import type { UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
 import {
   buildAppMileageLineContext,
@@ -32,10 +33,12 @@ type PlaceSource = "station" | "map";
 
 export const MileageEventsPanel: React.FC = () => {
   const { t } = useTranslation();
-  const { railwayData, mileageUserEvents } = useStore((state) => ({
-    railwayData: state.railwayData,
-    mileageUserEvents: state.mileageUserEvents,
-  }));
+  const { railwayData, mileageUserEvents } = useStore(
+    useShallow((state) => ({
+      railwayData: state.railwayData,
+      mileageUserEvents: state.mileageUserEvents,
+    }))
+  );
   const { importEvents, persistEvents } = useMileageEventActions();
   const fileInputRef = useRef<HTMLInputElement>(null);
 

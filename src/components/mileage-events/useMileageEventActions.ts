@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useStore } from "../../store";
+import { useShallow } from "zustand/react/shallow";
 import { useUserData } from "../../hooks/useUserData";
 import type { UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
 
@@ -12,15 +13,17 @@ export function useMileageEventActions() {
     badgeSettings,
     mileageUserEvents,
     setMileageUserEvents,
-  } = useStore((state) => ({
-    user: state.user,
-    trips: state.trips,
-    pins: state.pins,
-    folders: state.folders,
-    badgeSettings: state.badgeSettings,
-    mileageUserEvents: state.mileageUserEvents,
-    setMileageUserEvents: state.setMileageUserEvents,
-  }));
+  } = useStore(
+    useShallow((state) => ({
+      user: state.user,
+      trips: state.trips,
+      pins: state.pins,
+      folders: state.folders,
+      badgeSettings: state.badgeSettings,
+      mileageUserEvents: state.mileageUserEvents,
+      setMileageUserEvents: state.setMileageUserEvents,
+    }))
+  );
   const { saveData } = useUserData();
 
   const persistEvents = useCallback(

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../../store";
+import { useShallow } from "zustand/react/shallow";
 import type { UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
 import {
   boundMileageEventForDisplay,
@@ -45,10 +46,12 @@ interface Props {
 export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) => {
   const { t } = useTranslation();
   const { goToTab } = useAppNavigation();
-  const { railwayData, trips } = useStore((state) => ({
-    railwayData: state.railwayData,
-    trips: state.trips,
-  }));
+  const { railwayData, trips } = useStore(
+    useShallow((state) => ({
+      railwayData: state.railwayData,
+      trips: state.trips,
+    }))
+  );
   const { removeEvent, updateEvent } = useMileageEventActions();
   const [editing, setEditing] = useState(false);
 

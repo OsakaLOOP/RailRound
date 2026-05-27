@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Combine, Filter, Search, Tag, Tags } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../../store";
+import { useShallow } from "zustand/react/shallow";
 import type { MileageUserEventVisibility, UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
 import {
   boundMileageEventsForDisplay,
@@ -32,10 +33,12 @@ export const EventSearchPanel: React.FC<Props> = ({
   onViewMap,
 }) => {
   const { t } = useTranslation();
-  const { railwayData, mileageUserEvents } = useStore((state) => ({
-    railwayData: state.railwayData,
-    mileageUserEvents: state.mileageUserEvents,
-  }));
+  const { railwayData, mileageUserEvents } = useStore(
+    useShallow((state) => ({
+      railwayData: state.railwayData,
+      mileageUserEvents: state.mileageUserEvents,
+    }))
+  );
   const { persistEvents } = useMileageEventActions();
   const sourceEvents = events ?? mileageUserEvents;
   const lineKeys = useMemo(() => Object.keys(railwayData).sort(), [railwayData]);

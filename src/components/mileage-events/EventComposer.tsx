@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { MapPinned, Navigation, Plus, Route, TrainFront } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../../store";
+import { useShallow } from "zustand/react/shallow";
 import type { UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
 import {
   buildAppMileageLineContext,
@@ -45,10 +46,12 @@ export const EventComposer: React.FC<Props> = ({
   onCancel,
 }) => {
   const { t } = useTranslation();
-  const { railwayData, trips } = useStore((state) => ({
-    railwayData: state.railwayData,
-    trips: state.trips,
-  }));
+  const { railwayData, trips } = useStore(
+    useShallow((state) => ({
+      railwayData: state.railwayData,
+      trips: state.trips,
+    }))
+  );
   const { addEvent, updateEvent } = useMileageEventActions();
 
   const lineKeys = useMemo(() => Object.keys(railwayData).sort(), [railwayData]);

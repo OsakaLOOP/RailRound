@@ -10,6 +10,7 @@ import {
   TrainTrack,
 } from "lucide-react";
 import { useStore } from "../../store";
+import { useShallow } from "zustand/react/shallow";
 import {
   buildLineSelectorGroups,
   CategoryKey,
@@ -34,7 +35,12 @@ export const StationLineSearchModal: React.FC<Props> = ({
   onSelect,
   allowedLines,
 }) => {
-  const { railwayData, badgeSettings } = useStore();
+  const { railwayData, badgeSettings } = useStore(
+    useShallow((state) => ({
+      railwayData: state.railwayData,
+      badgeSettings: state.badgeSettings,
+    }))
+  );
   const { t } = useTranslation();
 
   const [mode, setMode] = useState<SearchModalMode>(initialMode);

@@ -2841,6 +2841,19 @@ function initViews(): void {
       if (err.message === "Pipeline run aborted by a newer run.") return;
       throw err;
     }
+    compileCleanDecisions(lastPipelineRun?.passFids);
+    try {
+      compileTopology();
+    } catch (err) {
+      handleError(err);
+    }
+    setStepProgress("clean", {
+      status: "done",
+      summary: "Clean rule parameters changed. Annotate, compile, validation, and exports are now stale.",
+      completedActions: dedupe([...(activeWorkspace().progress.clean.completedActions ?? []), "loadWorkspaceSource"]),
+      diagnostics: diagnosticSummaries(),
+    });
+    invalidateDownstream("clean", "Clean rule parameters changed after this step. Re-run from annotate.");
     refreshViews();
   });
 

@@ -23,12 +23,18 @@
 - docs/: 方案、审计与发布流程文档
   - geo worker 字段契约: docs/geo_worker_geojson_contract_2026-04-27.md
   - rail graph v1 设计参考: docs/rail-graph-v1/
+  - mileage-centric UserEvent 接入文档: docs/rail-graph-v1/user-event-mileage-layer.md
 - rail graph MVP 工作台:
   - standalone HTML: rail-graph-mvp.html
   - browser shell/engine adapter: src/rail-graph-v1-mvp/app.ts
   - map/list interaction: src/rail-graph-v1-mvp/map-view.ts, src/rail-graph-v1-mvp/list-view.ts
   - local pipeline model/API client: src/rail-graph-v1-mvp/pipeline.ts
   - Vite dev local task API: scripts/rail-graph-mvp-server.js + vite.config.js plugin
+- mileage-centric UserEvent 层:
+  - public types/API: src/rail-graph-v1/mileage-event.types.ts, src/rail-graph-v1/mileage-events.ts
+  - aggregate compatibility: src/rail-graph-aggregate/user-event/mileage-*.ts
+  - user app entry: src/components/map/MileageEventsPanel.tsx, src/utils/mileageUserEvents.ts
+  - verify: npm run rail:events:mileage-verify
 
 ### Routing / SEO / EdgeOne entry points
 
@@ -112,6 +118,33 @@
 - companion:
   - docs/rail-graph-v1/\*
   - rail-graph-mvp.html
+
+### D3. Mileage UserEvent / user-facing event layer
+
+- primary:
+  - src/rail-graph-v1/mileage-event.types.ts
+  - src/rail-graph-v1/mileage-events.ts
+  - docs/rail-graph-v1/user-event-mileage-layer.md
+- aggregate compatibility:
+  - src/rail-graph-aggregate/user-event/mileage-adapter.ts
+  - src/rail-graph-aggregate/user-event/mileage-integration.ts
+  - src/rail-graph-aggregate/user-event/mileage-query.ts
+  - src/rail-graph-aggregate/user-event/mileage-store.ts
+- user-facing app:
+  - src/components/map/MileageEventsPanel.tsx
+  - src/utils/mileageUserEvents.ts
+  - src/store/index.ts
+  - src/hooks/useUserData.ts
+  - src/services/api.js
+  - public/functions/api/user/data.js
+- i18n companion:
+  - public/locales/en/translation.json
+  - public/locales/ja-JP/translation.json
+  - public/locales/zh-CN/translation.json
+  - public/locales/zh-TW/translation.json
+- verification:
+  - src/rail-graph-v1-mvp/verify-mileage-user-events.ts
+  - npm run rail:events:mileage-verify
 
 ### E. API contract related updates
 

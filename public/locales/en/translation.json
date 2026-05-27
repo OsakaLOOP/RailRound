@@ -339,6 +339,26 @@
     "comingSoon": "TODO",
     "refresh": "Refresh"
   },
+  "mileageEvents": {
+    "open": "Mileage events",
+    "title": "Mileage events",
+    "timeline": "Line",
+    "place": "Place",
+    "time": "Time",
+    "line": "Line",
+    "station": "Station",
+    "distanceKm": "Mileage km",
+    "fromTime": "From",
+    "toTime": "To",
+    "titlePlaceholder": "Title",
+    "bodyPlaceholder": "Note",
+    "addAtStation": "Add by place",
+    "addAtMileage": "Add by mileage",
+    "empty": "No matching mileage events",
+    "defaultTitle": "Mileage event",
+    "timeUnknown": "No time bound",
+    "linear": "estimated"
+  },
   "map": {
     "loadFail": "Map load failed ({{domain}})\nPlease check network or VPN",
     "rubberBandBreak": "Oops! Rubber band snapped! 💥",

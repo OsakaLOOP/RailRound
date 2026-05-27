@@ -322,6 +322,26 @@
     "comingSoon": "敬請期待",
     "refresh": "重新整理"
   },
+  "mileageEvents": {
+    "open": "里程事件",
+    "title": "里程事件",
+    "timeline": "沿線",
+    "place": "地點",
+    "time": "時間",
+    "line": "路線",
+    "station": "車站",
+    "distanceKm": "里程 km",
+    "fromTime": "開始",
+    "toTime": "結束",
+    "titlePlaceholder": "標題",
+    "bodyPlaceholder": "備註",
+    "addAtStation": "按地點新增",
+    "addAtMileage": "按里程新增",
+    "empty": "沒有符合的里程事件",
+    "defaultTitle": "里程事件",
+    "timeUnknown": "時間未綁定",
+    "linear": "估算"
+  },
   "map": {
     "loadFail": "地圖加載失敗 ({{domain}})\n請檢查網絡或切換 VPN 節點",
     "rubberBandBreak": "哎呀！橡皮筋拉斷了，彈到手了！💥",

@@ -18,6 +18,7 @@ import { MapContainer } from "./components/map/MapContainer";
 import { PinEditor } from "./components/map/PinEditor";
 import { FabButton } from "./components/map/FabButton";
 import { LocateButton } from "./components/map/LocateButton";
+import { MileageEventsPanel } from "./components/map/MileageEventsPanel";
 import { Header } from "./components/layout/Header";
 import { BottomNav } from "./components/layout/BottomNav";
 import { TripsPage } from "./pages/TripsPage";
@@ -65,11 +66,13 @@ export const AppLayout: React.FC = () => {
     setGeoData,
     trips,
     pins,
+    mileageUserEvents,
     railwayData,
     geoData,
     companyDB,
     setTrips,
     setPins,
+    setMileageUserEvents,
     folders,
     badgeSettings,
     setSegmentGeometries,
@@ -90,11 +93,13 @@ export const AppLayout: React.FC = () => {
       setGeoData: state.setGeoData,
       trips: state.trips,
       pins: state.pins,
+      mileageUserEvents: state.mileageUserEvents,
       railwayData: state.railwayData,
       geoData: state.geoData,
       companyDB: state.companyDB,
       setTrips: state.setTrips,
       setPins: state.setPins,
+      setMileageUserEvents: state.setMileageUserEvents,
       folders: state.folders,
       badgeSettings: state.badgeSettings,
       setSegmentGeometries: state.setSegmentGeometries,
@@ -1423,7 +1428,7 @@ export const AppLayout: React.FC = () => {
         lines: Array.from(linesUsed),
         companies: Array.from(companiesUsed),
       },
-      data: { trips: trips, pins: pins },
+      data: { trips: trips, pins: pins, mileageUserEvents },
     };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], {
       type: "application/json",
@@ -1496,6 +1501,19 @@ export const AppLayout: React.FC = () => {
         const newPins = uniqueIncomingPins.filter(
           (p) => !currentPinIds.has(p.id),
         );
+        const currentEventIds = new Set(mileageUserEvents.map((event) => event.id));
+        const incomingEvents = backup.data.mileageUserEvents || backup.data.mileage_user_events || [];
+        const uniqueIncomingEvents: typeof mileageUserEvents = [];
+        const tempEventIds = new Set();
+        incomingEvents.forEach((event: any) => {
+          if (event?.id && !tempEventIds.has(event.id)) {
+            tempEventIds.add(event.id);
+            uniqueIncomingEvents.push(event);
+          }
+        });
+        const newEvents = uniqueIncomingEvents.filter(
+          (event) => !currentEventIds.has(event.id),
+        );
         if (newTrips.length > 0) {
           setTrips((prev) =>
             [...prev, ...newTrips].sort((a, b) => b.date.localeCompare(a.date)),
@@ -1503,6 +1521,9 @@ export const AppLayout: React.FC = () => {
         }
         if (newPins.length > 0) {
           setPins((prev) => [...prev, ...newPins]);
+        }
+        if (newEvents.length > 0) {
+          setMileageUserEvents((prev) => [...prev, ...newEvents]);
         }
         showAlert(
           t(
@@ -1730,6 +1751,7 @@ export const AppLayout: React.FC = () => {
             />
             <FabButton />
             <LocateButton />
+            <MileageEventsPanel />
             <PinEditor />
           </div>
         </div>

@@ -39,14 +39,14 @@ export const api = {
     return data;
   },
 
-  async saveData(token, trips, pins, latest_5, version = null, folders = null, badge_settings = null) {
+  async saveData(token, trips, pins, latest_5, version = null, folders = null, badge_settings = null, mileage_user_events = null) {
     const res = await fetch(`${API_BASE}/user/data`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ trips, pins, latest_5, version, folders, badge_settings })
+      body: JSON.stringify({ trips, pins, latest_5, version, folders, badge_settings, mileage_user_events })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to save data');

@@ -14,6 +14,7 @@ import type {
 import type { Diagnostic, ProvenanceRecord } from "./diagnostic-types";
 import type { EventAnchor, EventPolicy, RunEvent, RunOrder, ScenicViewResolution, TimelinePoint } from "./event.types";
 import type { GeoJSONLineString, GeoJSONPolygon, GeoJSONPosition } from "./geojson";
+import type { BoundMileageEvent, UserEventV2 } from "./mileage-event.types";
 import type { ISODateTime } from "./primitives";
 import type { RenderGeometryPlan, ResolvedGeoJsonPath, RunPath, RunSpec } from "./runtime.types";
 import type { ServicePattern, ServiceTemplateLayer } from "./service-template.types";
@@ -60,6 +61,11 @@ export interface RailGraph {
   eventLayer: {
     anchors: EventAnchor[];
     policies: EventPolicy[];
+    /**
+     * Mileage-centric user events. These are warm metadata: changing them does
+     * not alter topology/pathfinding, only event projection and user-facing UI.
+     */
+    mileageUserEvents?: UserEventV2[];
   };
   indexes: RailGraphIndexes;
   provenance: ProvenanceRecord[];
@@ -91,5 +97,6 @@ export interface RunContext {
   readonly timeline: readonly TimelinePoint[] | null;
   readonly resolvedAnchors: readonly ScenicViewResolution[] | null;
   readonly events: readonly RunEvent[] | null;
+  readonly mileageUserEvents?: readonly BoundMileageEvent[] | null;
   readonly diagnostics: readonly Diagnostic[];
 }

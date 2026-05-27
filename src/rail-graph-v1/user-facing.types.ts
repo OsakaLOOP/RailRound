@@ -4,6 +4,7 @@
 
 import type { RunEventType } from "./event.types";
 import type { GeoJSONLineString, GeoJSONPosition } from "./geojson";
+import type { BoundMileageEvent } from "./mileage-event.types";
 import type { DirectionLabel, EntityRef } from "./primitives";
 import type { ResolvedGeoJsonPath, RunPath } from "./runtime.types";
 import type { ServiceType } from "./service-template.types";
@@ -43,6 +44,7 @@ export interface TripResultSegment {
   resolvedPath: ResolvedGeoJsonPath;
   geometry: GeoJSONLineString;
   events: TripEvent[];
+  mileageEvents?: BoundMileageEvent[];
 }
 
 export interface StationStop {

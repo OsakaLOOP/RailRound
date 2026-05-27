@@ -14,6 +14,7 @@
     "rail:aggregate:verify:cross-pf": "tsx src/rail-graph-v1-mvp/verify-cross-pattern-pathfinding.ts",
     "rail:aggregate:verify:events": "tsx src/rail-graph-v1-mvp/verify-event-aggregation.ts",
     "rail:aggregate:verify:cross-ws": "tsx src/rail-graph-v1-mvp/verify-aggregate-cross-workspace.ts",
+    "rail:events:mileage-verify": "tsx src/rail-graph-v1-mvp/verify-mileage-user-events.ts",
     "build:all": "node scripts/build_all.js",
     "build:package": "tsx scripts/build-package.ts",
     "publish:package": "cd packages/route-slice-preview && npm publish",

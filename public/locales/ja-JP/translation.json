@@ -323,6 +323,26 @@
     "comingSoon": "TODO",
     "refresh": "更新"
   },
+  "mileageEvents": {
+    "open": "キロ程イベント",
+    "title": "キロ程イベント",
+    "timeline": "沿線",
+    "place": "場所",
+    "time": "時間",
+    "line": "路線",
+    "station": "駅",
+    "distanceKm": "キロ程 km",
+    "fromTime": "開始",
+    "toTime": "終了",
+    "titlePlaceholder": "タイトル",
+    "bodyPlaceholder": "メモ",
+    "addAtStation": "場所から追加",
+    "addAtMileage": "キロ程で追加",
+    "empty": "一致するキロ程イベントはありません",
+    "defaultTitle": "キロ程イベント",
+    "timeUnknown": "時刻未設定",
+    "linear": "推定"
+  },
   "map": {
     "loadFail": "マップの読み込みに失敗しました ({{domain}})\nネットワークまたは VPN を確認してください",
     "rubberBandBreak": "痛っ！輪ゴムが切れて手に当たった！💥",

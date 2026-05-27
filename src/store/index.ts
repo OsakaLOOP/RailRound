@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { db } from '../utils/db';
 import changelog from '../../public/changelog.json';
+import type { UserEventV2 } from '../rail-graph-v1/mileage-event.types';
 
 // --- Custom IndexedDB Storage for Zustand ---
 // Because railwayData can easily exceed the 5MB localStorage limit,
@@ -259,6 +260,7 @@ export interface GlobalStore {
   isLoggedIn: boolean;
   trips: Trip[];
   pins: Pin[];
+  mileageUserEvents: UserEventV2[];
   folders: Folder[];
   badgeSettings: BadgeSettings;
   appVersion: string;
@@ -279,6 +281,9 @@ export interface GlobalStore {
   addPin: (pin: Pin) => void;
   updatePin: (pin: Pin) => void;
   removePin: (id: ID) => void;
+  setMileageUserEvents: (events: UserEventV2[] | ((prev: UserEventV2[]) => UserEventV2[])) => void;
+  addMileageUserEvent: (event: UserEventV2) => void;
+  removeMileageUserEvent: (id: string) => void;
 
   setFolders: (folders: Folder[] | ((prev: Folder[]) => Folder[])) => void;
   setBadgeSettings: (settings: BadgeSettings) => void;
@@ -368,6 +373,7 @@ export const useStore = create<GlobalStore>()(
       isLoggedIn: false,
       trips: [],
       pins: [],
+      mileageUserEvents: [],
       folders: [],
       appVersion: changelog.meta.currentVersion || '0.0.0',
       badgeSettings: {
@@ -391,6 +397,9 @@ export const useStore = create<GlobalStore>()(
       addPin: (pin) => set((state) => ({ pins: [...state.pins, pin] })),
       updatePin: (pin) => set((state) => ({ pins: state.pins.map(p => p.id === pin.id ? pin : p) })),
       removePin: (id) => set((state) => ({ pins: state.pins.filter(p => p.id !== id) })),
+      setMileageUserEvents: (input) => set((state) => ({ mileageUserEvents: typeof input === 'function' ? input(state.mileageUserEvents) : input })),
+      addMileageUserEvent: (event) => set((state) => ({ mileageUserEvents: [...state.mileageUserEvents, event] })),
+      removeMileageUserEvent: (id) => set((state) => ({ mileageUserEvents: state.mileageUserEvents.filter(event => event.id !== id) })),
 
       setFolders: (input) => set((state) => ({ folders: typeof input === 'function' ? input(state.folders) : input })),
       setBadgeSettings: (settings) => set({ badgeSettings: settings }),
@@ -499,6 +508,7 @@ export const useStore = create<GlobalStore>()(
         isLoggedIn: state.isLoggedIn,
         trips: state.trips,
         pins: state.pins,
+        mileageUserEvents: state.mileageUserEvents,
         folders: state.folders,
         badgeSettings: state.badgeSettings,
         myFeedbackIds: state.myFeedbackIds,

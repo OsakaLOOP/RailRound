@@ -323,6 +323,26 @@
     "comingSoon": "敬请期待",
     "refresh": "刷新"
   },
+  "mileageEvents": {
+    "open": "里程事件",
+    "title": "里程事件",
+    "timeline": "沿线",
+    "place": "地点",
+    "time": "时间",
+    "line": "线路",
+    "station": "车站",
+    "distanceKm": "里程 km",
+    "fromTime": "开始",
+    "toTime": "结束",
+    "titlePlaceholder": "标题",
+    "bodyPlaceholder": "备注",
+    "addAtStation": "按地点添加",
+    "addAtMileage": "按里程添加",
+    "empty": "没有匹配的里程事件",
+    "defaultTitle": "里程事件",
+    "timeUnknown": "时间未绑定",
+    "linear": "估算"
+  },
   "map": {
     "loadFail": "地图加载失败 ({{domain}})\n请检查网络或切换 VPN 节点",
     "rubberBandBreak": "哎呀！橡皮筋拉断了，弹到手了！💥",

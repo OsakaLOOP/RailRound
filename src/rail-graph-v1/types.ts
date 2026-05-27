@@ -13,6 +13,7 @@ export type * from "./base-topology.types";
 export type * from "./service-template.types";
 export type * from "./editing.types";
 export type * from "./event.types";
+export type * from "./mileage-event.types";
 export type * from "./runtime.types";
 export type * from "./graph.types";
 export type * from "./user-facing.types";

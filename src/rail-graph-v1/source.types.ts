@@ -6,6 +6,7 @@ import type { BaseTopologyLayer } from "./base-topology.types";
 import type { Diagnostic, ProvenanceRecord } from "./diagnostic-types";
 import type { PatchSet } from "./editing.types";
 import type { EventAnchor } from "./event.types";
+import type { UserEventV2 } from "./mileage-event.types";
 import type { ServicePattern } from "./service-template.types";
 
 export interface SourceEnvelope {
@@ -25,6 +26,7 @@ export interface NormalizedEntityBatch {
   baseTopology: BaseTopologyLayer;
   servicePatterns: ServicePattern[];
   eventAnchors: EventAnchor[];
+  mileageUserEvents?: UserEventV2[];
   provenance: ProvenanceRecord[];
   diagnostics: Diagnostic[];
 }

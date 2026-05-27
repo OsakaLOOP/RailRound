@@ -199,13 +199,9 @@ export const LocateButton: React.FC = () => {
         {...eventProps}
         onContextMenu={(e) => e.preventDefault()}
         disabled={status === "locating"}
-        className={`p-3 rounded-full shadow-lg transition-all active:scale-95 flex items-center justify-center w-12 h-12
-                    ${status === "idle"
-            ? "bg-white text-gray-700 hover:bg-gray-50"
-            : status === "locating"
-              ? "bg-white text-blue-500 cursor-not-allowed"
-              : "bg-blue-500 text-white"
-          }`}
+        className={`rl-map-control rl-focus flex items-center justify-center transition-all active:scale-95 ${status === "locating" ? "text-sky-600 cursor-not-allowed" : status === "located" ? "rl-map-control-active" : ""}`}
+        title={t("map.locate", "定位当前位置")}
+        aria-label={t("map.locate", "定位当前位置")}
       >
         {status === "idle" && <Locate size={24} />}
         {status === "locating" && (

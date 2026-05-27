@@ -305,8 +305,15 @@
     "loginRegister": "登錄 / 註冊",
     "logout": "退出",
     "exportKML": "導出 KML",
+    "exportData": "導出備份",
+    "importData": "導入備份",
     "data": "資料庫",
     "mapData": "地圖"
+  },
+  "nav": {
+    "records": "記錄",
+    "map": "地圖",
+    "stats": "統計"
   },
   "common": {
     "deleteConfirm": "確認刪除?",
@@ -349,7 +356,11 @@
     "geoDenied": "位置訪問被拒絕。",
     "geoFail": "獲取位置失敗。",
     "geoTimeout": "獲取位置超時。",
-    "geoUnavailable": "位置信息不可用。"
+    "geoUnavailable": "位置信息不可用。",
+    "locate": "定位目前位置",
+    "pinToolAdd": "添加地圖圖釘",
+    "pinToolSnap": "切換為吸附模式",
+    "pinToolExit": "退出圖釘模式"
   },
   "chest": {
     "searchingRoute": "正在尋找路徑...",

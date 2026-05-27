@@ -306,8 +306,15 @@
     "loginRegister": "ログイン / 登録",
     "logout": "ログアウト",
     "exportKML": "KML エクスポート",
+    "exportData": "バックアップを書き出す",
+    "importData": "バックアップを読み込む",
     "data": "DB",
     "mapData": "マップ"
+  },
+  "nav": {
+    "records": "記録",
+    "map": "地図",
+    "stats": "統計"
   },
   "common": {
     "deleteConfirm": "削除しますか?",
@@ -350,7 +357,11 @@
     "geoDenied": "位置情報へのアクセスが拒否されました",
     "geoFail": "位置情報の取得に失敗しました",
     "geoTimeout": "タイムアウトしました",
-    "geoUnavailable": "位置情報が利用できません"
+    "geoUnavailable": "位置情報が利用できません",
+    "locate": "現在地を表示",
+    "pinToolAdd": "マップピンを追加",
+    "pinToolSnap": "吸着モードに切り替え",
+    "pinToolExit": "ピンモードを終了"
   },
   "chest": {
     "searchingRoute": "ルートを検索中...",

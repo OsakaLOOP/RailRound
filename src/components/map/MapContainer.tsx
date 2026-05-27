@@ -29,11 +29,13 @@ type FlyToLocationDetail = {
 interface Props {
   setStationMenu: (menu: StationMenuData | null) => void;
   isDraggingRef: React.MutableRefObject<boolean>;
+  showDebugZoom?: boolean;
 }
 
 export const MapContainer: React.FC<Props> = ({
   setStationMenu,
   isDraggingRef,
+  showDebugZoom = false,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
@@ -389,27 +391,29 @@ export const MapContainer: React.FC<Props> = ({
       )
       .addTo(map);
 
-    map.createPane("baseLinesPane");
+    const overlayPane = map.getPane("overlayPane")!;
+
+    map.createPane("baseLinesPane", overlayPane);
     const baseLinesPane = map.getPane("baseLinesPane")!;
     baseLinesPane.style.zIndex = "390";
     baseLinesPane.style.pointerEvents = "none";
 
-    map.createPane("baseStationsPane");
+    map.createPane("baseStationsPane", overlayPane);
     const baseStationsPane = map.getPane("baseStationsPane")!;
     baseStationsPane.style.zIndex = "400";
     baseStationsPane.style.pointerEvents = "none";
 
-    map.createPane("routePane");
+    map.createPane("routePane", overlayPane);
     const routePane = map.getPane("routePane")!;
     routePane.style.zIndex = "410";
     routePane.style.pointerEvents = "none";
 
-    map.createPane("visitedStationsPane");
+    map.createPane("visitedStationsPane", overlayPane);
     const visitedStationsPane = map.getPane("visitedStationsPane")!;
     visitedStationsPane.style.zIndex = "420";
     visitedStationsPane.style.pointerEvents = "none";
 
-    map.createPane("mileageEventsPane");
+    map.createPane("mileageEventsPane", overlayPane);
     const mileageEventsPane = map.getPane("mileageEventsPane")!;
     mileageEventsPane.style.zIndex = "430";
     mileageEventsPane.style.pointerEvents = "auto";
@@ -940,6 +944,9 @@ export const MapContainer: React.FC<Props> = ({
       return;
 
     const map = mapInstance.current;
+    if ((map as any)._animatingZoom) {
+      return;
+    }
     const currentZoom = map.getZoom();
 
     // At zoom < 5, strictly provide empty array to clear/hide stations
@@ -1651,5 +1658,31 @@ export const MapContainer: React.FC<Props> = ({
     });
   };
 
-  return <div ref={mapRef} style={{ width: "100%", height: "100%" }} />;
+  return (
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
+      {showDebugZoom && (
+        <div
+          style={{
+            position: "absolute",
+            top: "12px",
+            left: "12px",
+            zIndex: 1000,
+            backgroundColor: "rgba(15, 23, 42, 0.8)",
+            color: "#f8fafc",
+            padding: "4px 8px",
+            borderRadius: "4px",
+            fontSize: "12px",
+            fontFamily: "monospace",
+            fontWeight: "bold",
+            pointerEvents: "none",
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+          }}
+        >
+          Zoom: {mapZoom}
+        </div>
+      )}
+    </div>
+  );
 };

@@ -1778,7 +1778,7 @@ export const AppLayout: React.FC = () => {
     <DragProvider>
       <AppSEO routeState={routeState} />
 
-      <div className="flex flex-col h-[100dvh] bg-slate-100 font-sans text-slate-800 overflow-visible">
+      <div className="rl-shell flex flex-col h-[100dvh] font-sans text-slate-800 overflow-visible">
         <Toaster position="top-center" />
         <Header
           handleExportKML={handleExportKML}

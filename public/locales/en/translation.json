@@ -371,8 +371,15 @@
     "loginRegister": "Login / Register",
     "logout": "Logout",
     "exportKML": "Export KML",
+    "exportData": "Export backup",
+    "importData": "Import backup",
     "data": "DB",
     "mapData": "Map"
+  },
+  "nav": {
+    "records": "Records",
+    "map": "Map",
+    "stats": "Stats"
   },
   "common": {
     "deleteConfirm": "Confirm delete?",
@@ -529,7 +536,11 @@
     "geoDenied": "Permission denied",
     "geoFail": "Failed to get location",
     "geoTimeout": "Timeout getting location",
-    "geoUnavailable": "Location unavailable"
+    "geoUnavailable": "Location unavailable",
+    "locate": "Locate me",
+    "pinToolAdd": "Add map pin",
+    "pinToolSnap": "Switch to snap mode",
+    "pinToolExit": "Exit pin mode"
   },
   "chest": {
     "searchingRoute": "Searching path...",

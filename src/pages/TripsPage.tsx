@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useMemo } from "react";
 import {
   Train,
-  Edit2,
+  Pencil,
   Trash2,
   Star,
   Code,
@@ -1161,7 +1161,7 @@ export const TripsPage: React.FC = () => {
           key={trip.id}
           id={`trip-${String(trip.id)}`}
           data-year-month={isFirstInMonth ? trip.date.slice(0, 7) : undefined}
-          className={`${cls.bg} p-4 rounded-lg border ${cls.border} shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-pointer`}
+          className={`${cls.bg} p-4 rounded-lg border ${cls.border} shadow-sm transition-colors duration-200 hover:shadow-md cursor-pointer`}
           onClick={() => useStore.getState().startEditingWalkTrip(trip)}
         >
           <div
@@ -1181,7 +1181,7 @@ export const TripsPage: React.FC = () => {
                 }}
                 className={cls.btnEdit}
               >
-                <Edit2 size={14} />
+                <Pencil size={14} />
               </button>
               <button
                 onClick={(e) => {
@@ -1224,7 +1224,7 @@ export const TripsPage: React.FC = () => {
         key={trip.id}
         id={`trip-${String(trip.id)}`}
         data-year-month={isFirstInMonth ? trip.date.slice(0, 7) : undefined}
-        className="bg-white p-4 rounded-lg border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1"
+        className="rl-card p-4 transition-colors duration-200 hover:border-slate-300 hover:shadow-md"
       >
         <div className="flex justify-between mb-2 pb-2 border-b border-gray-50">
           <span className="text-xs font-bold text-gray-400">{trip.date}</span>
@@ -1260,7 +1260,7 @@ export const TripsPage: React.FC = () => {
               onClick={() => startEditingTrip(trip)}
               className="text-gray-400 hover:text-blue-500"
             >
-              <Edit2 size={14} />
+              <Pencil size={14} />
             </button>
             <button
               onClick={(e) => {
@@ -1820,22 +1820,22 @@ export const FloatingActionButtons: React.FC<{
             }
           }}
         >
-          <div className="flex gap-2 p-2 rounded-2xl">
+          <div className="flex gap-2 rounded-xl bg-white/80 p-2 shadow-lg backdrop-blur-sm ring-1 ring-slate-200/70">
             <button
               id="btn-add-trip"
               onClick={() => startEditingTrip()}
-              className="flex-1 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2"
+              className="rl-primary-action flex flex-1 items-center justify-center gap-2 px-4 py-3"
             >
               <Plus
-                className="group-hover:rotate-90 transition-transform duration-300"
                 size={18}
               />{" "}
               {t("tripsPage.recordNewTrip", "记录新行程")}
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex-none px-4 py-3 border-1 border-gray-300 text-gray-500 backdrop-blur-sm  shadow-lg rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-bold transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2"
+              className="rl-secondary-action flex flex-none items-center justify-center gap-2 px-4 py-3"
               title={t("tripsPage.importSuica", "导入 Suica CSV")}
+              aria-label={t("tripsPage.importSuica", "导入 Suica CSV")}
             >
               <Upload size={18} />
             </button>

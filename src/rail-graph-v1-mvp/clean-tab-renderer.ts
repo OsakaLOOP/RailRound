@@ -46,6 +46,9 @@ function fidOf(f: any): string {
   return props._fid || `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
 }
 
+const CLEAN_CANDIDATE_INITIAL_LIMIT = 180;
+const CLEAN_CANDIDATE_LIMIT_STEP = 320;
+
 /* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Render pipeline filter rules execution report as expandable details panel. */
 function renderPipelineReportHtml(report: any): string {
   if (!report || !report.phaseReports || report.phaseReports.length === 0) return "";
@@ -288,25 +291,21 @@ export function renderCleanHead(state: InternalState, headContainer: HTMLElement
   const { source, cleanOverrides, activeLevels, searchQuery, selectMode, cleanPipelineReport } = state.input;
   if (!source) return;
 
-  const allFeatures = source.features || [];
-  const keepSet = new Set(cleanOverrides?.keep || []);
-  const removeSet = new Set(cleanOverrides?.remove || []);
-
-  const localKeepCount = allFeatures.filter((f: any) => keepSet.has(fidOf(f))).length;
-  const localRemoveCount = allFeatures.filter((f: any) => removeSet.has(fidOf(f))).length;
+  const featureByFid = state.cleanFeatureByFid;
+  const keepFids = cleanOverrides?.keep || [];
+  const removeFids = cleanOverrides?.remove || [];
+  const localKeepCount = featureByFid
+    ? keepFids.reduce((count: number, fid: string) => count + (featureByFid.has(fid) ? 1 : 0), 0)
+    : keepFids.length;
+  const localRemoveCount = featureByFid
+    ? removeFids.reduce((count: number, fid: string) => count + (featureByFid.has(fid) ? 1 : 0), 0)
+    : removeFids.length;
 
   const levels = activeLevels || { high: true, medium: true, low: true };
   const query = searchQuery || "";
   const isSelectMode = !!selectMode;
-
-  const levelCounts = { high: 0, medium: 0, low: 0, unknown: 0 };
-  for (const f of allFeatures) {
-    const lv = ((f.properties || {}) as any).match_level;
-    if (lv === "high") levelCounts.high += 1;
-    else if (lv === "medium") levelCounts.medium += 1;
-    else if (lv === "low") levelCounts.low += 1;
-    else levelCounts.unknown += 1;
-  }
+  const levelCounts = state.cleanLevelCounts || { high: 0, medium: 0, low: 0, unknown: 0 };
+  const totalFeatures = state.cleanSourceTotal ?? source.features?.length ?? 0;
 
   const reportBlock = renderPipelineReportHtml(cleanPipelineReport);
 
@@ -322,7 +321,7 @@ export function renderCleanHead(state: InternalState, headContainer: HTMLElement
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <span style="font-weight:700; font-size:13px; color:#0f172a;">Manual Cleaning Override</span>
       <span class="lv-clean-stats" style="font-size:10.5px; color:#64748b; font-weight:600;">
-        Keep: <span style="color:#16a34a;">${localKeepCount}</span> | Remove: <span style="color:#dc2626;">${localRemoveCount}</span> (Total: ${allFeatures.length})
+        Keep: <span style="color:#16a34a;">${localKeepCount}</span> | Remove: <span style="color:#dc2626;">${localRemoveCount}</span> (Total: ${totalFeatures})
       </span>
     </div>
 
@@ -466,32 +465,65 @@ export function renderCleanCandidates(state: InternalState, candidates: any[], l
   if (!state.cleanCardByFid) {
     state.cleanCardByFid = new Map();
   }
+  const cleanCardByFid = state.cleanCardByFid;
 
-  const currentFids = new Set(candidates.map(c => fidOf(c)));
-  state.cleanCardByFid.forEach((card, fid) => {
-    if (!currentFids.has(fid)) {
-      card.remove();
-      state.cleanCardByFid.delete(fid);
-    }
-  });
+  const firstFid = candidates.length > 0 ? fidOf(candidates[0]) : "";
+  const lastFid = candidates.length > 0 ? fidOf(candidates[candidates.length - 1]) : "";
+  const levelsSig = Object.entries(state.input.activeLevels || {}).map(([k, v]) => `${k}:${v ? 1 : 0}`).join(",");
+  const filtersSig = Object.entries(state.input.activeFilters || {}).map(([k, v]) => `${k}:${v ? 1 : 0}`).join(",");
+  const candidateSig = `${candidates.length}|${firstFid}|${lastFid}|${state.input.searchQuery || ""}|${levelsSig}|${filtersSig}`;
+  if (state.cleanLastCandidateSig !== candidateSig) {
+    state.cleanLastCandidateSig = candidateSig;
+    state.cleanRenderLimit = CLEAN_CANDIDATE_INITIAL_LIMIT;
+    state.cleanCandidateIndexByFid = new Map();
+    cleanCardByFid.clear();
+    listContainer.replaceChildren();
+    listContainer.scrollTop = 0;
+  }
+
+  listContainer.querySelector(".lv-empty")?.remove();
+  listContainer.querySelector(".lv-clean-window-footer")?.remove();
 
   if (candidates.length === 0) {
+    cleanCardByFid.clear();
     listContainer.innerHTML = `<div class="lv-empty">No candidates match filters.</div>`;
     return;
   }
 
-  const emptyDiv = listContainer.querySelector(".lv-empty");
-  if (emptyDiv) emptyDiv.remove();
+  const currentLimit = Math.min(state.cleanRenderLimit ?? CLEAN_CANDIDATE_INITIAL_LIMIT, candidates.length);
+  let selectedIndex = -1;
+  if (selectedCandidateFid) {
+    let candidateIndexByFid = state.cleanCandidateIndexByFid;
+    if (!candidateIndexByFid || candidateIndexByFid.size === 0) {
+      candidateIndexByFid = new Map();
+      for (let i = 0; i < candidates.length; i += 1) {
+        candidateIndexByFid.set(fidOf(candidates[i]), i);
+      }
+      state.cleanCandidateIndexByFid = candidateIndexByFid;
+    }
+    selectedIndex = candidateIndexByFid.get(selectedCandidateFid) ?? -1;
+  }
+  const visibleCandidates = candidates.slice(0, currentLimit);
+  if (selectedIndex >= currentLimit) {
+    visibleCandidates.push(candidates[selectedIndex]);
+  }
+  const currentFids = new Set(visibleCandidates.map((c) => fidOf(c)));
+  cleanCardByFid.forEach((card, fid) => {
+    if (!currentFids.has(fid)) {
+      card.remove();
+      cleanCardByFid.delete(fid);
+    }
+  });
 
-  candidates.forEach((c, index) => {
+  visibleCandidates.forEach((c, index) => {
     const fid = fidOf(c);
-    let card = state.cleanCardByFid.get(fid);
+    let card = cleanCardByFid.get(fid);
     if (!card) {
       card = document.createElement("div");
       card.className = "lv-clean-item-card";
       card.dataset.fid = fid;
       listContainer.appendChild(card);
-      state.cleanCardByFid.set(fid, card);
+      cleanCardByFid.set(fid, card);
     }
 
     const props = (c.properties || {}) as any;
@@ -573,6 +605,110 @@ export function renderCleanCandidates(state: InternalState, candidates: any[], l
       listContainer.insertBefore(card, listContainer.children[index] || null);
     }
   });
+
+  if (currentLimit < candidates.length) {
+    const footer = document.createElement("div");
+    footer.className = "lv-clean-window-footer";
+    footer.style.cssText = "display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 2px 2px; font-size:10.5px; color:#64748b;";
+    footer.innerHTML = `
+      <span>Showing ${visibleCandidates.length} / ${candidates.length}</span>
+      <button class="lv-clean-load-more" style="font-size:10.5px; padding:3px 8px; border:1px solid #cbd5e1; border-radius:4px; background:#fff; cursor:pointer;">Load more</button>
+    `;
+    listContainer.appendChild(footer);
+  }
+}
+
+/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Update only clean card selected state without rebuilding the list. */
+export function updateCleanCandidateSelection(state: InternalState, previousFid: string | null, nextFid: string | null): void {
+  const cleanOverrides = state.input.cleanOverrides;
+  const selectionQueueFids = state.input.selectionQueueFids;
+  const stagedSet = new Set(state.input.staging?.stagedWayFids || []);
+  const keepSet = new Set(cleanOverrides?.keep || []);
+  const removeSet = new Set(cleanOverrides?.remove || []);
+  const overrideMeta = cleanOverrides?.meta || {};
+
+  const updateCard = (fid: string | null) => {
+    if (!fid) return;
+    const card = state.cleanCardByFid?.get(fid);
+    const feature = state.cleanFeatureByFid?.get(fid);
+    if (!card || !feature) return;
+    updateCleanCandidateCard(
+      card,
+      feature,
+      fid,
+      {
+        isRemove: removeSet.has(fid),
+        isKeep: keepSet.has(fid),
+        isSelected: nextFid === fid,
+        isQueued: !!selectionQueueFids?.has(fid) || stagedSet.has(fid),
+        reason: ((overrideMeta as Record<string, any>)[fid] || {}).reason || "",
+      },
+    );
+  };
+
+  updateCard(previousFid);
+  updateCard(nextFid);
+}
+
+function updateCleanCandidateCard(
+  card: HTMLElement,
+  c: any,
+  fid: string,
+  state: { isRemove: boolean; isKeep: boolean; isSelected: boolean; isQueued: boolean; reason: string },
+): void {
+  const props = (c.properties || {}) as any;
+  const { isRemove, isKeep, isSelected, isQueued, reason } = state;
+
+  let borderStyle = "border-left: 4px solid #cbd5e1;";
+  let bgStyle = "background:#fff;";
+  let textDecoration = "";
+  let outline = "";
+  if (isRemove) {
+    borderStyle = "border-left: 4px solid #dc2626;";
+    bgStyle = "background:#fef2f2; opacity:0.75;";
+    textDecoration = "text-decoration: line-through; color:#94a3b8;";
+  } else if (isKeep) {
+    borderStyle = "border-left: 4px solid #16a34a;";
+    bgStyle = "background:#f0fdf4;";
+  }
+  if (isSelected) {
+    bgStyle = "background:#eff6ff; border-color:#3b82f6;";
+  }
+  if (isQueued) {
+    outline = "outline:2px dashed #f59e0b; outline-offset:-2px;";
+    bgStyle = "background:#fffbeb;";
+  }
+
+  card.style.cssText = `border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:11px; transition:all 100ms; ${borderStyle} ${bgStyle} ${outline}`;
+  card.className = `lv-clean-item-card${isQueued ? ' queued' : ''}`;
+
+  const sig = `${isRemove ? 1 : 0}|${isKeep ? 1 : 0}|${isSelected ? 1 : 0}|${isQueued ? 1 : 0}|${reason}`;
+  if (card.dataset.sig === sig) return;
+  card.dataset.sig = sig;
+
+  const html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+      <span style="font-weight:600; ${textDecoration}">${isQueued ? '<span title="In select queue" style="color:#f59e0b; margin-right:3px;">●</span>' : ''}${escapeHtml(props.name || props.osm_id || "unnamed")}</span>
+      <span class="lv-clean-level-badge ${props.match_level || 'low'}">
+        ${props.match_level || 'low'} (${(props.match_score || 0).toFixed(2)})
+      </span>
+    </div>
+    <div style="font-size:10px; color:#64748b; margin-bottom:4px; display:grid; grid-template-columns:1fr; gap:1px;">
+      <div>Class: <b style="color:#475569;">${escapeHtml(props.class_main || "—")}</b> · Osm: <span>${escapeHtml(props.osm_type || "—")}/${escapeHtml(props.osm_id || "—")}</span></div>
+      <div>Station: <span>${escapeHtml(props.nearest_station || "—")}</span></div>
+    </div>
+    <div style="display:flex; gap:4px; align-items:center; margin-top:4px;">
+      <button class="lv-clean-act-btn keep ${isKeep ? 'active' : ''}" data-fid="${escapeAttr(fid)}" data-action="keep">Keep</button>
+      <button class="lv-clean-act-btn remove ${isRemove ? 'active' : ''}" data-fid="${escapeAttr(fid)}" data-action="remove">Remove</button>
+      <button class="lv-clean-act-btn reset" data-fid="${escapeAttr(fid)}" data-action="reset">Reset</button>
+      <input type="text" class="lv-clean-reason-input" data-fid="${escapeAttr(fid)}" placeholder="Reason/Justification..." value="${escapeAttr(reason)}" style="flex:1; min-width:0; font-size:10px; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px; height:18px;" />
+    </div>
+  `;
+
+  const reasonInput = card.querySelector(".lv-clean-reason-input") as HTMLInputElement | null;
+  if (!reasonInput || document.activeElement !== reasonInput) {
+    card.innerHTML = html;
+  }
 }
 
 /* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Render properties detail of selected candidate. */

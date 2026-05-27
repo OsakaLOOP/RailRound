@@ -44,7 +44,7 @@ import type { SensekiScenarioResult } from "./poc-senseki-pathfinding";
 import type { MvpOverrideState } from "./pipeline";
 import type { PipelineReport } from "./rule-handlers";
 import { polylineLengthMeters } from "./spatial-helpers";
-import { renderCleanHead, renderCleanRules, renderCleanCandidates, renderCleanDetail, getRuleHandlerType } from "./clean-tab-renderer";
+import { renderCleanHead, renderCleanRules, renderCleanCandidates, renderCleanDetail, updateCleanCandidateSelection, getRuleHandlerType } from "./clean-tab-renderer";
 import { RULE_PARAM_SCHEMAS } from "./rule-param-schema";
 
 // ── Public API ──────────────────────────────────────────────
@@ -76,6 +76,8 @@ export interface ListViewInput {
   /** 由 app.ts 的 runFilterPipeline 算好的"经全部 active rules 后通过"的 fid 集合 — 优先用它过滤候选,
    *  避免 list-view 自己再跑一次 filter (尤其涉及跨阶段 rule 时 list-view 算不出正确结果). */
   cleanPassFids?: Set<string>;
+  /** 与 cleanPassFids 同步的已过滤 feature 数组; 大数据量下避免 list-view 再扫全量 source。 */
+  cleanPassFeatures?: AnnotatedFeature[];
   /** 同一份 runFilterPipeline 的 per-rule 报告 — 渲染「规则剔除详情」可展开区. */
   cleanPipelineReport?: PipelineReport;
   ruleParamOverrides?: Record<string, Record<string, any>>;
@@ -114,6 +116,7 @@ export interface ListView {
   onCleanSearch(handler: (query: string) => void): void;
   onCleanSelectModeToggle(handler: (active: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via") => void): void;
   refreshStagingOnly?(selectMode: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via"): void;
+  refreshCleanSelectionOnly?(previousFid: string | null, nextFid: string | null): boolean;
   onCleanCandidateSelect(handler: (fid: string | null) => void): void;
   onCleanStagingAction?(handler: (action: string, data?: any) => void): void;
   onCleanRuleParamChange?(handler: (ruleId: string, params: Record<string, any> | null) => void): void;
@@ -121,7 +124,7 @@ export interface ListView {
 
 export type TabKey = "clean" | "pathfinding" | "annotate" | "diagnostics" | "raw";
 
-interface InternalState {
+export interface InternalState {
   container: HTMLElement;
   activeTab: TabKey;
   input: ListViewInput;
@@ -153,6 +156,14 @@ interface InternalState {
   functionalUseBrush: TrackFunctionalUse[];
   cleanFilter: "all" | "undecided" | "keep" | "remove";
   cleanCardByFid?: Map<string, HTMLElement>;
+  cleanFeatureByFid?: Map<string, AnnotatedFeature>;
+  cleanIndexedSource?: AnnotatedFeatureCollection | null;
+  cleanLevelCounts?: { high: number; medium: number; low: number; unknown: number };
+  cleanSourceTotal?: number;
+  cleanRenderLimit?: number;
+  cleanLastCandidateSig?: string;
+  cleanCandidateIndexByFid?: Map<string, number>;
+  cleanLastScrolledCandidateFid?: string | null;
 }
 
 const STYLE_ID = "mvp-list-view-styles";
@@ -364,6 +375,14 @@ export function createListView(container: HTMLElement): ListView {
     functionalUseBrush: [],
     cleanFilter: "all",
     cleanCardByFid: new Map(),
+    cleanFeatureByFid: new Map(),
+    cleanIndexedSource: null,
+    cleanLevelCounts: { high: 0, medium: 0, low: 0, unknown: 0 },
+    cleanSourceTotal: 0,
+    cleanRenderLimit: 160,
+    cleanLastCandidateSig: undefined,
+    cleanCandidateIndexByFid: new Map(),
+    cleanLastScrolledCandidateFid: null,
   };
 
   bindTabClicks(state);
@@ -420,6 +439,28 @@ export function createListView(container: HTMLElement): ListView {
         renderCleanHead(state, headPanel);
       }
     },
+    refreshCleanSelectionOnly(previousFid, nextFid) {
+      if (state.activeTab !== "clean") return false;
+      const container = state.container.querySelector(".lv-clean-container") as HTMLElement | null;
+      if (!container) return false;
+      const inspectorPanel = container.querySelector(".lv-clean-inspector") as HTMLElement | null;
+      if (!inspectorPanel) return false;
+
+      state.input = { ...state.input, selectedCandidateFid: nextFid };
+      updateCleanCandidateSelection(state, previousFid, nextFid);
+      renderCleanDetail(state, nextFid ? state.cleanFeatureByFid?.get(nextFid) : null, inspectorPanel);
+
+      if (nextFid && state.cleanLastScrolledCandidateFid !== nextFid) {
+        const card = state.cleanCardByFid?.get(nextFid);
+        if (card) {
+          card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          state.cleanLastScrolledCandidateFid = nextFid;
+        }
+      } else if (!nextFid) {
+        state.cleanLastScrolledCandidateFid = null;
+      }
+      return true;
+    },
   };
 }
 
@@ -455,32 +496,51 @@ function renderActiveTab(state: InternalState): void {
   }
 }
 
+function cleanFidOf(f: AnnotatedFeature): string {
+  const props = f.properties || {};
+  return (props as any)._fid
+    || `${(props as any).osm_type || ""}:${(props as any).osm_id || ""}:${(props as any).class_main || ""}:${(props as any).source_line_name || ""}`;
+}
+
+function ensureCleanFeatureIndex(state: InternalState, source: AnnotatedFeatureCollection): Map<string, AnnotatedFeature> {
+  if (state.cleanIndexedSource === source && state.cleanFeatureByFid) {
+    return state.cleanFeatureByFid;
+  }
+  const index = new Map<string, AnnotatedFeature>();
+  const levelCounts = { high: 0, medium: 0, low: 0, unknown: 0 };
+  for (const feature of source.features || []) {
+    index.set(cleanFidOf(feature), feature);
+    const lv = ((feature.properties || {}) as any).match_level;
+    if (lv === "high") levelCounts.high += 1;
+    else if (lv === "medium") levelCounts.medium += 1;
+    else if (lv === "low") levelCounts.low += 1;
+    else levelCounts.unknown += 1;
+  }
+  state.cleanIndexedSource = source;
+  state.cleanFeatureByFid = index;
+  state.cleanLevelCounts = levelCounts;
+  state.cleanSourceTotal = source.features?.length ?? 0;
+  return index;
+}
+
 function renderCleanTab(state: InternalState): void {
   const body = bodyEl(state, "clean");
-  const { source, selectedCandidateFid, cleanPassFids } = state.input;
+  const { source, selectedCandidateFid, cleanPassFids, cleanPassFeatures } = state.input;
 
   if (!source) {
     body.innerHTML = `<div class="lv-empty">No source candidates loaded. Select a Company and Line in Left panel "Prepare" or "Clean" step and load the workspace source.</div>`;
     return;
   }
 
-  const allFeatures = source.features || [];
-
-  const filteredCandidates = cleanPassFids
-    ? allFeatures.filter(f => {
-        const props = f.properties || {};
-        const fid = (props as any)._fid
-          || `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
-        return cleanPassFids.has(fid);
-      })
-    : [];
+  const sourceChanged = state.cleanIndexedSource !== source;
+  const featureByFid = ensureCleanFeatureIndex(state, source);
+  const filteredCandidates = cleanPassFeatures
+    ?? (cleanPassFids
+      ? Array.from(cleanPassFids, (fid) => featureByFid.get(fid)).filter((f): f is AnnotatedFeature => !!f)
+      : []);
 
   const selectedCandidate = selectedCandidateFid
-    ? allFeatures.find(f => {
-        const props = f.properties || {};
-        const fid = `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
-        return fid === selectedCandidateFid;
-      })
+    ? featureByFid.get(selectedCandidateFid)
     : null;
 
   let container = body.querySelector(".lv-clean-container") as HTMLElement | null;
@@ -502,16 +562,25 @@ function renderCleanTab(state: InternalState): void {
   const listContainer = container.querySelector(".lv-clean-list-container") as HTMLElement;
   const inspectorPanel = container.querySelector(".lv-clean-inspector") as HTMLElement;
 
+  if (sourceChanged) {
+    state.cleanLastCandidateSig = undefined;
+    state.cleanCandidateIndexByFid = new Map();
+    state.cleanLastScrolledCandidateFid = null;
+  }
+
   renderCleanHead(state, headPanel);
   renderCleanRules(state, rulesPanel);
   renderCleanCandidates(state, filteredCandidates, listContainer);
   renderCleanDetail(state, selectedCandidate, inspectorPanel);
 
-  if (selectedCandidateFid) {
+  if (selectedCandidateFid && state.cleanLastScrolledCandidateFid !== selectedCandidateFid) {
     const card = state.cleanCardByFid?.get(selectedCandidateFid);
     if (card) {
       card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      state.cleanLastScrolledCandidateFid = selectedCandidateFid;
     }
+  } else if (!selectedCandidateFid) {
+    state.cleanLastScrolledCandidateFid = null;
   }
 }
 
@@ -583,6 +652,13 @@ function bindCleanTabEventsDelegated(state: InternalState, container: HTMLElemen
   // 3. Click events
   container.addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
+
+    const loadMoreBtn = target.closest(".lv-clean-load-more");
+    if (loadMoreBtn) {
+      state.cleanRenderLimit = (state.cleanRenderLimit ?? 160) + 320;
+      renderCleanTab(state);
+      return;
+    }
 
     // Select Mode button
     const selmodeBtn = target.closest(".lv-clean-selmode-btn");

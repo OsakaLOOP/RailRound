@@ -149,6 +149,11 @@ const POSITRON_ATTR = "&copy; OpenStreetMap contributors &copy; CARTO";
 // ── 2. Public API ───────────────────────────────────────────
 
 export interface MapView {
+  lastRefs?: {
+    topoRef: BaseTopologyLayer;
+    geoJsonRef: AnnotatedFeatureCollection;
+    decisionsVersion: number | null;
+  } | null;
   /**
    * 增量更新地图. decisionsVersion 与 (topoRef, geoJsonRef) 三者全等时, update 早返回 (避免全量重绘).
    * @param decisionsVersion cleanDecisions 内容版本号; caller 自增, 避免 mapView 重算 Map 内容
@@ -186,6 +191,7 @@ interface InternalState {
   tileLayer: L.TileLayer | null;
   baseLayerKind: "positron" | "plain";
   entityLayers: Map<string, LayerEntry>;
+  entityLayersByFid: Map<string, LayerEntry[]>;
   /** edge.id → 对应 topo edge (用于 path bearing 计算) */
   edgeById: Map<string, TopologyEdge>;
   /** node id → LatLng (用于 path entry-node 追踪) */
@@ -206,6 +212,10 @@ interface InternalState {
   boxSelectHandlers: Array<(fids: string[]) => void>;
   boxHighlightGroup: L.LayerGroup;
   boxHighlightFidSig: string | null;
+  rebuildToken: number;
+  rebuildFrameId?: number;
+  isRebuilding?: boolean;
+  pendingFitToData?: boolean;
   animationFrameId?: number;
   animationTimeouts?: number[];
   originalZoom?: number;
@@ -221,7 +231,7 @@ export function createMapView(container: HTMLElement): MapView {
     center: [35.6900, 139.7040],
     zoom: 16,
     zoomSnap: 0.25,
-    preferCanvas: false,
+    preferCanvas: true,
   });
 
   const state: InternalState = {
@@ -229,6 +239,7 @@ export function createMapView(container: HTMLElement): MapView {
     tileLayer: null,
     baseLayerKind: "positron",
     entityLayers: new Map(),
+    entityLayersByFid: new Map(),
     edgeById: new Map(),
     nodeLatLngById: new Map(),
     featureGroup: L.featureGroup().addTo(map),
@@ -246,6 +257,10 @@ export function createMapView(container: HTMLElement): MapView {
     boxSelectHandlers: [],
     boxHighlightGroup: L.layerGroup().addTo(map),
     boxHighlightFidSig: null,
+    rebuildToken: 0,
+    rebuildFrameId: undefined,
+    isRebuilding: false,
+    pendingFitToData: false,
     animationTimeouts: [],
   };
 
@@ -331,11 +346,7 @@ export function createMapView(container: HTMLElement): MapView {
       applyBaseLayer(state, kind);
     },
     fitToData() {
-      if (state.entityLayers.size === 0) return;
-      const bounds = state.featureGroup.getBounds();
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [20, 20] });
-      }
+      fitToDataInternal(state);
     },
     fitToEntities(refs) {
       if (typeof window === "undefined") return;
@@ -359,47 +370,28 @@ export function createMapView(container: HTMLElement): MapView {
     },
     clearBoxSelectHighlight() {
       state.boxHighlightGroup.clearLayers();
+      state.boxHighlightFidSig = null;
     },
     highlightBoxSelect(fids) {
       const sig = fids.length === 0 ? "" : [...fids].sort().join("|");
       if (sig === state.boxHighlightFidSig) return;
       state.boxHighlightFidSig = sig;
       state.boxHighlightGroup.clearLayers();
-      const fidSet = new Set(fids);
-      state.entityLayers.forEach((entry) => {
-        if (entry.fid && fidSet.has(entry.fid)) {
-          let highlightLayer: L.Layer;
-          if (entry.kind === "edge") {
-            const poly = entry.layer as L.Polyline;
-            highlightLayer = L.polyline(poly.getLatLngs() as L.LatLngExpression[], {
-              color: "#ff00aa",
-              weight: 5,
-              opacity: 0.85,
-              interactive: false,
-            });
-          } else if (entry.kind === "platform") {
-            const poly = entry.layer as L.Polygon;
-            highlightLayer = L.polygon(poly.getLatLngs() as L.LatLngExpression[], {
-              color: "#ff00aa",
-              weight: 2,
-              fillColor: "#ff00aa",
-              fillOpacity: 0.4,
-              interactive: false,
-            });
-          } else {
-            const marker = entry.layer as L.CircleMarker;
-            highlightLayer = L.circleMarker(marker.getLatLng(), {
-              color: "#ff00aa",
-              radius: 6,
-              fillOpacity: 0.6,
-              interactive: false,
-            });
-          }
-          highlightLayer.addTo(state.boxHighlightGroup);
+      const visited = new Set<LayerEntry>();
+      for (const fid of fids) {
+        const entries = state.entityLayersByFid.get(fid);
+        if (!entries) continue;
+        for (const entry of entries) {
+          if (visited.has(entry)) continue;
+          visited.add(entry);
+          addBoxHighlightLayer(state, entry);
         }
-      });
+      }
     },
     destroy() {
+      if (state.rebuildFrameId !== undefined) {
+        window.cancelAnimationFrame(state.rebuildFrameId);
+      }
       map.remove();
     },
   };
@@ -428,17 +420,42 @@ function applyBaseLayer(state: InternalState, kind: "positron" | "plain"): void 
 
 // ── 6. Rebuild layers (核心渲染) ────────────────────────────
 
+const MAP_REBUILD_FRAME_BUDGET_MS = 10;
+const MAP_REBUILD_MIN_BATCH = 120;
+const MAP_REBUILD_MAX_BATCH = 900;
+
+function fitToDataInternal(state: InternalState): void {
+  if (state.isRebuilding) {
+    state.pendingFitToData = true;
+    return;
+  }
+  if (state.entityLayers.size === 0) return;
+  const bounds = state.featureGroup.getBounds();
+  if (bounds.isValid()) {
+    state.map.fitBounds(bounds, { padding: [20, 20] });
+  }
+}
+
 function rebuildLayers(
   state: InternalState,
   topo: BaseTopologyLayer,
   geoJson: AnnotatedFeatureCollection,
   cleanDecisions?: Map<string, string>,
 ): void {
-  // 清空旧 layers
+  if (state.rebuildFrameId !== undefined) {
+    window.cancelAnimationFrame(state.rebuildFrameId);
+    state.rebuildFrameId = undefined;
+  }
+
+  const token = ++state.rebuildToken;
+  state.isRebuilding = true;
+  state.pendingFitToData = false;
+
   state.featureGroup.clearLayers();
   state.arrowLayer.clearLayers();
   state.signalLayer.clearLayers();
   state.entityLayers.clear();
+  state.entityLayersByFid.clear();
   state.edgeById.clear();
   state.nodeLatLngById.clear();
   state.arrowById.clear();
@@ -450,252 +467,308 @@ function rebuildLayers(
     if (id) annotationIdToFeature.set(id, feature);
   }
 
-  // Render raw features from geoJson directly
-  for (const feature of geoJson.features) {
-    const properties = (feature.properties || {}) as any;
-    const annotation = properties.railGraph;
-    if (!annotation) continue;
-    const ref = annotation.id;
-    if (!ref) continue;
-
-    const fid = `${properties.osm_type || ""}:${properties.osm_id || ""}:${properties.class_main || ""}:${properties.source_line_name || ""}`;
-    const decision = cleanDecisions?.get(fid);
-    const matchLevel = properties.match_level || "all";
-
-    if (feature.geometry.type === "LineString" || feature.geometry.type === "MultiLineString") {
-      const coords = extractEdgeCoordinates(feature, undefined) ?? undefined;
-      if (!coords || coords.length < 2) continue;
-
-      const latLngs = coords.map((c) => [c[1], c[0]] as [number, number]);
-      
-      let baseStyle: L.PathOptions;
-      if (decision === "remove") {
-        baseStyle = {
-          color: "#94a3b8", // gray
-          weight: 1.5,
-          opacity: 0.25,
-          dashArray: "4,4",
-        };
-      } else {
-        const level = matchLevel || "all";
-        let color = "#2563eb"; // default blue
-        if (level === "high") color = "#16a34a"; // green
-        else if (level === "medium") color = "#ca8a04"; // yellow/gold
-        else if (level === "low") color = "#dc2626"; // red
-        
-        baseStyle = {
-          color,
-          weight: level === "low" ? 2.5 : 4,
-          opacity: 0.9,
-        };
-      }
-
-      const name = properties.name || properties.osm_id || "unnamed";
-      const polyline = L.polyline(latLngs, baseStyle);
-      polyline.bindTooltip(
-        `<b>${escapeHtml(name)}</b><br/>` +
-        `class: ${escapeHtml(properties.class_main || "—")}<br/>` +
-        `osm: ${escapeHtml(properties.osm_type || "")}/${escapeHtml(properties.osm_id || "")}<br/>` +
-        `match: ${escapeHtml(properties.match_level || "—")} (${(properties.match_score || 0).toFixed(2)})<br/>` +
-        `nearest station: ${escapeHtml(properties.nearest_station || "—")}`,
-        { sticky: true, direction: "top" },
-      );
-      bindLayerEvents(state, polyline, ref);
-      polyline.addTo(state.featureGroup);
-      state.entityLayers.set(ref, { layer: polyline, baseStyle, kind: "edge", fid });
-    }
-    else if (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon") {
-      const geom = extractPlatformGeometry(feature);
-      if (!geom) continue;
-      
-      let baseStyle: L.PathOptions;
-      if (decision === "remove") {
-        baseStyle = {
-          color: "#94a3b8",
-          weight: 1,
-          fillColor: "#cbd5e1",
-          fillOpacity: 0.1,
-          dashArray: "2,2",
-        };
-      } else {
-        baseStyle = {
-          color: "#a16207",
-          weight: 1.5,
-          fillColor: COLORS.platform,
-          fillOpacity: 0.55,
-        };
-      }
-
-      let layer: L.Path;
-      if (geom.kind === "polygon") {
-        const ringsLatLng = geom.rings.map((ring) => ring.map((c) => [c[1], c[0]] as [number, number]));
-        layer = L.polygon(ringsLatLng, baseStyle);
-      } else if (geom.kind === "line") {
-        const linesLatLng = geom.lines.map((line) => line.map((c) => [c[1], c[0]] as [number, number]));
-        layer = L.polyline(linesLatLng, {
-          ...baseStyle,
-          weight: 4,
-          opacity: 0.9,
-          fillOpacity: 0,
-          dashArray: "6 3",
-        });
-      } else {
-        const [lng, lat] = geom.coord;
-        layer = L.circleMarker([lat, lng], {
-          ...baseStyle,
-          weight: 2,
-          radius: 5,
-          fillOpacity: 0.8,
-        });
-      }
-
-      const name = properties.name || properties.osm_id || "platform";
-      layer.bindTooltip(
-        `<b>${escapeHtml(name)}</b><br/>` +
-        `class: platform_area<br/>` +
-        `nearest station: ${escapeHtml(properties.nearest_station || "—")}`,
-        { sticky: true, direction: "top" },
-      );
-      bindLayerEvents(state, layer, ref);
-      layer.addTo(state.featureGroup);
-      state.entityLayers.set(ref, { layer, baseStyle, kind: "platform", fid });
-    }
-    else if (feature.geometry.type === "Point") {
-      const coord = (feature.geometry as any).coordinates;
-      if (!coord || coord.length < 2) continue;
-      
-      let baseStyle: L.PathOptions;
-      const isStation = properties.class_main === "station" || properties.railway === "station" || properties.railway === "halt";
-      
-      if (decision === "remove") {
-        baseStyle = {
-          color: "#94a3b8",
-          weight: 1,
-          fillColor: "#cbd5e1",
-          fillOpacity: 0.15,
-          radius: 4,
-        } as L.PathOptions & { radius: number };
-      } else {
-        if (isStation) {
-          baseStyle = {
-            color: COLORS.station,
-            weight: 2,
-            fillColor: "#ffffff",
-            fillOpacity: 1,
-            radius: 6,
-          } as L.PathOptions & { radius: number };
-        } else {
-          baseStyle = {
-            color: "#475569",
-            weight: 1.5,
-            fillColor: "#94a3b8",
-            fillOpacity: 0.8,
-            radius: 4,
-          } as L.PathOptions & { radius: number };
-        }
-      }
-
-      const marker = L.circleMarker([coord[1], coord[0]], baseStyle as L.CircleMarkerOptions);
-      const name = properties.name || properties.osm_id || "station_point";
-      marker.bindTooltip(
-        `<b>${escapeHtml(name)}</b><br/>` +
-        `class: ${escapeHtml(properties.class_main || properties.railway || "point")}`,
-        { sticky: true, direction: "top" },
-      );
-      bindLayerEvents(state, marker, ref);
-      marker.addTo(state.featureGroup);
-      state.entityLayers.set(ref, { layer: marker, baseStyle, kind: "station", fid });
-    }
-  }
-
-  // Draw topology-specific overlays on top if topo is available
-  if (topo && topo.edges) {
-    for (const edge of topo.edges) {
-      let coords = edge.coordinates;
-      if (!coords) {
-        const sourceRef = edge.sourceSlice?.sourceFeatureRef;
-        if (sourceRef) {
-          const feature = annotationIdToFeature.get(sourceRef);
-          if (feature) {
-            coords = extractEdgeCoordinates(feature, edge.sourceSlice?.multiLineIndex) ?? undefined;
-          }
-        }
-      }
-      if (!coords || coords.length < 2) continue;
-
-      state.edgeById.set(edge.id, edge);
-      state.nodeLatLngById.set(edge.fromNodeRef, L.latLng(coords[0][1], coords[0][0]));
-      state.nodeLatLngById.set(edge.toNodeRef, L.latLng(coords[coords.length - 1][1], coords[coords.length - 1][0]));
-
-      const midLatLng = midpointAlong(coords);
-      const bearing = computeBearing(coords[0], coords[coords.length - 1]);
-      const arrowMarker = buildArrowMarker(midLatLng, edge, bearing);
-      arrowMarker.addTo(state.arrowLayer);
-      state.arrowById.set(edge.id, arrowMarker);
-    }
-  }
-
-  if (topo && topo.platforms && topo.stations) {
-    const stationFeatureById = new Map<string, AnnotatedFeature>();
+  const features = geoJson.features || [];
+  const edges = topo?.edges || [];
+  const platforms = topo?.platforms || [];
+  const signals = topo?.signals || [];
+  const stationFeatureById = new Map<string, AnnotatedFeature>();
+  if (topo?.stations) {
     for (const station of topo.stations) {
       const f = annotationIdToFeature.get(station.id);
       if (f && f.geometry.type === "Point") stationFeatureById.set(station.id, f);
     }
-    for (const platform of topo.platforms) {
-      if (!platform.stationRef) continue;
-      const stationFeature = stationFeatureById.get(platform.stationRef);
-      if (!stationFeature) continue;
-      const platformFeature = annotationIdToFeature.get(platform.id);
-      if (!platformFeature) continue;
-      const platformCenter = platformCentroidLatLng(platformFeature);
-      if (!platformCenter) continue;
-      const stationCoord = (stationFeature.geometry as GeoJSONPoint).coordinates;
-      const stationLatLng: [number, number] = [stationCoord[1], stationCoord[0]];
-      const bindLine = L.polyline([platformCenter, stationLatLng], {
-        color: "#0891b2",
-        weight: 1.5,
-        opacity: 0.75,
-        dashArray: "4 4",
-        interactive: false,
-      });
-      bindLine.addTo(state.featureGroup);
-    }
   }
 
-  if (topo && topo.signals) {
-    for (const signal of topo.signals) {
-      const edgeCoords = getEdgeCoords(signal.edgeRef, topo, annotationIdToFeature);
-      if (!edgeCoords) continue;
-      const latLng = interpolateAlong(edgeCoords, signal.measure);
-      const edgeBearing = computeBearing(edgeCoords[0], edgeCoords[edgeCoords.length - 1]);
+  let featureIndex = 0;
+  let edgeIndex = 0;
+  let platformIndex = 0;
+  let signalIndex = 0;
 
-      const facingSvg = buildSignalSvg(signal.facing, edgeBearing);
-      const marker = L.marker(latLng, {
-        icon: L.divIcon({
-          className: "mvp-signal-marker",
-          html: facingSvg,
-          iconSize: [24, 24],
-          iconAnchor: [12, 12],
-        }),
-        keyboard: false,
-      });
-      marker.bindTooltip(
-        `<b>${escapeHtml(signal.name ?? signal.id)}</b><br/>` +
-        `edge: ${escapeHtml(signal.edgeRef)}<br/>` +
-        `measure: ${signal.measure}<br/>` +
-        `facing: ${signal.facing}`,
-        { sticky: true, direction: "top" },
-      );
-      bindLayerEvents(state, marker, signal.id);
-      marker.addTo(state.signalLayer);
+  const schedule = () => {
+    state.rebuildFrameId = window.requestAnimationFrame(step);
+  };
 
-      state.entityLayers.set(signal.id, {
-        layer: marker as unknown as L.Path,
-        baseStyle: { facing: signal.facing, edgeBearing } as L.PathOptions & { facing?: string; edgeBearing?: number },
-        kind: "signal",
-      });
+  const finish = () => {
+    if (token !== state.rebuildToken) return;
+    state.rebuildFrameId = undefined;
+    state.isRebuilding = false;
+    if (state.pendingFitToData) {
+      state.pendingFitToData = false;
+      fitToDataInternal(state);
     }
+  };
+
+  const shouldPause = (startedAt: number, processed: number) => {
+    if (processed >= MAP_REBUILD_MAX_BATCH) return true;
+    return processed >= MAP_REBUILD_MIN_BATCH && performance.now() - startedAt >= MAP_REBUILD_FRAME_BUDGET_MS;
+  };
+
+  function step(): void {
+    if (token !== state.rebuildToken) return;
+    const startedAt = performance.now();
+    let processed = 0;
+
+    while (featureIndex < features.length) {
+      renderFeatureLayer(state, features[featureIndex], cleanDecisions);
+      featureIndex += 1;
+      processed += 1;
+      if (shouldPause(startedAt, processed)) return schedule();
+    }
+
+    while (edgeIndex < edges.length) {
+      renderTopologyEdgeOverlay(state, edges[edgeIndex], annotationIdToFeature);
+      edgeIndex += 1;
+      processed += 1;
+      if (shouldPause(startedAt, processed)) return schedule();
+    }
+
+    while (platformIndex < platforms.length) {
+      renderPlatformBindingOverlay(state, platforms[platformIndex], annotationIdToFeature, stationFeatureById);
+      platformIndex += 1;
+      processed += 1;
+      if (shouldPause(startedAt, processed)) return schedule();
+    }
+
+    while (signalIndex < signals.length) {
+      renderSignalOverlay(state, signals[signalIndex], topo, annotationIdToFeature);
+      signalIndex += 1;
+      processed += 1;
+      if (shouldPause(startedAt, processed)) return schedule();
+    }
+
+    finish();
   }
+
+  schedule();
+}
+
+function renderFeatureLayer(
+  state: InternalState,
+  feature: AnnotatedFeature,
+  cleanDecisions?: Map<string, string>,
+): void {
+  const properties = (feature.properties || {}) as any;
+  const annotation = properties.railGraph;
+  if (!annotation) return;
+  const ref = annotation.id;
+  if (!ref) return;
+
+  const fid = properties._fid || `${properties.osm_type || ""}:${properties.osm_id || ""}:${properties.class_main || ""}:${properties.source_line_name || ""}`;
+  const decision = cleanDecisions?.get(fid);
+  const matchLevel = properties.match_level || "all";
+
+  if (feature.geometry.type === "LineString" || feature.geometry.type === "MultiLineString") {
+    const coords = extractEdgeCoordinates(feature, undefined) ?? undefined;
+    if (!coords || coords.length < 2) return;
+
+    const latLngs = coords.map((c) => [c[1], c[0]] as [number, number]);
+    let baseStyle: L.PathOptions;
+    if (decision === "remove") {
+      baseStyle = { color: "#94a3b8", weight: 1.5, opacity: 0.25, dashArray: "4,4" };
+    } else {
+      const level = matchLevel || "all";
+      let color = "#2563eb";
+      if (level === "high") color = "#16a34a";
+      else if (level === "medium") color = "#ca8a04";
+      else if (level === "low") color = "#dc2626";
+      baseStyle = { color, weight: level === "low" ? 2.5 : 4, opacity: 0.9 };
+    }
+
+    const name = properties.name || properties.osm_id || "unnamed";
+    const polyline = L.polyline(latLngs, baseStyle);
+    polyline.bindTooltip(
+      `<b>${escapeHtml(name)}</b><br/>` +
+      `class: ${escapeHtml(properties.class_main || "—")}<br/>` +
+      `osm: ${escapeHtml(properties.osm_type || "")}/${escapeHtml(properties.osm_id || "")}<br/>` +
+      `match: ${escapeHtml(properties.match_level || "—")} (${(properties.match_score || 0).toFixed(2)})<br/>` +
+      `nearest station: ${escapeHtml(properties.nearest_station || "—")}`,
+      { sticky: true, direction: "top" },
+    );
+    bindLayerEvents(state, polyline, ref);
+    polyline.addTo(state.featureGroup);
+    registerEntityLayer(state, ref, { layer: polyline, baseStyle, kind: "edge", fid });
+    return;
+  }
+
+  if (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon") {
+    const geom = extractPlatformGeometry(feature);
+    if (!geom) return;
+
+    const baseStyle: L.PathOptions = decision === "remove"
+      ? { color: "#94a3b8", weight: 1, fillColor: "#cbd5e1", fillOpacity: 0.1, dashArray: "2,2" }
+      : { color: "#a16207", weight: 1.5, fillColor: COLORS.platform, fillOpacity: 0.55 };
+
+    let layer: L.Path;
+    if (geom.kind === "polygon") {
+      const ringsLatLng = geom.rings.map((ring) => ring.map((c) => [c[1], c[0]] as [number, number]));
+      layer = L.polygon(ringsLatLng, baseStyle);
+    } else if (geom.kind === "line") {
+      const linesLatLng = geom.lines.map((line) => line.map((c) => [c[1], c[0]] as [number, number]));
+      layer = L.polyline(linesLatLng, { ...baseStyle, weight: 4, opacity: 0.9, fillOpacity: 0, dashArray: "6 3" });
+    } else {
+      const [lng, lat] = geom.coord;
+      layer = L.circleMarker([lat, lng], { ...baseStyle, weight: 2, radius: 5, fillOpacity: 0.8 });
+    }
+
+    const name = properties.name || properties.osm_id || "platform";
+    layer.bindTooltip(
+      `<b>${escapeHtml(name)}</b><br/>class: platform_area<br/>nearest station: ${escapeHtml(properties.nearest_station || "—")}`,
+      { sticky: true, direction: "top" },
+    );
+    bindLayerEvents(state, layer, ref);
+    layer.addTo(state.featureGroup);
+    registerEntityLayer(state, ref, { layer, baseStyle, kind: "platform", fid });
+    return;
+  }
+
+  if (feature.geometry.type === "Point") {
+    const coord = (feature.geometry as any).coordinates;
+    if (!coord || coord.length < 2) return;
+
+    const isStation = properties.class_main === "station" || properties.railway === "station" || properties.railway === "halt";
+    let baseStyle: L.PathOptions;
+    if (decision === "remove") {
+      baseStyle = { color: "#94a3b8", weight: 1, fillColor: "#cbd5e1", fillOpacity: 0.15, radius: 4 } as L.PathOptions & { radius: number };
+    } else if (isStation) {
+      baseStyle = { color: COLORS.station, weight: 2, fillColor: "#ffffff", fillOpacity: 1, radius: 6 } as L.PathOptions & { radius: number };
+    } else {
+      baseStyle = { color: "#475569", weight: 1.5, fillColor: "#94a3b8", fillOpacity: 0.8, radius: 4 } as L.PathOptions & { radius: number };
+    }
+
+    const marker = L.circleMarker([coord[1], coord[0]], baseStyle as L.CircleMarkerOptions);
+    const name = properties.name || properties.osm_id || "station_point";
+    marker.bindTooltip(
+      `<b>${escapeHtml(name)}</b><br/>class: ${escapeHtml(properties.class_main || properties.railway || "point")}`,
+      { sticky: true, direction: "top" },
+    );
+    bindLayerEvents(state, marker, ref);
+    marker.addTo(state.featureGroup);
+    registerEntityLayer(state, ref, { layer: marker, baseStyle, kind: "station", fid });
+  }
+}
+
+function registerEntityLayer(state: InternalState, ref: string, entry: LayerEntry): void {
+  state.entityLayers.set(ref, entry);
+  if (!entry.fid) return;
+  const list = state.entityLayersByFid.get(entry.fid);
+  if (list) list.push(entry);
+  else state.entityLayersByFid.set(entry.fid, [entry]);
+}
+
+function addBoxHighlightLayer(state: InternalState, entry: LayerEntry): void {
+  let highlightLayer: L.Layer;
+  if (entry.kind === "edge") {
+    const poly = entry.layer as L.Polyline;
+    highlightLayer = L.polyline(poly.getLatLngs() as L.LatLngExpression[], {
+      color: "#ff00aa",
+      weight: 5,
+      opacity: 0.85,
+      interactive: false,
+    });
+  } else if (entry.kind === "platform") {
+    const poly = entry.layer as L.Polygon;
+    highlightLayer = L.polygon(poly.getLatLngs() as L.LatLngExpression[], {
+      color: "#ff00aa",
+      weight: 2,
+      fillColor: "#ff00aa",
+      fillOpacity: 0.4,
+      interactive: false,
+    });
+  } else {
+    const marker = entry.layer as L.CircleMarker;
+    highlightLayer = L.circleMarker(marker.getLatLng(), {
+      color: "#ff00aa",
+      radius: 6,
+      fillOpacity: 0.6,
+      interactive: false,
+    });
+  }
+  highlightLayer.addTo(state.boxHighlightGroup);
+}
+
+function renderTopologyEdgeOverlay(
+  state: InternalState,
+  edge: TopologyEdge,
+  annotationIdToFeature: Map<string, AnnotatedFeature>,
+): void {
+  let coords = edge.coordinates;
+  if (!coords) {
+    const sourceRef = edge.sourceSlice?.sourceFeatureRef;
+    const feature = sourceRef ? annotationIdToFeature.get(sourceRef) : undefined;
+    if (feature) coords = extractEdgeCoordinates(feature, edge.sourceSlice?.multiLineIndex) ?? undefined;
+  }
+  if (!coords || coords.length < 2) return;
+
+  state.edgeById.set(edge.id, edge);
+  state.nodeLatLngById.set(edge.fromNodeRef, L.latLng(coords[0][1], coords[0][0]));
+  state.nodeLatLngById.set(edge.toNodeRef, L.latLng(coords[coords.length - 1][1], coords[coords.length - 1][0]));
+
+  const midLatLng = midpointAlong(coords);
+  const bearing = computeBearing(coords[0], coords[coords.length - 1]);
+  const arrowMarker = buildArrowMarker(midLatLng, edge, bearing);
+  arrowMarker.addTo(state.arrowLayer);
+  state.arrowById.set(edge.id, arrowMarker);
+}
+
+function renderPlatformBindingOverlay(
+  state: InternalState,
+  platform: BaseTopologyLayer["platforms"][number],
+  annotationIdToFeature: Map<string, AnnotatedFeature>,
+  stationFeatureById: Map<string, AnnotatedFeature>,
+): void {
+  if (!platform.stationRef) return;
+  const stationFeature = stationFeatureById.get(platform.stationRef);
+  if (!stationFeature) return;
+  const platformFeature = annotationIdToFeature.get(platform.id);
+  if (!platformFeature) return;
+  const platformCenter = platformCentroidLatLng(platformFeature);
+  if (!platformCenter) return;
+  const stationCoord = (stationFeature.geometry as GeoJSONPoint).coordinates;
+  const stationLatLng: [number, number] = [stationCoord[1], stationCoord[0]];
+  L.polyline([platformCenter, stationLatLng], {
+    color: "#0891b2",
+    weight: 1.5,
+    opacity: 0.75,
+    dashArray: "4 4",
+    interactive: false,
+  }).addTo(state.featureGroup);
+}
+
+function renderSignalOverlay(
+  state: InternalState,
+  signal: BaseTopologyLayer["signals"][number],
+  topo: BaseTopologyLayer,
+  annotationIdToFeature: Map<string, AnnotatedFeature>,
+): void {
+  const edgeCoords = getEdgeCoords(signal.edgeRef, topo, annotationIdToFeature);
+  if (!edgeCoords) return;
+  const latLng = interpolateAlong(edgeCoords, signal.measure);
+  const edgeBearing = computeBearing(edgeCoords[0], edgeCoords[edgeCoords.length - 1]);
+
+  const marker = L.marker(latLng, {
+    icon: L.divIcon({
+      className: "mvp-signal-marker",
+      html: buildSignalSvg(signal.facing, edgeBearing),
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    }),
+    keyboard: false,
+  });
+  marker.bindTooltip(
+    `<b>${escapeHtml(signal.name ?? signal.id)}</b><br/>` +
+    `edge: ${escapeHtml(signal.edgeRef)}<br/>` +
+    `measure: ${signal.measure}<br/>` +
+    `facing: ${signal.facing}`,
+    { sticky: true, direction: "top" },
+  );
+  bindLayerEvents(state, marker, signal.id);
+  marker.addTo(state.signalLayer);
+
+  state.entityLayers.set(signal.id, {
+    layer: marker as unknown as L.Path,
+    baseStyle: { facing: signal.facing, edgeBearing } as L.PathOptions & { facing?: string; edgeBearing?: number },
+    kind: "signal",
+  });
 }
 
 function extractEdgeCoordinates(

@@ -84,7 +84,7 @@ export interface LineWorkspaceState {
     cleanFilters?: Record<string, boolean>;
     cleanLevels?: Record<string, boolean>;
     cleanSearchQuery?: string;
-    cleanSelectMode?: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via";
+    cleanSelectMode?: boolean | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via";
     cleanSelectedCandidateFid?: string | null;
     selectionQueue?: string[];
     ruleParamOverrides?: Record<string, Record<string, any>>;

@@ -115,9 +115,19 @@ let cleanDecisionsVersion = 0;
 let pendingLoadToken = 0;
 
 // 单次 pipeline 共享 cache: refreshViews / compileCleanDecisions 命中 sig 即复用.
-// 触发失效的位置: source 重载, rule/filter/level/search/overrides 变更.
+// 触发失效的位置: source 重载, rule/filter/level/search/rule params 变更.
 let lastPipelineRun: { passFids: Set<string>; passFeatures: GeoJsonFeature[]; report: PipelineReport; sig: string } | null = null;
 let cachedFilteredSource: { type: "FeatureCollection"; features: GeoJsonFeature[] } | null = null;
+let sourceVersion = 0;
+let cleanSearchDebounceTimer: number | null = null;
+let cleanSearchApplyToken = 0;
+let cleanLookupCache: {
+  sourceRef: GeoJsonFeatureCollection;
+  topoRef: BaseTopologyLayer | null;
+  fidByEntityRef: Map<string, string>;
+  annotationRefByFid: Map<string, string>;
+  topoIdsByFid: Map<string, string[]>;
+} | null = null;
 
 let activePipelineRunToken = 0;
 let isPipelineRunning = false;
@@ -131,6 +141,8 @@ const yieldToMain = () => new Promise((resolve) => {
     setTimeout(resolve, 0);
   }
 });
+
+const PIPELINE_FILTER_CHUNK_SIZE = 2000;
 
 async function ensurePipelinePrepared(): Promise<void> {
   if (!state.source) return;
@@ -195,12 +207,11 @@ async function ensurePipelinePrepared(): Promise<void> {
 function currentPipelineSig(): string {
   const ws = activeWorkspace();
   return [
-    state.source ? state.source.features.length : 0,                  // source identity proxy (length 变化即换;_fid 不变 length 不变)
+    sourceVersion,
+    state.source ? state.source.features.length : 0,
     JSON.stringify(cleanFilters),
     JSON.stringify(cleanLevels),
     cleanSearchQuery,
-    cleanOverrides?.keep?.length ?? 0,
-    cleanOverrides?.remove?.length ?? 0,
     (filterRules || []).length,
     JSON.stringify(ws.ui?.ruleParamOverrides || {}),
   ].join("|");
@@ -258,6 +269,22 @@ function getOrRunPipeline(): { passFids: Set<string>; passFeatures: GeoJsonFeatu
 
 function invalidatePipelineCache(): void {
   lastPipelineRun = null;
+  cachedFilteredSource = null;
+}
+
+function invalidateCleanLookupCache(): void {
+  cleanLookupCache = null;
+}
+
+function resetLoadedSourceState(): void {
+  state.source = null;
+  state.bindings = [];
+  state.stoppingPoints = [];
+  state.topo = null;
+  state.diagnostics = [];
+  sourceVersion++;
+  invalidatePipelineCache();
+  invalidateCleanLookupCache();
 }
 
 type RailGraphKind = RailGraphFeatureKind;
@@ -365,8 +392,8 @@ async function loadAllCleanDecisions(): Promise<void> {
     console.error("[clean] Failed to load filter rules:", err);
   }
 
-  // 3. Compile rules & overrides into in-memory map
-  invalidatePipelineCache();  // overrides 和 rules 可能都变了, 强制下次跑
+  // 3. Compile rules into pipeline output, then fold overrides into in-memory decisions.
+  invalidatePipelineCache();  // rules 可能变了, 强制下次跑
   try {
     await ensurePipelinePrepared();
   } catch (err: any) {
@@ -420,6 +447,126 @@ export function fidOf(f: GeoJsonFeature): string {
 
 function fidOfFeature(f: GeoJsonFeature): string { return fidOf(f); }
 
+function prepareFeatureForClean(f: GeoJsonFeature): void {
+  const props = (f.properties || {}) as any;
+  fidOf(f);
+  props._searchText = [
+    props.name,
+    props.nearest_station,
+    props.osm_id,
+    props.class_main,
+    props.source_line_name,
+  ].filter((v) => v !== undefined && v !== null).join("\u0001").toLowerCase();
+}
+
+function addLookupTopoId(index: Map<string, string[]>, fid: string | undefined, topoId: string | undefined): void {
+  if (!fid || !topoId) return;
+  const list = index.get(fid);
+  if (list) {
+    if (!list.includes(topoId)) list.push(topoId);
+  } else {
+    index.set(fid, [topoId]);
+  }
+}
+
+function ensureCleanLookupCache(): NonNullable<typeof cleanLookupCache> | null {
+  if (!state.source) return null;
+  const topoRef = state.topo ?? null;
+  if (
+    cleanLookupCache
+    && cleanLookupCache.sourceRef === state.source
+    && cleanLookupCache.topoRef === topoRef
+  ) {
+    return cleanLookupCache;
+  }
+
+  const fidByEntityRef = new Map<string, string>();
+  const annotationRefByFid = new Map<string, string>();
+  const topoIdsByFid = new Map<string, string[]>();
+
+  for (const feature of state.source.features) {
+    const fid = fidOf(feature);
+    const ref = feature.properties?.railGraph?.id;
+    if (ref) {
+      fidByEntityRef.set(ref, fid);
+      annotationRefByFid.set(fid, ref);
+    }
+  }
+
+  if (topoRef) {
+    for (const edge of topoRef.edges) {
+      const sourceRef = edge.sourceSlice?.sourceFeatureRef;
+      const fid = sourceRef ? fidByEntityRef.get(sourceRef) : undefined;
+      if (fid) {
+        fidByEntityRef.set(edge.id, fid);
+        addLookupTopoId(topoIdsByFid, fid, edge.id);
+      }
+    }
+    for (const platform of topoRef.platforms) {
+      const fid = fidByEntityRef.get(platform.id);
+      if (fid) {
+        fidByEntityRef.set(platform.id, fid);
+        addLookupTopoId(topoIdsByFid, fid, platform.id);
+      }
+    }
+    for (const station of topoRef.stations) {
+      const fid = fidByEntityRef.get(station.id);
+      if (fid) {
+        fidByEntityRef.set(station.id, fid);
+        addLookupTopoId(topoIdsByFid, fid, station.id);
+      }
+    }
+    for (const signal of topoRef.signals) {
+      const fid = fidByEntityRef.get(signal.id);
+      if (fid) {
+        fidByEntityRef.set(signal.id, fid);
+        addLookupTopoId(topoIdsByFid, fid, signal.id);
+      }
+    }
+  }
+
+  cleanLookupCache = {
+    sourceRef: state.source,
+    topoRef,
+    fidByEntityRef,
+    annotationRefByFid,
+    topoIdsByFid,
+  };
+  return cleanLookupCache;
+}
+
+function fidForEntityRef(ref: string | EntityRef, hintFid?: string | null): string | null {
+  if (hintFid) return hintFid;
+  return ensureCleanLookupCache()?.fidByEntityRef.get(String(ref)) ?? null;
+}
+
+function annotationRefForFid(fid: string): EntityRef | null {
+  return (ensureCleanLookupCache()?.annotationRefByFid.get(fid) as EntityRef | undefined) ?? null;
+}
+
+function topologyIdsForFid(fid: string): EntityRef[] {
+  return (ensureCleanLookupCache()?.topoIdsByFid.get(fid) as EntityRef[] | undefined) ?? [];
+}
+
+function featureMatchesBuiltinFilters(
+  f: GeoJsonFeature,
+  activeLevels: Record<string, boolean>,
+  queryLower: string,
+): boolean {
+  const props = (f.properties || {}) as any;
+  const lv = props.match_level || "low";
+  if (activeLevels && activeLevels[lv] === false) return false;
+  if (queryLower) {
+    const searchText = typeof props._searchText === "string"
+      ? props._searchText
+      : String(props.name || "").toLowerCase()
+        + "\u0001" + String(props.nearest_station || "").toLowerCase()
+        + "\u0001" + String(props.osm_id || "").toLowerCase();
+    if (!searchText.includes(queryLower)) return false;
+  }
+  return true;
+}
+
 // rule 可编程的两阶段执行引擎:
 //   - 每条 rule 可声明 rule.phase (默认 1) 决定执行顺序; 同 phase 内 sequential 剔除 (按 rule.order / JSON 顺序)
 //   - 每条 rule 可声明 rule.input.{source, geometry_types} 决定它的「参考集」
@@ -444,21 +591,10 @@ export function runFilterPipeline(
   searchQuery: string,
 ): PipelineResult {
   const t0 = performance.now();
+  const queryLower = searchQuery.trim().toLowerCase();
 
   // phase 0 (内置): level + search 过滤 — 廉价、O(N), 必在最前。
-  let passed: GeoJsonFeature[] = features.filter((f) => {
-    const props = (f.properties || {}) as any;
-    const lv = props.match_level || "low";
-    if (activeLevels && activeLevels[lv] === false) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const matchName = String(props.name || "").toLowerCase().includes(q)
-        || String(props.nearest_station || "").toLowerCase().includes(q)
-        || String(props.osm_id || "").includes(q);
-      if (!matchName) return false;
-    }
-    return true;
-  });
+  let passed: GeoJsonFeature[] = features.filter((f) => featureMatchesBuiltinFilters(f, activeLevels, queryLower));
 
   const totalIn = features.length;
   const phaseReports: PipelineReport["phaseReports"] = [];
@@ -516,6 +652,53 @@ export function runFilterPipeline(
   return { passFids: new Set(passed.map(fidOf)), passFeatures: passed, report };
 }
 
+async function filterBuiltinAsync(
+  features: GeoJsonFeature[],
+  activeLevels: Record<string, boolean>,
+  searchQuery: string,
+  token: number,
+): Promise<GeoJsonFeature[]> {
+  const queryLower = searchQuery.trim().toLowerCase();
+  const passed: GeoJsonFeature[] = [];
+  for (let i = 0; i < features.length; i += PIPELINE_FILTER_CHUNK_SIZE) {
+    if (token !== activePipelineRunToken) {
+      throw new Error("Pipeline run aborted by a newer run.");
+    }
+    const end = Math.min(i + PIPELINE_FILTER_CHUNK_SIZE, features.length);
+    for (let j = i; j < end; j += 1) {
+      const feature = features[j];
+      if (featureMatchesBuiltinFilters(feature, activeLevels, queryLower)) {
+        passed.push(feature);
+      }
+    }
+    if (end < features.length) await yieldToMain();
+  }
+  return passed;
+}
+
+async function filterRuleAsync(
+  features: GeoJsonFeature[],
+  rule: any,
+  refPool: GeoJsonFeature[],
+  token: number,
+): Promise<GeoJsonFeature[]> {
+  const passed: GeoJsonFeature[] = [];
+  for (let i = 0; i < features.length; i += PIPELINE_FILTER_CHUNK_SIZE) {
+    if (token !== activePipelineRunToken) {
+      throw new Error("Pipeline run aborted by a newer run.");
+    }
+    const end = Math.min(i + PIPELINE_FILTER_CHUNK_SIZE, features.length);
+    for (let j = i; j < end; j += 1) {
+      const feature = features[j];
+      if (dispatchRule(rule, feature, refPool)) {
+        passed.push(feature);
+      }
+    }
+    if (end < features.length) await yieldToMain();
+  }
+  return passed;
+}
+
 export async function runFilterPipelineAsync(
   features: GeoJsonFeature[],
   rules: any[],
@@ -528,19 +711,7 @@ export async function runFilterPipelineAsync(
 
   await yieldToMain();
 
-  let passed: GeoJsonFeature[] = features.filter((f) => {
-    const props = (f.properties || {}) as any;
-    const lv = props.match_level || "low";
-    if (activeLevels && activeLevels[lv] === false) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const matchName = String(props.name || "").toLowerCase().includes(q)
-        || String(props.nearest_station || "").toLowerCase().includes(q)
-        || String(props.osm_id || "").includes(q);
-      if (!matchName) return false;
-    }
-    return true;
-  });
+  let passed: GeoJsonFeature[] = await filterBuiltinAsync(features, activeLevels, searchQuery, token);
 
   const totalIn = features.length;
   const phaseReports: PipelineReport["phaseReports"] = [];
@@ -574,7 +745,7 @@ export async function runFilterPipelineAsync(
       const refPool = resolveRuleInputCached(rule, features, passed, refCache);
       const inSize = passed.length;
       const tRule = performance.now();
-      passed = passed.filter((f) => dispatchRule(rule, f, refPool));
+      passed = await filterRuleAsync(passed, rule, refPool, token);
       const ms = performance.now() - tRule;
       ruleReports.push({
         ruleId: rule.id ?? "?",
@@ -582,6 +753,7 @@ export async function runFilterPipelineAsync(
         phase,
         inSize,
         outSize: passed.length,
+        eliminated: inSize - passed.length,
         ms,
         refSize: refPool.length,
       });
@@ -627,11 +799,7 @@ function resolveRuleInput(rule: any, allFeatures: GeoJsonFeature[], passedSoFar:
 }
 
 export function loadGeoJson(raw: string | GeoJsonFeatureCollection): RailGraphMvpState {
-  state.source = null;
-  state.bindings = [];
-  state.stoppingPoints = [];
-  state.topo = null;
-  state.diagnostics = [];
+  resetLoadedSourceState();
   return importGeoJson(raw);
 }
 
@@ -651,16 +819,18 @@ export function importGeoJson(raw: string | GeoJsonFeatureCollection): RailGraph
   }));
 
   const deduped = dedupeFeatures([...existing, ...incoming]);
-  // 一次性预算 fid 到 properties._fid, 整个 source 生命周期内 fidOf 直接返回缓存。
+  // 一次性预计算 fid/searchText, 整个 source 生命周期内过滤和渲染直接复用。
   for (const f of deduped.features) {
-    fidOf(f);
+    prepareFeatureForClean(f);
   }
   state.source = {
     type: "FeatureCollection",
     features: deduped.features,
   };
   state.topo = null;
-  lastPipelineRun = null;  // source 换了, pipeline cache 失效
+  sourceVersion++;
+  invalidatePipelineCache();  // source 换了, pipeline cache 失效
+  invalidateCleanLookupCache();
   state.diagnostics = deduped.skipped > 0
     ? [diagnostic("info", "MVP_IMPORT_DEDUPED", "import", "Duplicate features were skipped.", { skipped: deduped.skipped })]
     : [];
@@ -700,6 +870,7 @@ export function annotateFeature(
     source: annotation.source ?? existing.source,
   };
   state.topo = null;
+  invalidateCleanLookupCache();
   return state;
 }
 
@@ -843,6 +1014,7 @@ export function compileTopology(): BaseTopologyLayer {
 
   state.diagnostics = diagnostics;
   state.topo = topo;
+  invalidateCleanLookupCache();
   return topo;
 }
 
@@ -1037,9 +1209,9 @@ function normalizeAnnotation(feature: GeoJsonFeature, index: number): RailGraphA
   if (existing?.kind) {
     const rawId = existing.id !== undefined && existing.id !== null ? String(existing.id) : "";
     return {
+      ...existing,
       schemaVersion: "rail-graph-v1",
       source: "manual",
-      ...existing,
       id: rawId || stableId("manual", "feature", String(index)),
     };
   }
@@ -2100,36 +2272,9 @@ function render(): void {
 }
 
 // 将 candidateId 映射到拓扑层 ID 列表 / Map candidate ID to topology layer IDs
-function findTopologyIdsForCandidate(candidateId: string): string[] {
+function findTopologyIdsForCandidate(candidateId: string): EntityRef[] {
   if (!state.topo || !state.source) return [];
-  const ids: string[] = [];
-  
-  const getFid = (feature: any) => {
-    if (!feature) return null;
-    const p = feature.properties || {};
-    return `${p.osm_type || ""}:${p.osm_id || ""}:${p.class_main || ""}:${p.source_line_name || ""}`;
-  };
-
-  // Check edges
-  for (const edge of state.topo.edges) {
-    const sourceRef = edge.sourceSlice?.sourceFeatureRef;
-    if (sourceRef) {
-      const feature = state.source.features.find((f) => f.properties.railGraph?.id === sourceRef);
-      if (getFid(feature) === candidateId) {
-        ids.push(edge.id);
-      }
-    }
-  }
-
-  // Check platforms
-  for (const platform of state.topo.platforms) {
-    const feature = state.source.features.find((f) => f.properties.railGraph?.id === platform.id);
-    if (getFid(feature) === candidateId) {
-      ids.push(platform.id);
-    }
-  }
-  
-  return ids;
+  return topologyIdsForFid(candidateId);
 }
 
 function initViews(): void {
@@ -2156,14 +2301,7 @@ function initViews(): void {
     // select mode 走专用快路: mapView 已经在 entityLayers 里存了 fid, 直接 toggle 队列,
     // 不调 selectFeatureByRef / highlightEntity 避免覆盖队列高亮。
     if (cleanSelectMode) {
-      let fid: string | null = hintFid ?? null;
-      if (!fid && state.source) {
-        const feature = state.source.features.find((f) => f.properties.railGraph?.id === ref);
-        if (feature) {
-          const p = feature.properties || {};
-          fid = `${p.osm_type || ""}:${p.osm_id || ""}:${p.class_main || ""}:${p.source_line_name || ""}`;
-        }
-      }
+      const fid = fidForEntityRef(ref, hintFid);
       if (!fid) return;
 
       if (cleanSelectMode === "select-queue") {
@@ -2201,45 +2339,7 @@ function initViews(): void {
     listView?.highlightEntity(ref);
     listView?.selectFeatureByRef(ref);
 
-    let fid: string | null = hintFid ?? null;
-    if (!fid && state.source) {
-      const feature = state.source.features.find((f) => f.properties.railGraph?.id === ref);
-      if (feature) {
-        const p = feature.properties || {};
-        fid = `${p.osm_type || ""}:${p.osm_id || ""}:${p.class_main || ""}:${p.source_line_name || ""}`;
-      }
-    }
-    if (!fid && state.topo) {
-      const edge = state.topo.edges.find((e) => e.id === ref);
-      if (edge) {
-        const sourceRef = edge.sourceSlice?.sourceFeatureRef;
-        if (sourceRef && state.source) {
-          const feature = state.source.features.find((f) => f.properties.railGraph?.id === sourceRef);
-          if (feature) {
-            const p = feature.properties || {};
-            fid = `${p.osm_type || ""}:${p.osm_id || ""}:${p.class_main || ""}:${p.source_line_name || ""}`;
-          }
-        }
-      } else {
-        const platform = state.topo.platforms.find((p) => p.id === ref);
-        if (platform && state.source) {
-          const feature = state.source.features.find((f) => f.properties.railGraph?.id === platform.id);
-          if (feature) {
-            const p = feature.properties || {};
-            fid = `${p.osm_type || ""}:${p.osm_id || ""}:${p.class_main || ""}:${p.source_line_name || ""}`;
-          }
-        } else {
-          const station = state.topo.stations.find((s) => s.id === ref);
-          if (station && state.source) {
-            const feature = state.source.features.find((f) => f.properties.railGraph?.id === station.id);
-            if (feature) {
-              const p = feature.properties || {};
-              fid = `${p.osm_type || ""}:${p.osm_id || ""}:${p.class_main || ""}:${p.source_line_name || ""}`;
-            }
-          }
-        }
-      }
-    }
+    const fid = fidForEntityRef(ref, hintFid);
 
     if (fid) {
       cleanSelectedCandidateFid = fid;
@@ -2351,11 +2451,11 @@ function initViews(): void {
     if (action === "keep") {
       keepSet.add(fid);
       removeSet.delete(fid);
-      meta[fid] = { ...(meta[fid] || {}), reason };
+      meta[fid] = { ...(meta[fid] || {}), reason: reason ?? "" };
     } else if (action === "remove") {
       removeSet.add(fid);
       keepSet.delete(fid);
-      meta[fid] = { ...(meta[fid] || {}), reason };
+      meta[fid] = { ...(meta[fid] || {}), reason: reason ?? "" };
     } else if (action === "reset") {
       keepSet.delete(fid);
       removeSet.delete(fid);
@@ -2415,29 +2515,38 @@ function initViews(): void {
     refreshViews();
   });
 
-  listView.onCleanSearch(async (query) => {
+  listView.onCleanSearch((query) => {
     cleanSearchQuery = query;
     persistWorkspaceCleanUiState();
-    try {
-      await ensurePipelinePrepared();
-    } catch (err: any) {
-      if (err.message === "Pipeline run aborted by a newer run.") return;
-      throw err;
+    invalidatePipelineCache();
+    const myToken = ++cleanSearchApplyToken;
+    if (cleanSearchDebounceTimer !== null) {
+      window.clearTimeout(cleanSearchDebounceTimer);
     }
-    compileCleanDecisions();
-    try {
-      compileTopology();
-    } catch (err) {
-      handleError(err);
-    }
-    setStepProgress("clean", {
-      status: "done",
-      summary: "Clean search changed. Annotate, compile, validation, and exports are now stale.",
-      completedActions: dedupe([...(activeWorkspace().progress.clean.completedActions ?? []), "loadWorkspaceSource"]),
-      diagnostics: diagnosticSummaries(),
-    });
-    invalidateDownstream("clean", "Clean search changed after this step. Re-run from annotate.");
-    refreshViews();
+    cleanSearchDebounceTimer = window.setTimeout(async () => {
+      cleanSearchDebounceTimer = null;
+      try {
+        await ensurePipelinePrepared();
+        if (myToken !== cleanSearchApplyToken) return;
+        compileCleanDecisions(lastPipelineRun?.passFids);
+        try {
+          compileTopology();
+        } catch (err) {
+          handleError(err);
+        }
+        setStepProgress("clean", {
+          status: "done",
+          summary: "Clean search changed. Annotate, compile, validation, and exports are now stale.",
+          completedActions: dedupe([...(activeWorkspace().progress.clean.completedActions ?? []), "loadWorkspaceSource"]),
+          diagnostics: diagnosticSummaries(),
+        });
+        invalidateDownstream("clean", "Clean search changed after this step. Re-run from annotate.");
+        refreshViews();
+      } catch (err: any) {
+        if (err.message === "Pipeline run aborted by a newer run.") return;
+        handleError(err);
+      }
+    }, 180);
   });
 
   listView.onCleanSelectModeToggle((active) => {
@@ -2486,20 +2595,11 @@ function initViews(): void {
       refreshViews();
       return;
     }
+    const previousFid = cleanSelectedCandidateFid;
     cleanSelectedCandidateFid = fid;
     persistWorkspaceCleanUiState();
     if (fid) {
-      let ref: EntityRef | null = null;
-      if (state.source) {
-        const feature = state.source.features.find((f) => {
-          const props = (f.properties || {}) as any;
-          const f_id = `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
-          return f_id === fid;
-        });
-        if (feature?.properties?.railGraph?.id) {
-          ref = feature.properties.railGraph.id as EntityRef;
-        }
-      }
+      const ref = annotationRefForFid(fid);
       if (ref) {
         mapView?.fitToEntities([ref]);
         mapView?.highlightEntities([ref]);
@@ -2511,7 +2611,9 @@ function initViews(): void {
         }
       }
     }
-    refreshViews();
+    if (!listView?.refreshCleanSelectionOnly?.(previousFid, fid)) {
+      refreshViews();
+    }
   });
 
   listView.onCleanStagingAction?.(async (action, data) => {
@@ -2675,6 +2777,7 @@ function initViews(): void {
         newWs.recommendedStep = "clean";
         newWs.progress.prepare = {
           status: "done",
+          summary: "Exported queue source is ready for clean review.",
           updatedAt: new Date().toISOString(),
           lastAction: "extractAndMatch",
           completedActions: ["extractAndMatch"],
@@ -2691,14 +2794,9 @@ function initViews(): void {
 
         pipelineArtifacts = [];
         activePipelineTask = null;
-        state.source = null;
-        state.bindings = [];
-        state.stoppingPoints = [];
-        state.topo = null;
-        state.diagnostics = [];
+        resetLoadedSourceState();
         lastPathfindingResults = undefined;
         lastCurrentStep = null;
-        lastPipelineRun = null;
         allCleanDecisions.clear();
         cleanDecisionsVersion++;
         cleanSelectionQueue.clear();
@@ -2821,6 +2919,18 @@ function bindSelectModeBarOnce(): void {
   cancelBtn.addEventListener("click", () => { exitMode(); });
 }
 
+function sameStringSet(a: string[] = [], b: string[] = []): boolean {
+  if (a.length !== b.length) return false;
+  const aSet = new Set(a);
+  if (aSet.size !== b.length) return false;
+  return b.every((item) => aSet.has(item));
+}
+
+function cleanOverrideDecisionsEqual(prev: MvpOverrideState | null, next: MvpOverrideState): boolean {
+  return sameStringSet(prev?.keep ?? [], next.keep)
+    && sameStringSet(prev?.remove ?? [], next.remove);
+}
+
 async function updateCleanOverrides(keep: string[], remove: string[], meta: Record<string, any>): Promise<void> {
   const project = activeProject();
   const nextOverride: MvpOverrideState = {
@@ -2829,18 +2939,23 @@ async function updateCleanOverrides(keep: string[], remove: string[], meta: Reco
     remove,
     meta
   };
+  const decisionsChanged = !cleanOverrideDecisionsEqual(cleanOverrides, nextOverride);
   cleanOverrides = nextOverride;
-  invalidatePipelineCache();  // keep/remove 改了, override 决策会变 → 重跑 pipeline
 
   try {
     await saveOverrides(project.overridePath, nextOverride);
+    if (!decisionsChanged) {
+      refreshViews();
+      return;
+    }
+
     try {
       await ensurePipelinePrepared();
     } catch (err: any) {
       if (err.message === "Pipeline run aborted by a newer run.") return;
       throw err;
     }
-    compileCleanDecisions();
+    compileCleanDecisions(lastPipelineRun?.passFids);
     try {
       compileTopology();
     } catch (err) {
@@ -3042,6 +3157,7 @@ function refreshViews(): void {
       selectedCandidateFid: cleanSelectedCandidateFid,
       activeTab,
       cleanPassFids: passFids,
+      cleanPassFeatures: passFeatures,
       cleanPipelineReport: report,
       selectionQueueFids: new Set(cleanSelectionQueue),
       staging: activeWorkspace().staging || { via: [], stagedWayFids: [] },
@@ -3958,16 +4074,11 @@ function bindPipelineUi(): void {
       workspaceState.activeKey = key;
       pipelineArtifacts = [];
       activePipelineTask = null;
-      state.source = null;
-      state.bindings = [];
-      state.stoppingPoints = [];
-      state.topo = null;
-      state.diagnostics = [];
+      resetLoadedSourceState();
       lastPathfindingResults = undefined;
       lastCurrentStep = null;
       // PR-A: invalidate 整条 cache 链 (pipeline cache + decisions + selection queue 等内存状态),
       // 防止上一 workspace 的 cache 错配新 workspace 的 source.
-      lastPipelineRun = null;
       allCleanDecisions.clear();
       cleanDecisionsVersion++;
       cleanSelectionQueue.clear();
@@ -4044,15 +4155,10 @@ function bindPipelineUi(): void {
     showNewWorkspace = false;
     pipelineArtifacts = [];
     activePipelineTask = null;
-    state.source = null;
-    state.bindings = [];
-    state.stoppingPoints = [];
-    state.topo = null;
-    state.diagnostics = [];
+    resetLoadedSourceState();
     lastPathfindingResults = undefined;
     lastCurrentStep = null;
     // PR-A: invalidate cache 链 + RAF 双相, 与 workspace switch handler 一致.
-    lastPipelineRun = null;
     allCleanDecisions.clear();
     cleanDecisionsVersion++;
     cleanSelectionQueue.clear();

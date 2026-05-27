@@ -24,7 +24,7 @@ function makeMockKV(initial = new Map<string, string>()) {
   };
 }
 
-function buildRecord(overrides: Record<string, any> = {}) {
+function buildRecord(overrides: Record<string, any> = {}): any {
   return {
     id: `fb_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
     created_at: new Date().toISOString(),

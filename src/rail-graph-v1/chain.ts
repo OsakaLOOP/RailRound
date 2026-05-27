@@ -365,6 +365,7 @@ function alignNodeToPath(
     case "terminus":
       return -1;
   }
+  return -1;
 }
 
 function findFirstBindingEdge(

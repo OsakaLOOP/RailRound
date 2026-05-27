@@ -56,7 +56,7 @@ export const SubscribeModal: React.FC = () => {
     setLoadingStatus(true);
     api
       .getTierStatus(user.token)
-      .then((data) => {
+      .then((data: any) => {
         useStore.getState().setUserProfile({
           ...useStore.getState().userProfile,
           tier: data.tier,

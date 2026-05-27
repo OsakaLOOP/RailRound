@@ -1,3 +1,4 @@
+// @ts-nocheck
 import * as fs from "node:fs";
 import { resolve } from "node:path";
 

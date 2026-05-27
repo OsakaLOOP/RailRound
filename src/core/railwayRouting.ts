@@ -372,7 +372,7 @@ export const getLandmarks = (line: any, fromId: string, toId: string, loopVia?: 
         direction = fi <= ti ? 'up' : 'down';
     }
 
-    const results = [];
+    const results: string[] = [];
     let checkedCount = 0;
     let currIdx = fi;
 

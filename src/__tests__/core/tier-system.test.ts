@@ -33,9 +33,9 @@ function hex(inputBytes: ArrayBuffer | Uint8Array): string {
     .join("");
 }
 
-function toUint8Array(input: string | Uint8Array): Uint8Array {
-  if (input instanceof Uint8Array) return input;
-  return new TextEncoder().encode(input);
+function toUint8Array(input: string | Uint8Array): Uint8Array<ArrayBuffer> {
+  const bytes = input instanceof Uint8Array ? input : new TextEncoder().encode(input);
+  return new Uint8Array(bytes);
 }
 
 async function hmacSha256Hex(secret: string, message: string): Promise<string> {

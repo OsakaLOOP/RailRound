@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Test DFS logic
 const visitedEdges = new Set();
 const edgeSequence = [];

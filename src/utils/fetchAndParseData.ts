@@ -17,7 +17,7 @@ export const fetchAndParseData = async () => {
 
     try {
         const dbReq = indexedDB.open('RailLOOPDB', 1);
-        const db = await new Promise((resolve, reject) => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
             dbReq.onsuccess = () => resolve(dbReq.result);
             dbReq.onerror = () => reject(dbReq.error);
         });
@@ -53,7 +53,7 @@ export const fetchAndParseData = async () => {
                 const activeFiles = changelog.meta.activeFiles || [];
 
                 if (activeFiles.length > 0) {
-                    const chunkPromises = activeFiles.map(async (fileName) => {
+                    const chunkPromises = activeFiles.map(async (fileName: string) => {
                         // In browser, geojson are under /geojson or /data? Main app uses /geojson
                         const url = `/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}?v=${version}`;
                         const res = await fetch(url);
@@ -78,7 +78,7 @@ export const fetchAndParseData = async () => {
                     if (manifestRes && manifestRes.ok) {
                         const manifest = await manifestRes.json();
                         const fileNames = Array.isArray(manifest.files) ? manifest.files : Object.keys(manifest.files || {});
-                        const chunkPromises = fileNames.map(async (fileName) => {
+                        const chunkPromises = fileNames.map(async (fileName: string) => {
                             const url = `/geojson/${fileName.includes('.geojson') ? fileName : `${fileName}.geojson`}?v=${version}`;
                             const res = await fetch(url);
                             if (!res.ok) throw new Error(`Failed to fetch ${fileName}`);

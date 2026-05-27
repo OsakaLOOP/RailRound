@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { SENSEKI_RAIL } from "./senseki-data";
 import { buildTopologyLayer } from "../rail-graph-v1/topology";
 

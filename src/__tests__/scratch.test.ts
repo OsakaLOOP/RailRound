@@ -7,6 +7,7 @@ import { SENSEKI_RAIL } from '../rail-graph-v1-mvp/senseki-data';
 import { SENSEKI_PF_OVERRIDES } from '../rail-graph-v1-mvp/poc-senseki-pathfinding';
 import { buildTopologyLookup } from '../rail-graph-v1/topology';
 import { findPaths } from '../rail-graph-v1/pathfinding';
+import type { EntityRef } from '../rail-graph-v1/primitives';
 
 describe('Diagnostics', () => {
   it('should run S5 pathfinding at depth 200', () => {
@@ -25,7 +26,7 @@ describe('Diagnostics', () => {
     const edge1320 = topo.edges.find(e => e.sourceSlice?.sourceFeatureRef === "osm:way:1320551298")!;
     const edge3513 = topo.edges.find(e => e.sourceSlice?.sourceFeatureRef === "osm:way:351315047")!;
 
-    function findDeadEndNode(edge: any): string {
+    function findDeadEndNode(edge: any): EntityRef {
       const fromOut = topo.adjacency.outEdges[edge.fromNodeRef]?.length ?? 0;
       const fromIn = topo.adjacency.inEdges[edge.fromNodeRef]?.length ?? 0;
       const fromDegree = fromOut + fromIn;

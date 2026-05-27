@@ -1,3 +1,4 @@
+// @ts-nocheck
 import * as fs from "node:fs";
 
 const file = "d:\\Downloads\\senseki-demo-2026-05-19T11-36-40.railround.json";

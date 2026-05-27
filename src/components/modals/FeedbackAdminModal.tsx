@@ -133,7 +133,7 @@ export const FeedbackAdminModal: React.FC = () => {
       const seen = new Set<string>();
 
       while (cursor !== null) {
-        const res = await api.getFeedbackAdminList({
+        const res: any = await api.getFeedbackAdminList({
           cursor,
           limit: 50,
           // No category/status filter — fetch everything, filter client-side

@@ -216,7 +216,9 @@ describe('Step 3: Trace DFS Step-by-Step', () => {
           }
 
           if (subEdge?.coordinates && subSubEdge?.coordinates) {
-            const subSubNodeCoord = subEdge.fromNodeRef === subSubState.currentNode ? subEdge.coordinates[0] : subEdge.coordinates[edgeOut.coordinates.length - 1]; // wait, using index of coords
+            const subSubNodeCoord = subEdge.fromNodeRef === subSubState.currentNode
+              ? subEdge.coordinates[0]
+              : subEdge.coordinates[subEdge.coordinates.length - 1];
             const subSubAngle = calculateTurnAngle(subEdge.coordinates, subSubEdge.coordinates, subSubNodeCoord);
             console.log(`            Turn angle from ${subEdge.sourceSlice?.sourceFeatureRef} to ${subSubEdge.sourceSlice?.sourceFeatureRef}: ${subSubAngle}°`);
             if (subSubAngle >= 90) {

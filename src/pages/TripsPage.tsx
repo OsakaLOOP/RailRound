@@ -1820,11 +1820,11 @@ export const FloatingActionButtons: React.FC<{
             }
           }}
         >
-          <div className="flex gap-2 rounded-xl bg-white/80 p-2 shadow-lg backdrop-blur-sm ring-1 ring-slate-200/70">
+          <div className="flex gap-2 p-2 pointer-events-none">
             <button
               id="btn-add-trip"
               onClick={() => startEditingTrip()}
-              className="rl-primary-action flex flex-1 items-center justify-center gap-2 px-4 py-3"
+              className="rl-primary-action flex flex-1 items-center justify-center gap-2 px-4 py-3 pointer-events-auto shadow-md"
             >
               <Plus
                 size={18}
@@ -1833,7 +1833,7 @@ export const FloatingActionButtons: React.FC<{
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="rl-secondary-action flex flex-none items-center justify-center gap-2 px-4 py-3"
+              className="rl-secondary-action flex flex-none items-center justify-center gap-2 px-4 py-3 pointer-events-auto shadow-md"
               title={t("tripsPage.importSuica", "导入 Suica CSV")}
               aria-label={t("tripsPage.importSuica", "导入 Suica CSV")}
             >

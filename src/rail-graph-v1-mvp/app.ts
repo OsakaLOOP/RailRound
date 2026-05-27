@@ -3688,6 +3688,7 @@ function getStepBodyHtml(stepKey: WorkflowStep, progress: any, workspace: LineWo
           <button class="step-action-btn primary strong" data-action="exportSnapshot" ${actionDisabledAttr("exportSnapshot")}>Export Snapshot</button>
           <button id="mvp-export-geojson" class="strong" ${directExportDisabledAttr("geojson")}>GeoJSON</button>
           <button id="mvp-export-topo" class="strong" ${directExportDisabledAttr("topology")}>Topology</button>
+          <button id="mvp-export-aggregate-fixture" class="strong" onclick="window.__exportAggregateFixture?.()" ${state.source && state.source.features.length > 0 ? "" : 'disabled title="Load source first"'}>Aggregate Fixture</button>
         </div>
       `;
     default:
@@ -4846,6 +4847,39 @@ function bindUi(): void {
     }
     writeExportToInput(exportTopology());
   });
+  (window as any).__exportAggregateFixture = async () => {
+    if (!state.source || state.source.features.length === 0) {
+      handleError(new Error("Load source first."));
+      return;
+    }
+    if (allCleanDecisions.size === 0) {
+      handleError(new Error("No clean decisions compiled. Load source from Clean step first."));
+      return;
+    }
+    const cleanFeatures = state.source.features.filter((f) => allCleanDecisions.get(fidOf(f)) !== "remove");
+    if (cleanFeatures.length === 0) {
+      handleError(new Error("All features removed after clean. Check override/rules."));
+      return;
+    }
+    const project = activeProject();
+    const slug = project.selectedPresetId !== "custom"
+      ? project.selectedPresetId
+      : project.lineName;
+    const filename = `aggregate-${slug}.cleaned.geojson`;
+    const fc = { type: "FeatureCollection" as const, features: cleanFeatures };
+    try {
+      const resp = await fetch("/api/rail-graph-mvp/fixture/export", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ filename, featureCollection: fc }),
+      });
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || resp.statusText);
+      alert(`Exported ${result.features} clean features → fixtures/${filename}`);
+    } catch (e) {
+      handleError(e);
+    }
+  };
 
   document.getElementById("mvp-export-snapshot")?.addEventListener("click", () => {
     try {

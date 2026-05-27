@@ -487,6 +487,25 @@ export function railGraphMvpServerPlugin() {
             json(res, 200, { remove: [], keep: [], meta: {} })
             return
           }
+          if (req.method === 'POST' && pathname === '/fixture/export') {
+            const body = await readBody(req)
+            const { filename, featureCollection } = body
+            if (!filename || !featureCollection) {
+              json(res, 400, { error: 'Missing filename or featureCollection' })
+              return
+            }
+            const safe = String(filename).replace(/[\\/:<>"|?*\x00-\x1f]/g, '')
+            if (!safe || safe.length > 200) {
+              json(res, 400, { error: 'Invalid filename' })
+              return
+            }
+            const fixtureDir = path.resolve('src', 'rail-graph-v1-mvp', 'fixtures')
+            fs.mkdirSync(fixtureDir, { recursive: true })
+            const outPath = path.join(fixtureDir, safe)
+            fs.writeFileSync(outPath, JSON.stringify(featureCollection, null, 2), 'utf8')
+            json(res, 200, { ok: true, path: outPath, features: featureCollection.features?.length ?? 0 })
+            return
+          }
           if (req.method === 'POST' && pathname === '/workspace/seed-source') {
             const body = await readBody(req)
             const { projectKey, sourceGeoJsonPath, featureCollection, geojsonSourceDir, matchedOutputRoot } = body

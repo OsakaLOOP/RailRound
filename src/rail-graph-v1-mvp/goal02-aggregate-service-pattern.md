@@ -30,7 +30,7 @@ Verify 命令 (三选一对应当前 PR):
   read §章节  →  规划文件改动  →  实现  →  tsc 自检  →  verify PASS  →  写 PR 描述  →  停下等待 review
   失败时: 读 src/rail-graph-aggregate/.verify/*.json 报告, 修, 再跑 verify
 
-数据准备: 仙石线 + 东北本线 + 仙石东北联络线 由用户在 senseki-data.ts 或同目录 fixture 中提供; 你的 aggregate adapter 必须能读到至少 2 个 workspace 的 source.features。如果数据缺失, 在 verify 脚本输出明确 "DATA NOT READY" 提示, 不要伪造数据继续。
+数据准备: Aggregate workspace 拥有自己的持久化数据, 通过"导入"动作从 member workspace 获取。导入时一次性应用该 workspace 的 clean pipeline (rule + override), 结果写入 aggregate 自己的存储, 之后不再依赖源 workspace 状态变化。初始数据已通过 MVP app 导出到 fixtures/ 目录供 verify 使用 (详见 §11)。如果数据缺失, 在 verify 脚本输出明确 "DATA NOT READY" 提示, 不要伪造数据继续。
 
 下面进入 §1 开始阅读。
 ```
@@ -63,13 +63,24 @@ prepare → clean → annotate → compile → validate → export。每个 work
 | Pipeline server | `scripts/rail-graph-mvp-server.js` | 提供 fs API; 可以扩展加 aggregate 文件读写 endpoint |
 | Map view | `src/rail-graph-v1-mvp/map-view.ts` | `createMapView`; 渲染层可以**复用其 createMapView**, 但新 aggregate app 自己组织顶层 shell |
 
-### 1.4 用户准备的数据
-用户晚上在 `src/rail-graph-v1-mvp/senseki-data.ts` (或同目录下新 fixture 文件) 准备:
-- 仙石线 (senseki) workspace 的 source.features (已 annotated)
-- 东北本线 (tohoku-main) workspace 的 source.features (已 annotated)
-- 仙石东北联络线 (senseki-tohoku-connector) 的 way 对象 (作为第三个 workspace, 或合并到上述之一)
+### 1.4 Aggregate 数据模型
 
-agent 不要预设数据形态, **从 senseki-data.ts 实际 export 名读起**; 若读不到, verify 脚本输出 "DATA NOT READY" 即终止当前 PR, 等用户补数据。
+Aggregate workspace 是独立实体, 拥有自己的持久化数据和状态:
+- **导入时**: 从 N 个 member workspace 读取 source features, 一次性应用各自的 clean pipeline (rule + override), 合并去重后写入 aggregate 自己的存储
+- **导入后**: aggregate 的 features 是不可变快照, 不再跟踪源 workspace 的后续变化
+- **重新导入**: 用户可手动触发 re-import 以同步源 workspace 的最新状态
+
+Agent 可复用的模块:
+- `rule-handlers.ts` + `spatial-helpers.ts`: 纯函数, Node 兼容, 可直接 import 跑 clean pipeline
+- `runFilterPipeline()` 逻辑 (在 app.ts 中, 需提取或复制核心循环)
+- `readPipelineArtifact()` / `readOverrides()`: 通过 server API 读取源 workspace 的 matched_assets.geojson 和 override 文件
+- MVP app 的 "Aggregate Fixture" 导出按钮: 已实现, 可将当前 workspace clean 后的 features 写入 `src/rail-graph-v1-mvp/fixtures/`
+
+当前已导出的 fixture (供 verify 脚本使用):
+- `fixtures/aggregate-senseki.cleaned.geojson` (仙石線, 465 features)
+- `fixtures/aggregate-東北本線_v2.cleaned.geojson` (東北本線_v2, 300 features)
+
+Layer 1 跨工作区连通性已验证 PASS: `npm run rail:aggregate:verify:cross-ws` (详见 §11.3)
 
 ---
 
@@ -137,7 +148,7 @@ PR 之间是**线性依赖** (PR2 用 PR1 的 ServicePattern store; PR3 用 PR2 
 
 ### 4.3 实现要点
 
-- **aggregate-state.ts**: `loadAggregate({memberWorkspaceKeys: string[]})` 应当: 对每个 ws 跑 `loadWorkspaceState(ws).source` → 合并 features (按 _fid 去重) → 重跑 `compileTopology` 等价逻辑 (复用 mvp app.ts 的 compileTopology) 得到 unified `BaseTopologyLayer`。注意 _fid / nodeId 重复, 必须以 `${ws}:${original_fid}` 命名空间化避免冲突, 且要让 agent 在脚本能复现这个映射
+- **aggregate-state.ts**: Aggregate 拥有自己的持久化 features 和 topology。`loadAggregate({aggregateKey})` 从 aggregate 自己的存储读取已导入的 features + compiled topology。`importWorkspaces({memberWorkspaceKeys})` 是导入动作: 对每个 ws 读取 source (matched_assets.geojson via server API) + override + filter_rules → 跑 clean pipeline → 合并去重 (按 `osm_type:osm_id:class_main` 三段, 详见 §11.4) → `compileTopology` → 持久化到 aggregate 存储。导入后 aggregate 数据独立于源 workspace。注意 topology 编译时 nodeId 基于坐标自动共享 (跨 workspace 连通的关键), edgeId 基于 annotation.id 天然唯一 (含 osm way id)。
 - **chain-editor.ts**: 状态机三态 `{idle, picking-origin, picking-via, picking-terminus}`; map 点击 station_point feature → addNode; 旁边一个 chain preview 面板 (kind+at); "Compute" 按钮 → 调 `findPathsV2({chain, topo: aggregate.topo, lookup: aggregate.lookup, startEntryPoints, endEntryPoints})`
 - **adapter.ts**: 路径 `RawCandidateV2` → `ServicePattern`: `edgeSequence` 直接拷; `traceSequence` 沿 edgeSequence 扫描 platform binding 生成 ServiceStopEntry/ServicePassEntry; `pathSegments` 按 edgeRef 分块
 - **render-plan.ts**: 必须是**无副作用纯函数**, 不导入 leaflet。输出形如 `{ patternId, displayColor, polylineSegments: [{edgeRef, coords: [[lng,lat],...], strokeStyle: {color, weight, dashArray?, offset?}}], stationMarkers: [...] }`
@@ -340,3 +351,90 @@ AGGREGATE VERIFY: PASS
 | D6 | 渲染验证: 纯函数抽出 + dump 脚本; agent 不验 leaflet DOM | leaflet 渲染由人眼最终核 |
 | D7 | 信号机 / 清洗规则 / Timeline 全部不做 | 见 §8 |
 | D8 | scope cut 优先: 跨线寻路用固定 transfer cost + edgeCount dijkstra | 不做时间最短 / 最短换乘 |
+
+---
+
+## 11. 参考数据 · Layer 1 验证结果 · 最终验证要求
+
+### 11.1 仙石東北ライン参考数据
+
+| 角色 | OSM Way ID | FID (实测) | 所属工作区 |
+|------|-----------|------------|-----------|
+| 仙台上行起始 | way/1015018069 | `way:1015018069:rail:東北本線` | 東北本線_v2 |
+| 仙台下行终到 | way/884011779 | `way:884011779:rail:東北本線` | 東北本線_v2 |
+| 联络线 (単線) | way/351315049 | `way:351315049:rail:仙石線` | 仙石線 (两边有副本, 去重后保留仙石線侧) |
+| 石巻上行终到 | way/882389027 | `way:882389027:rail:仙石線` | 仙石線 |
+| 石巻下行始発 | way/351315047 | `way:351315047:rail:仙石線` | 仙石線 |
+
+参考里程: 仙台→石巻 48.5km
+
+### 11.2 数据来源与 Aggregate 数据模型
+
+**产品架构** (aggregate app 正式流程):
+- Aggregate workspace 通过 "Import Workspaces" 动作从 member workspace 导入
+- 导入时: 读 matched_assets.geojson + override + filter_rules → 跑 clean pipeline → 合并去重 → compileTopology → 写入 aggregate 自己的持久化存储
+- 导入后: aggregate 数据是不可变快照, 不再跟踪源 workspace 变化
+- Agent 可复用 MVP 的 `rule-handlers.ts`, `spatial-helpers.ts`, `dispatchRule()` 等纯函数模块
+
+**Verify 便利方案** (仅用于 headless 验证脚本):
+- MVP app 的 "Aggregate Fixture" 按钮将当前 workspace clean 后的 features 导出到 `src/rail-graph-v1-mvp/fixtures/`
+- Verify 脚本直接读这些 fixture 文件, 不需要启动 server 或跑 pipeline
+- Fixture 是一次性快照, 不是产品数据路径
+
+当前 fixture:
+- `aggregate-senseki.cleaned.geojson` (465 features, ~911KB)
+- `aggregate-東北本線_v2.cleaned.geojson` (300 features, ~594KB)
+
+### 11.3 Layer 1 验证结果 (way-graph 连通性, 已 PASS)
+
+```
+verify 命令: npm run rail:aggregate:verify:cross-ws
+脚本: src/rail-graph-v1-mvp/verify-aggregate-cross-workspace.ts
+
+合并: 465 + 300 = 765 raw → 755 merged (10 dedup)
+rail ways: 357
+5 个参考 way: 全部定位成功
+正向 (仙台→石巻 via connector): 5 candidates, best = 124 edges, 47.6km
+反向 (石巻→仙台 via connector): 5 candidates
+结论: 数据拼接后 way-graph 层面跨工作区连通, 路径长度与参考值一致
+```
+
+### 11.4 去重策略 (已验证, agent 必须遵循)
+
+```typescript
+// FID 格式: osm_type:osm_id:class_main:source_line_name
+// 去重 key: osm_type:osm_id:class_main (前三段, 忽略 source_line_name)
+function coreId(f) {
+  const p = f.properties || {};
+  return `${p.osm_type || ""}:${p.osm_id || ""}:${p.class_main || ""}`;
+}
+```
+
+注意: topology 编译阶段的 edgeId 基于 `annotation.id` (如 `osm:way:351315049`) 天然唯一, nodeId 基于坐标自动共享。**不需要** `${ws}:${original_fid}` 命名空间化 — 这是旧方案, 已被验证结果推翻。
+
+### 11.5 Layer 2 最终验证要求 (topology + IntentionChain)
+
+Layer 1 通过后, PR1 的 `aggregate-state.ts` 完成 `compileTopology()` 后必须额外验证:
+
+| # | 断言 | 说明 |
+|---|------|------|
+| T1 | `compileTopology()` 成功, edges > 0 | aggregate topology 可编译 |
+| T2 | 联络线 edge 在 topology 中可定位 | 按 `sourceSlice.sourceFeatureRef` 含 osm_id=351315049 查找 |
+| T3 | `findPathsV2` 返回 ≥1 candidate | IntentionChain 可解 |
+| T4 | candidate.edgeSequence 包含联络线 edgeRef | 路径经过连接线 |
+| T5 | candidate.totalDistanceMeters 在 30000~70000 范围 | 参考 48.5km |
+| T6 | 反向 chain (石巻→仙台, direction="up") 也返回 ≥1 candidate | 双向可达 |
+
+IntentionChain 结构 (ref 值运行时从 compiled topology 动态查找):
+```typescript
+const chain: IntentionChain = {
+  mode: "sketch",
+  nodes: [
+    { kind: "origin", at: { nodeRef: <仙台端 node> }, direction: "down" },
+    { kind: "via_edge", edgeRef: <联络线 edge, sourceSlice 含 351315049> },
+    { kind: "terminus", at: { nodeRef: <石巻端 node> } },
+  ]
+};
+```
+
+Node 定位方式: `compileTopology` 中 nodeId = `manual:node:${lon.toFixed(6)},${lat.toFixed(6)}`, 基于坐标。联络线两端坐标与東北本線/仙石線端点坐标相同, 自动共享 node — 这是跨工作区连通的关键。

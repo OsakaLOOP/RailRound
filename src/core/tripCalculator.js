@@ -324,8 +324,21 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
 export const calculateLatestStats = (trips, segmentGeometries, railwayData, geoData) => {
     // 1. Basic Stats
     const totalTrips = trips.length;
-    const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
-    const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
+
+    // Manual single-pass calculation to prevent massive temporary array allocations
+    const allSegments = [];
+    const uniqueLinesSet = new Set();
+    for (let i = 0; i < trips.length; i++) {
+        const t = trips[i];
+        const segs = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
+        for (let j = 0; j < segs.length; j++) {
+            allSegments.push(segs[j]);
+            if (segs[j].lineKey) {
+                uniqueLinesSet.add(segs[j].lineKey);
+            }
+        }
+    }
+    const uniqueLines = uniqueLinesSet.size;
 
     // Calc total distance using helper (aggregating cached or on-the-fly)
     const { totalDist: grandTotalDist } = getRouteVisualData(allSegments, segmentGeometries, railwayData, geoData);

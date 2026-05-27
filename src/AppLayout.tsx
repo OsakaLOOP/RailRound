@@ -749,59 +749,87 @@ export const AppLayout: React.FC = () => {
     useEffect(() => {
         // 使用 setTimeout 加上简单的防抖，防止编辑/添加行程时高频触发导致卡顿
         const timerId = setTimeout(() => {
-            const allSegments = trips.flatMap(trip => trip.segments || []);
-
-
-            // Extract visited stations logic
+            const allSegments: any[] = [];
             const visited = new Set<string>();
-            allSegments.forEach(seg => {
-                const line = railwayData[seg.lineKey];
-                if (!line) return;
+            const needed: any[] = [];
 
-                const fromIdx = line.stations.findIndex(s => s.id === seg.fromId);
-                const toIdx = line.stations.findIndex(s => s.id === seg.toId);
+            // Build allSegments manually and calculate visited stations in a single pass to avoid array allocations
+            for (let i = 0; i < trips.length; i++) {
+                const trip = trips[i];
+                const segs = trip.segments;
+                if (!segs) continue;
 
-                if (fromIdx !== -1 && toIdx !== -1) {
-                    const isLoop = !!line.meta?.isLoop;
-                    let realVia = seg.loopVia;
-                    if (isLoop && (!realVia || realVia === 'auto')) {
-                        realVia = computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId);
+                for (let j = 0; j < segs.length; j++) {
+                    const seg = segs[j];
+                    allSegments.push(seg);
+
+                    const line = railwayData[seg.lineKey];
+                    if (line) {
+                        const fromIdx = line.stations.findIndex(s => s.id === seg.fromId);
+                        const toIdx = line.stations.findIndex(s => s.id === seg.toId);
+
+                        if (fromIdx !== -1 && toIdx !== -1) {
+                            const isLoop = !!line.meta?.isLoop;
+                            let realVia = seg.loopVia;
+                            if (isLoop && (!realVia || realVia === 'auto')) {
+                                realVia = computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId);
+                            }
+
+                            if (isLoop && (realVia === 'up' || realVia === 'down')) {
+                                let currIdx = fromIdx;
+                                const n = line.stations.length;
+                                visited.add(line.stations[currIdx].id);
+
+                                let safeCounter = 0;
+                                while (currIdx !== toIdx && safeCounter <= n) {
+                                    if (realVia === 'up') {
+                                        currIdx = (currIdx + 1) % n;
+                                    } else {
+                                        currIdx = (currIdx - 1 + n) % n;
+                                    }
+                                    visited.add(line.stations[currIdx].id);
+                                    safeCounter++;
+                                }
+                            } else {
+                                // Linear line or unhandled loop edge cases
+                                const start = Math.min(fromIdx, toIdx);
+                                const end = Math.max(fromIdx, toIdx);
+                                for (let k = start; k <= end; k++) {
+                                    visited.add(line.stations[k].id);
+                                }
+                            }
+                        }
                     }
 
-                    if (isLoop && (realVia === 'up' || realVia === 'down')) {
-                        let currIdx = fromIdx;
-                        const n = line.stations.length;
-                        visited.add(line.stations[currIdx].id);
-
-                        let safeCounter = 0;
-                        while (currIdx !== toIdx && safeCounter <= n) {
-                            if (realVia === 'up') {
-                                currIdx = (currIdx + 1) % n;
-                            } else {
-                                currIdx = (currIdx - 1 + n) % n;
-                            }
-                            visited.add(line.stations[currIdx].id);
-                            safeCounter++;
+                    // Filter needed missing geometries manually without allocating a new array via .filter
+                    if (seg.lineKey && seg.fromId && seg.toId) {
+                        const isLoopCheck = !!(railwayData[seg.lineKey]?.meta?.isLoop);
+                        let realViaCheck = seg.loopVia;
+                        if (isLoopCheck && realViaCheck === 'auto') {
+                            realViaCheck = computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId);
                         }
-                    } else {
-                        // Linear line or unhandled loop edge cases
-                        const start = Math.min(fromIdx, toIdx);
-                        const end = Math.max(fromIdx, toIdx);
-                        for (let i = start; i <= end; i++) {
-                            visited.add(line.stations[i].id);
+                        const key = (isLoopCheck && realViaCheck)
+                            ? `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realViaCheck}`
+                            : `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+
+                        if (!segmentGeometries.has(key)) {
+                            needed.push(seg);
                         }
                     }
                 }
-            });
+            }
+
             setVisitedStations(visited);
 
             // 1. 优先使用已有的缓存进行渲染，保证部分路线立即显示，防止整张地图因为几段缺失而瘫痪。
             const buildRenderList = (cache: Map<string, any>) => {
                 const list: any[] = [];
-                trips.forEach(trip => {
+                // Use standard for loops per learning constraints to minimize chained iterator overhead
+                for (let i = 0; i < trips.length; i++) {
+                    const trip = trips[i];
                     const segs = trip.segments || [];
-                    for (let i = 0; i < segs.length; i++) {
-                        const seg = segs[i];
+                    for (let j = 0; j < segs.length; j++) {
+                        const seg = segs[j];
                         const isLoop = !!(railwayData[seg.lineKey]?.meta?.isLoop);
                         let realVia = seg.loopVia;
                         if (isLoop && realVia === 'auto') {
@@ -820,15 +848,15 @@ export const AppLayout: React.FC = () => {
                         }
 
                         // Check for transfer to the next segment
-                        if (i < segs.length - 1) {
-                            const nextSeg = segs[i + 1];
+                        if (j < segs.length - 1) {
+                            const nextSeg = segs[j + 1];
                             const nextLine = railwayData[nextSeg.lineKey];
                             const nextS1 = nextLine?.stations.find((s: any) => s.id === nextSeg.fromId);
 
                             // If they are different stations (by id) but part of a continuous trip, we draw a transfer line
                             if (s2 && nextS1 && s2.id !== nextS1.id) {
                                 list.push({
-                                    id: `transfer_${trip.id}_${i}`,
+                                    id: `transfer_${trip.id}_${j}`,
                                     coords: [[s2.lat, s2.lng], [nextS1.lat, nextS1.lng]],
                                     color: '#9ca3af', // default gray for transfer
                                     isMulti: false,
@@ -839,26 +867,14 @@ export const AppLayout: React.FC = () => {
                             }
                         }
                     }
-                });
+                }
                 return list;
             };
 
             const renderList = buildRenderList(segmentGeometries);
             setTripSegmentsGeometry(renderList);
 
-            // 2. 筛选缺失的数据发送给 Worker
-            const needed = allSegments.filter(seg => {
-                if (!seg.lineKey || !seg.fromId || !seg.toId) return false;
-                const isLoop = !!(railwayData[seg.lineKey]?.meta?.isLoop);
-                let realVia = seg.loopVia;
-                if (isLoop && realVia === 'auto') {
-                    realVia = computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId);
-                }
-                const key = (isLoop && realVia)
-                    ? `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realVia}`
-                    : `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
-                return !segmentGeometries.has(key);
-            });
+            // 2. 筛选缺失的数据发送给 Worker (Already calculated above directly)
 
             if (needed.length === 0) return;
 

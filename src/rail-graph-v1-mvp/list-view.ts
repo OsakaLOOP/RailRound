@@ -113,6 +113,7 @@ export interface ListView {
   onCleanLevelToggle(handler: (level: string, checked: boolean) => void): void;
   onCleanSearch(handler: (query: string) => void): void;
   onCleanSelectModeToggle(handler: (active: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via") => void): void;
+  refreshStagingOnly?(selectMode: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via"): void;
   onCleanCandidateSelect(handler: (fid: string | null) => void): void;
   onCleanStagingAction?(handler: (action: string, data?: any) => void): void;
   onCleanRuleParamChange?(handler: (ruleId: string, params: Record<string, any> | null) => void): void;
@@ -410,6 +411,15 @@ export function createListView(container: HTMLElement): ListView {
     onCleanCandidateSelect(h) { state.cleanCandidateSelectHandlers.push(h); },
     onCleanStagingAction(h) { state.cleanStagingActionHandlers.push(h); },
     onCleanRuleParamChange(h) { state.cleanRuleParamChangeHandlers.push(h); },
+    refreshStagingOnly(selectMode) {
+      const container = state.container.querySelector(".lv-clean-container") as HTMLElement | null;
+      if (!container) return;
+      const headPanel = container.querySelector(".lv-clean-head-panel") as HTMLElement | null;
+      if (headPanel) {
+        state.input = { ...state.input, selectMode };
+        renderCleanHead(state, headPanel);
+      }
+    },
   };
 }
 
@@ -633,6 +643,21 @@ function bindCleanTabEventsDelegated(state: InternalState, container: HTMLElemen
     const exportBtn = target.closest(".lv-clean-staging-export");
     if (exportBtn) {
       state.cleanStagingActionHandlers.forEach(h => h("export"));
+      return;
+    }
+    const deleteCandidateBtn = target.closest(".lv-clean-staging-delete-candidate");
+    if (deleteCandidateBtn) {
+      state.cleanStagingActionHandlers.forEach(h => h("delete-candidate"));
+      return;
+    }
+    const mergeAllQueueBtn = target.closest(".lv-clean-staging-merge-all-queue");
+    if (mergeAllQueueBtn) {
+      state.cleanStagingActionHandlers.forEach(h => h("merge-all-queue"));
+      return;
+    }
+    const clearQueueBtn = target.closest(".lv-clean-staging-clear-queue");
+    if (clearQueueBtn) {
+      state.cleanStagingActionHandlers.forEach(h => h("clear-queue"));
       return;
     }
 

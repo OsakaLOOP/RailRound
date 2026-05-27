@@ -205,6 +205,7 @@ interface InternalState {
   clickHandlers: Array<(ref: EntityRef, fid?: string) => void>;
   boxSelectHandlers: Array<(fids: string[]) => void>;
   boxHighlightGroup: L.LayerGroup;
+  boxHighlightFidSig: string | null;
   animationFrameId?: number;
   animationTimeouts?: number[];
   originalZoom?: number;
@@ -244,6 +245,7 @@ export function createMapView(container: HTMLElement): MapView {
     clickHandlers: [],
     boxSelectHandlers: [],
     boxHighlightGroup: L.layerGroup().addTo(map),
+    boxHighlightFidSig: null,
     animationTimeouts: [],
   };
 
@@ -359,6 +361,9 @@ export function createMapView(container: HTMLElement): MapView {
       state.boxHighlightGroup.clearLayers();
     },
     highlightBoxSelect(fids) {
+      const sig = fids.length === 0 ? "" : [...fids].sort().join("|");
+      if (sig === state.boxHighlightFidSig) return;
+      state.boxHighlightFidSig = sig;
       state.boxHighlightGroup.clearLayers();
       const fidSet = new Set(fids);
       state.entityLayers.forEach((entry) => {
@@ -370,6 +375,7 @@ export function createMapView(container: HTMLElement): MapView {
               color: "#ff00aa",
               weight: 5,
               opacity: 0.85,
+              interactive: false,
             });
           } else if (entry.kind === "platform") {
             const poly = entry.layer as L.Polygon;
@@ -378,6 +384,7 @@ export function createMapView(container: HTMLElement): MapView {
               weight: 2,
               fillColor: "#ff00aa",
               fillOpacity: 0.4,
+              interactive: false,
             });
           } else {
             const marker = entry.layer as L.CircleMarker;
@@ -385,6 +392,7 @@ export function createMapView(container: HTMLElement): MapView {
               color: "#ff00aa",
               radius: 6,
               fillOpacity: 0.6,
+              interactive: false,
             });
           }
           highlightLayer.addTo(state.boxHighlightGroup);

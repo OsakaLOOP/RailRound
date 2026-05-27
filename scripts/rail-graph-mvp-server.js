@@ -489,20 +489,24 @@ export function railGraphMvpServerPlugin() {
           }
           if (req.method === 'POST' && pathname === '/workspace/seed-source') {
             const body = await readBody(req)
-            const { projectKey, sourceGeoJsonPath, featureCollection, geojsonSourceDir } = body
-            
+            const { projectKey, sourceGeoJsonPath, featureCollection, geojsonSourceDir, matchedOutputRoot } = body
+
             if (!sourceGeoJsonPath || !featureCollection) {
               json(res, 400, { error: 'Missing sourceGeoJsonPath or featureCollection' })
               return
             }
-            
+
             const resolvedPath = path.resolve(sourceGeoJsonPath)
-            const resolvedDir = path.resolve(geojsonSourceDir || 'D:\\GIS\\geojson_source')
-            if (!resolvedPath.startsWith(resolvedDir)) {
-              json(res, 403, { error: 'Access denied: Target path must be within geojsonSourceDir' })
+            const allowedDirs = [
+              path.resolve(geojsonSourceDir || 'D:\\GIS\\geojson_source'),
+              path.resolve(matchedOutputRoot || 'D:\\GIS\\matched_by_company'),
+            ]
+            const allowed = allowedDirs.some(dir => resolvedPath.startsWith(dir))
+            if (!allowed) {
+              json(res, 403, { error: 'Access denied: Target path must be within geojsonSourceDir or matchedOutputRoot' })
               return
             }
-            
+
             fs.mkdirSync(path.dirname(resolvedPath), { recursive: true })
             fs.writeFileSync(resolvedPath, JSON.stringify(featureCollection, null, 2), 'utf8')
             json(res, 200, { ok: true })

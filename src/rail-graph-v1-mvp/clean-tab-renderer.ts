@@ -207,17 +207,21 @@ function renderStagingPanelHtml(state: InternalState): string {
         <button class="lv-clean-staging-prev-candidate lv-clean-act-btn" style="padding:2px 4px; font-size:9.5px;" ${activeCandidateIndex <= 0 ? "disabled" : ""}>◀◀ Prev</button>
         <span style="flex:1; text-align:center; font-weight:600; color:#16a34a;">Candidate ${activeCandidateIndex + 1} / ${candidates.length}</span>
         <button class="lv-clean-staging-next-candidate lv-clean-act-btn" style="padding:2px 4px; font-size:9.5px;" ${activeCandidateIndex >= candidates.length - 1 ? "disabled" : ""}>Next ▶▶</button>
+        <button class="lv-clean-staging-delete-candidate" style="padding:2px 6px; font-size:9.5px; border:1px solid #fca5a5; background:#fef2f2; color:#dc2626; border-radius:3px; cursor:pointer; font-weight:700;" title="Delete this candidate">🗑</button>
       </div>
-      <div style="margin-top: 4px;">
-        <button class="lv-clean-staging-commit-queue primary" style="width:100%; font-size:10px; padding:4px 6px; background:#4f46e5; border-color:#4f46e5; color:#fff; cursor:pointer; font-weight:700;">
-          📥 Solidify Path & Add to Queue
+      <div style="margin-top:4px; display:flex; gap:4px;">
+        <button class="lv-clean-staging-commit-queue primary" style="flex:1; font-size:10px; padding:4px 6px; background:#4f46e5; border-color:#4f46e5; color:#fff; cursor:pointer; font-weight:700;">
+          📥 Solidify Current → Queue
+        </button>
+        <button class="lv-clean-staging-merge-all-queue" style="flex:1; font-size:10px; padding:4px 6px; background:#7c3aed; border:1px solid #7c3aed; color:#fff; cursor:pointer; font-weight:700; border-radius:4px;">
+          ⊕ Merge All → Queue
         </button>
       </div>
     ` : "";
 
     candidatesHtml = `
       ${candidateNav}
-      <div style="font-size:10px; color:#64748b; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Staged ways (${unionFids.length}): <span style="font-family:ui-monospace,monospace; color:#334155;">${unionFids.map((f: string) => f.split(":")[1] || f).join(", ")}</span></div>
+      <div style="font-size:10px; color:#64748b; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Queue (${unionFids.length}): <span style="font-family:ui-monospace,monospace; color:#334155;">${unionFids.map((f: string) => f.split(":")[1] || f).join(", ")}</span></div>
     `;
   }
 
@@ -267,10 +271,11 @@ function renderStagingPanelHtml(state: InternalState): string {
         ${candidatesHtml}
 
         ${unionFids.length > 0 ? `
-          <div style="margin-top:4px; border-top:1px dashed #e2e8f0; padding-top:4px;">
-            <button class="lv-clean-staging-export primary strong" style="width:100%; font-size:10.5px; padding:4px 8px; background:#16a34a; border-color:#16a34a; color:#fff; cursor:pointer;">
-              Export Staged → New Workspace
+          <div style="margin-top:4px; border-top:1px dashed #e2e8f0; padding-top:4px; display:flex; gap:4px;">
+            <button class="lv-clean-staging-export primary strong" style="flex:1; font-size:10.5px; padding:4px 8px; background:#16a34a; border-color:#16a34a; color:#fff; cursor:pointer;">
+              Export Queue → New Workspace
             </button>
+            <button class="lv-clean-staging-clear-queue" style="font-size:10.5px; padding:4px 8px; border:1px solid #fca5a5; background:#fef2f2; color:#dc2626; border-radius:4px; cursor:pointer; font-weight:700;" title="Clear queue">🗑</button>
           </div>
         ` : ""}
       </div>
@@ -519,6 +524,15 @@ export function renderCleanCandidates(state: InternalState, candidates: any[], l
 
     card.style.cssText = `border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:11px; transition:all 100ms; ${borderStyle} ${bgStyle} ${outline}`;
     card.className = `lv-clean-item-card${isQueued ? ' queued' : ''}`;
+
+    const sig = `${isRemove ? 1 : 0}|${isKeep ? 1 : 0}|${isSelected ? 1 : 0}|${isQueued ? 1 : 0}|${reason}`;
+    if (card.dataset.sig === sig) {
+      if (listContainer.children[index] !== card) {
+        listContainer.insertBefore(card, listContainer.children[index] || null);
+      }
+      return;
+    }
+    card.dataset.sig = sig;
 
     const html = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">

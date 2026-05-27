@@ -90,7 +90,7 @@ import {
   type MvpOverrideState,
 } from "./pipeline";
 import { findPaths } from "./way-graph-pathfinder";
-import { exportStagedToNewWorkspace } from "./staging-store";
+import { exportQueueToNewWorkspace } from "./staging-store";
 
 let cleanOverrides: MvpOverrideState | null = null;
 const cleanLevels: Record<string, boolean> = { high: true, medium: true, low: true };
@@ -117,6 +117,7 @@ let pendingLoadToken = 0;
 // 单次 pipeline 共享 cache: refreshViews / compileCleanDecisions 命中 sig 即复用.
 // 触发失效的位置: source 重载, rule/filter/level/search/overrides 变更.
 let lastPipelineRun: { passFids: Set<string>; passFeatures: GeoJsonFeature[]; report: PipelineReport; sig: string } | null = null;
+let cachedFilteredSource: { type: "FeatureCollection"; features: GeoJsonFeature[] } | null = null;
 
 let activePipelineRunToken = 0;
 let isPipelineRunning = false;
@@ -2168,6 +2169,7 @@ function initViews(): void {
       if (cleanSelectMode === "select-queue") {
         if (cleanSelectionQueue.has(fid)) cleanSelectionQueue.delete(fid);
         else cleanSelectionQueue.add(fid);
+        persistWorkspaceCleanUiState();
         syncSelectModeBar();
       } else if (cleanSelectMode === "staging-origin") {
         updateActiveWorkspace((workspace) => {
@@ -2440,12 +2442,14 @@ function initViews(): void {
 
   listView.onCleanSelectModeToggle((active) => {
     cleanSelectMode = active;
-    if (!active) {
-      cleanSelectionQueue.clear();
+    if (active === "select-queue" || active === false) {
+      persistWorkspaceCleanUiState();
+      syncSelectModeBar();
+      refreshViews();
+    } else {
+      syncSelectModeBar();
+      listView!.refreshStagingOnly?.(cleanSelectMode);
     }
-    persistWorkspaceCleanUiState();
-    syncSelectModeBar();
-    refreshViews();
   });
 
   listView.onCleanCandidateSelect((fid) => {
@@ -2453,6 +2457,7 @@ function initViews(): void {
       if (cleanSelectMode === "select-queue") {
         if (cleanSelectionQueue.has(fid)) cleanSelectionQueue.delete(fid);
         else cleanSelectionQueue.add(fid);
+        persistWorkspaceCleanUiState();
         syncSelectModeBar();
         return;
       } else if (cleanSelectMode === "staging-origin") {
@@ -2582,6 +2587,53 @@ function initViews(): void {
       });
       persistWorkspace();
       refreshViews();
+    } else if (action === "delete-candidate") {
+      updateActiveWorkspace((workspace) => {
+        if (workspace.staging && workspace.staging.candidates && workspace.staging.candidates.length > 0) {
+          const idx = workspace.staging.activeCandidateIndex ?? 0;
+          workspace.staging.candidates.splice(idx, 1);
+          if (workspace.staging.candidates.length === 0) {
+            workspace.staging.activeCandidateIndex = undefined;
+            workspace.staging.stagedWayFids = [];
+          } else {
+            const newIdx = Math.min(idx, workspace.staging.candidates.length - 1);
+            workspace.staging.activeCandidateIndex = newIdx;
+            workspace.staging.stagedWayFids = workspace.staging.candidates[newIdx] || [];
+          }
+        }
+      });
+      persistWorkspace();
+      refreshViews();
+    } else if (action === "merge-all-queue") {
+      const staging = ws.staging;
+      if (!staging || !staging.candidates || staging.candidates.length === 0) return;
+
+      const merged = new Set<string>();
+      for (const path of staging.candidates) {
+        for (const fid of path) merged.add(fid);
+      }
+      for (const fid of merged) cleanSelectionQueue.add(fid);
+
+      updateActiveWorkspace((workspace) => {
+        workspace.staging = {
+          via: [],
+          stagedWayFids: [],
+          origin: undefined,
+          terminus: undefined,
+          candidates: undefined,
+          activeCandidateIndex: undefined
+        };
+      });
+
+      persistWorkspaceCleanUiState();
+      persistWorkspace();
+      syncSelectModeBar();
+      refreshViews();
+    } else if (action === "clear-queue") {
+      cleanSelectionQueue.clear();
+      persistWorkspaceCleanUiState();
+      syncSelectModeBar();
+      refreshViews();
     } else if (action === "commit-queue") {
       const staging = ws.staging;
       if (!staging || !staging.stagedWayFids || staging.stagedWayFids.length === 0) return;
@@ -2601,33 +2653,42 @@ function initViews(): void {
         };
       });
 
+      persistWorkspaceCleanUiState();
       persistWorkspace();
       syncSelectModeBar();
       refreshViews();
     } else if (action === "export") {
       const staging = ws.staging || { via: [], stagedWayFids: [] };
-      const unionFids = Array.from(new Set([
+      const queueFids = new Set([
         ...cleanSelectionQueue,
         ...(staging.stagedWayFids || [])
-      ]));
-      if (unionFids.length === 0 || !state.source) return;
-      
-      const keepStaging = confirm("Export to new workspace successfully created! Keep staging in the current workspace?");
-      
+      ]);
+      if (queueFids.size === 0 || !state.source) return;
+
+      const { passFeatures } = getOrRunPipeline();
+      const keepQueue = confirm("Export queue to new workspace?\n\nQueue ways + spatially matched objects will be included.\nKeep queue in current workspace?");
+
       try {
-        const exportStaging = {
-          ...staging,
-          stagedWayFids: unionFids
+        const newWs = await exportQueueToNewWorkspace(ws, queueFids, passFeatures, globalSettings);
+
+        newWs.currentStep = "clean";
+        newWs.recommendedStep = "clean";
+        newWs.progress.prepare = {
+          status: "done",
+          updatedAt: new Date().toISOString(),
+          lastAction: "extractAndMatch",
+          completedActions: ["extractAndMatch"],
+          artifacts: [],
+          diagnostics: [],
         };
-        const newWs = await exportStagedToNewWorkspace(ws, exportStaging, globalSettings, state.source.features);
-        
+
         workspaceState.workspaces[newWs.key] = newWs;
         workspaceState.activeKey = newWs.key;
-        
-        if (!keepStaging) {
+
+        if (!keepQueue) {
           ws.staging = undefined;
         }
-        
+
         pipelineArtifacts = [];
         activePipelineTask = null;
         state.source = null;
@@ -2642,24 +2703,23 @@ function initViews(): void {
         cleanDecisionsVersion++;
         cleanSelectionQueue.clear();
         if (mapView) mapView.lastRefs = null;
-        
+
         mapView?.update(cloneTopo(EMPTY_TOPO), { type: "FeatureCollection", features: [] }, allCleanDecisions, cleanDecisionsVersion);
         persistWorkspace();
         renderWorkflowChrome();
-        
+
         const myToken = ++pendingLoadToken;
         requestAnimationFrame(async () => {
           if (myToken !== pendingLoadToken) return;
           try {
-            await startPipelineTask("match", newWs.project);
             await loadWorkspaceDataAndCompile(myToken);
           } catch (err) {
-            console.error("Failed to run match task after export:", err);
-            alert(`New workspace created, but match run failed: ${err}`);
+            console.error("Failed to load new workspace after export:", err);
+            alert(`New workspace created, but load failed: ${err}`);
           }
         });
       } catch (err) {
-        console.error("Export staged failed:", err);
+        console.error("Export queue failed:", err);
         alert(`Export failed: ${err}`);
       }
     }
@@ -2691,6 +2751,7 @@ function initViews(): void {
   mapView.onBoxSelect((fids) => {
     if (!cleanSelectMode || !fids || fids.length === 0) return;
     for (const fid of fids) cleanSelectionQueue.add(fid);
+    persistWorkspaceCleanUiState();
     syncSelectModeBar();
   });
 
@@ -2730,7 +2791,6 @@ function bindSelectModeBarOnce(): void {
   if (!removeBtn || !keepBtn || !cancelBtn) return;
 
   const exitMode = () => {
-    cleanSelectionQueue.clear();
     cleanSelectMode = false;
     persistWorkspaceCleanUiState();
     syncSelectModeBar();
@@ -2752,6 +2812,7 @@ function bindSelectModeBarOnce(): void {
       meta[fid] = { ...(meta[fid] || {}), reason };
     }
     await updateCleanOverrides(Array.from(keepSet), Array.from(removeSet), meta);
+    cleanSelectionQueue.clear();
     exitMode();
   };
 
@@ -2961,13 +3022,11 @@ function refreshViews(): void {
   }
 
   if (state.source) {
-    // 单次共享: getOrRunPipeline 命中 sig 即复用, 不会重复跑.
     const { passFids, passFeatures, report } = getOrRunPipeline();
-    const filteredSource = {
-      type: "FeatureCollection" as const,
-      features: passFeatures,
-    };
-    mapView.update(state.topo || EMPTY_TOPO, filteredSource, allCleanDecisions, cleanDecisionsVersion);
+    if (!cachedFilteredSource || cachedFilteredSource.features !== passFeatures) {
+      cachedFilteredSource = { type: "FeatureCollection", features: passFeatures };
+    }
+    mapView.update(state.topo || EMPTY_TOPO, cachedFilteredSource, allCleanDecisions, cleanDecisionsVersion);
     listView.update({
       topo: state.topo,
       diagnostics: state.diagnostics,
@@ -3264,6 +3323,7 @@ function restoreWorkspaceCleanUiState(): void {
   cleanSelectedCandidateFid = ui?.cleanSelectedCandidateFid ?? null;
 
   cleanSelectionQueue.clear();
+  for (const fid of ui?.selectionQueue ?? []) cleanSelectionQueue.add(fid);
 }
 
 function persistWorkspaceCleanUiState(): void {
@@ -3275,6 +3335,7 @@ function persistWorkspaceCleanUiState(): void {
       cleanSearchQuery,
       cleanSelectMode,
       cleanSelectedCandidateFid,
+      selectionQueue: Array.from(cleanSelectionQueue),
     };
   });
 }

@@ -3,12 +3,21 @@ import { polylineLengthMeters } from "./spatial-helpers";
 type NodeKey = string;
 type WayFid = string;
 
-const PRECISION_M_DEFAULT = 0.0000001;   // 7 decimal places ≈ 1cm
-const PRECISION_M_FALLBACK = 0.0001;     // 4 decimal places ≈ 1m
+const PRECISION_M_DEFAULT = 0.0000001;
+const PRECISION_M_FALLBACK = 0.0001;
+const ANGLE_THRESHOLD_DEG = 90;
+
+interface WayEdge {
+  aKey: NodeKey;
+  bKey: NodeKey;
+  lengthM: number;
+  coords: [number, number][];
+}
 
 interface WayGraph {
-  edges: Map<WayFid, { aKey: NodeKey; bKey: NodeKey; lengthM: number }>;
+  edges: Map<WayFid, WayEdge>;
   adj: Map<NodeKey, Array<{ wayFid: string; otherKey: NodeKey }>>;
+  nodeCoords: Map<NodeKey, [number, number]>;
 }
 
 function roundToPrecision(num: number, precision: number): number {
@@ -20,16 +29,76 @@ function nodeKey(coord: [number, number], precision: number): NodeKey {
   return `${roundToPrecision(coord[0], precision)},${roundToPrecision(coord[1], precision)}`;
 }
 
-/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Build a topological way graph based on coordinates and precision settings. */
+function turnAngleDeg(
+  inCoords: [number, number][],
+  outCoords: [number, number][],
+  sharedNode: [number, number],
+): number {
+  if (inCoords.length < 2 || outCoords.length < 2) return 180;
+
+  const refLat = sharedNode[1] * Math.PI / 180;
+  const kx = 111320 * Math.cos(refLat);
+  const ky = 111320;
+
+  const inEnd = sharedNode;
+  let inStart = inCoords[0];
+  const inStartDist = Math.abs(inCoords[0][0] - sharedNode[0]) + Math.abs(inCoords[0][1] - sharedNode[1]);
+  const inEndDist = Math.abs(inCoords[inCoords.length - 1][0] - sharedNode[0]) + Math.abs(inCoords[inCoords.length - 1][1] - sharedNode[1]);
+  if (inStartDist < inEndDist) {
+    // shared is at start of inCoords, so approach direction is from end
+    for (let i = inCoords.length - 1; i >= 0; i--) {
+      if (Math.abs(inCoords[i][0] - sharedNode[0]) > 1e-7 || Math.abs(inCoords[i][1] - sharedNode[1]) > 1e-7) {
+        inStart = inCoords[i]; break;
+      }
+    }
+  } else {
+    for (let i = 0; i < inCoords.length; i++) {
+      if (Math.abs(inCoords[i][0] - sharedNode[0]) > 1e-7 || Math.abs(inCoords[i][1] - sharedNode[1]) > 1e-7) {
+        inStart = inCoords[i]; break;
+      }
+    }
+  }
+
+  const outStart = sharedNode;
+  let outEnd = outCoords[outCoords.length - 1];
+  const outStartDist = Math.abs(outCoords[0][0] - sharedNode[0]) + Math.abs(outCoords[0][1] - sharedNode[1]);
+  if (outStartDist < 1e-7) {
+    for (let i = 1; i < outCoords.length; i++) {
+      if (Math.abs(outCoords[i][0] - sharedNode[0]) > 1e-7 || Math.abs(outCoords[i][1] - sharedNode[1]) > 1e-7) {
+        outEnd = outCoords[i]; break;
+      }
+    }
+  } else {
+    for (let i = outCoords.length - 2; i >= 0; i--) {
+      if (Math.abs(outCoords[i][0] - sharedNode[0]) > 1e-7 || Math.abs(outCoords[i][1] - sharedNode[1]) > 1e-7) {
+        outEnd = outCoords[i]; break;
+      }
+    }
+  }
+
+  const dxA = (inEnd[0] - inStart[0]) * kx;
+  const dyA = (inEnd[1] - inStart[1]) * ky;
+  const dxB = (outEnd[0] - outStart[0]) * kx;
+  const dyB = (outEnd[1] - outStart[1]) * ky;
+
+  const lenA = Math.sqrt(dxA * dxA + dyA * dyA);
+  const lenB = Math.sqrt(dxB * dxB + dyB * dyB);
+  if (lenA === 0 || lenB === 0) return 180;
+
+  const dot = dxA * dxB + dyA * dyB;
+  const cosTheta = Math.max(-1, Math.min(1, dot / (lenA * lenB)));
+  return Math.acos(cosTheta) * 180 / Math.PI;
+}
+
 function buildWayGraph(features: any[], passFids: Set<string>, precision: number): WayGraph {
-  const edges = new Map<string, { aKey: string; bKey: string; lengthM: number }>();
+  const edges = new Map<string, WayEdge>();
   const adj = new Map<string, Array<{ wayFid: string; otherKey: string }>>();
+  const nodeCoords = new Map<string, [number, number]>();
 
   for (const f of features) {
     const props = f.properties || {};
     const fid = props._fid || `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
     if (!passFids.has(fid)) continue;
-
     if (f.geometry.type !== "LineString" && f.geometry.type !== "MultiLineString") continue;
 
     const coordsList: [number, number][][] = f.geometry.type === "LineString"
@@ -45,7 +114,9 @@ function buildWayGraph(features: any[], passFids: Set<string>, precision: number
       const bKey = nodeKey(last, precision);
       const lengthM = polylineLengthMeters(coords);
 
-      edges.set(fid, { aKey, bKey, lengthM });
+      edges.set(fid, { aKey, bKey, lengthM, coords });
+      nodeCoords.set(aKey, first);
+      nodeCoords.set(bKey, last);
 
       if (!adj.has(aKey)) adj.set(aKey, []);
       adj.get(aKey)!.push({ wayFid: fid, otherKey: bKey });
@@ -55,10 +126,9 @@ function buildWayGraph(features: any[], passFids: Set<string>, precision: number
     }
   }
 
-  return { edges, adj };
+  return { edges, adj, nodeCoords };
 }
 
-/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Breadth-first search to find the shortest path between start and end ways. */
 function findShortestPath(g: WayGraph, startFid: string, endFid: string, excludedWayFids: Set<string>): string[] | null {
   if (startFid === endFid) {
     return excludedWayFids.has(startFid) ? null : [startFid];
@@ -69,40 +139,54 @@ function findShortestPath(g: WayGraph, startFid: string, endFid: string, exclude
   if (!startEdge || !endEdge) return null;
 
   const targets = new Set([endEdge.aKey, endEdge.bKey]);
-  const queue: Array<{ nodeKey: string; path: string[] }> = [];
-  const visited = new Set<string>();
+  const queue: Array<{ nodeKey: string; path: string[]; prevWayFid: string }> = [];
+  const visited = new Map<string, Set<string>>();
 
-  queue.push({ nodeKey: startEdge.aKey, path: [startFid] });
-  queue.push({ nodeKey: startEdge.bKey, path: [startFid] });
-  visited.add(startEdge.aKey);
-  visited.add(startEdge.bKey);
+  for (const nk of [startEdge.aKey, startEdge.bKey]) {
+    queue.push({ nodeKey: nk, path: [startFid], prevWayFid: startFid });
+    if (!visited.has(nk)) visited.set(nk, new Set());
+    visited.get(nk)!.add(startFid);
+  }
 
   while (queue.length > 0) {
     const curr = queue.shift()!;
 
-    if (targets.has(curr.nodeKey)) {
+    if (targets.has(curr.nodeKey) && curr.path.length > 1) {
       return [...curr.path, endFid];
     }
+
+    const sharedCoord = g.nodeCoords.get(curr.nodeKey);
+    const prevEdge = g.edges.get(curr.prevWayFid);
 
     const neighbors = g.adj.get(curr.nodeKey) || [];
     for (const n of neighbors) {
       if (excludedWayFids.has(n.wayFid)) continue;
       if (curr.path.includes(n.wayFid)) continue;
 
-      if (!visited.has(n.otherKey)) {
-        visited.add(n.otherKey);
-        queue.push({
-          nodeKey: n.otherKey,
-          path: [...curr.path, n.wayFid]
-        });
+      if (prevEdge && sharedCoord) {
+        const nextEdge = g.edges.get(n.wayFid);
+        if (nextEdge) {
+          const angle = turnAngleDeg(prevEdge.coords, nextEdge.coords, sharedCoord);
+          if (angle >= ANGLE_THRESHOLD_DEG) continue;
+        }
       }
+
+      const visitedAtNode = visited.get(n.otherKey);
+      if (visitedAtNode && visitedAtNode.has(n.wayFid)) continue;
+      if (!visited.has(n.otherKey)) visited.set(n.otherKey, new Set());
+      visited.get(n.otherKey)!.add(n.wayFid);
+
+      queue.push({
+        nodeKey: n.otherKey,
+        path: [...curr.path, n.wayFid],
+        prevWayFid: n.wayFid,
+      });
     }
   }
 
   return null;
 }
 
-/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Find K shortest alternative paths by deleting path segments one-by-one. */
 function bfsKShortest(g: WayGraph, startFid: string, endFid: string, k: number): string[][] {
   const paths: string[][] = [];
   const pathSet = new Set<string>();
@@ -115,8 +199,7 @@ function bfsKShortest(g: WayGraph, startFid: string, endFid: string, k: number):
 
   for (let i = 1; i < p0.length - 1; i++) {
     if (paths.length >= k) break;
-    const edgeToExclude = p0[i];
-    const pAlt = findShortestPath(g, startFid, endFid, new Set([edgeToExclude]));
+    const pAlt = findShortestPath(g, startFid, endFid, new Set([p0[i]]));
     if (pAlt) {
       const key = pAlt.join("|");
       if (!pathSet.has(key)) {
@@ -129,7 +212,6 @@ function bfsKShortest(g: WayGraph, startFid: string, endFid: string, k: number):
   return paths.sort((a, b) => a.length - b.length);
 }
 
-/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Find combined routes passing through origin, via nodes, and terminus. */
 function findStagedPaths(g: WayGraph, origin: string, via: string[], terminus: string, k: number): string[][] {
   const segments = [origin, ...via, terminus];
   const segmentPaths: string[][][] = [];
@@ -177,7 +259,6 @@ function findStagedPaths(g: WayGraph, origin: string, via: string[], terminus: s
   return paths;
 }
 
-/* 仅对某个独立的功能或者组件/长工具函数添加简短中英注释 / Public entrypoint for path finding between staged nodes with geometric precision fallback. */
 export function findPaths(
   features: any[],
   passFids: Set<string>,
@@ -205,3 +286,4 @@ export function findPaths(
     error: "no path, add a via"
   };
 }
+

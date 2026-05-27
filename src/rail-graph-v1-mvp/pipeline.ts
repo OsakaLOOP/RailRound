@@ -86,6 +86,7 @@ export interface LineWorkspaceState {
     cleanSearchQuery?: string;
     cleanSelectMode?: false | "select-queue" | "staging-origin" | "staging-terminus" | "staging-via";
     cleanSelectedCandidateFid?: string | null;
+    selectionQueue?: string[];
     ruleParamOverrides?: Record<string, Record<string, any>>;
   };
   lastTaskId?: string;

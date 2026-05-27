@@ -64,6 +64,7 @@ export interface TopologyNode {
   id: EntityRef;
   kind: TopologyNodeKind;
   name?: string;
+  coordinates?: [number, number];
   geometryRef?: EntityRef;
   properties?: {
     mileageKm?: number;

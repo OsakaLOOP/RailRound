@@ -11,6 +11,7 @@
     "pre-submit": "npm run build && npm --prefix blog run test",
     "rail:mvp:clean-verify:senseki": "tsx src/rail-graph-v1-mvp/verify-senseki-clean.ts",
     "rail:aggregate:verify:patterns": "tsx src/rail-graph-v1-mvp/verify-aggregate-patterns.ts",
+    "rail:aggregate:verify:compiled-topology": "tsx src/rail-graph-v1-mvp/verify-aggregate-compiled-topology.ts",
     "rail:aggregate:verify:cross-pf": "tsx src/rail-graph-v1-mvp/verify-cross-pattern-pathfinding.ts",
     "rail:aggregate:verify:events": "tsx src/rail-graph-v1-mvp/verify-event-aggregation.ts",
     "rail:aggregate:verify:cross-ws": "tsx src/rail-graph-v1-mvp/verify-aggregate-cross-workspace.ts",

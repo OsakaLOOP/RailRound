@@ -14,3 +14,4 @@
 - ServicePattern resolving now branches by aggregate mode:
   - `mode: "compiled-topology"` uses `findPathsV2` through `service-pattern/adapter.ts`;
   - `mode: "no-direction-graph"` keeps the fixture substitute resolver for verify-only data.
+- `npm run rail:aggregate:verify:compiled-topology` uses a small in-memory synthetic compiled topology to verify the product adapter branch while real annotated aggregate data is still pending.

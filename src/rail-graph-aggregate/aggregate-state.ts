@@ -9,6 +9,7 @@ import {
   type FixtureSource,
 } from "./no-direction-graph";
 import { isNodeRuntime, readAggregateJson, writeAggregateJson } from "./storage";
+import { importCompiledAggregateFromMvpWorkspaces } from "./workspace-import";
 
 export interface AggregateState {
   aggregateKey: string;
@@ -39,6 +40,7 @@ export interface LoadAggregateArgs {
 
 export interface ImportWorkspacesArgs {
   aggregateKey: string;
+  memberWorkspaceKeys?: string[];
   fixtureSources?: FixtureSource[];
   /**
    * Current implementation imports cleaned fixtures into a no-direction graph.
@@ -83,12 +85,8 @@ export async function loadAggregate(args: LoadAggregateArgs): Promise<AggregateS
 }
 
 export async function importWorkspaces(args: ImportWorkspacesArgs): Promise<AggregateState> {
-  if (!args.allowNoDirection) {
-    throw new Error(
-      "No-direction fixture import is disabled for default callers. " +
-      "Pass allowNoDirection from verify only until annotated aggregate import is available.",
-    );
-  }
+  if (!args.allowNoDirection) return await importCompiledWorkspaces(args);
+
   const fixtureSources = args.fixtureSources ?? DEFAULT_FIXTURE_SOURCES;
   const sources = [];
   for (const fixture of fixtureSources) {
@@ -119,6 +117,37 @@ export async function importWorkspaces(args: ImportWorkspacesArgs): Promise<Aggr
     },
   };
 
+  await saveAggregate(state);
+  return state;
+}
+
+async function importCompiledWorkspaces(args: ImportWorkspacesArgs): Promise<AggregateState> {
+  if (isNodeRuntime()) {
+    throw new Error(
+      "Compiled aggregate import requires the browser MVP workspace state and the Vite fs API. " +
+      "Open rail-graph-aggregate.html and use Import MVP Workspaces.",
+    );
+  }
+  const imported = await importCompiledAggregateFromMvpWorkspaces({
+    memberWorkspaceKeys: args.memberWorkspaceKeys,
+  });
+  const now = new Date().toISOString();
+  const state: AggregateState = {
+    aggregateKey: args.aggregateKey,
+    memberWorkspaceKeys: imported.memberWorkspaceKeys,
+    mode: "compiled-topology",
+    featureCollection: imported.featureCollection,
+    topo: imported.topo,
+    diagnostics: imported.diagnostics,
+    perWorkspaceEdgeCount: imported.perWorkspaceEdgeCount,
+    metadata: {
+      createdAt: now,
+      updatedAt: now,
+      source: "import",
+      note: `Compiled aggregate imported from ${imported.memberWorkspaceKeys.length} MVP workspace(s). ` +
+        `features=${imported.importedFeatureCount}, deduped=${imported.dedupedFeatureCount}.`,
+    },
+  };
   await saveAggregate(state);
   return state;
 }

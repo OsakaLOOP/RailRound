@@ -2,8 +2,10 @@ import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { IntentionNode } from "../rail-graph-v1/chain.types";
 import type { EntityRef } from "../rail-graph-v1/primitives";
-import type { TopologyEdge } from "../rail-graph-v1/base-topology.types";
-import { loadAggregate, type AggregateState } from "./aggregate-state";
+import type { Station, TopologyEdge } from "../rail-graph-v1/base-topology.types";
+import { projectPointToPolyline } from "../rail-graph-v1/geometry-math";
+import { importWorkspaces, loadAggregate, type AggregateState } from "./aggregate-state";
+import { listMvpImportWorkspaces } from "./workspace-import";
 import {
   nodeCoordinate,
   findEdgeByOsmId,
@@ -66,10 +68,13 @@ interface AppState {
   routeTo: EntityRef | "";
   selectedEdgeRef: EntityRef | null;
   selectedNodeRef: EntityRef | null;
+  selectedStationRef: EntityRef | null;
   selectedPatternId: EntityRef | null;
   editingPatternId: EntityRef | null;
   eventDraftAnchor: UserEvent["anchor"] | null;
   editingEventId: EntityRef | null;
+  allowNoDirectionLoad: boolean;
+  lastLoadError: string | null;
   message: string;
 }
 
@@ -81,8 +86,10 @@ interface MapState {
   candidateLayer: L.LayerGroup;
   eventLayer: L.LayerGroup;
   nodeLayer: L.LayerGroup;
+  stationLayer: L.LayerGroup;
   edgeLayers: Map<EntityRef, L.Polyline>;
   nodeLayers: Map<EntityRef, L.CircleMarker>;
+  stationLayers: Map<EntityRef, L.CircleMarker>;
 }
 
 let state: AppState = {
@@ -97,10 +104,13 @@ let state: AppState = {
   routeTo: "",
   selectedEdgeRef: null,
   selectedNodeRef: null,
+  selectedStationRef: null,
   selectedPatternId: null,
   editingPatternId: null,
   eventDraftAnchor: null,
   editingEventId: null,
+  allowNoDirectionLoad: false,
+  lastLoadError: null,
   message: "正在加载 aggregate...",
 };
 
@@ -115,11 +125,18 @@ async function boot(): Promise<void> {
   await loadAll();
 }
 
-async function loadAll(): Promise<void> {
+async function loadAll(options: { allowNoDirection?: boolean } = {}): Promise<void> {
   try {
-    state.message = "加载 aggregate 与已保存 ServicePattern...";
+    const allowNoDirection = options.allowNoDirection ?? state.allowNoDirectionLoad;
+    state.message = allowNoDirection
+      ? "加载 aggregate 验证 fallback 与已保存 ServicePattern..."
+      : "加载 compiled aggregate 与已保存 ServicePattern...";
     renderPanels();
-    const aggregate = await loadAggregate({ aggregateKey: AGGREGATE_KEY });
+    const aggregate = await loadAggregate({
+      aggregateKey: AGGREGATE_KEY,
+      allowNoDirection,
+      noDirectionReason: allowNoDirection ? "verify" : undefined,
+    });
     let patterns: StoredServicePattern[] = [];
     let userEvents: UserEvent[] = [];
     try {
@@ -138,12 +155,25 @@ async function loadAll(): Promise<void> {
       patterns,
       userEvents,
       selectedPatternId: patterns[0]?.patternId ?? null,
+      allowNoDirectionLoad: allowNoDirection,
+      lastLoadError: null,
       message: `已加载 ${aggregate.topo.edges.length} edges / ${patterns.length} patterns / ${userEvents.length} events`,
     };
     renderMap();
     renderPanels();
   } catch (error) {
-    state.message = `加载失败: ${(error as Error).message}`;
+    state = {
+      ...state,
+      aggregate: null,
+      patterns: [],
+      userEvents: [],
+      candidates: [],
+      crossPath: null,
+      selectedPatternId: null,
+      lastLoadError: (error as Error).message,
+      message: `加载失败: ${(error as Error).message}`,
+    };
+    renderMap();
     renderPanels();
   }
 }
@@ -310,8 +340,10 @@ function initMap(): void {
     candidateLayer: L.layerGroup().addTo(map),
     eventLayer: L.layerGroup().addTo(map),
     nodeLayer: L.layerGroup().addTo(map),
+    stationLayer: L.layerGroup().addTo(map),
     edgeLayers: new Map(),
     nodeLayers: new Map(),
+    stationLayers: new Map(),
   };
 }
 
@@ -336,6 +368,16 @@ async function handleAction(action: string, el: HTMLElement): Promise<void> {
   switch (action) {
     case "reload":
       await loadAll();
+      return;
+    case "import-workspaces":
+      await importSelectedWorkspaces();
+      return;
+    case "load-no-direction":
+      await loadAll({ allowNoDirection: true });
+      return;
+    case "reload-strict":
+      state.allowNoDirectionLoad = false;
+      await loadAll({ allowNoDirection: false });
       return;
     case "set-mode":
       setPickMode(el.dataset.mode as ChainEditorMode);
@@ -394,6 +436,15 @@ async function handleAction(action: string, el: HTMLElement): Promise<void> {
       renderMap();
       renderPanels();
       return;
+    case "seed-route-query":
+      seedRouteQuery();
+      return;
+    case "clear-selection":
+      clearSelection();
+      return;
+    case "fit-map":
+      fitMapToData();
+      return;
     case "draft-event-station":
       draftStationEvent();
       return;
@@ -415,6 +466,55 @@ async function handleAction(action: string, el: HTMLElement): Promise<void> {
     case "delete-event":
       await removeEvent(el.dataset.eventId as EntityRef);
       return;
+  }
+}
+
+async function importSelectedWorkspaces(): Promise<void> {
+  const memberWorkspaceKeys = selectedImportWorkspaceKeys();
+  try {
+    state.message = memberWorkspaceKeys.length > 0
+      ? `正在导入 ${memberWorkspaceKeys.length} 个 MVP workspace...`
+      : "正在导入全部 MVP workspace...";
+    renderPanels();
+    const aggregate = await importWorkspaces({
+      aggregateKey: AGGREGATE_KEY,
+      memberWorkspaceKeys: memberWorkspaceKeys.length > 0 ? memberWorkspaceKeys : undefined,
+    });
+    let patterns: StoredServicePattern[] = [];
+    let userEvents: UserEvent[] = [];
+    try {
+      patterns = await loadServicePatterns({ aggregateKey: aggregate.aggregateKey });
+    } catch {
+      patterns = [];
+    }
+    try {
+      userEvents = await loadUserEvents({ aggregateKey: aggregate.aggregateKey });
+    } catch {
+      userEvents = [];
+    }
+    state = {
+      ...state,
+      aggregate,
+      patterns,
+      userEvents,
+      candidates: [],
+      activeCandidateIndex: 0,
+      crossPath: null,
+      selectedPatternId: patterns[0]?.patternId ?? null,
+      allowNoDirectionLoad: false,
+      lastLoadError: null,
+      message: `导入完成: ${aggregate.memberWorkspaceKeys.length} members / ${aggregate.topo.edges.length} edges`,
+    };
+    didFit = false;
+    renderMap();
+    renderPanels();
+  } catch (error) {
+    state = {
+      ...state,
+      lastLoadError: (error as Error).message,
+      message: `导入失败: ${(error as Error).message}`,
+    };
+    renderPanels();
   }
 }
 
@@ -666,6 +766,53 @@ function resolveRouteQuery(): void {
   renderPanels();
 }
 
+function seedRouteQuery(): void {
+  const transferGraph = buildTransferGraph(state.patterns);
+  const patternsById = new Map(state.patterns.map((pattern) => [pattern.patternId, pattern] as const));
+
+  for (const relation of transferGraph.transfers) {
+    const patternA = patternsById.get(relation.patternA);
+    const patternB = patternsById.get(relation.patternB);
+    if (!patternA || !patternB) continue;
+
+    const shared = new Set(relation.sharedStations);
+    const stationsA = patternA.traceSequence.map((trace) => trace.stationRef);
+    const stationsB = patternB.traceSequence.map((trace) => trace.stationRef);
+    const from = stationsA.find((stationRef) => !shared.has(stationRef)) ?? stationsA[0];
+    const to = stationsB.find((stationRef) => !shared.has(stationRef)) ?? stationsB[stationsB.length - 1];
+    if (!from || !to || from === to) continue;
+
+    const crossPath = resolveCrossPattern({
+      patterns: state.patterns,
+      transferGraph,
+      from,
+      to,
+    });
+    state.routeFrom = from;
+    state.routeTo = to;
+    state.crossPath = crossPath;
+    state.selectedPatternId = null;
+    state.message = crossPath
+      ? `已载入示例 OD: ${shortRef(from)} → ${shortRef(to)}`
+      : `已载入示例 OD，但未找到路径: ${shortRef(from)} → ${shortRef(to)}`;
+    renderMap();
+    renderPanels();
+    return;
+  }
+
+  const stations = routeStations();
+  if (stations.length >= 2) {
+    state.routeFrom = stations[0];
+    state.routeTo = stations[stations.length - 1];
+    state.crossPath = null;
+    state.message = "已载入首末 station 作为示例 OD，但没有可用 transfer 关系";
+  } else {
+    state.message = "需要至少两条含 station trace 的 ServicePattern 才能生成示例 OD";
+  }
+  renderMap();
+  renderPanels();
+}
+
 function draftStationEvent(): void {
   if (!state.selectedNodeRef) {
     state.message = "先在地图点击一个 node，再创建 station event";
@@ -912,8 +1059,21 @@ function drawNodes(): void {
 let didFit = false;
 function fitMapOnce(): void {
   if (didFit || !mapState) return;
+  fitMapToData();
+}
+
+function fitMapToData(): void {
+  if (!mapState) return;
   const bounds = L.latLngBounds([]);
   mapState.graphLayer.eachLayer((layer) => {
+    const maybe = layer as L.Polyline;
+    if (typeof maybe.getBounds === "function") bounds.extend(maybe.getBounds());
+  });
+  mapState.patternLayer.eachLayer((layer) => {
+    const maybe = layer as L.Polyline;
+    if (typeof maybe.getBounds === "function") bounds.extend(maybe.getBounds());
+  });
+  mapState.candidateLayer.eachLayer((layer) => {
     const maybe = layer as L.Polyline;
     if (typeof maybe.getBounds === "function") bounds.extend(maybe.getBounds());
   });
@@ -923,19 +1083,37 @@ function fitMapOnce(): void {
   }
 }
 
+function clearSelection(): void {
+  state.selectedEdgeRef = null;
+  state.selectedNodeRef = null;
+  state.selectedStationRef = null;
+  state.eventDraftAnchor = null;
+  state.editingEventId = null;
+  state.message = "已清空地图选择";
+  renderMap();
+  renderPanels();
+}
+
 function renderPanels(): void {
   const container = document.getElementById("agg-panels");
   if (!container) return;
   const aggregate = state.aggregate;
   const selectedPattern = state.patterns.find((pattern) => pattern.patternId === state.selectedPatternId);
   const orderedEvents = eventsOnSelectedPath();
+  const importWorkspaces = safeImportWorkspaceList();
   container.innerHTML = `
     <section class="agg-section">
       <h2>Aggregate</h2>
       <div class="status">${escapeHtml(state.message)}</div>
       <div class="agg-row" style="margin-top:8px;">
         <button data-action="reload">重新加载</button>
+        <button class="primary" data-action="import-workspaces" ${importWorkspaces.length > 0 ? "" : "disabled"}>导入 MVP 工作区</button>
+        <button data-action="load-no-direction">加载 verify fallback</button>
+        <button data-action="reload-strict">加载 compiled</button>
+        <button data-action="fit-map" ${aggregate ? "" : "disabled"}>缩放到数据</button>
+        <button data-action="clear-selection" ${state.selectedEdgeRef || state.selectedNodeRef || state.selectedStationRef ? "" : "disabled"}>清空选择</button>
       </div>
+      ${state.lastLoadError ? `<div class="small muted" style="margin-top:6px;">last error: <span class="mono">${escapeHtml(state.lastLoadError)}</span></div>` : ""}
       <div class="small muted" style="margin-top:8px;">
         mode: <b>${escapeHtml(aggregate?.mode ?? "loading")}</b><br>
         edges: <b>${aggregate?.topo.edges.length ?? 0}</b> · nodes: <b>${aggregate?.topo.nodes.length ?? 0}</b><br>
@@ -943,6 +1121,9 @@ function renderPanels(): void {
         ${aggregate?.mode === "no-direction-graph"
           ? `<br><b>verify fallback</b>: no-direction 数据仅供验证，正式 UI 需等待人工标注后的 aggregate import。`
           : ""}
+      </div>
+      <div class="list" style="margin-top:8px;">
+        ${importWorkspaceListHtml(importWorkspaces)}
       </div>
     </section>
 
@@ -1005,6 +1186,7 @@ function renderPanels(): void {
         </label>
         <div class="agg-row">
           <button class="primary" data-action="resolve-route" ${state.patterns.length >= 2 ? "" : "disabled"}>查询换乘路径</button>
+          <button data-action="seed-route-query" ${state.patterns.length >= 2 ? "" : "disabled"}>示例 OD</button>
           <button data-action="clear-route" ${state.crossPath ? "" : "disabled"}>清空</button>
         </div>
       </div>
@@ -1025,6 +1207,35 @@ function renderPanels(): void {
       ${eventsHtml()}
     </section>
   `;
+}
+
+function safeImportWorkspaceList(): ReturnType<typeof listMvpImportWorkspaces> {
+  try {
+    return listMvpImportWorkspaces();
+  } catch {
+    return [];
+  }
+}
+
+function importWorkspaceListHtml(items: ReturnType<typeof listMvpImportWorkspaces>): string {
+  if (items.length === 0) {
+    return `<div class="item small muted">未发现 MVP workspace。先打开 MVP 工作台创建/加载 workspace。</div>`;
+  }
+  return items.map((item) => `
+    <label class="item" style="display:flex; gap:8px; align-items:flex-start;">
+      <input type="checkbox" class="import-workspace-checkbox" value="${escapeAttr(item.key)}" checked style="margin-top:2px;">
+      <span>
+        <b>${escapeHtml(item.companyName)} / ${escapeHtml(item.lineName)}</b><br>
+        <span class="small muted">annotate: <b>${escapeHtml(item.annotateStatus)}</b> · compile: <b>${escapeHtml(item.compileStatus)}</b></span><br>
+        <span class="small mono">${escapeHtml(item.key)}</span>
+      </span>
+    </label>
+  `).join("");
+}
+
+function selectedImportWorkspaceKeys(): EntityRef[] {
+  return Array.from(document.querySelectorAll<HTMLInputElement>(".import-workspace-checkbox:checked"))
+    .map((input) => input.value as EntityRef);
 }
 
 function renderCandidatePreview(): void {

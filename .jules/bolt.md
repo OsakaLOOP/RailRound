@@ -5,3 +5,7 @@
 ## 2024-04-15 - [Avoid O(N log N) Sorting on Massive Geographical Collections]
 **Learning:** In spatial queries like `findNearbyStations` where we scan `railwayData` containing thousands of stations to find the top K nearest points, allocating all elements to an array and running `Array.prototype.sort()` results in massive temporary object allocation and $O(N \log N)$ execution time (taking ~8.5ms in benchmarks).
 **Action:** Replace full array sorts with a bounded Top-K array using a simple $O(K)$ insertion sort during the $O(N)$ iteration phase. This brings the time complexity effectively down to $O(N)$, speeding up operations by ~36x (taking ~0.24ms). Remember to apply a final sort if total elements found are less than $K$.
+
+## 2024-05-28 - [Avoid Turf allocations in coordinate array path distance calculations]
+**Learning:** Found an opportunity to replace Turf.js overhead when calculating the length of arrays of coordinates `[lat, lng]` (frequently mapped to `[lng, lat]` internally for `turf.length(turf.lineString(...))`). By replacing this with an `O(N)` manual loop (`calcPolylineDist`) using the native Haversine `calcDist` formula we drastically reduce garbage collection overhead without sacrificing correctness.
+**Action:** Always check the coordinate order (`[lat, lng]` vs `[lng, lat]`) when applying optimizations that interface between native Leaflet code and Turf.js. Turf requires `[lng, lat]`, while Leaflet (and the native `calcDist`) use `[lat, lng]`.

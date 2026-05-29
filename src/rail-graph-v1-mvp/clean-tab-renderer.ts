@@ -212,6 +212,12 @@ function renderStagingPanelHtml(state: InternalState): string {
         <button class="lv-clean-staging-next-candidate lv-clean-act-btn" style="padding:2px 4px; font-size:9.5px;" ${activeCandidateIndex >= candidates.length - 1 ? "disabled" : ""}>Next ▶▶</button>
         <button class="lv-clean-staging-delete-candidate" style="padding:2px 6px; font-size:9.5px; border:1px solid #fca5a5; background:#fef2f2; color:#dc2626; border-radius:3px; cursor:pointer; font-weight:700;" title="Delete this candidate">🗑</button>
       </div>
+      <div style="margin-top:4px; display:flex; gap:4px; align-items:center; justify-content:space-between; background:#faf5ff; border:1px solid #e9d5ff; padding:3px 6px; border-radius:4px;">
+        <span style="font-size:9.5px; color:#6b21a8; font-weight:600; white-space:nowrap;">Bulk Dir:</span>
+        <button class="lv-clean-staging-annotate-up lv-clean-act-btn" style="padding:2px 4px; font-size:9.5px; background:#fff; border:1px solid #d8b4fe; border-radius:3px; cursor:pointer; color:#6b21a8; flex:1; text-align:center;" title="Annotate all track features in the current candidate path as UP (上行)">正 (Up)</button>
+        <button class="lv-clean-staging-annotate-down lv-clean-act-btn" style="padding:2px 4px; font-size:9.5px; background:#fff; border:1px solid #d8b4fe; border-radius:3px; cursor:pointer; color:#6b21a8; flex:1; text-align:center;" title="Annotate all track features in the current candidate path as DOWN (下行)">反 (Down)</button>
+        <button class="lv-clean-staging-annotate-both lv-clean-act-btn" style="padding:2px 4px; font-size:9.5px; background:#fff; border:1px solid #d8b4fe; border-radius:3px; cursor:pointer; color:#6b21a8; flex:1; text-align:center;" title="Annotate all track features in the current candidate path as BIDIRECTIONAL (双向)">双 (Both)</button>
+      </div>
       <div style="margin-top:4px; display:flex; gap:4px;">
         <button class="lv-clean-staging-commit-queue primary" style="flex:1; font-size:10px; padding:4px 6px; background:#4f46e5; border-color:#4f46e5; color:#fff; cursor:pointer; font-weight:700;">
           📥 Solidify Current → Queue

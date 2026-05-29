@@ -542,6 +542,52 @@ function rebuildLayers(
   schedule();
 }
 
+/**
+ * 计算 Feature 的基础渲染样式。支持按方向着色与 matchLevel 兜底。
+ * Compute base style for Feature, supporting direction coloring and matchLevel fallback.
+ */
+function featureBaseStyle(
+  feature: AnnotatedFeature,
+  decision?: string,
+  matchLevel?: string,
+): L.PathOptions {
+  if (decision === "remove") {
+    return { color: "#94a3b8", weight: 1.5, opacity: 0.25, dashArray: "4,4" };
+  }
+
+  const properties = (feature.properties || {}) as any;
+  const annotation = properties.railGraph;
+  const directionRole = annotation?.track?.directionRole;
+  const role = annotation?.track?.role;
+
+  if (directionRole) {
+    const color = colorForDirectionRole(directionRole, role);
+    const isDashed = directionRole === "reversible";
+    const isConnector = role === "connector";
+    return {
+      color,
+      weight: isConnector || directionRole === "bidirectional" ? 2 : 4,
+      opacity: isConnector ? 0.6 : 0.9,
+      dashArray: isDashed ? "6,4" : undefined,
+      lineCap: "round",
+      lineJoin: "round",
+    };
+  }
+
+  // Fallback to match_level coloring
+  const level = matchLevel || "all";
+  let color = "#2563eb";
+  if (level === "high") color = "#16a34a";
+  else if (level === "medium") color = "#ca8a04";
+  else if (level === "low") color = "#dc2626";
+
+  return {
+    color,
+    weight: level === "low" ? 2.5 : 4,
+    opacity: 0.9,
+  };
+}
+
 function renderFeatureLayer(
   state: InternalState,
   feature: AnnotatedFeature,
@@ -562,17 +608,7 @@ function renderFeatureLayer(
     if (!coords || coords.length < 2) return;
 
     const latLngs = coords.map((c) => [c[1], c[0]] as [number, number]);
-    let baseStyle: L.PathOptions;
-    if (decision === "remove") {
-      baseStyle = { color: "#94a3b8", weight: 1.5, opacity: 0.25, dashArray: "4,4" };
-    } else {
-      const level = matchLevel || "all";
-      let color = "#2563eb";
-      if (level === "high") color = "#16a34a";
-      else if (level === "medium") color = "#ca8a04";
-      else if (level === "low") color = "#dc2626";
-      baseStyle = { color, weight: level === "low" ? 2.5 : 4, opacity: 0.9 };
-    }
+    const baseStyle = featureBaseStyle(feature, decision, matchLevel);
 
     const name = properties.name || properties.osm_id || "unnamed";
     const polyline = L.polyline(latLngs, baseStyle);
@@ -708,6 +744,7 @@ function renderTopologyEdgeOverlay(
   const arrowMarker = buildArrowMarker(midLatLng, edge, bearing);
   arrowMarker.addTo(state.arrowLayer);
   state.arrowById.set(edge.id, arrowMarker);
+  bindLayerEvents(state, arrowMarker, edge.id);
 }
 
 function renderPlatformBindingOverlay(

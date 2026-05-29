@@ -10,6 +10,9 @@ import type {
   StoppingPoint,
   TopologyEdge,
   TopologyNode,
+  TopologyEdgeRole,
+  TraversalDirection,
+  TrackDirectionRole,
 } from "../rail-graph-v1/base-topology.types";
 import type { Diagnostic, DiagnosticLevel } from "../rail-graph-v1/diagnostic-types";
 import type {
@@ -49,6 +52,7 @@ import {
   type SensekiPathExportScenario,
   type SensekiScenarioResult,
 } from "./poc-senseki-pathfinding";
+import { preSplitSourceFeatures } from "./pre-split-helper";
 import { createMapView, type MapView } from "./map-view";
 import { createListView, type ListView, type TabKey } from "./list-view";
 import { dispatchRule, registerRuleHandler, type PipelineReport, type RuleReport } from "./rule-handlers";
@@ -819,13 +823,26 @@ export function importGeoJson(raw: string | GeoJsonFeatureCollection): RailGraph
   }));
 
   const deduped = dedupeFeatures([...existing, ...incoming]);
-  // 一次性预计算 fid/searchText, 整个 source 生命周期内过滤和渲染直接复用。
-  for (const f of deduped.features) {
+  // 保证 ID 的唯一性，防止不同源 index 冲突导致 inspector 错误跳转
+  deduped.features.forEach((f, finalIndex) => {
+    if (f.properties.railGraph) {
+      const ann = f.properties.railGraph;
+      if (!ann.id || ann.id.startsWith("manual:feature:idx:")) {
+        ann.id = stableId("manual", "feature", `final:${finalIndex}:${f.geometry?.type || "unknown"}`);
+      }
+    }
+  });
+
+  // Apply pre-splitting and crossover snapping at Data import/loading time
+  const splitFeatures = preSplitSourceFeatures(deduped.features);
+
+  // 一次性预计算 fid/searchText,整个 source 生命周期内过滤和渲染直接复用。
+  for (const f of splitFeatures) {
     prepareFeatureForClean(f);
   }
   state.source = {
     type: "FeatureCollection",
-    features: deduped.features,
+    features: splitFeatures,
   };
   state.topo = null;
   sourceVersion++;
@@ -857,9 +874,38 @@ export function createFeature(input: {
 }
 
 export function annotateFeature(
-  featureIndex: number,
+  featureIndex: number | string,
   annotation: Partial<RailGraphAnnotation> & { kind: RailGraphKind },
 ): RailGraphMvpState {
+  if (typeof featureIndex === "string") {
+    if (state.source) {
+      state.source.features.forEach((f) => {
+        const fid = f.properties?.railGraph?.id || "";
+        const pOriginal = (f.properties as any)?.railGraph?.preSplitOriginalId || fid;
+        const osmId = f.properties?.osm_id ? `osm:way:${f.properties.osm_id}` : "";
+        if (
+          fid === featureIndex ||
+          pOriginal === featureIndex ||
+          osmId === featureIndex ||
+          fid.startsWith(featureIndex + ":") ||
+          pOriginal.startsWith(featureIndex + ":")
+        ) {
+          const existing = f.properties.railGraph ?? normalizeAnnotation(f, 0);
+          f.properties.railGraph = {
+            ...existing,
+            ...annotation,
+            schemaVersion: "rail-graph-v1",
+            id: annotation.id ?? existing.id,
+            source: annotation.source ?? existing.source,
+          };
+        }
+      });
+    }
+    state.topo = null;
+    invalidateCleanLookupCache();
+    return state;
+  }
+
   const feature = getFeature(featureIndex);
   const existing = feature.properties.railGraph ?? normalizeAnnotation(feature, featureIndex);
   feature.properties.railGraph = {
@@ -998,7 +1044,8 @@ export function compileTopology(): BaseTopologyLayer {
     }
   }
 
-  applyCrossoverSnapping(topo, diagnostics);
+  // Snapping and splitting is now done at Data stage loading time.
+  // applyCrossoverSnapping(topo, diagnostics);
 
   topo.adjacency = buildAdjacency(topo.edges);
   addBindings(topo, diagnostics);
@@ -1204,22 +1251,26 @@ function hashSensekiData(): string {
   return h.toString(16).padStart(8, "0").slice(0, 8);
 }
 
+/* 仅对标注对象进行标准化 / Normalize the railGraph annotation inside properties, ensuring a stable default ID. */
 function normalizeAnnotation(feature: GeoJsonFeature, index: number): RailGraphAnnotation {
   const existing = feature.properties?.railGraph;
+  const props = feature.properties || {};
+  const stableKey = props._fid || props.fid || (props.osm_id ? `${props.osm_type || "way"}:${props.osm_id}` : `idx:${index}`);
+
   if (existing?.kind) {
     const rawId = existing.id !== undefined && existing.id !== null ? String(existing.id) : "";
     return {
       ...existing,
       schemaVersion: "rail-graph-v1",
       source: "manual",
-      id: rawId || stableId("manual", "feature", String(index)),
+      id: rawId || stableId("manual", "feature", String(stableKey)),
     };
   }
 
   return {
     kind: "unknown",
     schemaVersion: "rail-graph-v1",
-    id: stableId("manual", "feature", `${index}:${feature.geometry?.type || "unknown"}`),
+    id: stableId("manual", "feature", `${stableKey}:${feature.geometry?.type || "unknown"}`),
     source: "manual",
   };
 }
@@ -1316,10 +1367,10 @@ function addTrackFeature(
       functionalUse: annotation.track?.functionalUse,
       directionRole: annotation.track?.directionRole,
       sourceSlice: {
-        sourceFeatureRef: annotation.id,
+        sourceFeatureRef: (annotation as any).preSplitOriginalId || annotation.id,
         multiLineIndex: feature.geometry.type === "MultiLineString" ? lineIndex : undefined,
-        startMeasure: 0,
-        endMeasure: 1,
+        startMeasure: (annotation as any).preSplitStartMeasure ?? 0,
+        endMeasure: (annotation as any).preSplitEndMeasure ?? 1,
       },
       sourceTags: extractSourceTags(feature.properties),
     });
@@ -2336,10 +2387,9 @@ function initViews(): void {
       return;
     }
 
-    listView?.highlightEntity(ref);
-    listView?.selectFeatureByRef(ref);
-
     const fid = fidForEntityRef(ref, hintFid);
+    listView?.highlightEntity(ref);
+    listView?.selectFeatureByRef(ref, fid ?? undefined);
 
     if (fid) {
       cleanSelectedCandidateFid = fid;
@@ -2375,6 +2425,8 @@ function initViews(): void {
       } else {
         mapView?.fitToEntities([refStr]);
       }
+      const fid = fidForEntityRef(ref);
+      listView?.selectFeatureByRef(ref, fid ?? undefined);
     }
   });
 
@@ -2704,6 +2756,152 @@ function initViews(): void {
           }
         }
       });
+      persistWorkspace();
+      refreshViews();
+    } else if (action === "annotate-candidate-up" || action === "annotate-candidate-down" || action === "annotate-candidate-both") {
+      const staging = ws.staging;
+      if (!staging || !staging.stagedWayFids || staging.stagedWayFids.length === 0) return;
+      if (!state.source) return;
+
+      const directionValue = action === "annotate-candidate-up" ? "up"
+                           : action === "annotate-candidate-down" ? "down"
+                           : "bidirectional";
+
+      // 1) Build fid to feature index map
+      const fidToIdx = new Map<string, number>();
+      state.source.features.forEach((feature, idx) => {
+        fidToIdx.set(fidOf(feature), idx);
+      });
+
+      // 2) Gather coordinates for ways in traversal order
+      const wayCoords: [number, number][][] = [];
+      const validFids: string[] = [];
+      for (const fid of staging.stagedWayFids) {
+        const featureIdx = fidToIdx.get(fid);
+        if (featureIdx === undefined) continue;
+        const feature = state.source.features[featureIdx];
+        if (feature.geometry?.type !== "LineString") continue;
+        wayCoords.push(feature.geometry.coordinates as [number, number][]);
+        validFids.push(fid);
+      }
+
+      /* 依据路径连通拓扑关系, 推导各区段几何坐标的正反走向 / Deduce segment geometry orientation based on path connectivity */
+      const reversals = new Array<boolean>(validFids.length).fill(false);
+      const n = validFids.length;
+      if (n > 1) {
+        const dist = (p1: [number, number], p2: [number, number]): number => {
+          if (!p1 || !p2) return 9999;
+          return Math.abs(p1[0] - p2[0]) + Math.abs(p1[1] - p2[1]);
+        };
+
+        for (let i = 0; i < n; i++) {
+          const coords = wayCoords[i];
+          const A = coords[0];
+          const B = coords[coords.length - 1];
+
+          if (i === 0) {
+            const nextCoords = wayCoords[1];
+            const nextA = nextCoords[0];
+            const nextB = nextCoords[nextCoords.length - 1];
+
+            const dAA = dist(A, nextA);
+            const dAB = dist(A, nextB);
+            const dBA = dist(B, nextA);
+            const dBB = dist(B, nextB);
+            const minD = Math.min(dAA, dAB, dBA, dBB);
+
+            if (minD === dBA || minD === dBB) {
+              reversals[0] = false;
+            } else {
+              reversals[0] = true;
+            }
+          } else {
+            const prevCoords = wayCoords[i - 1];
+            const prevReversed = reversals[i - 1];
+            const prevExit = prevReversed ? prevCoords[0] : prevCoords[prevCoords.length - 1];
+
+            const dA = dist(A, prevExit);
+            const dB = dist(B, prevExit);
+
+            if (dA < dB) {
+              reversals[i] = false;
+            } else {
+              reversals[i] = true;
+            }
+          }
+        }
+      }
+
+      // 4) Apply reversals and set directionRole for each segment
+      let appliedCount = 0;
+      for (let i = 0; i < validFids.length; i++) {
+        const fid = validFids[i];
+        const shouldReverse = reversals[i];
+        const featureIdx = fidToIdx.get(fid)!;
+        const feature = state.source.features[featureIdx];
+
+        const baseAnn = normalizeAnnotation(feature, featureIdx);
+        const currentKind = baseAnn.kind === "unknown" ? "track_geometry" : baseAnn.kind;
+        const trackBase = baseAnn.track ?? { role: "main" as TopologyEdgeRole, traversal: "both" as TraversalDirection };
+
+        // Reverse coords if required
+        let nextCoords: any = feature.geometry.coordinates;
+        let nextGeomReversed = !!trackBase.geometryReversed;
+        if (shouldReverse) {
+          nextCoords = [...(feature.geometry.coordinates as any)].reverse();
+          nextGeomReversed = !trackBase.geometryReversed;
+        }
+
+        const nextTrack = {
+          ...trackBase,
+          directionRole: directionValue as TrackDirectionRole,
+          geometryReversed: nextGeomReversed
+        };
+
+        const nextAnn: RailGraphAnnotation = {
+          ...baseAnn,
+          kind: currentKind,
+          track: nextTrack
+        };
+
+        const nextFeature = {
+          ...feature,
+          geometry: {
+            ...feature.geometry,
+            coordinates: nextCoords,
+          } as any,
+          properties: {
+            ...feature.properties,
+            railGraph: nextAnn,
+          },
+        };
+        if (shouldReverse) {
+          (nextFeature as any)._coordsReversed = !(feature as any)._coordsReversed;
+        }
+
+        state.source.features[featureIdx] = nextFeature;
+        if (nextAnn.id) saveAnnotationOverride(nextAnn.id, nextAnn);
+        appliedCount++;
+      }
+
+      if (appliedCount === 0) return;
+
+      console.log(`[annotate] bulk direction and orientation applied to ${appliedCount} segments as ${directionValue}`);
+
+      try {
+        compileTopology();
+      } catch (error) {
+        handleError(error);
+      }
+
+      setStepProgress("annotate", {
+        status: "done",
+        summary: `Bulk direction annotation and orientation alignment applied ${appliedCount} change(s) as ${directionValue}. Compile, validation, and exports are now stale.`,
+        completedActions: dedupe([...(activeWorkspace().progress.annotate.completedActions ?? []), "loadWorkspaceSource"]),
+        diagnostics: diagnosticSummaries(),
+      });
+      invalidateDownstream("annotate", "Annotations changed after this step. Re-run from compile.");
+
       persistWorkspace();
       refreshViews();
     } else if (action === "merge-all-queue") {

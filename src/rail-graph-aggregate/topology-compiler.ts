@@ -128,7 +128,8 @@ export function compileAggregateTopology(args: CompileAggregateTopologyArgs): Co
     }
   }
 
-  applyCrossoverSnapping(topo, diagnostics);
+  // Snapping and splitting is now done at Data stage loading time.
+  // applyCrossoverSnapping(topo, diagnostics);
   topo.adjacency = buildAdjacency(topo.edges);
   addBindings(topo, diagnostics, bindings);
   addStoppingPoints(topo, diagnostics, stoppingPoints);
@@ -230,10 +231,10 @@ function addTrackFeature(
       functionalUse: annotation.track?.functionalUse,
       directionRole: annotation.track?.directionRole,
       sourceSlice: {
-        sourceFeatureRef: annotation.id,
+        sourceFeatureRef: (annotation as any).preSplitOriginalId || annotation.id,
         multiLineIndex: feature.geometry.type === "MultiLineString" ? lineIndex : undefined,
-        startMeasure: 0,
-        endMeasure: 1,
+        startMeasure: (annotation as any).preSplitStartMeasure ?? 0,
+        endMeasure: (annotation as any).preSplitEndMeasure ?? 1,
       },
       sourceTags: extractSourceTags(feature.properties),
     });

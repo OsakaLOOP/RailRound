@@ -11,10 +11,7 @@ describe('Senseki Pathfinding S3', () => {
     loadGeoJson(SENSEKI_RAIL);
 
     Object.entries(SENSEKI_PF_OVERRIDES).forEach(([id, annotation]) => {
-      const index = SENSEKI_RAIL.features.findIndex(f => f.properties?.railGraph?.id === id || f.properties?.osm_id === id.replace("osm:way:", ""));
-      if (index !== -1) {
-        annotateFeature(index, annotation as any);
-      }
+      annotateFeature(id, annotation as any);
     });
 
     const topo = exportTopology();

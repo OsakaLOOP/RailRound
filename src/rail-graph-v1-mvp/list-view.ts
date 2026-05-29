@@ -99,7 +99,7 @@ export interface ListView {
   update(input: ListViewInput): void;
   highlightEntity(ref: EntityRef | null): void;
   /** 通过 entity ref / annotation.id 反查 feature, 选中并切换到 Annotate tab. 若找不到则切 tab 但不选中. */
-  selectFeatureByRef(ref: EntityRef): void;
+  selectFeatureByRef(ref: EntityRef, fid?: string): void;
   onEntityHover(handler: (ref: EntityRef | null) => void): void;
   onEntityClick(handler: (ref: EntityRef) => void): void;
   onPathHover(handler: (path: PathHandlerPayload | null) => void): void;
@@ -403,11 +403,11 @@ export function createListView(container: HTMLElement): ListView {
     highlightEntity(ref) {
       applyEntityHover(state, ref);
     },
-    selectFeatureByRef(ref) {
+    selectFeatureByRef(ref, fid) {
       if (state.activeTab === "clean") {
         return;
       }
-      const idx = findFeatureIdxByRef(state, ref);
+      const idx = findFeatureIdxByRef(state, ref, fid);
       if (idx == null) return;
       // brush 激活 + track feature → 仅刷方向, 不切 tab/不改 selected
       if (applyDirRoleBrushIfActive(state, idx)) return;
@@ -709,6 +709,22 @@ function bindCleanTabEventsDelegated(state: InternalState, container: HTMLElemen
     const nextBtn = target.closest(".lv-clean-staging-next-candidate");
     if (nextBtn) {
       state.cleanStagingActionHandlers.forEach(h => h("next-candidate"));
+      return;
+    }
+    /* DFS候选段方向批量标注按钮事件监听 / Event listeners for bulk direction annotation of DFS candidate segments */
+    const annotateUpBtn = target.closest(".lv-clean-staging-annotate-up");
+    if (annotateUpBtn) {
+      state.cleanStagingActionHandlers.forEach(h => h("annotate-candidate-up"));
+      return;
+    }
+    const annotateDownBtn = target.closest(".lv-clean-staging-annotate-down");
+    if (annotateDownBtn) {
+      state.cleanStagingActionHandlers.forEach(h => h("annotate-candidate-down"));
+      return;
+    }
+    const annotateBothBtn = target.closest(".lv-clean-staging-annotate-both");
+    if (annotateBothBtn) {
+      state.cleanStagingActionHandlers.forEach(h => h("annotate-candidate-both"));
       return;
     }
     const commitQueueBtn = target.closest(".lv-clean-staging-commit-queue");
@@ -1850,6 +1866,10 @@ function bindScenarioEvents(state: InternalState): void {
     entry.addEventListener("mouseleave", () => {
       state.hoverHandlers.forEach((h) => h(null));
     });
+    entry.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.clickHandlers.forEach((h) => h(ref));
+    });
   });
   state.container.querySelectorAll<HTMLElement>(".lv-chain-node").forEach((node) => {
     const ref = node.dataset.ref as EntityRef | undefined;
@@ -1876,8 +1896,17 @@ function updateItemSelected(state: InternalState): void {
   });
 }
 
-function findFeatureIdxByRef(state: InternalState, ref: EntityRef): number | null {
+/* 仅对功能进行检索 / Find index of the source feature matching entity ref or unique fid. */
+function findFeatureIdxByRef(state: InternalState, ref: EntityRef, fid?: string): number | null {
   const features = state.input.source?.features ?? [];
+  if (fid) {
+    for (let i = 0; i < features.length; i += 1) {
+      const f = features[i];
+      const props = f.properties || {};
+      const fFid = props._fid || `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
+      if (fFid === fid) return i;
+    }
+  }
   // 1) 直接匹配 annotation.id
   for (let i = 0; i < features.length; i += 1) {
     if (features[i].properties.railGraph?.id === ref) return i;

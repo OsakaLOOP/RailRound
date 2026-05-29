@@ -16,12 +16,7 @@ describe("Line Graph v2 — senseki sanity", () => {
   it("constructs LG with expected scale and pruning stats", () => {
     loadGeoJson(SENSEKI_RAIL);
     Object.entries(SENSEKI_PF_OVERRIDES).forEach(([id, annotation]) => {
-      const index = SENSEKI_RAIL.features.findIndex(
-        (f) =>
-          (f.properties as any)?.railGraph?.id === id ||
-          (f.properties as any)?.osm_id === id.replace("osm:way:", ""),
-      );
-      if (index !== -1) annotateFeature(index, annotation as any);
+      annotateFeature(id, annotation as any);
     });
 
     const topo = exportTopology();
@@ -71,12 +66,7 @@ describe("Line Graph v2 — senseki sanity", () => {
   it("reversible+turnback edges produce paired turnback LG edges", () => {
     loadGeoJson(SENSEKI_RAIL);
     Object.entries(SENSEKI_PF_OVERRIDES).forEach(([id, annotation]) => {
-      const index = SENSEKI_RAIL.features.findIndex(
-        (f) =>
-          (f.properties as any)?.railGraph?.id === id ||
-          (f.properties as any)?.osm_id === id.replace("osm:way:", ""),
-      );
-      if (index !== -1) annotateFeature(index, annotation as any);
+      annotateFeature(id, annotation as any);
     });
 
     const topo = exportTopology();

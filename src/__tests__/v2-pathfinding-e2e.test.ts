@@ -37,12 +37,7 @@ describe("Pathfinding v2 — senseki end-to-end", () => {
   it("solves S3 (跨渡线, 无折返) in shorter iterations than v1", () => {
     loadGeoJson(SENSEKI_RAIL);
     Object.entries(SENSEKI_PF_OVERRIDES).forEach(([id, annotation]) => {
-      const index = SENSEKI_RAIL.features.findIndex(
-        (f) =>
-          (f.properties as any)?.railGraph?.id === id ||
-          (f.properties as any)?.osm_id === id.replace("osm:way:", ""),
-      );
-      if (index !== -1) annotateFeature(index, annotation as any);
+      annotateFeature(id, annotation as any);
     });
 
     const topo = exportTopology();
@@ -95,12 +90,7 @@ describe("Pathfinding v2 — senseki end-to-end", () => {
   it("solves S5 (跨整条线 146 edges)", () => {
     loadGeoJson(SENSEKI_RAIL);
     Object.entries(SENSEKI_PF_OVERRIDES).forEach(([id, annotation]) => {
-      const index = SENSEKI_RAIL.features.findIndex(
-        (f) =>
-          (f.properties as any)?.railGraph?.id === id ||
-          (f.properties as any)?.osm_id === id.replace("osm:way:", ""),
-      );
-      if (index !== -1) annotateFeature(index, annotation as any);
+      annotateFeature(id, annotation as any);
     });
 
     const topo = exportTopology();
@@ -146,12 +136,7 @@ describe("Pathfinding v2 — senseki end-to-end", () => {
   it("solves S1 (全程往返 1 折返) — v1 OOM/0-cand 场景", () => {
     loadGeoJson(SENSEKI_RAIL);
     Object.entries(SENSEKI_PF_OVERRIDES).forEach(([id, annotation]) => {
-      const index = SENSEKI_RAIL.features.findIndex(
-        (f) =>
-          (f.properties as any)?.railGraph?.id === id ||
-          (f.properties as any)?.osm_id === id.replace("osm:way:", ""),
-      );
-      if (index !== -1) annotateFeature(index, annotation as any);
+      annotateFeature(id, annotation as any);
     });
 
     const topo = exportTopology();

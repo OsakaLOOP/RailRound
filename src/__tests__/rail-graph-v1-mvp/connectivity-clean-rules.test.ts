@@ -13,7 +13,6 @@ function rail(id: string, coords: number[][]): AnnotatedFeature {
       osm_type: "way",
       osm_id: id,
       class_main: "rail",
-      source_line_name: "test",
       railGraph: { kind: "track_geometry", schemaVersion: "rail-graph-v1", id, source: "test" },
     },
   } as unknown as AnnotatedFeature;

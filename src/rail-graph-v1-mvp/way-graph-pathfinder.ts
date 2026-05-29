@@ -4,7 +4,7 @@ type NodeKey = string;
 type WayFid = string;
 
 const PRECISION_M_DEFAULT = 0.0000001;
-const PRECISION_M_FALLBACK = 0.0001;
+const PRECISION_M_FALLBACK = 0.0000045; // ~0.5m in degrees / 约0.5米(度)
 const ANGLE_THRESHOLD_DEG = 90;
 
 interface WayEdge {

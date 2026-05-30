@@ -38,6 +38,19 @@ export interface RailGraphIndexes {
   edgesBySection: Record<string, string[]>;
 }
 
+export interface RailGraphFingerprints {
+  /** Hash of the topology hot layer. This is the canonical graphId. */
+  topoHash: string;
+  /** Hash of geometry-only warm data. */
+  geometryHash: string;
+  /** Hash of display-only warm data. */
+  displayHash: string;
+  /** Hash of event-layer warm data. */
+  eventHash: string;
+  /** Hash of provenance and diagnostics cold data. */
+  provenanceHash: string;
+}
+
 /**
  * 统一多层图。topo 包含固定底层事实与已确认 service 模板。
  * 管理员 draft/proposal/heuristic trace 不在这里；它们属于编辑会话。
@@ -81,6 +94,7 @@ export interface PatternDisplayMeta {
 export interface SystemContext {
   readonly graphId: string;  // sha256(canonicalJson(RailGraph.topo))
   readonly graph: RailGraph;
+  readonly fingerprints: RailGraphFingerprints;
   readonly diagnostics: readonly Diagnostic[];
   readonly createdAt: ISODateTime;
 }

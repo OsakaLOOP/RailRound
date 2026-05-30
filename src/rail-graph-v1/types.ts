@@ -21,3 +21,12 @@ export type * from "./deployment.types";
 export type * from "./community.types";
 export type * from "./source.types";
 export type * from "./snapshot.types";
+
+export { canonicalJson, fingerprint, sha256Hex } from "./fingerprint";
+export {
+  buildRailGraph,
+  buildRailGraphFingerprints,
+  buildRailGraphIndexes,
+  buildSystemContext,
+  toGraphIdInput,
+} from "./graph-builder";

@@ -293,7 +293,11 @@ function createSyntheticTopology(): BaseTopologyLayer {
     nodes,
     edges,
     adjacency: buildAdjacency(edges),
-    stations: [],
+    stations: nodes.map((node) => ({
+      id: node.id,
+      name: node.name ?? String(node.id),
+      platformRefs: [],
+    })),
     platforms: [],
     platformTrackBindings: [],
     stoppingPoints: [],

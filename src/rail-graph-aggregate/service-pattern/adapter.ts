@@ -4,6 +4,7 @@ import type {
   ServicePathSegment,
   ServicePassEntry,
 } from "../../rail-graph-v1/service-template.types";
+import { assertServicePatternValidForTopology } from "../../rail-graph-v1/service-template-validation";
 import { buildTopologyLookup, type TopologyLookup, traverseTo } from "../../rail-graph-v1/topology";
 import { findPathsV2, type FindPathsV2Args, type FindPathsV2Result } from "../../rail-graph-v1/pathfinding-v2";
 import type { AggregateState } from "../aggregate-state";
@@ -40,7 +41,7 @@ export function adaptChainToPattern(args: AdaptChainToPatternArgs): StoredServic
   });
   const now = new Date().toISOString();
   const patternId = args.patternId ?? (`aggregate:pattern:${hashText(path.edgeSequence.join("|"))}` as EntityRef);
-  return {
+  const pattern: StoredServicePattern = {
     patternId,
     lineRef: args.lineRef ?? (`aggregate:line:${args.aggregate.aggregateKey}` as EntityRef),
     systemRef: `aggregate:system:${args.aggregate.aggregateKey}` as EntityRef,
@@ -53,7 +54,7 @@ export function adaptChainToPattern(args: AdaptChainToPatternArgs): StoredServic
       reverseDirection: "up",
     },
     edgeSequence: path.edgeSequence,
-    traceSequence: buildTraceSequence(path),
+    traceSequence: buildTraceSequence(args.aggregate, path),
     pathSegments: buildPathSegments(args.aggregate, path),
     displayName: args.displayName ?? String(patternId),
     displayColor: args.displayColor ?? "#2563eb",
@@ -67,6 +68,8 @@ export function adaptChainToPattern(args: AdaptChainToPatternArgs): StoredServic
         : "Built on compiled aggregate topology.",
     },
   };
+  assertServicePatternValidForTopology(args.aggregate.topo, pattern);
+  return pattern;
 }
 
 export function resolveChainPath(args: {
@@ -187,14 +190,66 @@ function anchorToNodeRef(anchor: ChainEndpointAnchor, aggregate: AggregateState)
   return anchor.measure <= 0.5 ? edge.fromNodeRef : edge.toNodeRef;
 }
 
-function buildTraceSequence(path: AggregateCandidatePath): ServicePassEntry[] {
-  return path.nodeSequence.map((nodeRef, index) => ({
-    orderIndex: index,
-    passageType: "pass",
-    stopType: "pass_through",
-    stationRef: nodeRef,
-    edgeRef: path.edgeSequence[Math.min(index, Math.max(0, path.edgeSequence.length - 1))] ?? ("" as EntityRef),
-  }));
+function buildTraceSequence(aggregate: AggregateState, path: AggregateCandidatePath): ServicePassEntry[] {
+  const stationIds = new Set(aggregate.topo.stations.map((station) => station.id));
+  const bindingsByEdge = new Map<EntityRef, Array<{ stationRef: EntityRef; platformRef: EntityRef }>>();
+  for (const binding of aggregate.topo.platformTrackBindings) {
+    const list = bindingsByEdge.get(binding.edgeRef) ?? [];
+    if (!list.some((item) => item.stationRef === binding.stationRef && item.platformRef === binding.platformRef)) {
+      list.push({ stationRef: binding.stationRef, platformRef: binding.platformRef });
+    }
+    bindingsByEdge.set(binding.edgeRef, list);
+  }
+
+  const out: ServicePassEntry[] = [];
+  const seen = new Set<string>();
+  for (const [edgeIndex, edgeRef] of path.edgeSequence.entries()) {
+    const bindings = bindingsByEdge.get(edgeRef) ?? [];
+    for (const binding of bindings) {
+      const key = `${binding.stationRef}:${edgeRef}:${binding.platformRef}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        orderIndex: out.length,
+        passageType: "pass",
+        stopType: "pass_through",
+        stationRef: binding.stationRef,
+        edgeRef,
+        platformRef: binding.platformRef,
+        measureRange: { startMeasure: 0, endMeasure: 1 },
+      });
+    }
+    if (bindings.length > 0) continue;
+    const fallbackNode = path.nodeSequence[Math.min(edgeIndex, path.nodeSequence.length - 1)];
+    if (!fallbackNode || !stationIds.has(fallbackNode)) continue;
+    const key = `${fallbackNode}:${edgeRef}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      orderIndex: out.length,
+      passageType: "pass",
+      stopType: "pass_through",
+      stationRef: fallbackNode,
+      edgeRef,
+    });
+  }
+
+  const lastNode = path.nodeSequence[path.nodeSequence.length - 1];
+  const lastEdge = path.edgeSequence[path.edgeSequence.length - 1];
+  if (lastNode && lastEdge && stationIds.has(lastNode)) {
+    const key = `${lastNode}:${lastEdge}:terminus`;
+    if (!seen.has(key)) {
+      out.push({
+        orderIndex: out.length,
+        passageType: "pass",
+        stopType: "pass_through",
+        stationRef: lastNode,
+        edgeRef: lastEdge,
+      });
+    }
+  }
+
+  return out;
 }
 
 function buildPathSegments(aggregate: AggregateState, path: AggregateCandidatePath): ServicePathSegment[] {

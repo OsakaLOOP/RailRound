@@ -1,6 +1,7 @@
 import type { IntentionChain } from "../../rail-graph-v1/chain.types";
 import type { EntityRef } from "../../rail-graph-v1/primitives";
 import type { ServicePattern } from "../../rail-graph-v1/service-template.types";
+import { validateServicePatternShape } from "../../rail-graph-v1/service-template-validation";
 import { readAggregateJson, writeAggregateJson } from "../storage";
 
 export interface StoredServicePattern extends ServicePattern {
@@ -79,14 +80,5 @@ export async function deleteServicePattern(args: {
 }
 
 export function validateStoredServicePattern(value: unknown): StoredServicePattern {
-  if (!value || typeof value !== "object") {
-    throw new Error("ServicePattern must be an object.");
-  }
-  const pattern = value as StoredServicePattern;
-  if (!pattern.patternId) throw new Error("ServicePattern.patternId is required.");
-  if (!pattern.lineRef) throw new Error(`ServicePattern[${pattern.patternId}].lineRef is required.`);
-  if (!Array.isArray(pattern.edgeSequence)) throw new Error(`ServicePattern[${pattern.patternId}].edgeSequence must be an array.`);
-  if (!Array.isArray(pattern.traceSequence)) throw new Error(`ServicePattern[${pattern.patternId}].traceSequence must be an array.`);
-  if (!Array.isArray(pattern.pathSegments)) throw new Error(`ServicePattern[${pattern.patternId}].pathSegments must be an array.`);
-  return pattern;
+  return validateServicePatternShape(value) as StoredServicePattern;
 }

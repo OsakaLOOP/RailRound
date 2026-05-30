@@ -21,7 +21,14 @@ export type * from "./deployment.types";
 export type * from "./community.types";
 export type * from "./source.types";
 export type * from "./snapshot.types";
+export type * from "./service-template-validation";
 
+export {
+  assertServicePatternValidForTopology,
+  hasBlockingServicePatternDiagnostics,
+  validateServicePatternAgainstTopology,
+  validateServicePatternShape,
+} from "./service-template-validation";
 export { canonicalJson, fingerprint, sha256Hex } from "./fingerprint";
 export {
   buildRailGraph,

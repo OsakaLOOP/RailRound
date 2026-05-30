@@ -15,3 +15,11 @@
   - `mode: "compiled-topology"` uses `findPathsV2` through `service-pattern/adapter.ts`;
   - `mode: "no-direction-graph"` keeps the fixture substitute resolver for verify-only data.
 - `npm run rail:aggregate:verify:compiled-topology` uses a small in-memory synthetic compiled topology to verify the product adapter branch while real annotated aggregate data is still pending.
+
+## 2026-05-31 · Goal02 PR2 Confirmed ServicePattern Boundary
+
+- `StoredServicePattern` persistence now reuses the rail-graph-v1 ServicePattern shape validator before saving or loading aggregate pattern JSON.
+- `adaptChainToPattern()` validates generated patterns against the active topology before returning them. The compiled-topology branch is now the product path; the no-direction graph remains a verify-only substitute behind the explicit allow flag.
+- Stop trace entries are strict confirmed facts: `stationRef`, `platformRef`, `edgeRef`, `stoppingPointRef`, and matching `PlatformTrackBinding` must all exist in the topology.
+- Pass trace entries still allow platform-free station passage for current aggregate verification. If a pass entry carries `platformRef`, callers can opt into binding enforcement with `requirePassPlatformBinding`.
+- The synthetic compiled-topology verifier now includes station records explicitly instead of treating raw topology nodes as implicit stations.

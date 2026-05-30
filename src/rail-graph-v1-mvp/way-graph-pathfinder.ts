@@ -97,7 +97,7 @@ function buildWayGraph(features: any[], passFids: Set<string>, precision: number
 
   for (const f of features) {
     const props = f.properties || {};
-    const fid = props._fid || `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
+    const fid = props._fid || props.railGraph?.id || `${props.osm_type || ""}:${props.osm_id || ""}:${props.class_main || ""}:${props.source_line_name || ""}`;
     if (!passFids.has(fid)) continue;
     if (f.geometry.type !== "LineString" && f.geometry.type !== "MultiLineString") continue;
 

@@ -104,6 +104,9 @@ export interface RailGraphAnnotation {
   platform?: RailGraphPlatformAnnotation;
   signal?: RailGraphSignalAnnotation;
   entrance?: RailGraphStationEntranceAnnotation;
+  preSplitOriginalId?: string;
+  preSplitStartMeasure?: number;
+  preSplitEndMeasure?: number;
 }
 
 /**

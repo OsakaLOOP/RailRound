@@ -18,6 +18,7 @@ import { compileAggregateTopology } from "./topology-compiler";
 import { coreId, fidOf, type AggregateFeatureCollection } from "./no-direction-graph";
 import type { BaseTopologyLayer } from "../rail-graph-v1/base-topology.types";
 import type { Diagnostic } from "../rail-graph-v1/diagnostic-types";
+import { preSplitSourceFeatures } from "../rail-graph-v1-mvp/pre-split-helper";
 
 export interface MvpImportWorkspaceSummary {
   key: string;
@@ -96,6 +97,20 @@ export async function importCompiledAggregateFromMvpWorkspaces(args: {
 
     const raw = await readPipelineArtifact(`${workspace.project.lineDir}\\matched_assets.geojson`);
     const source = normalizeFeatureCollection(raw);
+
+    // Ensure ID uniqueness matching app.ts
+    source.features.forEach((f, finalIndex) => {
+      if (f.properties.railGraph) {
+        const ann = f.properties.railGraph;
+        if (!ann.id || ann.id.startsWith("manual:feature:idx:")) {
+          ann.id = stableId("manual", "feature", `final:${finalIndex}:${f.geometry?.type || "unknown"}`);
+        }
+      }
+    });
+
+    // Apply pre-splitting and crossover snapping at Data loading time
+    const splitFeatures = preSplitSourceFeatures(source.features);
+
     const rules = await readFilterRules(workspace);
     const overrides = await readCleanOverrides(workspace);
     const activeFilters = activeFiltersFor(workspace, rules);
@@ -106,7 +121,7 @@ export async function importCompiledAggregateFromMvpWorkspaces(args: {
       ...(workspace.ui?.cleanLevels ?? {}),
     };
     const pipeline = runFilterPipeline(
-      source.features,
+      splitFeatures,
       rules,
       activeFilters,
       activeLevels,
@@ -114,7 +129,7 @@ export async function importCompiledAggregateFromMvpWorkspaces(args: {
     );
     const keepSet = new Set(overrides.keep ?? []);
     const removeSet = new Set(overrides.remove ?? []);
-    const cleaned = source.features.filter((feature) => {
+    const cleaned = splitFeatures.filter((feature) => {
       const fid = fidOfFeature(feature);
       if (keepSet.has(fid)) return true;
       if (removeSet.has(fid)) return false;
@@ -304,7 +319,23 @@ function applyAnnotationOverrides(workspace: LineWorkspaceState, features: Annot
   if (Object.keys(overrides).length === 0) return features;
   return features.map((feature) => {
     const id = feature.properties.railGraph?.id;
-    const override = id ? overrides[id] : undefined;
+    let override = id ? overrides[id] : undefined;
+    if (!override && id) {
+      const osmId = feature.properties?.osm_id;
+      if (osmId) {
+        const osmKey = `osm:way:${osmId}`;
+        const manualKey = `manual:feature:way-${osmId}-linestring`;
+        const manualKeyPartA = `manual:feature:way-${osmId}-part_A`;
+        const manualKeyPartB = `manual:feature:way-${osmId}-part_B`;
+        if (id.endsWith(":part_A")) {
+          override = overrides[manualKeyPartA] || overrides[osmKey] || overrides[manualKey];
+        } else if (id.endsWith(":part_B")) {
+          override = overrides[manualKeyPartB] || overrides[osmKey] || overrides[manualKey];
+        } else {
+          override = overrides[osmKey] || overrides[manualKey];
+        }
+      }
+    }
     if (!override) return feature;
     return applyAnnotationOverride(feature, override);
   });
@@ -341,7 +372,11 @@ function applyAnnotationOverride(feature: AnnotatedFeature, annotation: RailGrap
     geometry,
     properties: {
       ...feature.properties,
-      railGraph: annotation,
+      railGraph: {
+        ...feature.properties.railGraph,
+        ...annotation,
+        id: feature.properties.railGraph?.id || annotation.id || "",
+      },
     },
   };
   (nextFeature as unknown as { _coordsReversed?: boolean })._coordsReversed = shouldReverse ? targetReversed : currentReversed;
@@ -407,25 +442,29 @@ function normalizeFeature(feature: AnnotatedFeature, index: number): AnnotatedFe
 
 function normalizeAnnotation(feature: AnnotatedFeature, index: number): RailGraphAnnotation {
   const existing = feature.properties?.railGraph;
+  const props = feature.properties || {};
+  const stableKey = props._fid || props.fid || (props.osm_id ? `${props.osm_type || "way"}:${props.osm_id}` : `idx:${index}`);
+  const isOsm = !!props.osm_id;
+  const naturalId = isOsm 
+    ? `osm:${props.osm_type || "way"}:${props.osm_id}` 
+    : stableId("manual", "feature", `${stableKey}:${feature.geometry?.type || "unknown"}`);
+
   if (existing?.kind) {
-    const id = existing.id !== undefined && existing.id !== null ? String(existing.id) : "";
+    const rawId = existing.id !== undefined && existing.id !== null ? String(existing.id) : "";
     return {
       ...existing,
       schemaVersion: "rail-graph-v1",
-      source: existing.source ?? "manual",
-      id: id || stableFeatureId(feature, index),
+      source: "manual",
+      id: rawId || (isOsm ? naturalId : stableId("manual", "feature", String(stableKey))),
     };
   }
+
   return {
     kind: "unknown",
     schemaVersion: "rail-graph-v1",
-    id: stableFeatureId(feature, index),
+    id: naturalId,
     source: "manual",
   };
-}
-
-function stableFeatureId(feature: AnnotatedFeature, index: number): string {
-  return stableId("manual", "feature", `${index}:${feature.geometry?.type || "unknown"}`);
 }
 
 function countRailGraphKinds(features: AnnotatedFeature[]): Partial<Record<RailGraphFeatureKind, number>> {

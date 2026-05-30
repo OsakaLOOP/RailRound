@@ -564,10 +564,22 @@ function splitEdgeAtPoint(
   topo.edges.push(edgeA, edgeB);
 }
 
+function findCandidates(topo: BaseTopologyLayer, originalEdgeId: string): TopologyEdge[] {
+  return topo.edges.filter((edge) => {
+    const compilePrefix = `manual:edge:${originalEdgeId}`;
+    if (edge.id === compilePrefix || edge.id.startsWith(`${compilePrefix}:`)) return true;
+
+    if (edge.id === originalEdgeId || edge.id.startsWith(`${originalEdgeId}:`)) return true;
+
+    const sourceRef = edge.sourceSlice?.sourceFeatureRef;
+    if (sourceRef && (sourceRef === originalEdgeId || sourceRef.startsWith(`${originalEdgeId}:`))) return true;
+
+    return false;
+  });
+}
+
 function resolveAllSplitEdges(topo: BaseTopologyLayer, originalEdgeId: string): string[] {
-  return topo.edges
-    .filter((edge) => edge.id === originalEdgeId || edge.id.startsWith(`${originalEdgeId}:`))
-    .map((edge) => edge.id);
+  return findCandidates(topo, originalEdgeId).map((edge) => edge.id);
 }
 
 function resolveEdgeAndMeasure(
@@ -575,7 +587,7 @@ function resolveEdgeAndMeasure(
   originalEdgeId: string,
   originalMeasure: number,
 ): { edgeId: string; measure: number } | null {
-  const candidates = topo.edges.filter((edge) => edge.id === originalEdgeId || edge.id.startsWith(`${originalEdgeId}:`));
+  const candidates = findCandidates(topo, originalEdgeId);
   if (candidates.length === 0) return null;
   for (const edge of candidates) {
     const slice = edge.sourceSlice;

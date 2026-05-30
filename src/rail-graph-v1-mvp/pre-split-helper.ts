@@ -144,7 +144,7 @@ export function preSplitSourceFeatures(features: GeoJsonFeature[]): GeoJsonFeatu
           coordsA.push(proj.snapped);
           const coordsB = [proj.snapped, ...targetCoords.slice(segIdx + 1)];
 
-          const originalAnn = targetEdge.properties?.railGraph || {};
+          const originalAnn = (targetEdge.properties?.railGraph || {}) as RailGraphAnnotation;
           const originalStart = originalAnn.preSplitStartMeasure ?? 0;
           const originalEnd = originalAnn.preSplitEndMeasure ?? 1;
           const splitMeasure = originalStart + projResult.measure * (originalEnd - originalStart);

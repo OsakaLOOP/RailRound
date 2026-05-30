@@ -1366,6 +1366,19 @@ async function handleAction(action: string, el: HTMLElement): Promise<void> {
       renderPanels();
       return;
     }
+    case "locate-feature": {
+      const fid = el.dataset.id || null;
+      if (fid && state.aggregate) {
+        const feat = state.aggregate.featureCollection.features.find(f => (f.properties?.railGraph as RailGraphAnnotation | undefined)?.id === fid);
+        if (feat) {
+          const centroid = featureCentroid(feat);
+          if (centroid && mapState) {
+            mapState.map.setView([centroid[1], centroid[0]], 15);
+          }
+        }
+      }
+      return;
+    }
     case "save-inspector-changes": {
       const idx = Number(el.dataset.idx ?? -1);
       if (idx < 0 || !state.aggregate) return;
@@ -2274,8 +2287,57 @@ function renderPanels(): void {
   const rightCol = document.getElementById("agg-right-panel");
   if (!leftCol || !rightCol) return;
 
+  // 保存面板及其子级滚动容器的滚动条位置以及当前的焦点/光标位置，以防止局部刷新时页面跳动
+  // Save scroll positions and focus state to prevent layout jump on panel updates
+  const scrollPositions = new Map<string, number>();
+  const scrollableElements = document.querySelectorAll("[data-scroll-id]");
+  scrollableElements.forEach(el => {
+    const scrollId = el.getAttribute("data-scroll-id");
+    if (scrollId) {
+      scrollPositions.set(scrollId, el.scrollTop);
+    }
+  });
+
+  const leftScroll = leftCol.scrollTop;
+  const rightScroll = rightCol.scrollTop;
+
+  const activeElementId = document.activeElement?.id;
+  let cursorStart: number | null = null;
+  let cursorEnd: number | null = null;
+  if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) {
+    cursorStart = document.activeElement.selectionStart;
+    cursorEnd = document.activeElement.selectionEnd;
+  }
+
   leftCol.innerHTML = renderLeftColumn();
   rightCol.innerHTML = renderRightColumn();
+
+  leftCol.scrollTop = leftScroll;
+  rightCol.scrollTop = rightScroll;
+
+  scrollPositions.forEach((scrollTop, scrollId) => {
+    const el = document.querySelector(`[data-scroll-id="${scrollId}"]`);
+    if (el) {
+      el.scrollTop = scrollTop;
+    }
+  });
+
+  if (activeElementId) {
+    const el = document.getElementById(activeElementId);
+    if (el) {
+      el.focus();
+      if ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && cursorStart !== null && cursorEnd !== null) {
+        el.setSelectionRange(cursorStart, cursorEnd);
+      }
+    }
+  }
+
+  if (state.currentStep === "annotate" && state.selectedFeatureId) {
+    const selectedItem = document.querySelector(`.an-feature-item.selected`);
+    if (selectedItem) {
+      selectedItem.scrollIntoView({ block: "nearest" });
+    }
+  }
 }
 
 function renderLeftColumn(): string {
@@ -2456,7 +2518,7 @@ function renderStepLeftControls_Pattern(): string {
       <div class="small muted" style="margin-top: 2px;">
         选择模式: <b style="color: var(--color-status-ready);">${escapeHtml(pickModeLabel(state.editor.mode))}</b>
       </div>
-      <div class="list" style="max-height: 150px; overflow-y: auto; margin-top: 4px;">
+      <div id="pattern-chain-list" data-scroll-id="pattern-chain" class="list" style="max-height: 150px; overflow-y: auto; margin-top: 4px;">
         ${chainHtml()}
       </div>
       <div class="agg-row" style="margin-top: 4px; display: flex; gap: 6px; width: 100%;">
@@ -2745,7 +2807,10 @@ function renderStepRightPanel_Annotate(): string {
     inspectorHtml = `
       <div class="an-inspector-form">
         <label>特征 ID:</label>
-        <div class="mono" style="font-weight:600; word-break:break-all;">${escapeHtml(ann?.id || "")}</div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <div class="mono" style="font-weight:600; word-break:break-all; flex: 1;">${escapeHtml(ann?.id || "")}</div>
+          <button class="small" style="padding: 2px 6px; font-size: 10px; flex-shrink: 0; cursor: pointer;" data-action="locate-feature" data-id="${escapeAttr(ann?.id || "")}">定位</button>
+        </div>
         <label>特征类型:</label>
         <div class="pill done" style="width:fit-content; text-transform:uppercase;">${escapeHtml(kind)}</div>
         
@@ -2769,7 +2834,7 @@ function renderStepRightPanel_Annotate(): string {
   return `
     <div class="agg-section" style="flex: 1; display: flex; flex-direction: column; min-height: 200px; max-height: 300px; overflow: hidden;">
       <h2>标注特征列表 (${filtered.length} 个)</h2>
-      <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 6px;">
+      <div id="annotate-list-container" data-scroll-id="annotate-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 6px;">
         ${displayList}
       </div>
     </div>
@@ -2823,7 +2888,7 @@ function renderStepRightPanel_Compile(): string {
         ${checklistHtml}
       </div>
     </div>
-    <div class="agg-section" style="flex: 1; max-height: 400px; overflow-y: auto;">
+    <div class="agg-section" data-scroll-id="compile-diagnostics" style="flex: 1; max-height: 400px; overflow-y: auto;">
       <h2>拓扑编译诊断日志 (${diagnostics.length} 项)</h2>
       <div class="list" style="margin-top: 8px;">
         ${diagnosticsHtml || '<div class="item small muted" style="text-align: center;">🎉 无拓扑编译异常，编译质量完美！</div>'}
@@ -2835,14 +2900,14 @@ function renderStepRightPanel_Compile(): string {
 function renderStepRightPanel_Pattern(): string {
   const selectedPattern = state.patterns.find(p => p.patternId === state.selectedPatternId);
   return `
-    <div class="agg-section" style="flex: 1; max-height: 200px; overflow-y: auto;">
+    <div class="agg-section" data-scroll-id="pattern-candidates" style="flex: 1; max-height: 200px; overflow-y: auto;">
       <h2>候选路径解析结果 (${state.candidates.length} 条)</h2>
       <div class="list" style="margin-top: 8px;">
         ${candidatesHtml()}
       </div>
     </div>
     
-    <div class="agg-section" style="flex: 1; max-height: 240px; overflow-y: auto;">
+    <div class="agg-section" data-scroll-id="pattern-saved" style="flex: 1; max-height: 240px; overflow-y: auto;">
       <h2>已保存的运行模式 (Saved Patterns)</h2>
       <div class="list" style="margin-top: 8px;">
         ${patternsHtml()}
@@ -2877,14 +2942,14 @@ function renderStepRightPanel_Event(): string {
   const patternLabel = pattern ? pattern.displayName || pattern.patternId : "无";
 
   return `
-    <div class="agg-section" style="flex: 1; max-height: 200px; overflow-y: auto;">
+    <div class="agg-section" data-scroll-id="event-sequence" style="flex: 1; max-height: 200px; overflow-y: auto;">
       <h2>路径锚定事件聚合序列 [${escapeHtml(patternLabel)}]</h2>
       <div style="margin-top: 8px;">
         ${orderedEventsHtml(orderedEvents)}
       </div>
     </div>
     
-    <div class="agg-section" style="flex: 1; max-height: 350px; overflow-y: auto;">
+    <div class="agg-section" data-scroll-id="saved-events" style="flex: 1; max-height: 350px; overflow-y: auto;">
       <h2>已保存的事件库 (Saved UserEvents)</h2>
       <div style="margin-top: 8px;">
         ${eventsHtml()}

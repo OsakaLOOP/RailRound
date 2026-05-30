@@ -1256,6 +1256,10 @@ function normalizeAnnotation(feature: GeoJsonFeature, index: number): RailGraphA
   const existing = feature.properties?.railGraph;
   const props = feature.properties || {};
   const stableKey = props._fid || props.fid || (props.osm_id ? `${props.osm_type || "way"}:${props.osm_id}` : `idx:${index}`);
+  const isOsm = !!props.osm_id;
+  const naturalId = isOsm 
+    ? `osm:${props.osm_type || "way"}:${props.osm_id}` 
+    : stableId("manual", "feature", `${stableKey}:${feature.geometry?.type || "unknown"}`);
 
   if (existing?.kind) {
     const rawId = existing.id !== undefined && existing.id !== null ? String(existing.id) : "";
@@ -1263,14 +1267,14 @@ function normalizeAnnotation(feature: GeoJsonFeature, index: number): RailGraphA
       ...existing,
       schemaVersion: "rail-graph-v1",
       source: "manual",
-      id: rawId || stableId("manual", "feature", String(stableKey)),
+      id: rawId || (isOsm ? naturalId : stableId("manual", "feature", String(stableKey))),
     };
   }
 
   return {
     kind: "unknown",
     schemaVersion: "rail-graph-v1",
-    id: stableId("manual", "feature", `${stableKey}:${feature.geometry?.type || "unknown"}`),
+    id: naturalId,
     source: "manual",
   };
 }
@@ -1491,9 +1495,22 @@ function addPlatformFeature(
   }
 }
 
+function findCandidates(topo: BaseTopologyLayer, originalEdgeId: string): TopologyEdge[] {
+  return topo.edges.filter((edge) => {
+    const compilePrefix = `manual:edge:${originalEdgeId}`;
+    if (edge.id === compilePrefix || edge.id.startsWith(`${compilePrefix}:`)) return true;
+
+    if (edge.id === originalEdgeId || edge.id.startsWith(`${originalEdgeId}:`)) return true;
+
+    const sourceRef = edge.sourceSlice?.sourceFeatureRef;
+    if (sourceRef && (sourceRef === originalEdgeId || sourceRef.startsWith(`${originalEdgeId}:`))) return true;
+
+    return false;
+  });
+}
+
 function resolveAllSplitEdges(topo: BaseTopologyLayer, originalEdgeId: string): string[] {
-  const candidates = topo.edges.filter((e) => e.id === originalEdgeId || e.id.startsWith(originalEdgeId + ":"));
-  return candidates.map((e) => e.id);
+  return findCandidates(topo, originalEdgeId).map((e) => e.id);
 }
 
 function resolveEdgeAndMeasure(
@@ -1501,7 +1518,7 @@ function resolveEdgeAndMeasure(
   originalEdgeId: string,
   originalMeasure: number,
 ): { edgeId: string; measure: number } | null {
-  const candidates = topo.edges.filter((e) => e.id === originalEdgeId || e.id.startsWith(originalEdgeId + ":"));
+  const candidates = findCandidates(topo, originalEdgeId);
   if (candidates.length === 0) return null;
 
   for (const edge of candidates) {
@@ -3256,9 +3273,27 @@ function applyAnnotationOverrides(options: { includeLegacy?: boolean } = {}): { 
     ...state.source,
     features: state.source.features.map((f) => {
       const id = f.properties.railGraph?.id;
-      if (id && overrides[id]) {
+      let override = id ? overrides[id] : undefined;
+      if (!override && id) {
+        const osmId = f.properties?.osm_id;
+        if (osmId) {
+          const osmKey = `osm:way:${osmId}`;
+          const manualKey = `manual:feature:way-${osmId}-linestring`;
+          const manualKeyPartA = `manual:feature:way-${osmId}-part_A`;
+          const manualKeyPartB = `manual:feature:way-${osmId}-part_B`;
+          if (id.endsWith(":part_A")) {
+            override = overrides[manualKeyPartA] || overrides[osmKey] || overrides[manualKey];
+          } else if (id.endsWith(":part_B")) {
+            override = overrides[manualKeyPartB] || overrides[osmKey] || overrides[manualKey];
+          } else {
+            override = overrides[osmKey] || overrides[manualKey];
+          }
+        }
+      }
+
+      if (override) {
         applied += 1;
-        const targetReversed = !!overrides[id].track?.geometryReversed;
+        const targetReversed = !!override.track?.geometryReversed;
         const currentReversed = !!(f as any)._coordsReversed;
         let nextCoords = f.geometry.coordinates;
         let nextCoordsReversed = currentReversed;
@@ -3275,7 +3310,11 @@ function applyAnnotationOverrides(options: { includeLegacy?: boolean } = {}): { 
           },
           properties: {
             ...f.properties,
-            railGraph: overrides[id],
+            railGraph: {
+              ...f.properties.railGraph,
+              ...override,
+              id: f.properties.railGraph?.id || override.id || "",
+            },
           },
         };
         (nextFeature as any)._coordsReversed = nextCoordsReversed;

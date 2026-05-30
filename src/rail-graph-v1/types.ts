@@ -29,6 +29,12 @@ export {
   validateServicePatternAgainstTopology,
   validateServicePatternShape,
 } from "./service-template-validation";
+export {
+  buildRenderGeometryPlan,
+  createRunPathFromServicePattern,
+  resolveRunPathGeometry,
+  resolveServicePatternGeometry,
+} from "./render-geometry";
 export { canonicalJson, fingerprint, sha256Hex } from "./fingerprint";
 export {
   buildRailGraph,

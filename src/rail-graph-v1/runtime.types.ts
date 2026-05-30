@@ -69,6 +69,8 @@ export interface ResolvedGeoJsonPathSegment {
   orderIndex: number;
   edgeRef: EntityRef;
   geometry: GeoJSONLineString;
+  geometryRef?: EntityRef;
+  geometrySource?: "geometry_store" | "edge_coordinates" | "missing";
   measureRange: MeasureRange;
   distanceMeters: number;
   stationRef?: EntityRef;

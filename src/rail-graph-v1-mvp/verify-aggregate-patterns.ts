@@ -194,6 +194,24 @@ async function main(): Promise<void> {
       displayColor: p.displayColor,
       polylineSegmentCount: p.polylineSegments?.length ?? 0,
       stationMarkerCount: p.stationMarkers?.length ?? 0,
+      resolvedPath: p.resolvedPath
+        ? {
+          pathId: p.resolvedPath.pathId,
+          totalDistanceMeters: p.resolvedPath.totalDistanceMeters,
+          segmentCount: p.resolvedPath.segments.length,
+          stationPassageCount: p.resolvedPath.stationPassages.length,
+          diagnosticCodes: p.resolvedPath.diagnostics.map((diag) => diag.code),
+        }
+        : null,
+      renderGeometryPlan: p.renderGeometryPlan
+        ? {
+          geometrySource: p.renderGeometryPlan.geometrySource,
+          stitchedEdgeCount: p.renderGeometryPlan.stitchedEdgeRefs.length,
+          offsetSegmentCount: p.renderGeometryPlan.offsetSegments.length,
+          smoothingCount: p.renderGeometryPlan.smoothing.length,
+          diagnosticCodes: p.renderGeometryPlan.diagnostics.map((diag) => diag.code),
+        }
+        : null,
       sampleSegment: p.polylineSegments?.[0]
         ? {
           edgeRef: p.polylineSegments[0].edgeRef,
@@ -214,6 +232,11 @@ async function main(): Promise<void> {
     "render-plan: 每个 pattern 有非空 displayColor",
     renderPlan.every(p => typeof p.displayColor === "string" && p.displayColor.length > 0),
     `colors: ${renderPlan.map(p => p.displayColor).join(",")}`,
+  );
+  assert(
+    "render-plan: 每个 pattern 有 resolvedPath 且距离非负",
+    renderPlan.every(p => p.resolvedPath && p.resolvedPath.totalDistanceMeters >= 0),
+    `resolved distances = ${renderPlan.map(p => p.resolvedPath?.totalDistanceMeters ?? null).join(",")}`,
   );
 
   // ── §5. IntentionChain round-trip ─────────────────────────

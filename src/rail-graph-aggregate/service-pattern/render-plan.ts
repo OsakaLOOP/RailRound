@@ -1,4 +1,11 @@
 import type { EntityRef } from "../../rail-graph-v1/primitives";
+import { buildSystemContext } from "../../rail-graph-v1/graph-builder";
+import {
+  buildRenderGeometryPlan,
+  createRunPathFromServicePattern,
+  resolveServicePatternGeometry,
+} from "../../rail-graph-v1/render-geometry";
+import type { RenderGeometryPlan, ResolvedGeoJsonPath } from "../../rail-graph-v1/runtime.types";
 import type { AggregateState } from "../aggregate-state";
 import type { CrossPatternPath } from "../cross-pattern/types";
 import { nodeCoordinate } from "../no-direction-graph";
@@ -10,6 +17,8 @@ export interface PatternRenderPlan {
   displayColor: string;
   polylineSegments: PatternPolylineSegment[];
   stationMarkers: PatternStationMarker[];
+  resolvedPath?: ResolvedGeoJsonPath;
+  renderGeometryPlan?: RenderGeometryPlan;
 }
 
 export interface PatternPolylineSegment {
@@ -36,12 +45,22 @@ export function buildPatternRenderPlan(
 ): PatternRenderPlan[] {
   const edgesById = new Map(aggregate.topo.edges.map((edge) => [edge.id, edge] as const));
   const edgeUseOrder = buildEdgeUseOrder(patterns);
+  const context = buildSystemContext({
+    baseTopology: aggregate.topo,
+    servicePatterns: patterns,
+    sourceMode: aggregate.mode,
+    allowNoDirection: aggregate.mode === "no-direction-graph",
+    noDirectionReason: aggregate.mode === "no-direction-graph" ? "verify" : undefined,
+  });
+  const graph = context.graph;
 
-  return patterns.map((pattern, patternIndex) => ({
-    patternId: pattern.patternId,
-    displayName: pattern.displayName,
-    displayColor: pattern.displayColor || fallbackColor(patternIndex),
-    polylineSegments: pattern.edgeSequence.flatMap((edgeRef) => {
+  return patterns.map((pattern, patternIndex) => {
+    const edgeOffsets = buildPatternEdgeOffsets(edgeUseOrder, pattern);
+    return {
+      patternId: pattern.patternId,
+      displayName: pattern.displayName,
+      displayColor: pattern.displayColor || fallbackColor(patternIndex),
+      polylineSegments: pattern.edgeSequence.flatMap((edgeRef) => {
       const edge = edgesById.get(edgeRef);
       if (!edge?.coordinates || edge.coordinates.length < 2) return [];
       const useIndex = edgeUseOrder.get(edgeRef)?.indexOf(pattern.patternId) ?? 0;
@@ -55,14 +74,25 @@ export function buildPatternRenderPlan(
           offset: useIndex * 5,
         },
       }];
-    }),
-    stationMarkers: pattern.traceSequence.map((trace) => ({
-      stationRef: trace.stationRef,
-      orderIndex: trace.orderIndex,
-      coord: nodeCoordinate(aggregate.topo, trace.stationRef),
-      label: String(trace.stationRef),
-    })),
-  }));
+      }),
+      stationMarkers: pattern.traceSequence.map((trace) => ({
+        stationRef: trace.stationRef,
+        orderIndex: trace.orderIndex,
+        coord: nodeCoordinate(aggregate.topo, trace.stationRef),
+        label: String(trace.stationRef),
+      })),
+      resolvedPath: resolveServicePatternGeometry({
+        graph,
+        patternRef: pattern.patternId,
+        sourceGraphId: context.graphId,
+      }),
+      renderGeometryPlan: buildRenderGeometryPlan({
+        graph,
+        path: createRunPathFromServicePattern(pattern),
+        edgeOffsets,
+      }),
+    };
+  });
 }
 
 export function buildCrossPatternRenderPlan(
@@ -110,6 +140,21 @@ function buildEdgeUseOrder(patterns: StoredServicePattern[]): Map<EntityRef, Ent
       if (!list.includes(pattern.patternId)) list.push(pattern.patternId);
       out.set(edgeRef, list);
     }
+  }
+  return out;
+}
+
+function buildPatternEdgeOffsets(
+  edgeUseOrder: Map<EntityRef, EntityRef[]>,
+  pattern: StoredServicePattern,
+): Record<string, { offsetMeters: number; offsetSide: "right" }> {
+  const out: Record<string, { offsetMeters: number; offsetSide: "right" }> = {};
+  for (const edgeRef of pattern.edgeSequence) {
+    const useIndex = edgeUseOrder.get(edgeRef)?.indexOf(pattern.patternId) ?? 0;
+    out[edgeRef] = {
+      offsetMeters: useIndex * 5,
+      offsetSide: "right",
+    };
   }
   return out;
 }

@@ -39,6 +39,8 @@ export { resolveRunContext, resolveRunPath } from "./run-resolver";
 export { buildRunOrder, synthesizeTimeline, timelinePointByOrderIndex } from "./timeline";
 export { resolveEventAnchors } from "./event-anchors";
 export { generateRunEvents } from "./events";
+export { buildDeployedSystem, deployedContentInput, publishServiceTemplates } from "./deployment";
+export { buildPathPresets, buildPresetRunIdMap, pathPresetContentInput } from "./presets";
 export { canonicalJson, fingerprint, sha256Hex } from "./fingerprint";
 export {
   buildRailGraph,

@@ -3,6 +3,7 @@
 // ============================================================
 
 import type { ContributionStore } from "./community.types";
+import type { BaseTopologyRelation } from "./base-topology.types";
 import type { EventPolicyRef } from "./event.types";
 import type { DirectionLabel, EntityRef, ISODateTime } from "./primitives";
 import type { ResolvedGeoJsonPath, RunSpec } from "./runtime.types";
@@ -57,10 +58,11 @@ export interface DeployedSystem {
   sourceGraphId: string;
   templates: PublishedServiceTemplate[];
   stations: StationMeta[];
+  relations: BaseTopologyRelation[];
   defaultTimetables: TimetableSet[];
   generatedPresets: PathPreset[];
   contributions?: ContributionStore;
-  contentHash: string;  // sha256(canonicalJson(templates + stations + timetables))
+  contentHash: string;  // sha256(canonicalJson(templates + stations + relations + timetables + presets))
   presetHashes: Record<string, string>;
 }
 

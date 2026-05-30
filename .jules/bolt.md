@@ -5,3 +5,7 @@
 ## 2024-04-15 - [Avoid O(N log N) Sorting on Massive Geographical Collections]
 **Learning:** In spatial queries like `findNearbyStations` where we scan `railwayData` containing thousands of stations to find the top K nearest points, allocating all elements to an array and running `Array.prototype.sort()` results in massive temporary object allocation and $O(N \log N)$ execution time (taking ~8.5ms in benchmarks).
 **Action:** Replace full array sorts with a bounded Top-K array using a simple $O(K)$ insertion sort during the $O(N)$ iteration phase. This brings the time complexity effectively down to $O(N)$, speeding up operations by ~36x (taking ~0.24ms). Remember to apply a final sort if total elements found are less than $K$.
+
+## 2024-05-18 - [Avoid Re-building Station Index on Every Route Query]
+**Learning:** In `getTransferableLines`, an attempt to replace an O(N) line scan with an O(1) index lookup by calling `buildStationIndex` inside the function would have severely degraded performance. The `buildStationIndex` is a heavy operation, and the optimization relies on the fact that `buildStationIndex` implements an internal memoization cache based on reference equality (`lastRailwayDataRef === railwayData`). It's crucial to understand caching mechanisms before introducing them to the hot path.
+**Action:** Always verify if a helper function introduces overhead. If using a memoized builder, ensure the reference checks will hit the cache effectively and not unintentionally invalidate or recreate massive data structures.

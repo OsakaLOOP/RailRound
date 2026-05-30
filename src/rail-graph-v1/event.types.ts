@@ -91,6 +91,8 @@ export type RunEventType =
   | "through_service"
   | "coupling_operation"
   | "decoupling_operation"
+  | "turnback_operation"
+  | "stabling_operation"
   | "scenic_view"
   | "user_defined";
 

@@ -37,6 +37,7 @@
   - aggregate storage/import boundary: src/rail-graph-aggregate/aggregate-state.ts, src/rail-graph-aggregate/storage.ts
   - ServicePattern / Cross-Pattern / UserEvent modules: src/rail-graph-aggregate/{service-pattern,cross-pattern,user-event}/
   - verify scripts: npm run rail:aggregate:verify:{patterns,compiled-topology,cross-pf,events}
+  - full integration gate: npm run rail:integration:verify (scripts/verify-rail-graph-integration.mjs)
 - mileage-centric UserEvent 层:
   - public types/API: src/rail-graph-v1/mileage-event.types.ts, src/rail-graph-v1/mileage-events.ts
   - aggregate compatibility: src/rail-graph-aggregate/user-event/mileage-*.ts
@@ -181,6 +182,7 @@
 - verification:
   - src/rail-graph-v1-mvp/verify-mileage-user-events.ts
   - npm run rail:events:mileage-verify
+  - full rail-graph gate: scripts/verify-rail-graph-integration.mjs + npm run rail:integration:verify
 
 ### E. API contract related updates
 

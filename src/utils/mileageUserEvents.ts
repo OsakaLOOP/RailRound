@@ -7,6 +7,9 @@ import type {
   MileageUserEventVisibility,
   UserEventV2,
 } from "../rail-graph-v1/mileage-event.types";
+import type { EntityRef } from "../rail-graph-v1/primitives";
+import type { ResolvedGeoJsonPath } from "../rail-graph-v1/runtime.types";
+import type { TripResult as RailGraphTripResult, TripResultSegment } from "../rail-graph-v1/user-facing.types";
 import {
   compareBoundMileageEvents,
   projectEventToRunPath,
@@ -15,16 +18,29 @@ import {
   queryEventsNearPlace as queryCoreEventsNearPlace,
   resolvePlaceToMileage,
 } from "../rail-graph-v1/mileage-events";
-import type { EntityRef } from "../rail-graph-v1/primitives";
 import type { RailwayLine, RailwayMap, Station, Trip, TripSegment } from "../store";
 
 export interface AppMileageLineContext {
+  source?: "legacy_app";
   lineKey: string;
   line: RailwayLine;
   context: MileageProjectionContext;
   runPath: MileageRunPathLike;
   totalMeters: number;
 }
+
+export interface RailGraphMileageLineContext {
+  source: "rail_graph_runtime";
+  lineKey: string;
+  tripId?: string;
+  segmentIndex: number;
+  segment: TripResultSegment;
+  context: MileageProjectionContext;
+  runPath: MileageRunPathLike;
+  totalMeters: number;
+}
+
+export type MileageLineContextLike = AppMileageLineContext | RailGraphMileageLineContext;
 
 export interface MileageEventDraft {
   title?: string;
@@ -131,6 +147,7 @@ export function buildAppMileageLineContext(railwayData: RailwayMap, lineKey: str
   };
 
   return {
+    source: "legacy_app",
     lineKey,
     line,
     context,
@@ -144,8 +161,44 @@ export function buildAppMileageLineContext(railwayData: RailwayMap, lineKey: str
   };
 }
 
+export function buildRailGraphMileageLineContext(
+  tripResult: RailGraphTripResult,
+  segmentIndex = 0,
+): RailGraphMileageLineContext | null {
+  const segment = tripResult.segments[segmentIndex];
+  if (!segment) return null;
+  return buildRailGraphMileageSegmentContext(segment, {
+    tripId: tripResult.tripId,
+    segmentIndex,
+  });
+}
+
+export function buildRailGraphMileageSegmentContext(
+  segment: TripResultSegment,
+  options: { tripId?: string; segmentIndex?: number } = {},
+): RailGraphMileageLineContext {
+  const context = mileageContextFromResolvedPath(segment);
+  return {
+    source: "rail_graph_runtime",
+    lineKey: `rail-graph:${segment.patternRef}`,
+    tripId: options.tripId,
+    segmentIndex: options.segmentIndex ?? 0,
+    segment,
+    context,
+    runPath: {
+      systemRef: segment.systemRef,
+      lineRef: segment.lineRef,
+      patternRef: segment.patternRef,
+      direction: segment.direction,
+      edgeSequence: segment.resolvedPath.segments.map((pathSegment) => pathSegment.edgeRef),
+      stationSequence: segment.resolvedPath.stationPassages.map((passage) => passage.stationRef),
+    },
+    totalMeters: segment.resolvedPath.totalDistanceMeters,
+  };
+}
+
 export function createMileageEventFromStation(args: {
-  lineContext: AppMileageLineContext;
+  lineContext: MileageLineContextLike;
   stationId: string;
   title: string;
   body?: string;
@@ -155,7 +208,7 @@ export function createMileageEventFromStation(args: {
   mediaUrl?: string;
   tripId?: string | number;
 }): UserEventV2 | null {
-  const stationRef = appStationRef(args.lineContext.lineKey, args.stationId);
+  const stationRef = stationRefForContext(args.lineContext, args.stationId);
   const station = args.lineContext.context.stationMileage[stationRef];
   if (!station) return null;
   return createMileageEventAtResolvedDistance({
@@ -172,7 +225,7 @@ export function createMileageEventFromStation(args: {
 }
 
 export function createMileageEventAtDistance(args: {
-  lineContext: AppMileageLineContext;
+  lineContext: MileageLineContextLike;
   distanceMeters: number;
   title: string;
   body?: string;
@@ -194,7 +247,7 @@ export function createMileageEventAtDistance(args: {
 }
 
 export function createMileageEventFromCoordinates(args: {
-  lineContext: AppMileageLineContext;
+  lineContext: MileageLineContextLike;
   coordinates: [number, number];
   title: string;
   body?: string;
@@ -221,7 +274,7 @@ export function createMileageEventFromCoordinates(args: {
 }
 
 export function createMileageEventFromPlace(args: {
-  lineContext: AppMileageLineContext;
+  lineContext: MileageLineContextLike;
   place: MileagePlaceQuery;
   title: string;
   body?: string;
@@ -307,7 +360,7 @@ export function updateMileageEventFromDraft(event: UserEventV2, draft: MileageEv
   };
 }
 
-export function eventsForLine(events: readonly UserEventV2[], lineContext: AppMileageLineContext): BoundMileageEvent[] {
+export function eventsForLine(events: readonly UserEventV2[], lineContext: MileageLineContextLike): BoundMileageEvent[] {
   return events
     .map((event) => projectEventToRunPath(event, lineContext.runPath, lineContext.context))
     .filter((event): event is BoundMileageEvent => event !== null)
@@ -316,7 +369,7 @@ export function eventsForLine(events: readonly UserEventV2[], lineContext: AppMi
 
 export function queryEventsNearPlace(args: {
   events: readonly UserEventV2[];
-  lineContext: AppMileageLineContext;
+  lineContext: MileageLineContextLike;
   place: MileagePlaceQuery;
   radiusMeters: number;
 }) {
@@ -325,11 +378,11 @@ export function queryEventsNearPlace(args: {
 
 export function queryLineEventsByStation(args: {
   events: readonly UserEventV2[];
-  lineContext: AppMileageLineContext;
+  lineContext: MileageLineContextLike;
   stationId: string;
   radiusMeters: number;
 }) {
-  const stationRef = appStationRef(args.lineContext.lineKey, args.stationId);
+  const stationRef = stationRefForContext(args.lineContext, args.stationId);
   return queryEventsNearPlace({
     events: args.events,
     lineContext: args.lineContext,
@@ -340,13 +393,14 @@ export function queryLineEventsByStation(args: {
 
 export function queryEventsByMileage(args: {
   events: readonly UserEventV2[];
-  lineContext: AppMileageLineContext;
+  lineContext: MileageLineContextLike;
   fromMeters: number;
   toMeters: number;
 }) {
   return queryCoreEventsByMileage(args.events, {
     systemRef: args.lineContext.context.systemRef,
     lineRef: args.lineContext.context.lineRef,
+    patternRef: args.lineContext.context.patternRef,
     fromMeters: args.fromMeters,
     toMeters: args.toMeters,
   });
@@ -354,7 +408,7 @@ export function queryEventsByMileage(args: {
 
 export function queryLineEventsByMileage(args: {
   events: readonly UserEventV2[];
-  lineContext: AppMileageLineContext;
+  lineContext: MileageLineContextLike;
   fromMeters: number;
   toMeters: number;
 }) {
@@ -363,7 +417,7 @@ export function queryLineEventsByMileage(args: {
 
 export function queryEventsByTime(args: {
   events: readonly UserEventV2[];
-  lineContext: AppMileageLineContext;
+  lineContext: MileageLineContextLike;
   fromTime: string;
   toTime: string;
 }) {
@@ -375,7 +429,7 @@ export function queryEventsByTime(args: {
 
 export function queryLineEventsByTime(args: {
   events: readonly UserEventV2[];
-  lineContext: AppMileageLineContext;
+  lineContext: MileageLineContextLike;
   fromTime: string;
   toTime: string;
 }) {
@@ -384,9 +438,23 @@ export function queryLineEventsByTime(args: {
 
 export function projectEventsToTrip(
   events: readonly UserEventV2[],
+  tripResult: RailGraphTripResult,
+): BoundMileageEvent[];
+export function projectEventsToTrip(
+  events: readonly UserEventV2[],
   railwayData: RailwayMap,
   trip: Trip,
+): BoundMileageEvent[];
+export function projectEventsToTrip(
+  events: readonly UserEventV2[],
+  tripOrRailwayData: RailwayMap | RailGraphTripResult,
+  trip?: Trip,
 ): BoundMileageEvent[] {
+  if (isRailGraphTripResult(tripOrRailwayData)) {
+    return projectEventsToRailGraphTrip(events, tripOrRailwayData);
+  }
+  const railwayData = tripOrRailwayData;
+  if (!trip) return [];
   let cursor = 0;
   const output: BoundMileageEvent[] = [];
   for (const [segmentIndex, segment] of normalizeTripSegments(trip).entries()) {
@@ -707,7 +775,7 @@ export function normalizeTimeInput(value: string): string {
 }
 
 function createMileageEventAtResolvedDistance(args: {
-  lineContext: AppMileageLineContext;
+  lineContext: MileageLineContextLike;
   distanceMeters: number;
   id: EntityRef;
   draft: MileageEventDraft;
@@ -725,6 +793,8 @@ function createMileageEventAtResolvedDistance(args: {
     mileage: {
       systemRef: args.lineContext.context.systemRef,
       lineRef: args.lineContext.context.lineRef,
+      patternRef: args.lineContext.context.patternRef,
+      direction: args.lineContext.context.direction,
       distanceMeters: Math.max(0, Math.min(args.lineContext.totalMeters, args.distanceMeters)),
     },
     visibility: args.draft.visibility ?? "private",
@@ -732,6 +802,7 @@ function createMileageEventAtResolvedDistance(args: {
     payload: {
       ...(args.payload ?? {}),
       lineKey: args.lineContext.lineKey,
+      contextSource: args.lineContext.source ?? "legacy_app",
       ...(mediaUrl ? { mediaUrl } : {}),
       ...(tripId !== undefined && tripId !== "" ? { tripId } : {}),
     },
@@ -757,6 +828,108 @@ function normalizeTripSegments(trip: Trip): TripSegment[] {
   return trip.segments?.length
     ? trip.segments
     : [{ id: "legacy", lineKey: trip.lineKey || "", fromId: trip.fromId || "", toId: trip.toId || "" }];
+}
+
+function projectEventsToRailGraphTrip(
+  events: readonly UserEventV2[],
+  tripResult: RailGraphTripResult,
+): BoundMileageEvent[] {
+  let cursor = 0;
+  const output: BoundMileageEvent[] = [];
+  for (const [segmentIndex, segment] of tripResult.segments.entries()) {
+    const lineContext = buildRailGraphMileageSegmentContext(segment, {
+      tripId: tripResult.tripId,
+      segmentIndex,
+    });
+    const segmentEvents = queryEventsByMileage({
+      events,
+      lineContext,
+      fromMeters: 0,
+      toMeters: lineContext.totalMeters,
+    }).items;
+    for (const event of segmentEvents) {
+      const bound = projectEventToRunPath(event, lineContext.runPath, lineContext.context);
+      if (!bound) continue;
+      output.push({
+        ...bound,
+        distanceMetersFromRunStart: cursor + bound.distanceMetersFromRunStart,
+        orderIndex: segmentIndex,
+      });
+    }
+    cursor += lineContext.totalMeters;
+  }
+  return output.sort(compareBoundMileageEvents);
+}
+
+function mileageContextFromResolvedPath(segment: TripResultSegment): MileageProjectionContext {
+  const edgeMileage: MileageProjectionContext["edgeMileage"] = {};
+  const stationMileage: MileageProjectionContext["stationMileage"] = {};
+  const timeline: MileageProjectionContext["timeline"] = [];
+  let cursor = 0;
+
+  for (const pathSegment of segment.resolvedPath.segments) {
+    edgeMileage[pathSegment.edgeRef] = {
+      edgeRef: pathSegment.edgeRef,
+      startMeters: cursor,
+      endMeters: cursor + pathSegment.distanceMeters,
+      coordinates: pathSegment.geometry.coordinates,
+    };
+    cursor += pathSegment.distanceMeters;
+  }
+
+  for (const passage of segment.resolvedPath.stationPassages) {
+    const stop = segment.viaStations.find((candidate) => candidate.station.stationRef === passage.stationRef);
+    stationMileage[passage.stationRef] = {
+      stationRef: passage.stationRef,
+      distanceMeters: passage.distanceMetersFromStart,
+      coordinates: stop?.station.coordinates,
+      name: stop?.station.name,
+    };
+    const timestamp = stop?.departureTime ?? stop?.arrivalTime ?? passage.departureTime ?? passage.arrivalTime;
+    if (timestamp) {
+      timeline.push({
+        distanceMeters: passage.distanceMetersFromStart,
+        timestamp,
+      });
+    }
+  }
+
+  return {
+    systemRef: segment.systemRef,
+    lineRef: segment.lineRef,
+    patternRef: segment.patternRef,
+    direction: segment.direction,
+    edgeMileage,
+    stationMileage,
+    timeline: timeline.length >= 2 ? timeline : undefined,
+    linearTimeRange: {
+      startTime: segment.viaStations[0]?.departureTime ?? segment.viaStations[0]?.arrivalTime ?? DEFAULT_START_TIME,
+      endTime: segment.viaStations[segment.viaStations.length - 1]?.arrivalTime
+        ?? segment.viaStations[segment.viaStations.length - 1]?.departureTime
+        ?? DEFAULT_END_TIME,
+      startMeters: 0,
+      endMeters: Math.max(1, segment.resolvedPath.totalDistanceMeters),
+    },
+  };
+}
+
+function stationRefForContext(lineContext: MileageLineContextLike, stationId: string): EntityRef {
+  if (lineContext.source === "rail_graph_runtime") {
+    const exact = Object.keys(lineContext.context.stationMileage).find((stationRef) =>
+      stationRef === stationId || stationRef.endsWith(`:${stationId}`)
+    );
+    return (exact ?? stationId) as EntityRef;
+  }
+  return appStationRef(lineContext.lineKey, stationId);
+}
+
+function isRailGraphTripResult(value: RailwayMap | RailGraphTripResult): value is RailGraphTripResult {
+  return !!value
+    && typeof value === "object"
+    && "tripId" in value
+    && "segments" in value
+    && Array.isArray((value as RailGraphTripResult).segments)
+    && (value as RailGraphTripResult).segments.some((segment) => !!segment.resolvedPath);
 }
 
 function segmentMileageWindow(lineContext: AppMileageLineContext, segment: Pick<TripSegment, "fromId" | "toId">): {

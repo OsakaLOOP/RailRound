@@ -23,6 +23,7 @@
 - docs/: 方案、审计与发布流程文档
   - geo worker 字段契约: docs/geo_worker_geojson_contract_2026-04-27.md
   - rail graph v1 设计参考: docs/rail-graph-v1/
+  - rail graph v1 实施计划: docs/rail-graph-v1-plan/11-完全集成实施计划.md
   - mileage-centric UserEvent 接入文档: docs/rail-graph-v1/user-event-mileage-layer.md
 - rail graph MVP 工作台:
   - standalone HTML: rail-graph-mvp.html

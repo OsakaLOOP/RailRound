@@ -41,6 +41,7 @@ export { resolveEventAnchors } from "./event-anchors";
 export { generateRunEvents } from "./events";
 export { buildDeployedSystem, deployedContentInput, publishServiceTemplates } from "./deployment";
 export { buildPathPresets, buildPresetRunIdMap, pathPresetContentInput } from "./presets";
+export { buildTripResult, planTrip } from "./trip-planner";
 export { canonicalJson, fingerprint, sha256Hex } from "./fingerprint";
 export {
   buildRailGraph,

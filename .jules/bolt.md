@@ -5,3 +5,7 @@
 ## 2024-04-15 - [Avoid O(N log N) Sorting on Massive Geographical Collections]
 **Learning:** In spatial queries like `findNearbyStations` where we scan `railwayData` containing thousands of stations to find the top K nearest points, allocating all elements to an array and running `Array.prototype.sort()` results in massive temporary object allocation and $O(N \log N)$ execution time (taking ~8.5ms in benchmarks).
 **Action:** Replace full array sorts with a bounded Top-K array using a simple $O(K)$ insertion sort during the $O(N)$ iteration phase. This brings the time complexity effectively down to $O(N)$, speeding up operations by ~36x (taking ~0.24ms). Remember to apply a final sort if total elements found are less than $K$.
+
+## 2024-10-24 - [Avoid Turf.js Object Allocations for Polyline Distance Calculations]
+**Learning:** Using \`turf.length(turf.lineString(coords))\` in a loop to calculate polyline distances causes significant overhead due to temporary object allocations, taking roughly 4x longer than a native loop. This is especially problematic when visualizing routes, where many segments are processed.
+**Action:** Replace \`turf.length\` with a native O(N) loop wrapping the haversine formula (\`calcPolylineDist\`) that operates directly on the existing coordinate arrays without generating intermediate objects.

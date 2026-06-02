@@ -8,7 +8,6 @@ import type {
   UserEventV2,
 } from "../rail-graph-v1/mileage-event.types";
 import type { EntityRef } from "../rail-graph-v1/primitives";
-import type { ResolvedGeoJsonPath } from "../rail-graph-v1/runtime.types";
 import type { TripResult as RailGraphTripResult, TripResultSegment } from "../rail-graph-v1/user-facing.types";
 import {
   compareBoundMileageEvents,
@@ -19,6 +18,7 @@ import {
   resolvePlaceToMileage,
 } from "../rail-graph-v1/mileage-events";
 import type { RailwayLine, RailwayMap, Station, Trip, TripSegment } from "../store";
+import { getTripRailGraphSnapshot } from "./railGraphTripPersistence";
 
 export interface AppMileageLineContext {
   source?: "legacy_app";
@@ -180,20 +180,20 @@ export function buildRailGraphMileageSegmentContext(
   const context = mileageContextFromResolvedPath(segment);
   return {
     source: "rail_graph_runtime",
-    lineKey: `rail-graph:${segment.patternRef}`,
+    lineKey: `rail-graph:${segment.mileageProfile.patternRef ?? segment.segmentId}`,
     tripId: options.tripId,
     segmentIndex: options.segmentIndex ?? 0,
     segment,
     context,
     runPath: {
-      systemRef: segment.systemRef,
-      lineRef: segment.lineRef,
-      patternRef: segment.patternRef,
-      direction: segment.direction,
-      edgeSequence: segment.resolvedPath.segments.map((pathSegment) => pathSegment.edgeRef),
-      stationSequence: segment.resolvedPath.stationPassages.map((passage) => passage.stationRef),
+      systemRef: segment.mileageProfile.systemRef,
+      lineRef: segment.mileageProfile.lineRef,
+      patternRef: segment.mileageProfile.patternRef,
+      direction: segment.mileageProfile.direction,
+      edgeSequence: segment.mileageProfile.edgeSequence,
+      stationSequence: segment.mileageProfile.stationSequence,
     },
-    totalMeters: segment.resolvedPath.totalDistanceMeters,
+    totalMeters: segment.mileageProfile.totalDistanceMeters,
   };
 }
 
@@ -452,6 +452,12 @@ export function projectEventsToTrip(
 ): BoundMileageEvent[] {
   if (isRailGraphTripResult(tripOrRailwayData)) {
     return projectEventsToRailGraphTrip(events, tripOrRailwayData);
+  }
+  if (trip) {
+    const railGraphTrip = trip.railGraph?.tripResult ?? null;
+    if (railGraphTrip) {
+      return projectEventsToRailGraphTrip(events, railGraphTrip);
+    }
   }
   const railwayData = tripOrRailwayData;
   if (!trip) return [];
@@ -862,55 +868,37 @@ function projectEventsToRailGraphTrip(
 }
 
 function mileageContextFromResolvedPath(segment: TripResultSegment): MileageProjectionContext {
-  const edgeMileage: MileageProjectionContext["edgeMileage"] = {};
-  const stationMileage: MileageProjectionContext["stationMileage"] = {};
-  const timeline: MileageProjectionContext["timeline"] = [];
-  let cursor = 0;
-
-  for (const pathSegment of segment.resolvedPath.segments) {
-    edgeMileage[pathSegment.edgeRef] = {
-      edgeRef: pathSegment.edgeRef,
-      startMeters: cursor,
-      endMeters: cursor + pathSegment.distanceMeters,
-      coordinates: pathSegment.geometry.coordinates,
-    };
-    cursor += pathSegment.distanceMeters;
-  }
-
-  for (const passage of segment.resolvedPath.stationPassages) {
-    const stop = segment.viaStations.find((candidate) => candidate.station.stationRef === passage.stationRef);
-    stationMileage[passage.stationRef] = {
-      stationRef: passage.stationRef,
-      distanceMeters: passage.distanceMetersFromStart,
-      coordinates: stop?.station.coordinates,
-      name: stop?.station.name,
-    };
-    const timestamp = stop?.departureTime ?? stop?.arrivalTime ?? passage.departureTime ?? passage.arrivalTime;
-    if (timestamp) {
-      timeline.push({
-        distanceMeters: passage.distanceMetersFromStart,
-        timestamp,
-      });
-    }
-  }
-
   return {
-    systemRef: segment.systemRef,
-    lineRef: segment.lineRef,
-    patternRef: segment.patternRef,
-    direction: segment.direction,
-    edgeMileage,
-    stationMileage,
-    timeline: timeline.length >= 2 ? timeline : undefined,
-    linearTimeRange: {
+    systemRef: segment.mileageProfile.systemRef,
+    lineRef: segment.mileageProfile.lineRef,
+    patternRef: segment.mileageProfile.patternRef,
+    direction: segment.mileageProfile.direction,
+    edgeMileage: segment.mileageProfile.edgeMileage,
+    stationMileage: withStationDisplayMeta(segment),
+    timeline: segment.mileageProfile.timeline,
+    linearTimeRange: segment.mileageProfile.linearTimeRange ?? {
       startTime: segment.viaStations[0]?.departureTime ?? segment.viaStations[0]?.arrivalTime ?? DEFAULT_START_TIME,
       endTime: segment.viaStations[segment.viaStations.length - 1]?.arrivalTime
         ?? segment.viaStations[segment.viaStations.length - 1]?.departureTime
         ?? DEFAULT_END_TIME,
       startMeters: 0,
-      endMeters: Math.max(1, segment.resolvedPath.totalDistanceMeters),
+      endMeters: Math.max(1, segment.mileageProfile.totalDistanceMeters),
     },
   };
+}
+
+function withStationDisplayMeta(segment: TripResultSegment): MileageProjectionContext["stationMileage"] {
+  const stationMileage = { ...segment.mileageProfile.stationMileage };
+  for (const stop of segment.viaStations) {
+    const current = stationMileage[stop.station.stationRef];
+    if (!current) continue;
+    stationMileage[stop.station.stationRef] = {
+      ...current,
+      coordinates: current.coordinates ?? stop.station.coordinates,
+      name: current.name ?? stop.station.name,
+    };
+  }
+  return stationMileage;
 }
 
 function stationRefForContext(lineContext: MileageLineContextLike, stationId: string): EntityRef {
@@ -929,7 +917,11 @@ function isRailGraphTripResult(value: RailwayMap | RailGraphTripResult): value i
     && "tripId" in value
     && "segments" in value
     && Array.isArray((value as RailGraphTripResult).segments)
-    && (value as RailGraphTripResult).segments.some((segment) => !!segment.resolvedPath);
+    && (value as RailGraphTripResult).segments.some((segment) => !!segment.mileageProfile);
+}
+
+export function tripOrTripSnapshotToRailGraphTrip(trip: Trip): RailGraphTripResult | null {
+  return getTripRailGraphSnapshot(trip)?.tripResult ?? null;
 }
 
 function segmentMileageWindow(lineContext: AppMileageLineContext, segment: Pick<TripSegment, "fromId" | "toId">): {

@@ -15,6 +15,7 @@ import { useShallow } from "zustand/react/shallow";
 import toast from "react-hot-toast";
 import { useAppRouteState } from "../../hooks/useAppRouteState";
 import { boundMileageEventsForDisplay } from "../../utils/mileageUserEvents";
+import { tripToProductSegments } from "../../utils/tripProductProjection";
 import i18next from "i18next";
 
 // 记录各域名最后一次报错的时间，用于节流
@@ -310,27 +311,20 @@ export const MapContainer: React.FC<Props> = ({
         startLng = mapCenterSettings.lng;
       } else if (mapCenterSettings.mode === "latest") {
         const _trips = useStore.getState().trips;
-        if (
-          _trips &&
-          _trips.length > 0 &&
-          _trips[0].segments &&
-          _trips[0].segments.length > 0
-        ) {
-          const lastSegment = _trips[0].segments[_trips[0].segments.length - 1];
-          const geo = useStore.getState().geoData;
-          if (geo && geo.features) {
-            const targetFeature = geo.features.find(
-              (f: any) =>
-                f.properties.name === lastSegment.destination &&
-                f.properties.line === lastSegment.line,
+        if (_trips && _trips.length > 0) {
+          const productSegments = tripToProductSegments(_trips[0], railwayData);
+          const lastSegment = productSegments[productSegments.length - 1];
+          const lastCoords = lastSegment?.geometry?.[lastSegment.geometry.length - 1];
+          if (lastCoords) {
+            startLat = lastCoords[0];
+            startLng = lastCoords[1];
+          } else if (lastSegment) {
+            const endStation = railwayData[lastSegment.lineKey]?.stations.find(
+              (station: any) => station.id === lastSegment.toId,
             );
-            if (
-              targetFeature &&
-              targetFeature.geometry &&
-              targetFeature.geometry.coordinates
-            ) {
-              startLat = targetFeature.geometry.coordinates[1];
-              startLng = targetFeature.geometry.coordinates[0];
+            if (endStation) {
+              startLat = endStation.lat;
+              startLng = endStation.lng;
             }
           }
         }

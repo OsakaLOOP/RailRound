@@ -8,13 +8,14 @@ import type { EventPolicyRef } from "./event.types";
 import type { DirectionLabel, EntityRef, ISODateTime } from "./primitives";
 import type { ResolvedGeoJsonPath, RunSpec } from "./runtime.types";
 import type { ServiceType } from "./service-template.types";
-import type { RouteFingerprint, StationMeta, TripResult } from "./user-facing.types";
+import type { RouteFingerprint, StationMeta, TripResult, TripRuntimeArtifacts } from "./user-facing.types";
 
 export interface SavedTrip {
   savedId: string;
   userId: string;
   name?: string;
   tripResult: TripResult;
+  runtimeArtifacts?: TripRuntimeArtifacts;
   routeFingerprint: RouteFingerprint;
   createdAt: ISODateTime;
   tripDate?: string;
@@ -100,7 +101,6 @@ export interface PathPreset {
 export interface TripPlanRequest {
   presetId?: string;
   systemId: string;
-  patternRef?: EntityRef;
   startStationRef: EntityRef;
   endStationRef: EntityRef;
   viaRefs?: EntityRef[];
@@ -109,6 +109,6 @@ export interface TripPlanRequest {
 }
 
 export type PlanTripResult =
-  | { status: "ok"; trip: TripResult }
+  | { status: "ok"; trip: TripResult; runtimeArtifacts: TripRuntimeArtifacts }
   | { status: "unreachable"; reason: string; suggestions?: PathPreset[] }
   | { status: "invalid_request"; reason: string };

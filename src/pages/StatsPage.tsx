@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { LineLogo } from '../components/LineLogo';
 import { buildAppPathForLanguage, normalizeAppLang } from '../utils/routes';
 import { mileageEventStats, lineLabel } from '../utils/mileageUserEvents';
+import { tripToProductSegments } from '../utils/tripProductProjection';
 import { eventKindLabel, eventVisibilityLabel } from '../components/mileage-events/display';
 
 const CITIES = {
@@ -68,13 +69,18 @@ export const StatsPage: React.FC = () => {
             const trip = trips[i];
             _totalCost += (trip.cost || 0);
 
-            const segments = trip.segments || [{ lineKey: trip.lineKey, fromId: trip.fromId, toId: trip.toId }];
+            const segments = tripToProductSegments(trip, railwayData);
             for (let j = 0; j < segments.length; j++) {
                 const seg = segments[j];
                 if (!seg.lineKey) continue;
 
                 uniqueLinesSet.add(seg.lineKey);
                 counts.set(seg.lineKey, (counts.get(seg.lineKey) || 0) + 1);
+
+                if (seg.source === 'rail_graph') {
+                    _totalDist += seg.distanceKm;
+                    continue;
+                }
 
                 if (segmentGeometries && turf) {
                     const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;

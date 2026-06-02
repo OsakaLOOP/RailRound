@@ -2,164 +2,107 @@ import { describe, expect, it } from "vitest";
 import type { BaseTopologyLayer, TopologyEdge } from "../rail-graph-v1/base-topology.types";
 import type { EntityRef } from "../rail-graph-v1/primitives";
 import type { ServicePattern } from "../rail-graph-v1/service-template.types";
-import type { TripResult } from "../rail-graph-v1/user-facing.types";
-import {
-  buildDeployedSystem,
-  buildSystemContext,
-  planTrip,
-} from "../rail-graph-v1/types";
+import type { RailwayMap, RailGraphRuntimeState } from "../store";
 import { buildAdjacency } from "../rail-graph-v1/topology";
-import {
-  buildAppMileageLineContext,
-  buildRailGraphMileageLineContext,
-  createMileageEventFromPlace,
-  projectEventsToTrip,
-  queryEventsByMileage,
-  queryEventsByTime,
-} from "../utils/mileageUserEvents";
-import { tripResultToLegacyTrip } from "../utils/railGraphTripAdapter";
-import type { RailwayMap } from "../store";
+import { buildDeployedSystem, buildSystemContext } from "../rail-graph-v1/types";
+import { parseRailGraphDeploymentBundle } from "../services/railGraphDeploymentLoader";
+import { planAppRoute } from "../utils/appRoutePlanner";
 
-describe("mileage events runtime adapter", () => {
-  it("builds mileage context from rail-graph TripResult and creates mileage-only events", () => {
-    const trip = fixtureTripResult();
-    const lineContext = buildRailGraphMileageLineContext(trip);
-    expect(lineContext).not.toBeNull();
-    if (!lineContext) return;
-
-    const event = createMileageEventFromPlace({
-      lineContext,
-      place: { stationRef: "manual:station:b" as EntityRef },
-      title: "Runtime note",
-      kind: "user_note",
-      tripId: trip.tripId,
+describe("rail-graph app route planner facade", () => {
+  it("uses rail-graph runtime before legacy routing when the result is app-consumable", () => {
+    const runtime = fixtureRuntime();
+    const result = planAppRoute({
+      startLineKey: "manual:line:test",
+      startStationId: "manual:station:a",
+      endLineKey: "manual:line:test",
+      endStationId: "manual:station:c",
+      railwayData: fixtureRailwayData(),
+      railGraphRuntime: runtime,
     });
 
-    expect(event).not.toBeNull();
-    expect(event?.schemaVersion).toBe("mileage-user-event-v1");
-    expect(event?.mileage).toMatchObject({
-      systemRef: "manual:system:test",
-      lineRef: "manual:line:test",
-      patternRef: "manual:pattern:local",
-      distanceMeters: 100,
-    });
-    expect(event?.payload?.contextSource).toBe("rail_graph_runtime");
-  });
-
-  it("queries runtime events by mileage and timeline", () => {
-    const trip = fixtureTripResult();
-    const lineContext = buildRailGraphMileageLineContext(trip)!;
-    const runtimeEvent = createMileageEventFromPlace({
-      lineContext,
-      place: { stationRef: "manual:station:b" as EntityRef },
-      title: "Runtime note",
-      tripId: trip.tripId,
-    })!;
-
-    const mileageQuery = queryEventsByMileage({
-      events: [runtimeEvent],
-      lineContext,
-      fromMeters: 90,
-      toMeters: 110,
-    });
-    const timeQuery = queryEventsByTime({
-      events: [runtimeEvent],
-      lineContext,
-      fromTime: "2026-01-01T00:03:00.000Z",
-      toTime: "2026-01-01T00:04:00.000Z",
-    });
-
-    expect(mileageQuery.items.map((event) => event.id)).toEqual([runtimeEvent.id]);
-    expect(timeQuery.items).toHaveLength(1);
-    expect(timeQuery.items[0].timestampInference).toBe("timeline");
-  });
-
-  it("projects runtime events to TripResult segments instead of legacy station lists", () => {
-    const trip = fixtureTripResult();
-    const lineContext = buildRailGraphMileageLineContext(trip)!;
-    const runtimeEvent = createMileageEventFromPlace({
-      lineContext,
-      place: { distanceMeters: 250 },
-      title: "Runtime midpoint",
-      tripId: trip.tripId,
-    })!;
-
-    const projected = projectEventsToTrip([runtimeEvent], trip);
-
-    expect(projected).toHaveLength(1);
-    expect(projected[0]).toMatchObject({
-      distanceMetersFromRunStart: 250,
-      edgeRef: "manual:edge:e2",
-      timestampInference: "timeline",
+    expect(result.status).toBe("ok");
+    expect(result.source).toBe("rail_graph");
+    if (result.status !== "ok") return;
+    expect(result.segments[0]).toMatchObject({
+      lineKey: "manual:line:test",
+      fromId: "manual:station:a",
+      toId: "manual:station:c",
+      railGraphPatternRef: "manual:pattern:local",
     });
   });
 
-  it("projects saved app trips from their rail-graph product snapshot before legacy segments", () => {
-    const trip = fixtureTripResult();
-    const savedTrip = tripResultToLegacyTrip(trip);
-    savedTrip.segments = [{
-      id: "stale",
-      lineKey: "missing:legacy",
-      fromId: "x",
-      toId: "y",
-    }];
-    const lineContext = buildRailGraphMileageLineContext(trip)!;
-    const runtimeEvent = createMileageEventFromPlace({
-      lineContext,
-      place: { distanceMeters: 250 },
-      title: "Saved trip event",
-      tripId: savedTrip.id,
-    })!;
+  it("falls back to legacy routing when no rail-graph runtime is loaded", () => {
+    const result = planAppRoute({
+      startLineKey: "manual:line:test",
+      startStationId: "manual:station:a",
+      endLineKey: "manual:line:test",
+      endStationId: "manual:station:c",
+      railwayData: fixtureRailwayData(),
+    });
 
-    const projected = projectEventsToTrip([runtimeEvent], {}, savedTrip);
-
-    expect(projected).toHaveLength(1);
-    expect(projected[0]).toMatchObject({
-      distanceMetersFromRunStart: 250,
-      edgeRef: "manual:edge:e2",
-      timestampInference: "timeline",
+    expect(result.status).toBe("ok");
+    expect(result.source).toBe("legacy");
+    if (result.status !== "ok") return;
+    expect(result.segments[0]).toMatchObject({
+      lineKey: "manual:line:test",
+      fromId: "manual:station:a",
+      toId: "manual:station:c",
     });
   });
 
-  it("keeps legacy app-line events compatible", () => {
-    const lineKey = "app:test-line";
-    const railwayData: RailwayMap = {
-      [lineKey]: {
-        meta: {
-          company: "Test Railway",
-          region: "test",
-          type: "fixture",
-          logo: null,
-          icon: null,
-        },
-        stations: [
-          { id: "a", name_ja: "Alpha", lat: 35.0, lng: 139.0, transfers: [], distToNext: 5 },
-          { id: "b", name_ja: "Beta", lat: 35.0, lng: 139.05, transfers: [] },
-        ],
+  it("falls back to legacy routing when rail-graph output cannot be consumed by current app data", () => {
+    const runtime = fixtureRuntime();
+    const railwayData = fixtureRailwayData();
+    railwayData["manual:line:test"].stations = railwayData["manual:line:test"].stations.map((station) => ({
+      ...station,
+      id: `legacy:${station.id}`,
+    }));
+    const result = planAppRoute({
+      startLineKey: "manual:line:test",
+      startStationId: "legacy:manual:station:a",
+      endLineKey: "manual:line:test",
+      endStationId: "legacy:manual:station:c",
+      railwayData,
+      railGraphRuntime: runtime,
+    });
+
+    expect(result.status).toBe("ok");
+    expect(result.source).toBe("legacy");
+    if (result.status !== "ok" || result.source !== "legacy") return;
+    expect(result.railGraphFallbackReason).toBeTruthy();
+  });
+
+  it("parses deployment bundles only when SystemContext and DeployedSystem match", () => {
+    const runtime = fixtureRuntime();
+    const parsed = parseRailGraphDeploymentBundle({
+      system: runtime.system,
+      deployed: runtime.deployed,
+    });
+    expect(parsed?.system.graphId).toBe(runtime.system.graphId);
+
+    const invalid = parseRailGraphDeploymentBundle({
+      system: runtime.system,
+      deployed: {
+        ...runtime.deployed,
+        sourceGraphId: "other",
       },
-    };
-    const lineContext = buildAppMileageLineContext(railwayData, lineKey)!;
-    const event = createMileageEventFromPlace({
-      lineContext,
-      place: { stationRef: `app-station:${lineKey}:b` as EntityRef },
-      title: "Legacy note",
-    })!;
-
-    expect(event.mileage.lineRef).toBe(`app-line:${lineKey}`);
-    expect(event.payload?.contextSource).toBe("legacy_app");
-    expect(projectEventsToTrip([event], railwayData, {
-      id: "legacy-trip",
-      date: "2026-01-01",
-      segments: [{ id: "seg", lineKey, fromId: "a", toId: "b" }],
-    })).toHaveLength(1);
+    });
+    expect(invalid).toBeNull();
   });
 });
 
-function fixtureTripResult(): TripResult {
-  const pattern = fixturePattern();
+function fixtureRuntime(): RailGraphRuntimeState {
   const system = buildSystemContext({
     baseTopology: fixtureTopology(),
-    servicePatterns: [pattern],
+    servicePatterns: [fixturePattern()],
+    displayStore: {
+      patternDisplay: {
+        "manual:pattern:local": {
+          displayName: "Local A-C",
+          displayColor: "#2563eb",
+        },
+      },
+    },
     createdAt: "2026-01-01T00:00:00.000Z",
   });
   const deployed = buildDeployedSystem({
@@ -167,28 +110,51 @@ function fixtureTripResult(): TripResult {
     systemId: "manual:system:test",
     version: "v1",
     createdAt: "2026-01-01T00:00:00.000Z",
-    defaultTimetables: [{
-      setId: "manual:timetable:local",
-      label: "Base timetable",
-      patternRef: pattern.patternId,
-      entries: [
-        { stationRef: "manual:station:a" as EntityRef, departureTime: "2026-01-01T00:00:00.000Z" },
-        { stationRef: "manual:station:c" as EntityRef, arrivalTime: "2026-01-01T00:10:00.000Z" },
-      ],
-    }],
   }).deployed;
-  const planned = planTrip({
+  return {
     system,
     deployed,
-    request: {
-      presetId: deployed.generatedPresets[0].presetId,
-      systemId: deployed.systemId,
-      startStationRef: "manual:station:a" as EntityRef,
-      endStationRef: "manual:station:c" as EntityRef,
+    source: "test",
+    loadedAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+function fixtureRailwayData(): RailwayMap {
+  return {
+    "manual:line:test": {
+      meta: {
+        company: "manual",
+        region: "test",
+        type: "JR",
+        logo: null,
+      },
+      stations: [
+        {
+          id: "manual:station:a",
+          name_ja: "A",
+          lat: 38.0000,
+          lng: 140.0000,
+          transfers: [],
+          distToNext: 0.1,
+        },
+        {
+          id: "manual:station:b",
+          name_ja: "B",
+          lat: 38.0000,
+          lng: 140.0010,
+          transfers: [],
+          distToNext: 0.2,
+        },
+        {
+          id: "manual:station:c",
+          name_ja: "C",
+          lat: 38.0010,
+          lng: 140.0010,
+          transfers: [],
+        },
+      ],
     },
-  });
-  if (planned.status !== "ok") throw new Error(`Fixture trip failed: ${planned.reason}`);
-  return planned.trip;
+  };
 }
 
 function fixtureTopology(): BaseTopologyLayer {

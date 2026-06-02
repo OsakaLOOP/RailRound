@@ -2,9 +2,14 @@
 // Rail Graph v1 — User-Facing Result Types
 // ============================================================
 
-import type { RunEventType } from "./event.types";
 import type { GeoJSONLineString, GeoJSONPosition } from "./geojson";
-import type { BoundMileageEvent } from "./mileage-event.types";
+import type {
+  BoundMileageEvent,
+  LinearMileageTimeRange,
+  MileageEdgeSpan,
+  MileageStationPoint,
+  MileageTimelinePoint,
+} from "./mileage-event.types";
 import type { DirectionLabel, EntityRef } from "./primitives";
 import type { ResolvedGeoJsonPath, RunPath } from "./runtime.types";
 import type { ServiceType } from "./service-template.types";
@@ -14,7 +19,7 @@ export type RouteFingerprint = string;
 export interface TripResult {
   tripId: string;
   presetId?: string;
-  planUsed: "preset" | "confirmed_template" | "admin_override";
+  planUsed: "preset" | "auto" | "admin_override";
   segments: TripResultSegment[];
   totalDistanceKm: number;
   totalTimeMinutes: number;
@@ -22,29 +27,69 @@ export interface TripResult {
   departureTime?: string;
   arrivalTime?: string;
   timeOfDay?: "morning" | "afternoon" | "evening" | "night";
-  eventTypeSummary: RunEventType[];
-  internalRunPaths: RunPath[];
+  eventTypeSummary: TripEvent["type"][];
 }
 
 export interface TripResultSegment {
-  lineRef: EntityRef;
-  patternRef: EntityRef;
-  systemRef: EntityRef;
-  companyRef?: EntityRef;
+  segmentId: string;
   lineLabel: string;
   displayColor: string;
-  serviceType: ServiceType;
-  direction: DirectionLabel;
   fromStation: StationMeta;
   toStation: StationMeta;
   viaStations: StationStop[];
   landmarkLabel?: string;
   distanceKm: number;
   timeMinutes: number;
-  resolvedPath: ResolvedGeoJsonPath;
   geometry: GeoJSONLineString;
+  mileageProfile: TripSegmentMileageProfile;
   events: TripEvent[];
   mileageEvents?: BoundMileageEvent[];
+}
+
+/**
+ * Product-facing mileage projection data. This is safe to persist with a trip
+ * and powers user-created mileage events without exposing RunPath or
+ * ResolvedGeoJsonPath internals.
+ */
+export interface TripSegmentMileageProfile {
+  systemRef: EntityRef;
+  lineRef?: EntityRef;
+  patternRef?: EntityRef;
+  companyRef?: EntityRef;
+  serviceType?: ServiceType;
+  direction?: DirectionLabel;
+  totalDistanceMeters: number;
+  edgeSequence: EntityRef[];
+  stationSequence: EntityRef[];
+  edgeMileage: Record<string, MileageEdgeSpan>;
+  stationMileage: Record<string, MileageStationPoint>;
+  timeline?: MileageTimelinePoint[];
+  linearTimeRange?: LinearMileageTimeRange;
+}
+
+/**
+ * Internal adapter/debug companion for callers that need to bridge current app
+ * structures while keeping TripResult itself product-facing.
+ */
+export interface TripRuntimeArtifacts {
+  tripId: string;
+  graphId: string;
+  runId: string;
+  routeFingerprint: RouteFingerprint;
+  segments: TripSegmentRuntimeArtifacts[];
+}
+
+export interface TripSegmentRuntimeArtifacts {
+  segmentId: string;
+  segmentIndex: number;
+  systemRef: EntityRef;
+  lineRef: EntityRef;
+  patternRef: EntityRef;
+  companyRef?: EntityRef;
+  serviceType: ServiceType;
+  direction: DirectionLabel;
+  runPath: RunPath;
+  resolvedPath: ResolvedGeoJsonPath;
 }
 
 export interface StationStop {

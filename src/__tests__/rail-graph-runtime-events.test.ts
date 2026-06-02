@@ -95,11 +95,11 @@ describe("rail-graph runtime events", () => {
     expect(eventTypes).toEqual([
       "platform_stop",
       "platform_pass",
+      "special_section_pass",
+      "scenic_view",
       "user_defined",
       "platform_stop",
       "turnback_operation",
-      "special_section_pass",
-      "scenic_view",
     ]);
     expect(context.events?.find((event) => event.eventType === "platform_pass")?.timestamp).toBe("2026-01-01T00:03:20.000Z");
     expect(context.events?.find((event) => event.eventType === "scenic_view")?.payload?.vehicleView).toMatchObject({
@@ -142,6 +142,32 @@ describe("rail-graph runtime events", () => {
     expect(context.path?.edgeSequence).toEqual(["manual:edge:e1"]);
     expect(context.events?.some((event) => event.eventType === "user_defined")).toBe(true);
     expect(context.path?.edgeSequence).toEqual(["manual:edge:e1"]);
+  });
+
+  it("slices confirmed template paths by requested start and end stations", () => {
+    const pattern = fixturePattern();
+    const system = buildSystemContext({
+      baseTopology: fixtureTopology(),
+      servicePatterns: [pattern],
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const context = resolveRunContext({
+      system,
+      spec: {
+        systemId: "manual:system:test",
+        patternRef: pattern.patternId,
+        startStationRef: "manual:station:b" as EntityRef,
+        endStationRef: "manual:station:c" as EntityRef,
+      },
+    });
+
+    expect(context.path?.edgeSequence).toEqual(["manual:edge:e2"]);
+    expect(context.path?.traceSequence.map((entry) => entry.stationRef)).toEqual([
+      "manual:station:b",
+      "manual:station:c",
+    ]);
+    expect(context.resolvedPath?.totalDistanceMeters).toBe(200);
   });
 
   it("returns fatal diagnostics when RunSpec references a missing pattern", () => {

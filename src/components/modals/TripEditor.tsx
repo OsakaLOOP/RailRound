@@ -4,17 +4,19 @@ import { useStore, EditorMode } from '../../store';
 import { DropZone } from '../DragContext';
 import { StationLineSearchModal, SearchModalMode } from './StationSearchModal';
 import { LineLogo } from '../LineLogo';
-import { isCompanyCompatible, getTransferableLines, findRoute, computeLoopVia, getLandmarks } from '../../core/railwayRouting'; // Will need to ensure these are typed
+import { isCompanyCompatible, getTransferableLines, computeLoopVia, getLandmarks } from '../../core/railwayRouting'; // Will need to ensure these are typed
 import { calcDist } from '../../core/tripCalculator';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
 import { showAlert, showConfirm } from '../../utils/alerts';
 import { buildNetworkDisplayModel } from '../../utils/networkDisplay';
+import { planAppRoute } from '../../utils/appRoutePlanner';
+import { tripResultToLegacyTrip } from '../../utils/railGraphTripAdapter';
 
 export const TripEditor: React.FC = () => {
     const {
-        isOpen, isEditing, form, editorMode, autoForm, isRouteSearching, railwayData, segmentGeometries, trips, pins, folders, badgeSettings, user, isAprilFool, autoRouteEasterEggType
+        isOpen, isEditing, form, editorMode, autoForm, isRouteSearching, railwayData, railGraphRuntime, segmentGeometries, trips, pins, folders, badgeSettings, user, isAprilFool, autoRouteEasterEggType
     } = useStore(useShallow(state => ({
         isOpen: state.isTripEditing,
         isEditing: !!state.editingTripId,
@@ -23,6 +25,7 @@ export const TripEditor: React.FC = () => {
         autoForm: state.autoForm,
         isRouteSearching: state.isRouteSearching,
         railwayData: state.railwayData,
+        railGraphRuntime: state.railGraphRuntime,
         segmentGeometries: state.segmentGeometries,
         trips: state.trips,
         pins: state.pins,
@@ -94,29 +97,42 @@ export const TripEditor: React.FC = () => {
             );
         }
 
-        // Save logic adapted from RailRound.jsx handleSaveTrip
-        const groupedTrips: any[] = [];
-        let currentGroup = [resolvedSegments[0]];
-        for (let i = 1; i < resolvedSegments.length; i++) {
-            const prev = resolvedSegments[i - 1];
-            const curr = resolvedSegments[i];
-            const meta1 = railwayData[prev.lineKey]?.meta;
-            const meta2 = railwayData[curr.lineKey]?.meta;
-            if (isCompanyCompatible(meta1, meta2)) { currentGroup.push(curr); }
-            else { groupedTrips.push(currentGroup); currentGroup = [curr]; }
-        }
-        groupedTrips.push(currentGroup);
-
-        const newTripsToAdd = groupedTrips.map((segs, index) => ({
-            id: Date.now() + index,
-            date: form.date || new Date().toISOString().split('T')[0],
-            cost: index === 0 ? (form.cost || 0) : 0,
-            memo: form.memo || '',
-            segments: segs,
-            lineKey: segs[0].lineKey, // legacy support
-            fromId: segs[0].fromId,   // legacy support
-            toId: segs[segs.length - 1].toId
-        }));
+        const hasRailGraphSnapshot = !!form.railGraph?.tripResult;
+        const newTripsToAdd = hasRailGraphSnapshot
+            ? [{
+                id: Date.now(),
+                date: form.date || new Date().toISOString().split('T')[0],
+                cost: form.cost || 0,
+                memo: form.memo || '',
+                segments: resolvedSegments,
+                railGraph: form.railGraph,
+                lineKey: resolvedSegments[0].lineKey,
+                fromId: resolvedSegments[0].fromId,
+                toId: resolvedSegments[resolvedSegments.length - 1].toId,
+            }]
+            : (() => {
+                const groupedTrips: any[] = [];
+                let currentGroup = [resolvedSegments[0]];
+                for (let i = 1; i < resolvedSegments.length; i++) {
+                    const prev = resolvedSegments[i - 1];
+                    const curr = resolvedSegments[i];
+                    const meta1 = railwayData[prev.lineKey]?.meta;
+                    const meta2 = railwayData[curr.lineKey]?.meta;
+                    if (isCompanyCompatible(meta1, meta2)) { currentGroup.push(curr); }
+                    else { groupedTrips.push(currentGroup); currentGroup = [curr]; }
+                }
+                groupedTrips.push(currentGroup);
+                return groupedTrips.map((segs, index) => ({
+                    id: Date.now() + index,
+                    date: form.date || new Date().toISOString().split('T')[0],
+                    cost: index === 0 ? (form.cost || 0) : 0,
+                    memo: form.memo || '',
+                    segments: segs,
+                    lineKey: segs[0].lineKey,
+                    fromId: segs[0].fromId,
+                    toId: segs[segs.length - 1].toId
+                }));
+            })();
 
         let nextTrips = [...trips];
         const editingTripId = useStore.getState().editingTripId;
@@ -176,15 +192,16 @@ export const TripEditor: React.FC = () => {
 
         setIsRouteSearching(true);
         setTimeout(() => {
-            const result = findRoute(
-                startLine,
-                startStation,
-                endLine,
-                endStation,
+            const result = planAppRoute({
+                startLineKey: startLine,
+                startStationId: startStation,
+                endLineKey: endLine,
+                endStationId: endStation,
                 railwayData,
-                isInfinite ? -1 : 6
-            );
-            if (result.error) {
+                railGraphRuntime,
+                maxTransfersOverride: isInfinite ? -1 : 6
+            });
+            if (result.status === 'error') {
                 setIsRouteSearching(false);
                 if (!isInfinite && result.error.includes("超出最大换乘次数")) {
                     setTimeout(async () => {
@@ -205,7 +222,17 @@ export const TripEditor: React.FC = () => {
             else {
                 const resultSegments = result.segments ?? [];
                 if (resultSegments.length > 20) { setIsRouteSearching(false); showAlert(t("tripEdit.pathTooLong", "路径过长"), '', 'warning'); return; }
-                setForm({ segments: resultSegments });
+                if (result.source === 'rail_graph') {
+                    const plannedTrip = tripResultToLegacyTrip(result.trip.tripResult, result.trip.runtimeArtifacts);
+                    setForm({
+                        ...plannedTrip,
+                        date: form.date || plannedTrip.date,
+                        memo: form.memo || plannedTrip.memo,
+                        cost: form.cost ?? plannedTrip.cost,
+                    });
+                } else {
+                    setForm({ segments: resultSegments, railGraph: undefined });
+                }
                 setEditorMode(EditorMode.Manual);
                 setTimeout(() => setIsRouteSearching(false), 200);
             }
@@ -258,7 +285,7 @@ export const TripEditor: React.FC = () => {
                 }
             }
             newSegs[index] = seg;
-            setForm({ segments: newSegs });
+            setForm({ segments: newSegs, railGraph: undefined });
         } else if (type === 'autoStart') {
             setAutoForm({ ...autoForm, startLine: lineKey, startStation: stationId || '' });
         } else if (type === 'autoEnd') {
@@ -289,7 +316,7 @@ export const TripEditor: React.FC = () => {
         }
 
         const newSegs = [...currentSegments, { id: Date.now().toString(), lineKey: '', fromId: '', toId: '', loopVia: 'auto' as const }];
-        setForm({ segments: newSegs });
+        setForm({ segments: newSegs, railGraph: undefined });
 
         // Auto open the line selector for the newly added segment
         openSelector('segment', currentSegments.length, currentAllowed);
@@ -309,12 +336,12 @@ export const TripEditor: React.FC = () => {
             newSegs[idx + 1] = { ...newSegs[idx + 1], lineKey: '', fromId: '', toId: '' };
         }
         newSegs[idx] = seg;
-        setForm({ segments: newSegs });
+        setForm({ segments: newSegs, railGraph: undefined });
     };
 
     const removeSegment = (idx: number) => {
         if (!form.segments) return;
-        setForm({ segments: form.segments.filter((_, i) => i !== idx) });
+        setForm({ segments: form.segments.filter((_, i) => i !== idx), railGraph: undefined });
     };
 
     return (
@@ -484,7 +511,7 @@ export const TripEditor: React.FC = () => {
                                                     if (item.type === 'station') {
                                                         const newSegs = [...form.segments!];
                                                         newSegs[idx] = { ...newSegs[idx], lineKey: item.lineKey, fromId: item.id };
-                                                        setForm({ segments: newSegs });
+                                                        setForm({ segments: newSegs, railGraph: undefined });
                                                     }
                                                 }}>
                                                     <select className="w-full p-2 border rounded text-xs bg-white" value={segment.fromId} onChange={e => updateSegment(idx, 'fromId', e.target.value)}>
@@ -498,7 +525,7 @@ export const TripEditor: React.FC = () => {
                                                     onClick={() => {
                                                         const newSegs = [...form.segments!];
                                                         newSegs[idx] = { ...newSegs[idx], fromId: segment.toId, toId: segment.fromId };
-                                                        setForm({ segments: newSegs });
+                                                        setForm({ segments: newSegs, railGraph: undefined });
                                                     }}
                                                 >
                                                     <ArrowRightLeft size={12} />
@@ -514,7 +541,7 @@ export const TripEditor: React.FC = () => {
                                                             update.fromId = '';
                                                         }
                                                         newSegs[idx] = update;
-                                                        setForm({ segments: newSegs });
+                                                        setForm({ segments: newSegs, railGraph: undefined });
                                                     }
                                                 }}>
                                                     <select className="w-full p-2 border rounded bg-white text-xs" value={segment.toId} onChange={e => updateSegment(idx, 'toId', e.target.value)}>

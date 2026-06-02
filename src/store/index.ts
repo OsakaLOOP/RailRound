@@ -2,7 +2,10 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { db } from '../utils/db';
 import changelog from '../../public/changelog.json';
+import type { TripResult, TripRuntimeArtifacts } from '../rail-graph-v1/user-facing.types';
 import type { UserEventV2 } from '../rail-graph-v1/mileage-event.types';
+import type { DeployedSystem } from '../rail-graph-v1/deployment.types';
+import type { SystemContext } from '../rail-graph-v1/graph.types';
 
 // --- Custom IndexedDB Storage for Zustand ---
 // Because railwayData can easily exceed the 5MB localStorage limit,
@@ -158,6 +161,10 @@ export interface Trip {
   cost?: number;
   memo?: string;
   segments: TripSegment[];
+  railGraph?: {
+    tripResult: TripResult;
+    runtimeArtifacts?: TripRuntimeArtifacts;
+  };
   suicaData?: any;
   lineKey?: string;
   fromId?: string;
@@ -165,6 +172,13 @@ export interface Trip {
   isWalk?: boolean;
   walkPath?: [number, number][]; // [lat, lng] array for the Bezier curve
   walkType?: 'ufo' | 'tree' | 'normal';
+}
+
+export interface RailGraphRuntimeState {
+  system: SystemContext;
+  deployed: DeployedSystem;
+  source: 'static_bundle' | 'manual' | 'test';
+  loadedAt: string;
 }
 
 export interface Pin {
@@ -244,12 +258,15 @@ export interface StationMenuData {
 export interface GlobalStore {
   // Data Slice
   railwayData: RailwayMap;
+  railGraphRuntime: RailGraphRuntimeState | null;
   companyDB: CompanyDB;
   geoData: CustomFeatureCollection;
   segmentGeometries: Map<string, any>;
   tripSegmentsGeometry: any[];
   visitedStations: Set<string>;
   setRailwayData: (updater: RailwayMap | ((prev: RailwayMap) => RailwayMap)) => void;
+  setRailGraphRuntime: (runtime: RailGraphRuntimeState | null) => void;
+  clearRailGraphRuntime: () => void;
   setCompanyDB: (db: CompanyDB | ((prev: CompanyDB) => CompanyDB)) => void;
   setGeoData: (data: CustomFeatureCollection | ((prev: CustomFeatureCollection) => CustomFeatureCollection)) => void;
   setSegmentGeometries: (data: Map<string, any>) => void;
@@ -357,6 +374,7 @@ export const useStore = create<GlobalStore>()(
     (set, get) => ({
       // --- Data Slice ---
       railwayData: {},
+      railGraphRuntime: null,
       companyDB: {},
       geoData: { type: 'FeatureCollection', features: [] },
       segmentGeometries: new Map(),
@@ -364,6 +382,8 @@ export const useStore = create<GlobalStore>()(
       visitedStations: new Set<string>(),
 
       setRailwayData: (input) => set((state) => ({ railwayData: typeof input === 'function' ? input(state.railwayData) : input })),
+      setRailGraphRuntime: (runtime) => set({ railGraphRuntime: runtime }),
+      clearRailGraphRuntime: () => set({ railGraphRuntime: null }),
       setCompanyDB: (input) => set((state) => ({ companyDB: typeof input === 'function' ? input(state.companyDB) : input })),
       setGeoData: (input) => set((state) => ({ geoData: typeof input === 'function' ? input(state.geoData) : input })),
       setSegmentGeometries: (data) => set({ segmentGeometries: data }),

@@ -7,6 +7,7 @@ import { computeAndSerializeRoute } from "../../utils/routeSerializer";
 import { generateRouteMdx } from "../../utils/codeGenerator";
 import type { RouteSliceData } from "../../utils/routeExportTypes";
 import { RouteSlicePreview } from "@blog-src/components/mdx/RouteSlicePreviewStatic";
+import { tripToProductRouteSegments, tripToRouteSliceData } from "../../utils/tripProductProjection";
 
 const LOCALES = ["en", "ja", "zh-cn", "zh-tw"] as const;
 const HEIGHTS = ["300px", "400px", "500px", "600px"] as const;
@@ -58,9 +59,9 @@ export const ExportRouteModal: React.FC = () => {
 
   useEffect(() => {
     if (!isOpen || !trip) return;
-    const hasSegments = Array.isArray(trip.segments) && trip.segments.length > 0;
+    const hasSegments = tripToProductRouteSegments(trip, railwayData).length > 0;
     setRouteMode(hasSegments ? "manual" : "auto");
-  }, [isOpen, trip]);
+  }, [isOpen, trip, railwayData]);
 
   useEffect(() => {
     if (!isOpen || !trip || !railwayData || !geoData) return;
@@ -72,11 +73,16 @@ export const ExportRouteModal: React.FC = () => {
 
     const compute = async () => {
       try {
-        const segments =
-          trip.segments?.filter(
-            (seg: any) => seg?.lineKey && seg?.fromId && seg?.toId,
-          ) || [];
+        const productRouteData = tripToRouteSliceData(trip, railwayData);
+        if (productRouteData) {
+          if (!cancelled) setRouteData(productRouteData);
+          return;
+        }
+
+        const segments = tripToProductRouteSegments(trip, railwayData);
         if (segments.length === 0) throw new Error("No segments found in this trip");
+        const firstSegment = segments[0];
+        const lastSegment = segments[segments.length - 1];
 
         const result =
           routeMode === "manual"
@@ -93,10 +99,10 @@ export const ExportRouteModal: React.FC = () => {
               })
             : await computeAndSerializeRoute({
                 mode: "auto",
-                startLineKey: segments[0].lineKey,
-                startStationId: segments[0].fromId,
-                endLineKey: segments[segments.length - 1].lineKey,
-                endStationId: segments[segments.length - 1].toId,
+                startLineKey: firstSegment.lineKey,
+                startStationId: firstSegment.fromId,
+                endLineKey: lastSegment.lineKey,
+                endStationId: lastSegment.toId,
                 railwayData,
                 geoData,
               });

@@ -37,7 +37,7 @@ type ComputeRouteParams =
   | ComputeAutoRouteParamsByName
   | ComputeAutoRouteParamsById;
 
-interface ManualSegmentInput {
+export interface ManualSegmentInput {
   lineKey: string;
   fromId?: string;
   toId?: string;

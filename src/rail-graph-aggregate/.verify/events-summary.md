@@ -16,4 +16,5 @@
 - ✅ [REGRESS PR1] pattern[aggregate:pattern:tohoku-connector].edgeSequence ⊂ aggregate
 - ✅ [REGRESS PR1] pattern[aggregate:pattern:senseki-east].edgeSequence ⊂ aggregate
 - ✅ [REGRESS PR1] pattern[aggregate:pattern:senseki-tohoku-through].edgeSequence ⊂ aggregate
+- ✅ [REGRESS PR1] pattern[aggregate:pattern:ServicePattern-4-mpp5jlxw].edgeSequence ⊂ aggregate
 - ✅ [REGRESS PR2] crossPath 非空

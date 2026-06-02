@@ -12,8 +12,12 @@ const vitestTestFiles = [
   "src/__tests__/rail-graph-render-geometry.test.ts",
   "src/__tests__/rail-graph-runtime-events.test.ts",
   "src/__tests__/rail-graph-deployment.test.ts",
+  "src/__tests__/rail-graph-deployment-export-script.test.ts",
   "src/__tests__/rail-graph-trip-planner.test.ts",
+  "src/__tests__/rail-graph-app-route-planner.test.ts",
+  "src/__tests__/rail-graph-saved-trip-roundtrip.test.ts",
   "src/__tests__/mileage-events-runtime-adapter.test.ts",
+  "src/__tests__/trip-product-projection.test.ts",
   "src/__tests__/core/railwayRouting.test.ts",
 ];
 
@@ -24,6 +28,16 @@ const commands = [
   ["npm", ["run", "rail:aggregate:verify:cross-pf"], "Aggregate cross-pattern pathfinding verify"],
   ["npm", ["run", "rail:aggregate:verify:events"], "Aggregate event verify"],
   ["npm", ["run", "rail:events:mileage-verify"], "Mileage UserEvent verify"],
+  ["npm", [
+    "run",
+    "rail:deployment:build",
+    "--",
+    "--aggregate-key",
+    "senseki-tohoku",
+    "--output",
+    "src/rail-graph-aggregate/.verify/deployed-system.verify.json",
+    "--allow-no-direction-verify",
+  ], "Aggregate deployment bundle build verify"],
   ["npx", ["vitest", "run", ...vitestTestFiles], "Runtime/app rail-graph vitest gate"],
   ["npx", ["tsc", "--noEmit", "-p", "tsconfig.json"], "TypeScript no-emit"],
   ["npm", ["run", "build"], "Root src/blog production build"],
@@ -103,6 +117,9 @@ function writeSummary(currentResults, failedLabel) {
   lines.push("- compiled topology enters SystemContext.");
   lines.push("- confirmed ServicePattern resolves geometry, timeline, and events.");
   lines.push("- deployed preset can be consumed by the trip planner.");
+  lines.push("- aggregate workspace can build a deployment bundle; no-direction output remains explicit verify-only.");
+  lines.push("- saved app trips preserve rail-graph TripResult product snapshots through API/load round-trip without default runtime artifacts.");
+  lines.push("- records/search/stats product projections can consume saved rail-graph TripResult snapshots even when legacy segments are stale.");
   lines.push("- mileage UserEvent projects to rail-graph TripResult and legacy app-line data remains compatible.");
   fs.writeFileSync(summaryPath, `${lines.join("\n")}\n`, "utf8");
 }

@@ -47,11 +47,13 @@ import { useMeta } from "./contexts";
 import { useTranslation } from "react-i18next";
 import { showAlert, showConfirm } from "./utils/alerts";
 import { boundMileageEventForDisplay } from "./utils/mileageUserEvents";
+import { tripToKmlPathItems, tripToProductSegments } from "./utils/tripProductProjection";
 import { useLocation } from "react-router-dom";
 import { useAppRouteState } from "./hooks/useAppRouteState";
 import { useAppNavigation } from "./hooks/useAppNavigation";
 import { AppSEO } from "./components/layout/AppSEO";
 import { getRouteInfoFromPath, toI18nLang } from "./utils/routes";
+import { loadDefaultRailGraphDeployment } from "./services/railGraphDeploymentLoader";
 
 const CURRENT_VERSION = meta["currentVersion"];
 
@@ -65,6 +67,7 @@ export const AppLayout: React.FC = () => {
     setModalState,
     setCompanyDB,
     setRailwayData,
+    setRailGraphRuntime,
     setGeoData,
     trips,
     pins,
@@ -93,6 +96,7 @@ export const AppLayout: React.FC = () => {
       setModalState: state.setModalState,
       setCompanyDB: state.setCompanyDB,
       setRailwayData: state.setRailwayData,
+      setRailGraphRuntime: state.setRailGraphRuntime,
       setGeoData: state.setGeoData,
       trips: state.trips,
       pins: state.pins,
@@ -148,6 +152,25 @@ export const AppLayout: React.FC = () => {
   const isDraggingRef = useRef(false);
   const workerRef = useRef<Worker | null>(null);
   const distanceWorkerRef = useRef<Worker | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadDefaultRailGraphDeployment().then((result) => {
+      if (cancelled || result.status !== "loaded") return;
+      const runtime = result.runtime;
+      if (!runtime) return;
+      setRailGraphRuntime(runtime);
+      console.log("[RailGraph] Loaded deployed runtime bundle", {
+        systemId: runtime.deployed.systemId,
+        graphId: runtime.system.graphId,
+      });
+    }).catch((error) => {
+      console.warn("[RailGraph] Failed to load deployed runtime bundle", error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [setRailGraphRuntime]);
 
   // --- April Fool's initialization ---
   useEffect(() => {
@@ -1029,7 +1052,11 @@ export const AppLayout: React.FC = () => {
   useEffect(() => {
     // 使用 setTimeout 加上简单的防抖，防止编辑/添加行程时高频触发导致卡顿
     const timerId = setTimeout(() => {
-      const allSegments = trips.flatMap((trip) => trip.segments || []);
+      const productTrips = trips.map((trip) => ({
+        trip,
+        segments: tripToProductSegments(trip, railwayData),
+      }));
+      const allSegments = productTrips.flatMap((item) => item.segments);
 
       // Extract visited stations logic
       const visited = new Set<string>();
@@ -1082,10 +1109,21 @@ export const AppLayout: React.FC = () => {
       // 1. 优先使用已有的缓存进行渲染，保证部分路线立即显示，防止整张地图因为几段缺失而瘫痪。
       const buildRenderList = (cache: Map<string, any>) => {
         const list: any[] = [];
-        trips.forEach((trip) => {
-          const segs = trip.segments || [];
+        productTrips.forEach(({ trip, segments: segs }) => {
           for (let i = 0; i < segs.length; i++) {
             const seg = segs[i];
+            if (seg.source === "rail_graph" && seg.geometry?.length) {
+              list.push({
+                id: seg.id || `rail-graph_${trip.id}_${i}`,
+                coords: seg.geometry,
+                color: seg.displayColor || "#94a3b8",
+                isMulti: false,
+                fallback: false,
+                popup: `${seg.lineLabel || seg.lineKey}: ${seg.fromName || seg.fromId} → ${seg.toName || seg.toId}`,
+              });
+              continue;
+            }
+
             const isLoop = !!railwayData[seg.lineKey]?.meta?.isLoop;
             let realVia = seg.loopVia;
             if (isLoop && realVia === "auto") {
@@ -1147,6 +1185,7 @@ export const AppLayout: React.FC = () => {
 
       // 2. 筛选缺失的数据发送给 Worker
       const needed = allSegments.filter((seg) => {
+        if (seg.source === "rail_graph") return false;
         if (!seg.lineKey || !seg.fromId || !seg.toId) return false;
         const isLoop = !!railwayData[seg.lineKey]?.meta?.isLoop;
         let realVia = seg.loopVia;
@@ -1349,6 +1388,11 @@ export const AppLayout: React.FC = () => {
         trips.forEach((trip) => {
           if (trip.isWalk) return; // Exclude walk trips
           const tripName = `${trip.date} - Trip ${trip.id}`;
+          const productPaths = tripToKmlPathItems(trip, railwayData);
+          if (productPaths.length > 0) {
+            allPaths.push(...productPaths);
+            return;
+          }
           trip.segments.forEach((seg: any, segIndex: number) => {
             const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
             const cached = segmentGeometries.get(key);
@@ -1414,10 +1458,11 @@ export const AppLayout: React.FC = () => {
     const linesUsed = new Set();
     const companiesUsed = new Set();
     trips.forEach((trip) => {
-      (trip.segments || []).forEach((s: any) => {
+      tripToProductSegments(trip, railwayData).forEach((s: any) => {
         if (s.lineKey) {
           linesUsed.add(s.lineKey);
           const meta = railwayData[s.lineKey]?.meta;
+          if (s.company) companiesUsed.add(s.company);
           if (meta && meta.company) companiesUsed.add(meta.company);
         }
       });

@@ -50,6 +50,10 @@ import { EventComposer } from "../components/mileage-events/EventComposer";
 import { EventInspector } from "../components/mileage-events/EventInspector";
 import type { MileageEventListEntry } from "../components/mileage-events/EventList";
 import { eventKindLabel, eventVisibilityLabel, mileageEventKinds, mileageEventVisibilities, timestampLabel } from "../components/mileage-events/display";
+import {
+  tripLineSummary as productTripLineSummary,
+  tripToProductSegments,
+} from "../utils/tripProductProjection";
 
 const RouteSlice = React.memo(
   ({ segments }: { segments: any[] }) => {
@@ -273,11 +277,11 @@ export const TripsPage: React.FC = () => {
       if (eventDateFrom && tripDate < eventDateFrom) return;
       if (eventDateTo && tripDate > eventDateTo) return;
 
-      const segments = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
+      const segments = tripToProductSegments(t, railwayData);
       if (eventLineKey && !segments.some((seg: any) => seg.lineKey === eventLineKey)) return;
       if (
         eventCompany &&
-        !segments.some((seg: any) => railwayData[seg.lineKey]?.meta?.company === eventCompany)
+        !segments.some((seg: any) => seg.company === eventCompany || railwayData[seg.lineKey]?.meta?.company === eventCompany)
       ) return;
 
       const tripEntries = tripEventEntriesMap.get(String(t.id)) ?? [];
@@ -558,19 +562,8 @@ export const TripsPage: React.FC = () => {
   };
 
   const tripLineSummary = (trip: (typeof trips)[number]) => {
-    const segments = trip.segments || [
-      { lineKey: trip.lineKey, fromId: trip.fromId, toId: trip.toId },
-    ];
-    const names = Array.from(
-      new Set(
-        segments
-          .map((segment: any) => segment.lineKey)
-          .filter(Boolean)
-          .map((key: string) => lineLabel(key)),
-      ),
-    );
-    if (names.length === 0) return t("mileageEvents.unknown", "Unknown");
-    return names.length > 2 ? `${names.slice(0, 2).join(" / ")} +${names.length - 2}` : names.join(" / ");
+    const summary = productTripLineSummary(trip, railwayData);
+    return summary === "Unknown" ? t("mileageEvents.unknown", "Unknown") : summary;
   };
 
   const tripEventEntries = (trip: (typeof trips)[number]) => {
@@ -655,9 +648,7 @@ export const TripsPage: React.FC = () => {
   };
 
   const tripReplayItems = (trip: (typeof trips)[number], entries: MileageEventListEntry[]) => {
-    const segments = trip.segments?.length
-      ? trip.segments
-      : [{ id: "legacy", lineKey: trip.lineKey || "", fromId: trip.fromId || "", toId: trip.toId || "" }];
+    const segments = tripToProductSegments(trip, railwayData);
     const items: Array<
       | {
           id: string;
@@ -677,16 +668,15 @@ export const TripsPage: React.FC = () => {
     let cursor = 0;
 
     segments.forEach((segment: any, index: number) => {
-      const line = railwayData[segment.lineKey];
-      const fromStation = line?.stations.find((station) => station.id === segment.fromId);
-      const toStation = line?.stations.find((station) => station.id === segment.toId);
-      const lineName = segment.lineKey ? lineLabel(segment.lineKey) : "-";
-      const fromName = fromStation?.name_ja || segment.fromId || t("mileageEvents.unknown", "Unknown");
-      const toName = toStation?.name_ja || segment.toId || t("mileageEvents.unknown", "Unknown");
+      const lineName = segment.lineLabel || (segment.lineKey ? lineLabel(segment.lineKey) : "-");
+      const fromName = segment.fromName || segment.fromId || t("mileageEvents.unknown", "Unknown");
+      const toName = segment.toName || segment.toId || t("mileageEvents.unknown", "Unknown");
       const lineContext = segment.lineKey ? buildAppMileageLineContext(railwayData, segment.lineKey) : null;
       const fromMileage = lineContext?.context.stationMileage[appStationRef(segment.lineKey, segment.fromId)];
       const toMileage = lineContext?.context.stationMileage[appStationRef(segment.lineKey, segment.toId)];
-      const segmentMeters = fromMileage && toMileage ? Math.abs(toMileage.distanceMeters - fromMileage.distanceMeters) : 0;
+      const segmentMeters = fromMileage && toMileage
+        ? Math.abs(toMileage.distanceMeters - fromMileage.distanceMeters)
+        : Math.round((segment.distanceKm || 0) * 1000);
 
       items.push({
         id: `boundary:${index}:start`,
@@ -799,14 +789,13 @@ export const TripsPage: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              {(trip.segments || [{ lineKey: trip.lineKey, fromId: trip.fromId, toId: trip.toId }]).map((segment: any, index: number) => {
-                const line = railwayData[segment.lineKey];
-                const from = line?.stations.find((station) => station.id === segment.fromId)?.name_ja || segment.fromId;
-                const to = line?.stations.find((station) => station.id === segment.toId)?.name_ja || segment.toId;
+              {tripToProductSegments(trip, railwayData).map((segment: any, index: number) => {
+                const from = segment.fromName || segment.fromId;
+                const to = segment.toName || segment.toId;
                 return (
                   <div key={`${segment.lineKey}_${segment.fromId}_${segment.toId}_${index}`} className="flex items-center gap-2 text-[11px] text-slate-500">
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    <span className="font-semibold text-slate-600">{segment.lineKey ? lineLabel(segment.lineKey) : "-"}</span>
+                    <span className="font-semibold text-slate-600">{segment.lineLabel || (segment.lineKey ? lineLabel(segment.lineKey) : "-")}</span>
                     <span>{from}</span>
                     <span className="text-slate-300">→</span>
                     <span>{to}</span>
@@ -1118,9 +1107,7 @@ export const TripsPage: React.FC = () => {
     trip: (typeof trips)[number],
     isFirstInMonth: boolean,
   ) => {
-    const segments = trip.segments || [
-      { lineKey: trip.lineKey, fromId: trip.fromId, toId: trip.toId },
-    ];
+    const segments = tripToProductSegments(trip, railwayData);
     const isWalk = trip.isWalk;
 
     if (isWalk) {
@@ -1283,7 +1270,7 @@ export const TripsPage: React.FC = () => {
               const icon = line?.meta?.icon;
               const getSt = (id: string) =>
                 line?.stations.find((s) => s.id === id)?.name_ja || id;
-              const displayModel = buildNetworkDisplayModel(seg, railwayData);
+              const displayModel = seg.source === "legacy" ? buildNetworkDisplayModel(seg, railwayData) : null;
               const displaySegments = displayModel?.segments || [];
               const boundaries = displayModel?.boundaries || [];
 
@@ -1306,13 +1293,13 @@ export const TripsPage: React.FC = () => {
                           />
                         )}
                         <span className="font-bold text-emerald-700 text-xs">
-                          {seg.lineKey}
+                          {seg.lineLabel || seg.lineKey}
                         </span>
                       </div>
                       <div className="pl-5 font-medium text-gray-700">
-                        {getSt(seg.fromId)}{" "}
+                        {seg.fromName || getSt(seg.fromId)}{" "}
                         <span className="text-gray-300 mx-1">→</span>{" "}
-                        {getSt(seg.toId)}
+                        {seg.toName || getSt(seg.toId)}
                       </div>
                     </>
                   ) : (
@@ -1393,7 +1380,7 @@ export const TripsPage: React.FC = () => {
                   )}
                   {(() => {
                     const isLoop = !!line?.meta?.isLoop;
-                    if (!isLoop) return null;
+                    if (!isLoop || seg.source !== "legacy") return null;
                     let realVia = seg.loopVia || "auto";
                     if (realVia === "auto") {
                       realVia = computeLoopVia(

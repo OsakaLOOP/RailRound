@@ -2,7 +2,7 @@
 
 - aggregateKey: `senseki-tohoku`
 - source: `legacy-projected`
-- patterns: **3**
+- patterns: **4**
 - mileage events: **3**
 
 ## Checks

@@ -28,6 +28,7 @@ import {
     eventStationLabel,
     timestampLabel,
 } from '../mileage-events/display';
+import { tripSearchText, tripToProductSegments } from '../../utils/tripProductProjection';
 
 interface Props {
     isOpen: boolean;
@@ -121,17 +122,7 @@ export const GlobalSearchModal: React.FC<Props> = ({
 
         const matchedTrips = trips
             .filter((trip) => {
-                const segments = trip.segments?.length
-                    ? trip.segments
-                    : [{ lineKey: trip.lineKey || '', fromId: trip.fromId || '', toId: trip.toId || '' }];
-                const segmentText = segments.map((segment) => {
-                    const line = railwayData[segment.lineKey];
-                    const from = line?.stations.find((station) => station.id === segment.fromId)?.name_ja || segment.fromId;
-                    const to = line?.stations.find((station) => station.id === segment.toId)?.name_ja || segment.toId;
-                    return `${lineLabel(segment.lineKey)} ${from} ${to} ${line?.meta?.company || ''}`;
-                }).join(' ');
-                return [trip.date, trip.memo || '', String(trip.id), segmentText]
-                    .join(' ')
+                return tripSearchText(trip, railwayData)
                     .toLowerCase()
                     .includes(lowerQuery);
             })
@@ -274,13 +265,10 @@ export const GlobalSearchModal: React.FC<Props> = ({
                                     </h4>
                                     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-50">
                                         {results.trips.map((trip) => {
-                                            const segments = trip.segments?.length
-                                                ? trip.segments
-                                                : [{ lineKey: trip.lineKey || '', fromId: trip.fromId || '', toId: trip.toId || '' }];
+                                            const segments = tripToProductSegments(trip, railwayData);
                                             const firstSegment = segments[0];
-                                            const line = railwayData[firstSegment?.lineKey || ''];
-                                            const from = line?.stations.find((station) => station.id === firstSegment?.fromId)?.name_ja || firstSegment?.fromId || '';
-                                            const to = line?.stations.find((station) => station.id === firstSegment?.toId)?.name_ja || firstSegment?.toId || '';
+                                            const from = firstSegment?.fromName || firstSegment?.fromId || '';
+                                            const to = firstSegment?.toName || firstSegment?.toId || '';
                                             return (
                                                 <button
                                                     key={`trip-${trip.id}`}
@@ -298,7 +286,7 @@ export const GlobalSearchModal: React.FC<Props> = ({
                                                     <div className="min-w-0 flex-1">
                                                         <div className="font-bold text-gray-800">{trip.date}</div>
                                                         <div className="text-xs text-gray-500 truncate">
-                                                            {lineLabel(firstSegment?.lineKey || '')} {from && to ? `${from} → ${to}` : String(trip.id)}
+                                                            {(firstSegment?.lineLabel || lineLabel(firstSegment?.lineKey || ''))} {from && to ? `${from} → ${to}` : String(trip.id)}
                                                             {segments.length > 1 ? ` +${segments.length - 1}` : ''}
                                                         </div>
                                                     </div>

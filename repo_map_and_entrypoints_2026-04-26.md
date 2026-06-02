@@ -24,6 +24,8 @@
   - geo worker 字段契约: docs/geo_worker_geojson_contract_2026-04-27.md
   - rail graph v1 设计参考: docs/rail-graph-v1/
   - rail graph v1 实施计划: docs/rail-graph-v1-plan/11-完全集成实施计划.md
+  - rail graph 产品契约偏离审计: docs/rail-graph-v1-plan/12-原始设计偏离审计与产品接入修正.md
+  - rail graph 阶段验收与最终成品总结: docs/rail-graph-v1-plan/13-阶段变更验收与最终成品总结.md
   - mileage-centric UserEvent 接入文档: docs/rail-graph-v1/user-event-mileage-layer.md
 - rail graph MVP 工作台:
   - standalone HTML: rail-graph-mvp.html
@@ -183,6 +185,45 @@
   - src/rail-graph-v1-mvp/verify-mileage-user-events.ts
   - npm run rail:events:mileage-verify
   - full rail-graph gate: scripts/verify-rail-graph-integration.mjs + npm run rail:integration:verify
+
+### D4. Rail Graph product trip contract
+
+- product-facing trip schema:
+  - src/rail-graph-v1/user-facing.types.ts
+  - src/rail-graph-v1/deployment.types.ts
+  - src/rail-graph-v1/trip-planner.ts
+- app/runtime bridge:
+  - src/utils/railGraphTripAdapter.ts
+  - src/utils/railGraphTripPersistence.ts
+  - src/utils/tripProductProjection.ts
+  - src/services/railGraphDeploymentLoader.ts
+  - src/utils/appRoutePlanner.ts
+  - src/utils/mileageUserEvents.ts
+- product consumers:
+  - src/core/tripCalculator.js
+  - src/pages/StatsPage.tsx
+  - src/components/modals/GlobalSearchModal.tsx
+- deployment publishing:
+  - scripts/build-rail-graph-deployment-bundle.ts
+  - npm run rail:deployment:build -- --aggregate-key <key>
+  - production build requires aggregate mode compiled-topology; use --allow-no-direction-verify only for .verify bundles
+  - scripts/export-rail-graph-deployment.mjs
+  - npm run rail:deployment:export -- --input <bundle.json>
+- app auto-route consumers:
+  - src/AppLayout.tsx
+  - src/components/modals/TripEditor.tsx
+  - src/components/Chest.jsx
+- contract audit:
+  - docs/rail-graph-v1-plan/12-原始设计偏离审计与产品接入修正.md
+- stage acceptance:
+  - docs/rail-graph-v1-plan/13-阶段变更验收与最终成品总结.md
+- tests:
+  - src/__tests__/rail-graph-trip-planner.test.ts
+  - src/__tests__/rail-graph-app-route-planner.test.ts
+  - src/__tests__/rail-graph-saved-trip-roundtrip.test.ts
+  - src/__tests__/rail-graph-deployment-export-script.test.ts
+  - src/__tests__/mileage-events-runtime-adapter.test.ts
+  - src/__tests__/trip-product-projection.test.ts
 
 ### E. API contract related updates
 

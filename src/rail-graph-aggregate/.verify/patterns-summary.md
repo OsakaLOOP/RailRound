@@ -3,9 +3,9 @@
 - aggregateKey: `senseki-tohoku`
 - members: `["senseki","tohoku-main"]`
 - topo: {"nodes":348,"edges":357,"stations":348,"platforms":0}
-- patterns loaded: **3**
-- render plans built: **3**
-- chain round-trip: 3/3
+- patterns loaded: **4**
+- render plans built: **4**
+- chain round-trip: 4/4
 
 ## Checks
 - ✅ aggregate.topo.edges 非空
@@ -15,6 +15,8 @@
 - ✅ pattern[aggregate:pattern:tohoku-connector].edgeSequence 全部在 aggregate.topo
 - ✅ pattern[aggregate:pattern:senseki-east].edgeSequence 全部在 aggregate.topo
 - ✅ pattern[aggregate:pattern:senseki-tohoku-through].edgeSequence 全部在 aggregate.topo
+- ✅ pattern[aggregate:pattern:ServicePattern-4-mpp5jlxw].edgeSequence 全部在 aggregate.topo
 - ✅ render-plan: 每个 pattern 至少 1 个 polylineSegment
 - ✅ render-plan: 每个 pattern 有非空 displayColor
+- ✅ render-plan: 每个 pattern 有 resolvedPath 且距离非负
 - ✅ ≥ 1 个 pattern 完成 chain round-trip

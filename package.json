@@ -16,6 +16,8 @@
     "rail:aggregate:verify:events": "tsx src/rail-graph-v1-mvp/verify-event-aggregation.ts",
     "rail:aggregate:verify:cross-ws": "tsx src/rail-graph-v1-mvp/verify-aggregate-cross-workspace.ts",
     "rail:events:mileage-verify": "tsx src/rail-graph-v1-mvp/verify-mileage-user-events.ts",
+    "rail:deployment:build": "tsx scripts/build-rail-graph-deployment-bundle.ts",
+    "rail:deployment:export": "node scripts/export-rail-graph-deployment.mjs",
     "rail:integration:verify": "node scripts/verify-rail-graph-integration.mjs",
     "build:all": "node scripts/build_all.js",
     "build:package": "tsx scripts/build-package.ts",

@@ -41,31 +41,29 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect, 
         const matchedLines: any[] = [];
         const matchedStations: any[] = [];
 
-        Object.entries(railwayData).forEach(([lineKey, lineData]) => {
-            const displayName = lineKey.includes(':') ? lineKey.split(':').slice(1).join(':') : lineKey;
+        // Optimization: Avoid chaining Object.entries().forEach() array allocations.
+        // Track array limits manually and early break to prevent searching through
+        // thousands of stations once UI display limits are reached.
+        let linesCount = 0;
+        let stationsCount = 0;
 
-            // Check line match
-            if (lineKey.toLowerCase().includes(lowerQuery) || displayName.toLowerCase().includes(lowerQuery)) {
-                matchedLines.push({
-                    lineKey,
-                    displayName,
-                    company: lineData.meta.company || '',
-                    logo: lineData.meta.logo || null,
-                    icon: lineData.meta.icon || null,
-                    companyIcon: lineData.meta.companyIcon || null,
-                    recolor: lineData.meta.recolor,
-                    color: lineData.meta.color
-                });
-            }
+        for (const lineKey in railwayData) {
+            if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
 
-            // Check station match
-            lineData.stations.forEach(station => {
-                if (station.name_ja.toLowerCase().includes(lowerQuery)) {
-                    matchedStations.push({
+            const lineData = railwayData[lineKey];
+            // Optimization: Replaced expensive `split(':').slice(1).join(':')`
+            // with faster `indexOf()` and `slice()`.
+            const colonIndex = lineKey.indexOf(':');
+            const displayName = colonIndex !== -1 ? lineKey.slice(colonIndex + 1) : lineKey;
+
+            const lineKeyLower = lineKey.toLowerCase();
+            const displayNameLower = displayName.toLowerCase();
+
+            if (linesCount < 50) {
+                if (lineKeyLower.includes(lowerQuery) || displayNameLower.includes(lowerQuery)) {
+                    matchedLines.push({
                         lineKey,
-                        lineDisplayName: displayName,
-                        stationId: station.id,
-                        stationName: station.name_ja,
+                        displayName,
                         company: lineData.meta.company || '',
                         logo: lineData.meta.logo || null,
                         icon: lineData.meta.icon || null,
@@ -73,15 +71,37 @@ export const GlobalSearchModal: React.FC<Props> = ({ isOpen, onClose, onSelect, 
                         recolor: lineData.meta.recolor,
                         color: lineData.meta.color
                     });
+                    linesCount++;
                 }
-            });
-        });
+            }
 
-        // (the code up there already populated `matchedLines` and `matchedStations` so no need to do performSearch here)
-        return {
-            lines: matchedLines.slice(0, 50), // Limit results for performance
-            stations: matchedStations.slice(0, 100)
-        };
+            if (stationsCount < 100) {
+                const stations = lineData.stations;
+                for (let i = 0; i < stations.length; i++) {
+                    const station = stations[i];
+                    if (station.name_ja.toLowerCase().includes(lowerQuery)) {
+                        matchedStations.push({
+                            lineKey,
+                            lineDisplayName: displayName,
+                            stationId: station.id,
+                            stationName: station.name_ja,
+                            company: lineData.meta.company || '',
+                            logo: lineData.meta.logo || null,
+                            icon: lineData.meta.icon || null,
+                            companyIcon: lineData.meta.companyIcon || null,
+                            recolor: lineData.meta.recolor,
+                            color: lineData.meta.color
+                        });
+                        stationsCount++;
+                        if (stationsCount >= 100) break;
+                    }
+                }
+            }
+
+            if (linesCount >= 50 && stationsCount >= 100) break;
+        }
+
+        return { lines: matchedLines, stations: matchedStations };
     }, [query, railwayData]);
 
     if (!isOpen && !isEmbedded) return null;

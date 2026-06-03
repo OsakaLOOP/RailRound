@@ -51,6 +51,7 @@ export const MapContainer: React.FC<Props> = ({
   const rubberBandLayerRef = useRef<L.LayerGroup | null>(null);
   const pendingFlyToLocationRef = useRef<FlyToLocationDetail | null>(null);
   const locateFlyingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFittedBoundsRef = useRef<string>("");
 
   // Explicit SVG Renderers for pointer-events passthrough
   const baseLinesRendererRef = useRef<L.Renderer | null>(null);
@@ -208,6 +209,62 @@ export const MapContainer: React.FC<Props> = ({
       renderTripRoutes();
     }
   }, [tripSegmentsGeometry, leafletReady, mapZoom, isMapInitialized]);
+
+  // 仅在坐标集发生实质变化时缩放适配视口范围 / Fit bounds only when coordinates change
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!isMapInitialized || !leafletReady || !map || !tripSegmentsGeometry) return;
+
+    const latLngs: L.LatLng[] = [];
+
+    tripSegmentsGeometry.forEach((seg: any) => {
+      if (seg.coords && seg.coords.length > 0) {
+        if (seg.isMulti) {
+          seg.coords.forEach((part: any[]) => {
+            part.forEach((pt: any) => {
+              if (Array.isArray(pt) && pt.length >= 2) {
+                latLngs.push(L.latLng(pt[0], pt[1]));
+              }
+            });
+          });
+        } else {
+          seg.coords.forEach((pt: any) => {
+            if (Array.isArray(pt) && pt.length >= 2) {
+              latLngs.push(L.latLng(pt[0], pt[1]));
+            }
+          });
+        }
+      }
+    });
+
+    const trips = useStore.getState().trips;
+    trips.forEach((t) => {
+      if (t.isWalk && t.walkPath) {
+        t.walkPath.forEach((pt) => {
+          if (Array.isArray(pt) && pt.length >= 2) {
+            latLngs.push(L.latLng(pt[0], pt[1]));
+          }
+        });
+      }
+    });
+
+    if (latLngs.length === 0) return;
+
+    const sortedCoordsStr = latLngs
+      .map((p) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`)
+      .sort()
+      .join(";");
+
+    if (lastFittedBoundsRef.current === sortedCoordsStr) {
+      return;
+    }
+    lastFittedBoundsRef.current = sortedCoordsStr;
+
+    const bounds = L.latLngBounds(latLngs);
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+    }
+  }, [tripSegmentsGeometry, isMapInitialized, leafletReady]);
 
   useEffect(() => {
     if (isMapInitialized && leafletReady && !isDraggingRef.current)

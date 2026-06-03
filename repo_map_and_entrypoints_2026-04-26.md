@@ -1,4 +1,4 @@
-﻿# RailRound Repo Map & Co-Change Entry Points (2026-04-26)
+# RailRound Repo Map & Co-Change Entry Points (2026-04-26)
 
 ## 1) Functional blocks
 

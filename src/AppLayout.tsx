@@ -32,6 +32,7 @@ import {
   isCompanyCompatible,
   getTransferableLines,
   computeLoopVia,
+  getSegmentKey,
 } from "./core/railwayRouting";
 import { calculateLatestStats } from "./core/tripCalculator";
 import { parseGeoJsonBatch } from "./core/parser";
@@ -1124,20 +1125,7 @@ export const AppLayout: React.FC = () => {
               continue;
             }
 
-            const isLoop = !!railwayData[seg.lineKey]?.meta?.isLoop;
-            let realVia = seg.loopVia;
-            if (isLoop && realVia === "auto") {
-              realVia = computeLoopVia(
-                railwayData,
-                seg.lineKey,
-                seg.fromId,
-                seg.toId,
-              );
-            }
-            const key =
-              isLoop && realVia
-                ? `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realVia}`
-                : `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+            const key = getSegmentKey(railwayData, seg.lineKey, seg.fromId, seg.toId, seg.loopVia);
             const cached = cache.get(key);
             const line = railwayData[seg.lineKey];
             const s1 = line?.stations.find((s: any) => s.id === seg.fromId);
@@ -1187,20 +1175,7 @@ export const AppLayout: React.FC = () => {
       const needed = allSegments.filter((seg) => {
         if (seg.source === "rail_graph") return false;
         if (!seg.lineKey || !seg.fromId || !seg.toId) return false;
-        const isLoop = !!railwayData[seg.lineKey]?.meta?.isLoop;
-        let realVia = seg.loopVia;
-        if (isLoop && realVia === "auto") {
-          realVia = computeLoopVia(
-            railwayData,
-            seg.lineKey,
-            seg.fromId,
-            seg.toId,
-          );
-        }
-        const key =
-          isLoop && realVia
-            ? `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realVia}`
-            : `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+        const key = getSegmentKey(railwayData, seg.lineKey, seg.fromId, seg.toId, seg.loopVia);
         return !segmentGeometries.has(key);
       });
 
@@ -1213,20 +1188,7 @@ export const AppLayout: React.FC = () => {
 
         // 先尝试从 IndexedDB 加载
         for (const seg of needed) {
-          const isLoop = !!railwayData[seg.lineKey]?.meta?.isLoop;
-          let realVia = seg.loopVia;
-          if (isLoop && realVia === "auto") {
-            realVia = computeLoopVia(
-              railwayData,
-              seg.lineKey,
-              seg.fromId,
-              seg.toId,
-            );
-          }
-          const key =
-            isLoop && realVia
-              ? `${seg.lineKey}_${seg.fromId}_${seg.toId}_${realVia}`
-              : `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
+          const key = getSegmentKey(railwayData, seg.lineKey, seg.fromId, seg.toId, seg.loopVia);
           let data = await db.get(db.STORE_SEGMENTS, key).catch(() => null);
 
           // 如果缓存是 fallback，但此时可能 geoData 已经加载好了，
@@ -1235,7 +1197,17 @@ export const AppLayout: React.FC = () => {
             newCache.set(key, data);
             updated = true;
           } else {
-            toCalculateInWorker.push(seg);
+            const line = railwayData[seg.lineKey];
+            const isLoop = !!line?.meta?.isLoop;
+            const resolvedVia = isLoop
+              ? !seg.loopVia || seg.loopVia === "auto"
+                ? computeLoopVia(railwayData, seg.lineKey, seg.fromId, seg.toId)
+                : seg.loopVia
+              : undefined;
+            toCalculateInWorker.push({
+              ...seg,
+              loopVia: resolvedVia,
+            });
           }
         }
 
@@ -1260,20 +1232,7 @@ export const AppLayout: React.FC = () => {
               } else {
                 // 对于确实无法匹配的数据，生成一个基于车站经纬度的 fallback，而不是 [0,0]
                 const seg = toCalculateInWorker.find((s: any) => {
-                  const isLoop = !!railwayData[s.lineKey]?.meta?.isLoop;
-                  let realVia = s.loopVia;
-                  if (isLoop && realVia === "auto") {
-                    realVia = computeLoopVia(
-                      railwayData,
-                      s.lineKey,
-                      s.fromId,
-                      s.toId,
-                    );
-                  }
-                  const k =
-                    isLoop && realVia
-                      ? `${s.lineKey}_${s.fromId}_${s.toId}_${realVia}`
-                      : `${s.lineKey}_${s.fromId}_${s.toId}`;
+                  const k = getSegmentKey(railwayData, s.lineKey, s.fromId, s.toId, s.loopVia);
                   return k === key;
                 });
                 let fallbackCoords = [

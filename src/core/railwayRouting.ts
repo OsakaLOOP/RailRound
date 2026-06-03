@@ -345,6 +345,29 @@ export const computeLoopVia = (railwayData: RailwayMap, lineKey: LineKey, fromId
 };
 
 /**
+ * 计算行程片段的唯一缓存 Key / Calculate unique cache key for a segment
+ */
+export const getSegmentKey = (
+  railwayData: RailwayMap,
+  lineKey: LineKey,
+  fromId: StationId,
+  toId: StationId,
+  loopVia?: 'up' | 'down' | 'auto'
+): string => {
+  const line = railwayData[lineKey];
+  const isLoop = !!line?.meta?.isLoop;
+  if (isLoop) {
+    let resolvedVia = loopVia;
+    if (!resolvedVia || resolvedVia === 'auto') {
+      resolvedVia = computeLoopVia(railwayData, lineKey, fromId, toId);
+    }
+    return `${lineKey}_${fromId}_${toId}_${resolvedVia}`;
+  }
+  return `${lineKey}_${fromId}_${toId}`;
+};
+
+
+/**
  * 获取起终点之间的地标站 (最多3个)
  * @param line 线路对象
  * @param fromId 起点站ID

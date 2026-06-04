@@ -1011,7 +1011,7 @@ export const TripsPage: React.FC = () => {
               })}
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <button
                 type="button"
                 className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
@@ -1020,30 +1020,35 @@ export const TripsPage: React.FC = () => {
                 <MapPinned size={13} />
                 {t("tripsPage.eventCenter.openMapEditor", "Open map editor")}
               </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                onClick={() => copyTripEventSummary(trip, entries)}
-              >
-                <Clipboard size={13} />
-                {t("tripsPage.eventCenter.copy", "Copy summary")}
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                onClick={() => exportTripEvents(trip, entries, "json")}
-              >
-                <FileJson size={13} />
-                JSON
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                onClick={() => exportTripEvents(trip, entries, "mdx")}
-              >
-                <Download size={13} />
-                MDX
-              </button>
+              <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 p-1">
+                <button
+                  type="button"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded text-slate-500 hover:bg-white hover:text-slate-800"
+                  onClick={() => copyTripEventSummary(trip, entries)}
+                  title={t("tripsPage.eventCenter.copy", "Copy summary")}
+                  aria-label={t("tripsPage.eventCenter.copy", "Copy summary")}
+                >
+                  <Clipboard size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded text-slate-500 hover:bg-white hover:text-slate-800"
+                  onClick={() => exportTripEvents(trip, entries, "json")}
+                  title={t("tripsPage.eventCenter.exportJson", "Export event JSON")}
+                  aria-label={t("tripsPage.eventCenter.exportJson", "Export event JSON")}
+                >
+                  <FileJson size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded text-slate-500 hover:bg-white hover:text-slate-800"
+                  onClick={() => exportTripEvents(trip, entries, "mdx")}
+                  title={t("tripsPage.eventCenter.exportMdx", "Export event MDX")}
+                  aria-label={t("tripsPage.eventCenter.exportMdx", "Export event MDX")}
+                >
+                  <Download size={13} />
+                </button>
+              </div>
             </div>
 
             <div className="rounded-md border border-slate-200 bg-slate-50/60 p-2">

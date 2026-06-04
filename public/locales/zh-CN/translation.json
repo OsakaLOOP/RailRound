@@ -222,7 +222,9 @@
       "departure": "出发",
       "transfer": "换乘",
       "arrival": "到达",
-      "openMapEditor": "打开地图编辑器"
+      "openMapEditor": "打开地图编辑器",
+      "exportJson": "导出事件 JSON",
+      "exportMdx": "导出事件 MDX"
     },
     "eventFilters": {
       "title": "行程事件筛选",
@@ -596,17 +598,6 @@
       "allSources": "全部来源",
       "allTypes": "全部类型",
       "allVisibility": "全部可见性"
-    },
-    "bulk": {
-      "title": "批量操作",
-      "selectEvent": "选择事件",
-      "selectVisible": "选择当前结果",
-      "clearVisible": "取消当前结果",
-      "selectedCount": "已选择 {{count}} 个",
-      "tagsPlaceholder": "给已选事件添加标签",
-      "addTags": "添加标签",
-      "applyVisibility": "应用可见性",
-      "mergeDuplicates": "合并重复事件"
     },
     "createSource": {
       "station": "车站",

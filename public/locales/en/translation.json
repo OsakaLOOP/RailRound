@@ -222,7 +222,9 @@
       "departure": "Departure",
       "transfer": "Transfer",
       "arrival": "Arrival",
-      "openMapEditor": "Open map editor"
+      "openMapEditor": "Open map editor",
+      "exportJson": "Export event JSON",
+      "exportMdx": "Export event MDX"
     },
     "eventFilters": {
       "title": "Trip event filters",
@@ -596,17 +598,6 @@
       "allSources": "All sources",
       "allTypes": "All types",
       "allVisibility": "All visibility"
-    },
-    "bulk": {
-      "title": "Batch actions",
-      "selectEvent": "Select event",
-      "selectVisible": "Select visible",
-      "clearVisible": "Clear visible",
-      "selectedCount": "{{count}} selected",
-      "tagsPlaceholder": "Add tags to selected",
-      "addTags": "Add tags",
-      "applyVisibility": "Apply visibility",
-      "mergeDuplicates": "Merge duplicates"
     },
     "createSource": {
       "station": "Station",

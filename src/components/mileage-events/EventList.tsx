@@ -6,15 +6,14 @@ import type { MileageLineContextLike } from "../../utils/mileageUserEvents";
 import { formatKm } from "../../utils/mileageUserEvents";
 import {
   eventKindLabel,
-  eventKindTone,
   eventLineLabel,
   eventMileageLabel,
   eventSourceLabel,
-  eventSourceTone,
   eventStationLabel,
   eventVisibilityLabel,
   timestampLabel,
 } from "./display";
+import { RailGraphBadge, RailGraphEventPill } from "../rail-graph/RailGraphBadges";
 
 export interface MileageEventListEntry {
   bound: BoundMileageEvent;
@@ -24,13 +23,10 @@ export interface MileageEventListEntry {
 interface Props {
   entries: MileageEventListEntry[];
   selectedId?: string | null;
-  selectedIds?: Set<string>;
   emptyLabel?: string;
   showLine?: boolean;
   compact?: boolean;
-  selectable?: boolean;
   onSelect?: (entry: MileageEventListEntry) => void;
-  onToggleSelect?: (entry: MileageEventListEntry) => void;
   onViewMap?: (entry: MileageEventListEntry) => void;
   onDelete?: (id: string) => void;
 }
@@ -38,13 +34,10 @@ interface Props {
 export const EventList: React.FC<Props> = ({
   entries,
   selectedId,
-  selectedIds,
   emptyLabel,
   showLine = true,
   compact = false,
-  selectable = false,
   onSelect,
-  onToggleSelect,
   onViewMap,
   onDelete,
 }) => {
@@ -63,10 +56,10 @@ export const EventList: React.FC<Props> = ({
       {entries.map((entry) => {
         const event = entry.bound.event;
         const selected = selectedId === event.id;
-        const checked = selectedIds?.has(event.id) ?? false;
         const stationLabel = eventStationLabel(entry.bound, entry.lineContext);
         const line = eventLineLabel(entry.bound, entry.lineContext);
         const sourceLabel = eventSourceLabel(entry.lineContext, t);
+        const sourceIsRailGraph = entry.lineContext?.source === "rail_graph_runtime";
         return (
           <article
             key={`${event.id}:${entry.bound.distanceMetersFromRunStart}`}
@@ -77,19 +70,6 @@ export const EventList: React.FC<Props> = ({
             }`}
           >
             <div className="flex items-start gap-2">
-              {selectable && (
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                  checked={checked}
-                  onChange={(changeEvent) => {
-                    changeEvent.stopPropagation();
-                    onToggleSelect?.(entry);
-                  }}
-                  onClick={(clickEvent) => clickEvent.stopPropagation()}
-                  aria-label={t("mileageEvents.bulk.selectEvent", "Select event")}
-                />
-              )}
               <button
                 type="button"
                 className="min-w-0 flex-1 text-left"
@@ -100,20 +80,18 @@ export const EventList: React.FC<Props> = ({
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span
-                      className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold ${eventKindTone(event.kind)}`}
-                    >
-                      {eventKindLabel(event.kind, t)}
-                    </span>
+                    <RailGraphEventPill type={event.kind} label={eventKindLabel(event.kind, t)} className="max-w-[8rem]" />
                     <div className="truncate text-sm font-semibold text-slate-800">
                       {event.title}
                     </div>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
-                    <span className="inline-flex items-center gap-1">
-                      <MapPinned size={12} />
-                      {eventMileageLabel(entry.bound) || formatKm(entry.bound.distanceMetersFromRunStart)}
-                    </span>
+                    <RailGraphBadge
+                      icon="distance"
+                      value={eventMileageLabel(entry.bound) || formatKm(entry.bound.distanceMetersFromRunStart)}
+                      tone="slate"
+                      className="rounded bg-white"
+                    />
                     {stationLabel && <span>{stationLabel}</span>}
                     {showLine && line && (
                       <span className="inline-flex items-center gap-1">
@@ -121,13 +99,18 @@ export const EventList: React.FC<Props> = ({
                         {line}
                       </span>
                     )}
-                    <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${eventSourceTone(entry.lineContext)}`}>
-                      {sourceLabel}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Clock size={12} />
-                      {timestampLabel(entry.bound.timestampInference, entry.bound.timestamp, t)}
-                    </span>
+                    <RailGraphBadge
+                      icon={sourceIsRailGraph ? "snapshot" : "legacy"}
+                      value={sourceLabel}
+                      tone={sourceIsRailGraph ? "emerald" : "slate"}
+                      className="rounded bg-white"
+                    />
+                    {!compact && (
+                      <span className="inline-flex items-center gap-1">
+                        <Clock size={12} />
+                        {timestampLabel(entry.bound.timestampInference, entry.bound.timestamp, t)}
+                      </span>
+                    )}
                     {!compact && (
                       <span>{eventVisibilityLabel(event.visibility, t)}</span>
                     )}

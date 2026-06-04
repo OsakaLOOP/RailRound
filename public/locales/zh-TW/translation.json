@@ -222,7 +222,9 @@
       "departure": "出發",
       "transfer": "換乘",
       "arrival": "抵達",
-      "openMapEditor": "打開地圖編輯器"
+      "openMapEditor": "打開地圖編輯器",
+      "exportJson": "匯出事件 JSON",
+      "exportMdx": "匯出事件 MDX"
     },
     "eventFilters": {
       "title": "行程事件篩選",
@@ -596,17 +598,6 @@
       "allSources": "全部來源",
       "allTypes": "全部類型",
       "allVisibility": "全部可見性"
-    },
-    "bulk": {
-      "title": "批量操作",
-      "selectEvent": "選擇事件",
-      "selectVisible": "選擇目前結果",
-      "clearVisible": "取消目前結果",
-      "selectedCount": "已選擇 {{count}} 個",
-      "tagsPlaceholder": "給已選事件新增標籤",
-      "addTags": "新增標籤",
-      "applyVisibility": "套用可見性",
-      "mergeDuplicates": "合併重複事件"
     },
     "createSource": {
       "station": "車站",

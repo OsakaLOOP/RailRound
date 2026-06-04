@@ -1509,7 +1509,8 @@ export const MapContainer: React.FC<Props> = ({
 
     const activateRouteItem = (item: RouteItem, event: L.LeafletMouseEvent) => {
       if (item.source === "walk" || item.isTransfer) return;
-      L.DomEvent.stopPropagation(event);
+      if (event.originalEvent) L.DomEvent.stop(event.originalEvent);
+      mapInstance.current?.closePopup();
       const projectionSource = item.source === "rail_graph" ? "rail_graph_runtime" : "legacy_app";
       const mapPoint = { lat: event.latlng.lat, lng: event.latlng.lng };
       const tripRatio = ratioAtRoutePoint(item, event.latlng);

@@ -48,7 +48,7 @@ import { useMeta } from "./contexts";
 import { useTranslation } from "react-i18next";
 import { showAlert, showConfirm } from "./utils/alerts";
 import { boundMileageEventForRichDisplay } from "./utils/mileageUserEvents";
-import { selectMileageEventOnMap } from "./utils/mileageEventUiBridge";
+import { mileageEventUiEvents, selectMileageEventOnMap } from "./utils/mileageEventUiBridge";
 import { tripToKmlPathItems, tripToProductSegments } from "./utils/tripProductProjection";
 import { buildTripDetailModel } from "./utils/railGraphTripDetailModel";
 import { useLocation } from "react-router-dom";
@@ -253,6 +253,16 @@ export const AppLayout: React.FC = () => {
       setStationMenu(null);
     }
   }, [routeState.tab, stationMenu]);
+
+  useEffect(() => {
+    const closeStationMenuForMileageEvents = () => setStationMenu(null);
+    window.addEventListener(mileageEventUiEvents.open, closeStationMenuForMileageEvents);
+    window.addEventListener(mileageEventUiEvents.select, closeStationMenuForMileageEvents);
+    return () => {
+      window.removeEventListener(mileageEventUiEvents.open, closeStationMenuForMileageEvents);
+      window.removeEventListener(mileageEventUiEvents.select, closeStationMenuForMileageEvents);
+    };
+  }, []);
 
   // --- Standalone April Fool's Fake Loading Effect ---
   useEffect(() => {

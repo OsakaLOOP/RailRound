@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { X, Copy, Download, CheckCircle2, Loader2, GitMerge, Route, Clock, MapPinned } from "lucide-react";
+import { X, Copy, Download, CheckCircle2, Loader2, GitMerge, Route, Clock, MapPinned, Moon, Sun } from "lucide-react";
 import { useStore } from "../../store";
 import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
@@ -139,7 +139,7 @@ export const ExportRouteModal: React.FC = () => {
 
   const handleCopy = async () => {
     if (!routeData) return;
-    const code = generateRouteMdx(routeData, { locale, height, showPromo, packageSource });
+    const code = generateRouteMdx(routeData, { locale, height, theme, showPromo, packageSource });
     await navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -147,7 +147,7 @@ export const ExportRouteModal: React.FC = () => {
 
   const handleDownload = () => {
     if (!routeData) return;
-    const code = generateRouteMdx(routeData, { locale, height, showPromo, packageSource });
+    const code = generateRouteMdx(routeData, { locale, height, theme, showPromo, packageSource });
     const blob = new Blob([code], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -378,7 +378,7 @@ export const ExportRouteModal: React.FC = () => {
                       onChange={() => setTheme("light")}
                       className="sr-only"
                     />
-                    ☀️ {t("exportRoute.themeLight", "Light")}
+                    <Sun size={13} /> {t("exportRoute.themeLight", "Light")}
                   </label>
                   <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer border transition-colors ${theme === "dark" ? "bg-slate-800 text-white border-slate-600 shadow-sm" : "bg-slate-50 text-slate-400 border-slate-200"}`}>
                     <input
@@ -389,7 +389,7 @@ export const ExportRouteModal: React.FC = () => {
                       onChange={() => setTheme("dark")}
                       className="sr-only"
                     />
-                    🌙 {t("exportRoute.themeDark", "Dark")}
+                    <Moon size={13} /> {t("exportRoute.themeDark", "Dark")}
                   </label>
                 </div>
               </div>

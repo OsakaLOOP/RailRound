@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Edit2, Plus, X, ListFilter, AlertTriangle, ArrowRightLeft, ArrowDown, Search, Loader2, CheckCircle2, GitMerge, Route, Clock, MapPinned } from 'lucide-react';
+import { Edit2, Plus, X, ListFilter, AlertTriangle, ArrowRightLeft, ArrowDown, Search, Loader2, CheckCircle2, GitMerge, Route } from 'lucide-react';
 import { useStore, EditorMode, type Trip } from '../../store';
 import { DropZone } from '../DragContext';
 import { StationLineSearchModal, SearchModalMode } from './StationSearchModal';
@@ -14,6 +14,7 @@ import { buildNetworkDisplayModel } from '../../utils/networkDisplay';
 import { planAppRouteCandidates, type AppRouteCandidate } from '../../utils/appRoutePlanner';
 import { tripResultToLegacyTrip } from '../../utils/railGraphTripAdapter';
 import { buildTripDetailModel, tripDetailKeyEvents } from '../../utils/railGraphTripDetailModel';
+import { RailGraphBadge, RailGraphEventPill } from '../rail-graph/RailGraphBadges';
 
 type AutoPlanStatus =
     | { kind: 'rail_graph'; count?: number }
@@ -486,6 +487,13 @@ export const TripEditor: React.FC = () => {
 
     const formatKm = (value?: number) => t('tripEdit.km', '{{value}} km', { value: Math.max(0, value || 0).toFixed(1) });
     const formatMinutes = (value?: number) => t('tripEdit.minutes', '{{count}} min', { count: Math.max(0, value || 0) });
+    const compactRailGraphRef = (value?: unknown) => {
+        const text = String(value ?? '').trim();
+        if (!text) return '';
+        const cut = Math.max(text.lastIndexOf(':'), text.lastIndexOf('/'), text.lastIndexOf('#'));
+        const label = cut >= 0 ? text.slice(cut + 1) : text;
+        return label || text;
+    };
     const patternCount = railGraphRuntime ? Object.keys(railGraphRuntime.system.graph.indexes.patternById).length : 0;
     const railGraphCandidateCount = autoPlanCandidates.filter(candidate => candidate.source === 'rail_graph').length;
     const legacyCandidateCount = autoPlanCandidates.filter(candidate => candidate.source === 'legacy').length;
@@ -500,8 +508,12 @@ export const TripEditor: React.FC = () => {
             <div className="grid gap-2 rounded-lg border border-slate-200 bg-white/80 p-3 text-[11px] text-slate-600 sm:grid-cols-2">
                 <div className="min-w-0">
                     <div className="flex items-center gap-1.5 font-bold text-slate-700">
-                        <GitMerge size={13} className={railGraphRuntime ? 'text-emerald-600' : 'text-slate-400'} />
-                        {t('tripEdit.railGraphPlannerSource', 'Rail graph runtime')}
+                        <RailGraphBadge
+                            icon="snapshot"
+                            value={t('tripEdit.railGraphPlannerSource', 'Rail graph runtime')}
+                            tone={railGraphRuntime ? 'emerald' : 'slate'}
+                            className="rounded"
+                        />
                     </div>
                     <div className="mt-1 leading-relaxed text-slate-500">
                         {railGraphRuntime
@@ -545,8 +557,12 @@ export const TripEditor: React.FC = () => {
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                             <div className="flex items-center gap-1.5 font-bold text-emerald-800">
-                                <CheckCircle2 size={14} />
-                                {t('tripEdit.manualRailGraphTitle', 'Editing saved rail-graph snapshot')}
+                                <RailGraphBadge
+                                    icon="snapshot"
+                                    value={t('tripEdit.manualRailGraphTitle', 'Editing saved rail-graph snapshot')}
+                                    tone="emerald"
+                                    className="rounded"
+                                />
                             </div>
                             <div className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-emerald-700">
                                 {t('tripEdit.manualRailGraphDetail', '{{segments}} segments · {{events}} user events · saved geometry and pattern metadata will be kept on save.', {
@@ -574,8 +590,12 @@ export const TripEditor: React.FC = () => {
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                         <div className="flex items-center gap-1.5 font-bold text-slate-700">
-                            <GitMerge size={14} className="text-slate-500" />
-                            {t('tripEdit.manualLegacyTitle', 'Editing GeoJSON route segments')}
+                            <RailGraphBadge
+                                icon="legacy"
+                                value={t('tripEdit.manualLegacyTitle', 'Editing GeoJSON route segments')}
+                                tone="slate"
+                                className="rounded"
+                            />
                         </div>
                         <div className="mt-1 text-[11px] text-slate-500">
                             {t('tripEdit.manualLegacyDetail', '{{count}} segments · compatible with imported GeoJSON and legacy records.', { count: segmentCount })}
@@ -659,42 +679,47 @@ export const TripEditor: React.FC = () => {
                             <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
                                 {candidate.source === 'rail_graph' ? (
                                     <>
-                                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
-                                            <Route size={12} />
-                                            {candidate.serviceType || t('tripEdit.detailUnknown', 'Unknown')}
-                                        </span>
-                                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
-                                            <GitMerge size={12} />
-                                            {directionText(candidate.directionLabel || candidate.direction)}
-                                        </span>
-                                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
-                                            <MapPinned size={12} />
-                                            {t('tripEdit.viaStationCount', '{{count}} via', { count: candidate.viaStationCount })}
-                                        </span>
-                                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
-                                            <Clock size={12} />
-                                            {formatMinutes(candidate.totalTimeMinutes)}
-                                        </span>
-                                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
-                                            {formatKm(candidate.totalDistanceKm)}
-                                        </span>
+                                        <RailGraphBadge
+                                            icon="service"
+                                            value={candidate.serviceType || t('tripEdit.detailUnknown', 'Unknown')}
+                                            tone="sky"
+                                            className="rounded"
+                                        />
+                                        <RailGraphBadge
+                                            icon="direction"
+                                            value={directionText(candidate.directionLabel || candidate.direction)}
+                                            tone="amber"
+                                            className="rounded"
+                                        />
+                                        <RailGraphBadge
+                                            icon="via"
+                                            value={t('tripEdit.viaStationCount', '{{count}} via', { count: candidate.viaStationCount })}
+                                            tone="slate"
+                                            className="rounded"
+                                        />
+                                        <RailGraphBadge icon="duration" value={formatMinutes(candidate.totalTimeMinutes)} tone="slate" className="rounded" />
+                                        <RailGraphBadge icon="distance" value={formatKm(candidate.totalDistanceKm)} tone="slate" className="rounded" />
                                         {candidate.patternRef && (
-                                            <span className="inline-flex max-w-[12rem] items-center gap-1 truncate rounded bg-slate-50 px-1.5 py-0.5" title={String(candidate.patternRef)}>
-                                                {t('tripEdit.candidatePatternRef', 'Pattern ref')}: {String(candidate.patternRef).split(':').slice(-1)[0]}
-                                            </span>
+                                            <RailGraphBadge
+                                                icon="pattern"
+                                                label={t('tripEdit.candidatePatternRef', 'Pattern ref')}
+                                                value={compactRailGraphRef(candidate.patternRef)}
+                                                tone="indigo"
+                                                className="max-w-[12rem] rounded"
+                                                title={String(candidate.patternRef)}
+                                            />
                                         )}
                                     </>
                                 ) : (
                                     <>
-                                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
-                                            <GitMerge size={12} />
-                                            {t('tripEdit.plannerLegacyResult', 'Planned by legacy search')}
-                                        </span>
+                                        <RailGraphBadge
+                                            icon="legacy"
+                                            value={t('tripEdit.plannerLegacyResult', 'Planned by legacy search')}
+                                            tone="slate"
+                                            className="rounded"
+                                        />
                                         {candidate.estimatedTime !== undefined && (
-                                            <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
-                                                <Clock size={12} />
-                                                {formatMinutes(candidate.estimatedTime)}
-                                            </span>
+                                            <RailGraphBadge icon="duration" value={formatMinutes(candidate.estimatedTime)} tone="slate" className="rounded" />
                                         )}
                                     </>
                                 )}
@@ -705,9 +730,7 @@ export const TripEditor: React.FC = () => {
                                         {t('tripEdit.keyEvents', 'Events')}
                                     </span>
                                     {candidate.keyEventLabels.map((label) => (
-                                        <span key={label} className="max-w-[10rem] truncate rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700">
-                                            {label}
-                                        </span>
+                                        <RailGraphEventPill key={label} type="note" label={label} title={label} className="max-w-[10rem]" />
                                     ))}
                                 </div>
                             )}
@@ -732,8 +755,12 @@ export const TripEditor: React.FC = () => {
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                         <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
-                            <GitMerge size={14} />
-                            {t('tripEdit.snapshotDetailTitle', 'Rail graph run')}
+                            <RailGraphBadge
+                                icon="snapshot"
+                                value={t('tripEdit.snapshotDetailTitle', 'Rail graph run')}
+                                tone="emerald"
+                                className="rounded"
+                            />
                         </div>
                         <div className="mt-1 truncate text-sm font-semibold text-slate-800">
                             {currentTripDetail.overview.title}
@@ -747,20 +774,35 @@ export const TripEditor: React.FC = () => {
                     </div>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
-                    <span className="rounded bg-white px-1.5 py-0.5">
-                        {t('tripEdit.snapshotPersistence', 'Saved as trip snapshot')}
-                    </span>
-                    <span className="rounded bg-white px-1.5 py-0.5">
-                        {t('tripEdit.planUsed', 'Plan')}: {currentTripDetail.overview.planUsed || t('tripEdit.detailUnknown', 'Unknown')}
-                    </span>
+                    <RailGraphBadge
+                        icon="snapshot"
+                        value={t('tripEdit.snapshotPersistence', 'Saved as trip snapshot')}
+                        tone="emerald"
+                        className="rounded bg-white"
+                    />
+                    <RailGraphBadge
+                        icon="service"
+                        label={t('tripEdit.planUsed', 'Plan')}
+                        value={currentTripDetail.overview.planUsed || t('tripEdit.detailUnknown', 'Unknown')}
+                        tone="sky"
+                        className="rounded bg-white"
+                    />
                     {currentTripDetail.overview.presetId && (
-                        <span className="max-w-[12rem] truncate rounded bg-white px-1.5 py-0.5">
-                            {t('tripEdit.presetId', 'Preset')}: {currentTripDetail.overview.presetId}
-                        </span>
+                        <RailGraphBadge
+                            icon="pattern"
+                            label={t('tripEdit.presetId', 'Preset')}
+                            value={compactRailGraphRef(currentTripDetail.overview.presetId)}
+                            tone="indigo"
+                            title={currentTripDetail.overview.presetId}
+                            className="max-w-[12rem] rounded bg-white"
+                        />
                     )}
-                    <span className="rounded bg-white px-1.5 py-0.5">
-                        {t('tripEdit.userEventCount', '{{count}} user events', { count: currentTripDetail.overview.userEventCount })}
-                    </span>
+                    <RailGraphBadge
+                        icon="userEvent"
+                        value={t('tripEdit.userEventCount', '{{count}} user events', { count: currentTripDetail.overview.userEventCount })}
+                        tone="violet"
+                        className="rounded bg-white"
+                    />
                 </div>
                 <div className="mt-3 space-y-2">
                     {currentTripDetail.segments.map((segment) => (
@@ -775,16 +817,25 @@ export const TripEditor: React.FC = () => {
                                 {segment.fromName} <span className="text-slate-300">→</span> {segment.toName}
                             </div>
                             <div className="mt-1 flex flex-wrap gap-1 pl-4 text-[10px] text-slate-500">
-                                <span className="rounded bg-slate-50 px-1.5 py-0.5">
-                                    {t('tripEdit.stopPassSummary', '{{stops}} stops / {{passes}} pass', { stops: segment.stopCount, passes: segment.passCount })}
-                                </span>
-                                <span className="rounded bg-slate-50 px-1.5 py-0.5">
-                                    {t('tripEdit.viaStationCount', '{{count}} via', { count: segment.viaStationCount })}
-                                </span>
+                                <RailGraphBadge
+                                    icon="stops"
+                                    value={t('tripEdit.stopPassSummary', '{{stops}} stops / {{passes}} pass', { stops: segment.stopCount, passes: segment.passCount })}
+                                    tone="slate"
+                                    className="rounded"
+                                />
+                                <RailGraphBadge
+                                    icon="via"
+                                    value={t('tripEdit.viaStationCount', '{{count}} via', { count: segment.viaStationCount })}
+                                    tone="slate"
+                                    className="rounded"
+                                />
                                 {segment.userEventCount > 0 && (
-                                    <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
-                                        {t('tripEdit.userEventCount', '{{count}} user events', { count: segment.userEventCount })}
-                                    </span>
+                                    <RailGraphBadge
+                                        icon="userEvent"
+                                        value={t('tripEdit.userEventCount', '{{count}} user events', { count: segment.userEventCount })}
+                                        tone="violet"
+                                        className="rounded"
+                                    />
                                 )}
                             </div>
                         </div>
@@ -793,9 +844,12 @@ export const TripEditor: React.FC = () => {
                 {keyEvents.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1">
                         {keyEvents.map((event) => (
-                            <span key={event.id} className="max-w-[13rem] truncate rounded border border-emerald-100 bg-white px-1.5 py-0.5 text-[10px] text-slate-600">
-                                {eventTypeLabel(event.type)} · {event.label}
-                            </span>
+                            <RailGraphEventPill
+                                key={event.id}
+                                type={event.type}
+                                label={`${eventTypeLabel(event.type)} · ${event.label}`}
+                                title={event.label}
+                            />
                         ))}
                     </div>
                 )}

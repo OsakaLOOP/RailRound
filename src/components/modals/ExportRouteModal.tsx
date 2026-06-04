@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { X, Copy, Download, CheckCircle2, Loader2, GitMerge, Route, Clock, MapPinned, Moon, Sun } from "lucide-react";
+import { X, Copy, Download, CheckCircle2, Loader2, Moon, Sun } from "lucide-react";
 import { useStore } from "../../store";
 import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
@@ -9,6 +9,7 @@ import type { RouteSliceData } from "../../utils/routeExportTypes";
 import { RouteSlicePreview } from "@blog-src/components/mdx/RouteSlicePreviewStatic";
 import { tripToProductRouteSegments, tripToRouteSliceData } from "../../utils/tripProductProjection";
 import { buildTripDetailModel, tripDetailKeyEvents } from "../../utils/railGraphTripDetailModel";
+import { RailGraphBadge, RailGraphEventPill } from "../rail-graph/RailGraphBadges";
 
 const LOCALES = ["en", "ja", "zh-cn", "zh-tw"] as const;
 const HEIGHTS = ["300px", "400px", "500px", "600px"] as const;
@@ -179,6 +180,14 @@ export const ExportRouteModal: React.FC = () => {
     return direction;
   };
 
+  const compactRailGraphRef = (value?: unknown) => {
+    const text = String(value ?? "").trim();
+    if (!text) return "";
+    const cut = Math.max(text.lastIndexOf(":"), text.lastIndexOf("/"), text.lastIndexOf("#"));
+    const label = cut >= 0 ? text.slice(cut + 1) : text;
+    return label || text;
+  };
+
   const renderSourceSummary = () => {
     if (!tripDetail) return null;
     if (tripDetail.kind === "rail_graph") {
@@ -189,8 +198,12 @@ export const ExportRouteModal: React.FC = () => {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
-                <GitMerge size={14} />
-                {t("exportRoute.railGraphSource", "Rail graph snapshot")}
+                <RailGraphBadge
+                  icon="snapshot"
+                  value={t("exportRoute.railGraphSource", "Rail graph snapshot")}
+                  tone="emerald"
+                  className="rounded"
+                />
               </div>
               <div className="mt-1 truncate text-sm font-semibold text-slate-800">
                 {tripDetail.overview.title}
@@ -205,32 +218,33 @@ export const ExportRouteModal: React.FC = () => {
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
             {firstSegment?.serviceType && (
-              <span className="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5">
-                <Route size={12} />
-                {firstSegment.serviceType}
-              </span>
+              <RailGraphBadge icon="service" value={firstSegment.serviceType} tone="sky" className="rounded bg-white" />
             )}
             {firstSegment?.direction && (
-              <span className="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5">
-                <GitMerge size={12} />
-                {directionLabel(firstSegment.direction)}
-              </span>
+              <RailGraphBadge icon="direction" value={directionLabel(firstSegment.direction)} tone="amber" className="rounded bg-white" />
             )}
-            <span className="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5">
-              <MapPinned size={12} />
-              {t("exportRoute.geoSourceRailGraph", "Saved geometry")}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5">
-              <Clock size={12} />
-              {t("exportRoute.userEvents", "{{count}} user events", { count: tripDetail.overview.userEventCount })}
-            </span>
+            {firstSegment?.patternRef && (
+              <RailGraphBadge
+                icon="pattern"
+                label={t("mileageEvents.inspector.pattern", "Pattern")}
+                value={compactRailGraphRef(firstSegment.patternRef)}
+                tone="indigo"
+                title={String(firstSegment.patternRef)}
+                className="max-w-[12rem] rounded bg-white"
+              />
+            )}
+            <RailGraphBadge icon="distance" value={t("exportRoute.geoSourceRailGraph", "Saved geometry")} tone="slate" className="rounded bg-white" />
+            <RailGraphBadge
+              icon="userEvent"
+              value={t("exportRoute.userEvents", "{{count}} user events", { count: tripDetail.overview.userEventCount })}
+              tone="violet"
+              className="rounded bg-white"
+            />
           </div>
           {keyEvents.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {keyEvents.map((event) => (
-                <span key={event.id} className="max-w-[13rem] truncate rounded border border-emerald-100 bg-white px-1.5 py-0.5 text-[10px] text-slate-600">
-                  {event.label}
-                </span>
+                <RailGraphEventPill key={event.id} type={event.type} label={event.label} title={event.label} />
               ))}
             </div>
           )}
@@ -241,8 +255,7 @@ export const ExportRouteModal: React.FC = () => {
     return (
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
         <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-          <Route size={14} />
-          {t("exportRoute.legacySource", "Legacy GeoJSON route")}
+          <RailGraphBadge icon="legacy" value={t("exportRoute.legacySource", "Legacy GeoJSON route")} tone="slate" className="rounded" />
         </div>
         <div className="mt-1 text-[11px] text-slate-500">
           {t("exportRoute.legacySourceDesc", "The preview is computed from current GeoJSON line data.")}

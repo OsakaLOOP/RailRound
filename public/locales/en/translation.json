@@ -221,7 +221,8 @@
       "sortedByMileage": "Sorted by trip mileage",
       "departure": "Departure",
       "transfer": "Transfer",
-      "arrival": "Arrival"
+      "arrival": "Arrival",
+      "openMapEditor": "Open map editor"
     },
     "eventFilters": {
       "title": "Trip event filters",

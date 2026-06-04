@@ -45,7 +45,7 @@ import {
   tagsFromInput,
 } from "../utils/mileageUserEvents";
 import type { MileageEventListEntry } from "../components/mileage-events/EventList";
-import { eventKindLabel, eventLineLabel, eventSourceLabel, eventSourceTone, eventStationLabel, eventVisibilityLabel, mileageEventKinds, mileageEventVisibilities } from "../components/mileage-events/display";
+import { eventKindLabel, eventLineLabel, eventSourceLabel, eventStationLabel, eventVisibilityLabel, mileageEventKinds, mileageEventVisibilities } from "../components/mileage-events/display";
 import {
   tripLineSummary as productTripLineSummary,
   tripToProductSegments,
@@ -635,7 +635,7 @@ export const TripsPage: React.FC = () => {
     });
   };
 
-  const openTripEventCreateOnMap = (trip: (typeof trips)[number]) => {
+  const openTripEventMapEditor = (trip: (typeof trips)[number]) => {
     const segments = tripToProductSegments(trip, railwayData);
     const railGraphTrip = trip.railGraph?.tripResult ?? null;
     const firstRailGraphSegment = railGraphTrip?.segments[0];
@@ -945,9 +945,15 @@ export const TripsPage: React.FC = () => {
               {entries.slice(0, 3).map((entry) => (
                 <span
                   key={entry.bound.event.id}
-                  className="max-w-[12rem] truncate rounded bg-white px-1.5 py-0.5 text-[10px] text-slate-500"
+                  className="inline-flex max-w-[14rem] items-center gap-1 rounded bg-white px-1 py-0.5"
                 >
-                  {formatKm(entry.bound.distanceMetersFromRunStart)} · {entry.bound.event.title}
+                  <RailGraphBadge icon="distance" value={formatKm(entry.bound.distanceMetersFromRunStart)} tone="slate" className="rounded" />
+                  <RailGraphEventPill
+                    type={entry.bound.event.kind}
+                    label={entry.bound.event.title}
+                    title={entry.bound.event.title}
+                    className="max-w-[9rem]"
+                  />
                 </span>
               ))}
               {entries.length === 0 && (
@@ -962,32 +968,23 @@ export const TripsPage: React.FC = () => {
 
         {isExpanded && (
           <div className="mt-3 space-y-3 rounded-md border border-slate-200 bg-white p-3">
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded bg-slate-50 p-2">
-                <div className="text-[10px] font-semibold uppercase text-slate-400">
-                  {t("tripsPage.eventCenter.trip", "Trip")}
-                </div>
-                <div className="mt-0.5 font-medium text-slate-700">{trip.date}</div>
-              </div>
-              <div className="rounded bg-slate-50 p-2">
-                <div className="text-[10px] font-semibold uppercase text-slate-400">
-                  {t("tripsPage.eventCenter.lines", "Lines")}
-                </div>
-                <div className="mt-0.5 truncate font-medium text-slate-700">{tripLineSummary(trip)}</div>
-              </div>
-            </div>
-
             <div className="rounded-md border border-slate-200 bg-slate-50/70 p-2 text-xs">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="font-semibold text-slate-700">
                   {t("tripsPage.eventCenter.projectionSource", "Projection source")}
                 </span>
-                <span className="rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                  {t("tripsPage.eventCenter.railGraphCount", "{{count}} rail graph", { count: sourceCounts.railGraph })}
-                </span>
-                <span className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
-                  {t("tripsPage.eventCenter.geoJsonCount", "{{count}} GeoJSON", { count: sourceCounts.legacy })}
-                </span>
+                <RailGraphBadge
+                  icon="snapshot"
+                  value={t("tripsPage.eventCenter.railGraphCount", "{{count}} rail graph", { count: sourceCounts.railGraph })}
+                  tone="emerald"
+                  className="rounded bg-white"
+                />
+                <RailGraphBadge
+                  icon="legacy"
+                  value={t("tripsPage.eventCenter.geoJsonCount", "{{count}} GeoJSON", { count: sourceCounts.legacy })}
+                  tone="slate"
+                  className="rounded bg-white"
+                />
               </div>
               <div className="mt-1 text-[11px] leading-relaxed text-slate-500">
                 {detail.kind === "rail_graph"
@@ -1018,10 +1015,10 @@ export const TripsPage: React.FC = () => {
               <button
                 type="button"
                 className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                onClick={() => openTripEventCreateOnMap(trip)}
+                onClick={() => openTripEventMapEditor(trip)}
               >
-                <Plus size={13} />
-                {t("tripsPage.eventCenter.addOnMap", "Add on map")}
+                <MapPinned size={13} />
+                {t("tripsPage.eventCenter.openMapEditor", "Open map editor")}
               </button>
               <button
                 type="button"
@@ -1086,6 +1083,7 @@ export const TripsPage: React.FC = () => {
                   const selected = selectedTripEventId === event.id;
                   const eventLine = eventLineLabel(item.entry.bound, item.entry.lineContext);
                   const eventStation = eventStationLabel(item.entry.bound, item.entry.lineContext);
+                  const sourceIsRailGraph = item.entry.lineContext?.source === "rail_graph_runtime";
                   return (
                     <div key={item.id} className="grid grid-cols-[4.5rem_1rem_minmax(0,1fr)] gap-2 text-xs">
                       <div className="pt-2 text-right font-mono text-[11px] text-slate-500">
@@ -1111,9 +1109,7 @@ export const TripsPage: React.FC = () => {
                         }}
                       >
                         <div className="flex min-w-0 items-center gap-2">
-                          <span className="shrink-0 rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                            {eventKindLabel(event.kind, t)}
-                          </span>
+                          <RailGraphEventPill type={event.kind} label={eventKindLabel(event.kind, t)} className="max-w-[8rem]" />
                           <span className="truncate font-semibold text-slate-800">{event.title}</span>
                           <button
                             type="button"
@@ -1128,9 +1124,12 @@ export const TripsPage: React.FC = () => {
                           </button>
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
-                          <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${eventSourceTone(item.entry.lineContext)}`}>
-                            {eventSourceLabel(item.entry.lineContext, t)}
-                          </span>
+                          <RailGraphBadge
+                            icon={sourceIsRailGraph ? "snapshot" : "legacy"}
+                            value={eventSourceLabel(item.entry.lineContext, t)}
+                            tone={sourceIsRailGraph ? "emerald" : "slate"}
+                            className="rounded"
+                          />
                           {eventLine && (
                             <span className="inline-flex max-w-[12rem] items-center gap-1 truncate">
                               <Route size={12} className="shrink-0 text-slate-400" />

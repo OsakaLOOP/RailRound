@@ -221,7 +221,8 @@
       "sortedByMileage": "旅程キロ程順",
       "departure": "出発",
       "transfer": "乗換",
-      "arrival": "到着"
+      "arrival": "到着",
+      "openMapEditor": "マップ編集を開く"
     },
     "eventFilters": {
       "title": "旅程イベントフィルター",

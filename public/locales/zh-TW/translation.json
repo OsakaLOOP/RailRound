@@ -221,7 +221,8 @@
       "sortedByMileage": "按行程里程排序",
       "departure": "出發",
       "transfer": "換乘",
-      "arrival": "抵達"
+      "arrival": "抵達",
+      "openMapEditor": "打開地圖編輯器"
     },
     "eventFilters": {
       "title": "行程事件篩選",

@@ -637,16 +637,23 @@ export const TripsPage: React.FC = () => {
 
   const openTripEventCreateOnMap = (trip: (typeof trips)[number]) => {
     const segments = tripToProductSegments(trip, railwayData);
-    const firstLineKey = segments.find((segment: any) => segment.lineKey)?.lineKey;
+    const railGraphTrip = trip.railGraph?.tripResult ?? null;
+    const firstRailGraphSegment = railGraphTrip?.segments[0];
+    const firstLineKey = firstRailGraphSegment
+      ? `rail-graph:${firstRailGraphSegment.mileageProfile.patternRef ?? firstRailGraphSegment.segmentId}`
+      : segments.find((segment: any) => segment.lineKey)?.lineKey;
     goToTab("map");
     window.setTimeout(() => {
       openMileageEventsPanel({
         mode: "create",
         lineKey: firstLineKey,
+        source: firstRailGraphSegment ? "rail_graph_runtime" : "legacy_app",
         create: {
           source: "trip",
           tripId: trip.id,
-          lineKey: firstLineKey,
+          tripSegmentIndex: 0,
+          tripRatio: 0.5,
+          lineKey: firstRailGraphSegment ? undefined : firstLineKey,
           tags: ["trip-event"],
         },
       });

@@ -17,11 +17,13 @@ import {
   boundMileageEventsForRichDisplay,
   buildAppMileageLineContext,
   eventsForLine,
+  formatKm,
   lineLabel,
   queryEventsNearPlace,
   queryLineEventsByStation,
   queryLineEventsByTime,
 } from "../../utils/mileageUserEvents";
+import { tripToProductSegments } from "../../utils/tripProductProjection";
 import { EventComposer } from "../mileage-events/EventComposer";
 import { EventInspector } from "../mileage-events/EventInspector";
 import { EventList, MileageEventListEntry } from "../mileage-events/EventList";
@@ -67,6 +69,9 @@ export const MileageEventsPanel: React.FC = () => {
   const [selectedProjection, setSelectedProjection] = useState<{
     lineKey?: string;
     source?: MileageEventSelectDetail["source"];
+    tripId?: string | number;
+    tripSegmentIndex?: number;
+    routeItemId?: string;
   } | null>(null);
   const [mapPoint, setMapPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [composerDraft, setComposerDraft] = useState<{
@@ -97,7 +102,13 @@ export const MileageEventsPanel: React.FC = () => {
       if (!detail.eventId) return;
       setOpen(true);
       setSelectedEventId(detail.eventId);
-      setSelectedProjection({ lineKey: detail.lineKey, source: detail.source });
+      setSelectedProjection({
+        lineKey: detail.lineKey,
+        source: detail.source,
+        tripId: detail.tripId,
+        tripSegmentIndex: detail.tripSegmentIndex,
+        routeItemId: detail.routeItemId,
+      });
       if (detail.lineKey && lineKeys.includes(detail.lineKey)) {
         setLineKey(detail.lineKey);
         setMode("line");
@@ -109,8 +120,17 @@ export const MileageEventsPanel: React.FC = () => {
       const detail = customEventDetail<MileageEventsOpenDetail>(event);
       setOpen(true);
       setSelectedEventId(detail.eventId ?? null);
-      if (!detail.eventId) {
-        setSelectedProjection(detail.lineKey || detail.source ? { lineKey: detail.lineKey, source: detail.source } : null);
+      const projectionDetail = detail.lineKey || detail.source || detail.tripId
+        ? {
+            lineKey: detail.lineKey,
+            source: detail.source,
+            tripId: detail.tripId,
+            tripSegmentIndex: detail.tripSegmentIndex,
+            routeItemId: detail.routeItemId,
+          }
+        : null;
+      if (!detail.eventId || projectionDetail) {
+        setSelectedProjection(projectionDetail);
       }
       if (detail.lineKey && lineKeys.includes(detail.lineKey)) {
         setLineKey(detail.lineKey);
@@ -245,6 +265,22 @@ export const MileageEventsPanel: React.FC = () => {
   const currentAxisEventCount = currentRailGraphAxis?.count ?? lineEntries.length;
   const selectedLineColor = currentRailGraphAxis?.color ?? lineContext?.line.meta.color ?? "#0f766e";
   const currentAxisSource = currentRailGraphAxis ? "rail_graph" : "legacy";
+  const activeTrip = useMemo(
+    () => selectedProjection?.tripId !== undefined
+      ? trips.find((trip) => String(trip.id) === String(selectedProjection.tripId)) ?? null
+      : null,
+    [selectedProjection?.tripId, trips],
+  );
+  const activeTripSegments = useMemo(
+    () => (activeTrip ? tripToProductSegments(activeTrip, railwayData) : []),
+    [activeTrip, railwayData],
+  );
+  const activeTripSegmentIndex =
+    typeof selectedProjection?.tripSegmentIndex === "number" ? selectedProjection.tripSegmentIndex : null;
+  const activeTripSegment =
+    activeTripSegmentIndex !== null && activeTripSegments.length > 0
+      ? activeTripSegments[Math.max(0, Math.min(activeTripSegments.length - 1, activeTripSegmentIndex))]
+      : null;
 
   useEffect(() => {
     if (!open) {
@@ -255,10 +291,19 @@ export const MileageEventsPanel: React.FC = () => {
       setActiveMileageLine({
         lineKey: selectedProjection.lineKey ?? null,
         source: selectedProjection.source,
+        tripId: selectedProjection.tripId,
+        tripSegmentIndex: selectedProjection.tripSegmentIndex,
+        routeItemId: selectedProjection.routeItemId,
       });
       return;
     }
-    setActiveMileageLine({ lineKey: lineContext ? effectiveLineKey : null });
+    setActiveMileageLine({
+      lineKey: lineContext ? effectiveLineKey : null,
+      source: selectedProjection?.source,
+      tripId: selectedProjection?.tripId,
+      tripSegmentIndex: selectedProjection?.tripSegmentIndex,
+      routeItemId: selectedProjection?.routeItemId,
+    });
   }, [effectiveLineKey, lineContext, open, selectedEvent, selectedProjection]);
 
   const selectEvent = (eventId: string) => {
@@ -274,6 +319,9 @@ export const MileageEventsPanel: React.FC = () => {
         eventId: event.id,
         lineKey: selectedProjection.lineKey,
         source: selectedProjection.source,
+        tripId: selectedProjection.tripId,
+        tripSegmentIndex: selectedProjection.tripSegmentIndex,
+        routeItemId: selectedProjection.routeItemId,
       });
       return;
     }
@@ -396,6 +444,31 @@ export const MileageEventsPanel: React.FC = () => {
             <div className="mt-0.5 line-clamp-2 text-[10px] text-slate-400">
               {t("mileageEvents.axisSourceHint", "Rail-graph trip events project from saved run snapshots; GeoJSON events remain on app-line mileage axes.")}
             </div>
+            {activeTripSegment && (
+              <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 border-t border-slate-100 pt-1.5">
+                <RailGraphBadge
+                  icon="pattern"
+                  value={activeTripSegment.lineLabel || lineLabel(activeTripSegment.lineKey)}
+                  tone={activeTripSegment.source === "rail_graph" ? "indigo" : "slate"}
+                  className="rounded bg-white"
+                />
+                {activeTripSegment.serviceType && (
+                  <RailGraphBadge icon="service" value={activeTripSegment.serviceType} tone="sky" className="rounded bg-white" />
+                )}
+                {activeTripSegment.direction && (
+                  <RailGraphBadge icon="direction" value={activeTripSegment.direction} tone="amber" className="rounded bg-white" />
+                )}
+                <RailGraphBadge
+                  icon="distance"
+                  value={formatKm(Math.max(0, activeTripSegment.distanceKm || 0) * 1000)}
+                  tone="slate"
+                  className="rounded bg-white"
+                />
+                <span className="min-w-0 flex-1 truncate text-[10px] font-medium text-slate-500">
+                  {activeTripSegment.fromName || activeTripSegment.fromId} → {activeTripSegment.toName || activeTripSegment.toId}
+                </span>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">

@@ -36,7 +36,7 @@ import { EventComposer } from "./EventComposer";
 import { useMileageEventActions } from "./useMileageEventActions";
 import { useAppNavigation } from "../../hooks/useAppNavigation";
 import { showConfirm } from "../../utils/alerts";
-import { selectMileageEventOnMap } from "../../utils/mileageEventUiBridge";
+import { mileageEventTripId, selectMileageEventOnMap } from "../../utils/mileageEventUiBridge";
 import { RailGraphBadge, RailGraphEventPill } from "../rail-graph/RailGraphBadges";
 
 interface Props {
@@ -105,6 +105,8 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
         eventId: event.id,
         lineKey: lineContext?.lineKey,
         source: lineContext?.source,
+        tripId: mileageEventTripId(event.payload?.tripId),
+        tripSegmentIndex: bound?.orderIndex,
       });
       if (!bound?.coordinates) return;
       window.dispatchEvent(

@@ -55,7 +55,7 @@ import {
   tripDetailKeyEvents,
   type TripDetailModel,
 } from "../utils/railGraphTripDetailModel";
-import { openMileageEventsPanel, selectMileageEventOnMap } from "../utils/mileageEventUiBridge";
+import { mileageEventTripId, openMileageEventsPanel, selectMileageEventOnMap } from "../utils/mileageEventUiBridge";
 import { RailGraphBadge, RailGraphEventPill, RailGraphSymbol, railGraphEventIcon } from "../components/rail-graph/RailGraphBadges";
 
 const RouteSlice = React.memo(
@@ -632,6 +632,8 @@ export const TripsPage: React.FC = () => {
       eventId,
       lineKey: entry ? eventEntryLineKey(entry) : undefined,
       source: entry?.lineContext?.source,
+      tripId: mileageEventTripId(entry?.bound.event.payload?.tripId),
+      tripSegmentIndex: entry?.bound.orderIndex,
     });
   };
 
@@ -648,6 +650,8 @@ export const TripsPage: React.FC = () => {
         mode: "create",
         lineKey: firstLineKey,
         source: firstRailGraphSegment ? "rail_graph_runtime" : "legacy_app",
+        tripId: trip.id,
+        tripSegmentIndex: 0,
         create: {
           source: "trip",
           tripId: trip.id,
@@ -668,6 +672,8 @@ export const TripsPage: React.FC = () => {
         eventId: entry.bound.event.id,
         lineKey: eventEntryLineKey(entry),
         source: entry.lineContext?.source,
+        tripId: mileageEventTripId(entry.bound.event.payload?.tripId),
+        tripSegmentIndex: entry.bound.orderIndex,
       });
       if (!entry.bound.coordinates) return;
       window.dispatchEvent(

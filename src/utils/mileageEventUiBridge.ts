@@ -10,6 +10,9 @@ export interface MileageEventsOpenDetail {
   lineKey?: string;
   source?: MileageEventsProjectionSource;
   eventId?: string;
+  tripId?: string | number;
+  tripSegmentIndex?: number;
+  routeItemId?: string;
   create?: {
     source?: MileageEventsComposerSource;
     tripId?: string | number;
@@ -29,6 +32,9 @@ export interface MileageEventSelectDetail {
   eventId: string;
   lineKey?: string;
   source?: MileageEventsProjectionSource;
+  tripId?: string | number;
+  tripSegmentIndex?: number;
+  routeItemId?: string;
 }
 
 export interface MileageEventsActiveAxisDetail {
@@ -56,6 +62,10 @@ export const mileageEventUiEvents = {
 
 export function customEventDetail<T>(event: Event): Partial<T> {
   return ((event as CustomEvent<T>).detail ?? {}) as Partial<T>;
+}
+
+export function mileageEventTripId(value: unknown): string | number | undefined {
+  return typeof value === "string" || typeof value === "number" ? value : undefined;
 }
 
 export function openMileageEventsPanel(detail: MileageEventsOpenDetail) {

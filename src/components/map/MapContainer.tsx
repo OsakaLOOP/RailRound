@@ -1550,6 +1550,9 @@ export const MapContainer: React.FC<Props> = ({
         mode: "create",
         lineKey: item.lineKey,
         source: projectionSource,
+        tripId: item.tripId,
+        tripSegmentIndex: item.segmentIndex,
+        routeItemId: item.id,
         create: {
           source: item.source === "rail_graph" ? "trip" : "map",
           tripId: item.tripId,

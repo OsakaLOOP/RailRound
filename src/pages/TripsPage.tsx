@@ -78,9 +78,7 @@ const RouteSlice = React.memo(
     useEffect(() => {
       const measure = () => {
         if (containerRef.current) {
-          const parent = containerRef.current.closest(
-            ".bg-white",
-          ) as HTMLElement;
+          const parent = containerRef.current.parentElement as HTMLElement;
           if (parent) setContainerWidth(parent.offsetWidth);
         }
       };
@@ -102,20 +100,22 @@ const RouteSlice = React.memo(
         </div>
       );
 
-    const maxWidth = Math.max(0, containerWidth - 300);
+    const maxWidth = Math.max(0, containerWidth - 64);
     const shouldRotate = isMobile && widthPx > maxWidth && maxWidth > 0;
+    const visualWidth = shouldRotate ? heightPx : widthPx;
+    const visualScale =
+      visualWidth > 0 && maxWidth > 0 ? Math.min(1, maxWidth / visualWidth) : 1;
 
     return (
       <div
         ref={containerRef}
-        className="absolute right-2 top-1/2 -translate-y-1/2 z-0 opacity-50 pointer-events-none flex flex-row items-center justify-end gap-2"
-        style={{ minWidth: shouldRotate ? "40px" : "100px" }}
+        className="absolute left-2 right-2 top-1/2 -translate-y-1/2 z-0 pointer-events-none flex min-w-0 flex-row items-center justify-end gap-2"
       >
         <div
+          className="relative z-0 opacity-50"
           style={{
-            width: shouldRotate ? heightPx : widthPx,
-            height: shouldRotate ? widthPx : heightPx,
-            maxWidth: shouldRotate ? "none" : "100%",
+            width: visualWidth * visualScale,
+            height: (shouldRotate ? widthPx : heightPx) * visualScale,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -125,8 +125,8 @@ const RouteSlice = React.memo(
             viewBox="0 0 100 50"
             preserveAspectRatio="none"
             style={{
-              width: widthPx,
-              height: heightPx,
+              width: widthPx * visualScale,
+              height: heightPx * visualScale,
               transform: shouldRotate ? "rotate(90deg)" : "none",
               transformOrigin: "center center",
             }}
@@ -145,7 +145,8 @@ const RouteSlice = React.memo(
             ))}
           </svg>
         </div>
-        <div className="text-[10px] font-bold text-gray-800 shrink-0 text-right opacity-100">
+        <div className="absolute inset-0 z-10 bg-[linear-gradient(to_right,rgba(255,255,255,0.6)_0%,rgba(255,255,255,0)_30%)]" />
+        <div className="relative z-20 text-[10px] font-bold text-gray-800 shrink-0 text-right opacity-50">
           {Math.round(totalDist)}km
         </div>
       </div>

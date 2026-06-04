@@ -588,6 +588,8 @@
     },
     "filter": {
       "allLines": "すべての路線",
+      "source": "ソース",
+      "allSources": "すべてのソース",
       "allTypes": "すべての種類",
       "allVisibility": "すべての公開範囲"
     },

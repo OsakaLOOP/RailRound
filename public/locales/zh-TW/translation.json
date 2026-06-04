@@ -588,6 +588,8 @@
     },
     "filter": {
       "allLines": "全部路線",
+      "source": "來源",
+      "allSources": "全部來源",
       "allTypes": "全部類型",
       "allVisibility": "全部可見性"
     },

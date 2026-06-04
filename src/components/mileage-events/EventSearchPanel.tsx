@@ -59,6 +59,7 @@ export const EventSearchPanel: React.FC<Props> = ({
   const [tags, setTags] = useState("");
   const [kind, setKind] = useState("all");
   const [visibility, setVisibility] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "rail_graph" | "legacy">("all");
   const [lineKey, setLineKey] = useState("");
   const [fromKm, setFromKm] = useState("");
   const [toKm, setToKm] = useState("");
@@ -78,8 +79,13 @@ export const EventSearchPanel: React.FC<Props> = ({
   );
 
   const entries = useMemo(
-    () => boundMileageEventsForRichDisplay(matchedEvents, railwayData, trips),
-    [matchedEvents, railwayData, trips],
+    () =>
+      boundMileageEventsForRichDisplay(matchedEvents, railwayData, trips).filter((entry) => {
+        if (sourceFilter === "all") return true;
+        if (sourceFilter === "rail_graph") return entry.lineContext.source === "rail_graph_runtime";
+        return entry.lineContext.source !== "rail_graph_runtime";
+      }),
+    [matchedEvents, railwayData, sourceFilter, trips],
   );
   const selectedEntries = useMemo(
     () => entries.filter((entry) => selectedEventIds.has(entry.bound.event.id)),
@@ -248,6 +254,18 @@ export const EventSearchPanel: React.FC<Props> = ({
               </select>
             </label>
           </div>
+          <label className="block text-xs font-medium text-slate-600">
+            {t("mileageEvents.filter.source", "Source")}
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+              value={sourceFilter}
+              onChange={(event) => setSourceFilter(event.target.value as typeof sourceFilter)}
+            >
+              <option value="all">{t("mileageEvents.filter.allSources", "All sources")}</option>
+              <option value="rail_graph">{t("mileageEvents.sourceRailGraph", "Rail graph snapshot")}</option>
+              <option value="legacy">{t("mileageEvents.sourceLegacy", "GeoJSON axis")}</option>
+            </select>
+          </label>
           <label className="block text-xs font-medium text-slate-600">
             {t("mileageEvents.line", "Line")}
             <select

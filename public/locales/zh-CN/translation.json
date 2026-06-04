@@ -588,6 +588,8 @@
     },
     "filter": {
       "allLines": "全部线路",
+      "source": "来源",
+      "allSources": "全部来源",
       "allTypes": "全部类型",
       "allVisibility": "全部可见性"
     },

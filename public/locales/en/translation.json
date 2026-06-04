@@ -588,6 +588,8 @@
     },
     "filter": {
       "allLines": "All lines",
+      "source": "Source",
+      "allSources": "All sources",
       "allTypes": "All types",
       "allVisibility": "All visibility"
     },

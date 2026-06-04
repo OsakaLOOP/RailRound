@@ -14,6 +14,7 @@ import { useStore } from "../../store";
 import { useShallow } from "zustand/react/shallow";
 import type { UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
 import {
+  boundMileageEventsForRichDisplay,
   buildAppMileageLineContext,
   eventsForLine,
   lineLabel,
@@ -42,10 +43,11 @@ import {
 
 export const MileageEventsPanel: React.FC = () => {
   const { t } = useTranslation();
-  const { railwayData, mileageUserEvents } = useStore(
+  const { railwayData, mileageUserEvents, trips } = useStore(
     useShallow((state) => ({
       railwayData: state.railwayData,
       mileageUserEvents: state.mileageUserEvents,
+      trips: state.trips,
     }))
   );
   const { importEvents } = useMileageEventActions();
@@ -199,6 +201,30 @@ export const MileageEventsPanel: React.FC = () => {
     () => mileageUserEvents.find((event) => event.id === selectedEventId) ?? null,
     [mileageUserEvents, selectedEventId],
   );
+  const activeRailGraphLineKey =
+    selectedProjection?.source === "rail_graph_runtime" && selectedProjection.lineKey
+      ? selectedProjection.lineKey
+      : "";
+  const currentRailGraphAxis = useMemo(() => {
+    if (!activeRailGraphLineKey) return null;
+    const entries = boundMileageEventsForRichDisplay(mileageUserEvents, railwayData, trips).filter(
+      (entry) =>
+        entry.lineContext.source === "rail_graph_runtime" &&
+        entry.lineContext.lineKey === activeRailGraphLineKey,
+    );
+    const lineContext = entries[0]?.lineContext;
+    return {
+      label:
+        lineContext?.source === "rail_graph_runtime"
+          ? lineContext.segment.lineLabel || lineLabel(activeRailGraphLineKey)
+          : lineLabel(activeRailGraphLineKey),
+      count: entries.length,
+      color:
+        lineContext?.source === "rail_graph_runtime"
+          ? lineContext.segment.displayColor || "#059669"
+          : "#059669",
+    };
+  }, [activeRailGraphLineKey, mileageUserEvents, railwayData, trips]);
   const sourceCounts = useMemo(() => {
     let railGraph = 0;
     let legacy = 0;
@@ -212,9 +238,11 @@ export const MileageEventsPanel: React.FC = () => {
     });
     return { railGraph, legacy };
   }, [mileageUserEvents]);
-  const currentAxisLabel = effectiveLineKey ? lineLabel(effectiveLineKey) : t("mileageEvents.noLineLoaded", "No line loaded");
-  const currentAxisEventCount = lineEntries.length;
-  const selectedLineColor = lineContext?.line.meta.color || "#0f766e";
+  const currentAxisLabel =
+    currentRailGraphAxis?.label ??
+    (effectiveLineKey ? lineLabel(effectiveLineKey) : t("mileageEvents.noLineLoaded", "No line loaded"));
+  const currentAxisEventCount = currentRailGraphAxis?.count ?? lineEntries.length;
+  const selectedLineColor = currentRailGraphAxis?.color ?? lineContext?.line.meta.color ?? "#0f766e";
 
   useEffect(() => {
     if (!open) {

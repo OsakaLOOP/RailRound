@@ -5,6 +5,7 @@ import {
   Edit2,
   Eye,
   FileJson,
+  GitMerge,
   Link2Off,
   MapPinned,
   Route,
@@ -154,6 +155,56 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
     updateEvent(updateMileageEventFromDraft(event, { tripId: "" }));
   };
 
+  const renderProjectionContext = () => {
+    if (!lineContext) return null;
+    if (lineContext.source === "rail_graph_runtime") {
+      const profile = lineContext.segment.mileageProfile;
+      return (
+        <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-2.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-emerald-800">
+            <GitMerge size={14} />
+            {t("mileageEvents.inspector.railGraphContext", "Saved rail-graph run")}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] font-semibold text-slate-600">
+            <span className="rounded bg-white px-1.5 py-0.5 text-emerald-700">
+              {t("mileageEvents.sourceRailGraph", "Rail graph snapshot")}
+            </span>
+            <span className="rounded bg-white px-1.5 py-0.5">
+              {t("mileageEvents.inspector.segment", "Segment")} {lineContext.segmentIndex + 1}
+            </span>
+            {profile.serviceType && (
+              <span className="rounded bg-white px-1.5 py-0.5">
+                {t("mileageEvents.inspector.service", "Service")} {profile.serviceType}
+              </span>
+            )}
+            {profile.direction && (
+              <span className="rounded bg-white px-1.5 py-0.5">
+                {t("mileageEvents.inspector.direction", "Direction")} {profile.direction}
+              </span>
+            )}
+            {profile.patternRef && (
+              <span className="max-w-full truncate rounded bg-white px-1.5 py-0.5">
+                {t("mileageEvents.inspector.pattern", "Pattern")} {String(profile.patternRef)}
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs">
+        <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+          <Route size={14} />
+          {t("mileageEvents.inspector.legacyContext", "GeoJSON mileage axis")}
+        </div>
+        <div className="mt-1 text-[11px] text-slate-500">
+          {t("mileageEvents.sourceLegacy", "GeoJSON axis")}
+          {lineName ? ` · ${lineName}` : ""}
+        </div>
+      </div>
+    );
+  };
+
   if (editing) {
     return (
       <section className="rounded-md border border-slate-200 bg-white p-3">
@@ -211,6 +262,8 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
           <InfoTerm label={t("mileageEvents.inspector.line", "Line")} value={lineName || t("mileageEvents.unknown", "Unknown")} />
           <InfoTerm label={t("mileageEvents.inspector.time", "Time")} value={timestampLabel(bound?.timestampInference, bound?.timestamp, t)} />
         </dl>
+
+        {renderProjectionContext()}
 
         {projectionStatus && projectionStatus.code !== "projected" && (
           <ProjectionStatusNotice status={projectionStatus} />

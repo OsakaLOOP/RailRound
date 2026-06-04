@@ -70,10 +70,12 @@ export const TripEditor: React.FC = () => {
     const [allowedLines, setAllowedLines] = useState<string[] | null>(null);
     const [autoPlanStatus, setAutoPlanStatus] = useState<AutoPlanStatus | null>(null);
     const [autoPlanCandidates, setAutoPlanCandidates] = useState<AppRouteCandidate[]>([]);
+    const [appliedCandidateId, setAppliedCandidateId] = useState<string | null>(null);
 
     const setManualSegmentsForm = (next: Parameters<typeof setForm>[0]) => {
         setAutoPlanStatus(null);
         setAutoPlanCandidates([]);
+        setAppliedCandidateId(null);
         setForm(next);
     };
 
@@ -81,12 +83,14 @@ export const TripEditor: React.FC = () => {
         if (!isOpen) {
             setAutoPlanStatus(null);
             setAutoPlanCandidates([]);
+            setAppliedCandidateId(null);
         }
     }, [isOpen]);
 
     useEffect(() => {
         setAutoPlanStatus(null);
         setAutoPlanCandidates([]);
+        setAppliedCandidateId(null);
     }, [autoForm.startLine, autoForm.startStation, autoForm.endLine, autoForm.endStation]);
 
     const currentTripDetail = useMemo(() => {
@@ -327,6 +331,7 @@ export const TripEditor: React.FC = () => {
             setForm({ segments: candidate.segments, railGraph: undefined });
             setAutoPlanStatus({ kind: 'legacy', reason: candidate.railGraphFallbackReason });
         }
+        setAppliedCandidateId(candidate.candidateId);
         setEditorMode(EditorMode.Manual);
     };
 
@@ -533,6 +538,60 @@ export const TripEditor: React.FC = () => {
         );
     };
 
+    const renderManualSourceStrip = () => {
+        if (currentTripDetail?.kind === 'rail_graph') {
+            return (
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-xs text-slate-600">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                                <CheckCircle2 size={14} />
+                                {t('tripEdit.manualRailGraphTitle', 'Editing saved rail-graph snapshot')}
+                            </div>
+                            <div className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-emerald-700">
+                                {t('tripEdit.manualRailGraphDetail', '{{segments}} segments · {{events}} user events · saved geometry and pattern metadata will be kept on save.', {
+                                    segments: currentTripDetail.segments.length,
+                                    events: currentTripDetail.overview.userEventCount,
+                                })}
+                            </div>
+                        </div>
+                        {renderPlannerBadge({
+                            tone: 'ready',
+                            icon: 'ready',
+                            label: t('tripEdit.railGraphSnapshot', 'Rail graph snapshot'),
+                        }, true)}
+                    </div>
+                    <div className="mt-2 rounded-md bg-white/80 px-2 py-1.5 text-[11px] text-slate-500">
+                        {t('tripEdit.manualSnapshotEditWarning', 'Changing line segments below converts this trip back to editable GeoJSON segments. Use auto planning to choose a new rail-graph snapshot.')}
+                    </div>
+                </div>
+            );
+        }
+
+        const segmentCount = form.segments?.filter(segment => segment.lineKey || segment.fromId || segment.toId).length ?? 0;
+        return (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                            <GitMerge size={14} className="text-slate-500" />
+                            {t('tripEdit.manualLegacyTitle', 'Editing GeoJSON route segments')}
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-500">
+                            {t('tripEdit.manualLegacyDetail', '{{count}} segments · compatible with imported GeoJSON and legacy records.', { count: segmentCount })}
+                        </div>
+                    </div>
+                    {autoPlanStatus?.kind === 'legacy' && renderPlannerBadge({
+                        tone: 'fallback',
+                        icon: 'fallback',
+                        label: t('tripEdit.plannerLegacyResult', 'Planned by legacy search'),
+                        title: plannerReasonTitle(autoPlanStatus.reason),
+                    }, true)}
+                </div>
+            </div>
+        );
+    };
+
     const renderRouteCandidates = () => {
         if (autoPlanCandidates.length === 0) return null;
         return (
@@ -546,14 +605,21 @@ export const TripEditor: React.FC = () => {
                     </div>
                 </div>
                 <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-                    {autoPlanCandidates.map((candidate) => (
+                    {autoPlanCandidates.map((candidate) => {
+                        const applied = appliedCandidateId === candidate.candidateId;
+                        return (
                         <button
                             key={candidate.candidateId}
                             type="button"
+                            aria-pressed={applied}
                             className={`w-full rounded-lg border bg-white p-3 text-left shadow-sm transition active:scale-[0.99] ${
-                                candidate.source === 'rail_graph'
-                                    ? 'border-emerald-100 hover:border-emerald-200 hover:bg-emerald-50/40'
-                                    : 'border-amber-100 hover:border-amber-200 hover:bg-amber-50/40'
+                                applied
+                                    ? candidate.source === 'rail_graph'
+                                        ? 'border-emerald-300 bg-emerald-50/60 ring-2 ring-emerald-100'
+                                        : 'border-amber-300 bg-amber-50/60 ring-2 ring-amber-100'
+                                    : candidate.source === 'rail_graph'
+                                        ? 'border-emerald-100 hover:border-emerald-200 hover:bg-emerald-50/40'
+                                        : 'border-amber-100 hover:border-amber-200 hover:bg-amber-50/40'
                             }`}
                             onClick={() => applyRouteCandidate(candidate)}
                         >
@@ -571,10 +637,14 @@ export const TripEditor: React.FC = () => {
                                     </div>
                                 <div className="flex shrink-0 flex-col items-end gap-1">
                                     <span className={candidate.source === 'rail_graph'
-                                        ? 'rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white'
-                                        : 'rounded-md bg-amber-600 px-2 py-1 text-xs font-semibold text-white'}
+                                        ? applied
+                                            ? 'rounded-md bg-white px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200'
+                                            : 'rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white'
+                                        : applied
+                                            ? 'rounded-md bg-white px-2 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200'
+                                            : 'rounded-md bg-amber-600 px-2 py-1 text-xs font-semibold text-white'}
                                     >
-                                        {t('tripEdit.useCandidate', 'Use')}
+                                        {applied ? t('tripEdit.candidateApplied', 'Applied') : t('tripEdit.useCandidate', 'Use')}
                                     </span>
                                     <span className={candidate.source === 'rail_graph'
                                         ? 'rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700'
@@ -647,7 +717,8 @@ export const TripEditor: React.FC = () => {
                                 </div>
                             )}
                         </button>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         );
@@ -915,6 +986,7 @@ export const TripEditor: React.FC = () => {
 
                     {editorMode === EditorMode.Manual && (
                         <div className="p-6 space-y-6 overflow-y-auto">
+                            {renderManualSourceStrip()}
                             <input type="date" className="w-full p-2 border rounded bg-gray-50 font-bold text-gray-800" value={form.date || ''} onChange={e => setForm({ date: e.target.value })} />
 
                             <div>

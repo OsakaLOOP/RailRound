@@ -214,6 +214,7 @@
       "railGraphProjectionHint": "ユーザーイベントは、この旅程の保存済み rail-graph 運行スナップショット上で並びます。",
       "geoJsonProjectionHint": "ユーザーイベントは、現在の GeoJSON app-line キロ程軸上で並びます。",
       "add": "イベントを追加",
+      "addOnMap": "地図で追加",
       "copy": "概要をコピー",
       "empty": "この旅程にはイベントがありません",
       "replay": "旅程リプレイ",
@@ -327,7 +328,8 @@
     "placeholderMemo": "メモ...",
     "placeholderUrl": "画像URL...",
     "btnCreate": "追加",
-    "btnUpdate": "更新"
+    "btnUpdate": "更新",
+    "createEvent": "ユーザーイベントを作成"
   },
   "githubCard": {
     "title": "GitHub プロフィール装飾",
@@ -550,13 +552,12 @@
     "markerClusterWithSource": "{{count}} 件のイベント · {{source}}",
     "markerSingleWithSource": "{{title}} · {{source}}",
     "useMapCenter": "地図中心を使用",
-    "convertPins": "ピンを変換",
-    "legacyPinTitle": "インポートした地図ピン",
     "sourceCountRailGraph": "Rail graph {{count}}",
     "sourceCountLegacy": "GeoJSON {{count}}",
     "sourceRailGraph": "Rail graph スナップショット",
     "sourceLegacy": "GeoJSON 軸",
     "sourceMixed": "混在ソース",
+    "selectedLine": "選択中の路線",
     "noLineLoaded": "路線未読み込み",
     "axisEventCount": "軸上 {{count}} 件",
     "axisSourceHint": "rail-graph 旅程イベントは保存済み運行スナップショットから投影され、GeoJSON イベントは app-line キロ程軸に残ります。",

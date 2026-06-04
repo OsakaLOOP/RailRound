@@ -47,8 +47,6 @@ import {
   searchMileageEvents,
   tagsFromInput,
 } from "../utils/mileageUserEvents";
-import { EventComposer } from "../components/mileage-events/EventComposer";
-import { EventInspector } from "../components/mileage-events/EventInspector";
 import type { MileageEventListEntry } from "../components/mileage-events/EventList";
 import { eventKindLabel, eventSourceLabel, eventSourceTone, eventVisibilityLabel, mileageEventKinds, mileageEventVisibilities, timestampLabel } from "../components/mileage-events/display";
 import {
@@ -60,6 +58,7 @@ import {
   tripDetailKeyEvents,
   type TripDetailModel,
 } from "../utils/railGraphTripDetailModel";
+import { openMileageEventsPanel, selectMileageEventOnMap } from "../utils/mileageEventUiBridge";
 
 const RouteSlice = React.memo(
   ({ segments }: { segments: any[] }) => {
@@ -218,7 +217,6 @@ export const TripsPage: React.FC = () => {
   const [eventKind, setEventKind] = useState<MileageUserEventKind | "all">("all");
   const [eventIncompleteOnly, setEventIncompleteOnly] = useState(false);
   const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
-  const [addingEventTripId, setAddingEventTripId] = useState<string | null>(null);
   const [selectedTripEventId, setSelectedTripEventId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -626,24 +624,44 @@ export const TripsPage: React.FC = () => {
     }, 0);
   };
 
-  const selectTripEvent = (eventId: string) => {
+  const eventEntryLineKey = (entry: MileageEventListEntry) => entry.lineContext?.lineKey;
+
+  const selectTripEvent = (eventId: string, entry?: MileageEventListEntry) => {
     setSelectedTripEventId(eventId);
-    window.dispatchEvent(
-      new CustomEvent("mileage-event:select", {
-        detail: { eventId },
-      }),
-    );
+    selectMileageEventOnMap({
+      eventId,
+      lineKey: entry ? eventEntryLineKey(entry) : undefined,
+      source: entry?.lineContext?.source,
+    });
+  };
+
+  const openTripEventCreateOnMap = (trip: (typeof trips)[number]) => {
+    const segments = tripToProductSegments(trip, railwayData);
+    const firstLineKey = segments.find((segment: any) => segment.lineKey)?.lineKey;
+    goToTab("map");
+    window.setTimeout(() => {
+      openMileageEventsPanel({
+        mode: "create",
+        lineKey: firstLineKey,
+        create: {
+          source: "trip",
+          tripId: trip.id,
+          lineKey: firstLineKey,
+          tags: ["trip-event"],
+        },
+      });
+    }, 150);
   };
 
   const focusTripEventOnMap = (entry: MileageEventListEntry) => {
-    selectTripEvent(entry.bound.event.id);
+    selectTripEvent(entry.bound.event.id, entry);
     goToTab("map");
     window.setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent("mileage-event:select", {
-          detail: { eventId: entry.bound.event.id },
-        }),
-      );
+      selectMileageEventOnMap({
+        eventId: entry.bound.event.id,
+        lineKey: eventEntryLineKey(entry),
+        source: entry.lineContext?.source,
+      });
       if (!entry.bound.coordinates) return;
       window.dispatchEvent(
         new CustomEvent("map:fly-to-location", {
@@ -862,10 +880,6 @@ export const TripsPage: React.FC = () => {
     const replayItems = tripReplayItems(trip, entries);
     const detail = buildTripDetailModel({ trip, railwayData, userEvents: mileageUserEvents });
     const isExpanded = expandedTripId === tripId;
-    const selectedEvent =
-      selectedTripEventId && entries.some((entry) => entry.bound.event.id === selectedTripEventId)
-        ? mileageUserEvents.find((event) => event.id === selectedTripEventId) ?? null
-        : null;
 
     return (
       <div className="mt-3 border-t border-gray-100 pt-3" onClick={(event) => event.stopPropagation()}>
@@ -971,10 +985,10 @@ export const TripsPage: React.FC = () => {
               <button
                 type="button"
                 className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                onClick={() => setAddingEventTripId(addingEventTripId === tripId ? null : tripId)}
+                onClick={() => openTripEventCreateOnMap(trip)}
               >
                 <Plus size={13} />
-                {t("tripsPage.eventCenter.add", "Add event")}
+                {t("tripsPage.eventCenter.addOnMap", "Add on map")}
               </button>
               <button
                 type="button"
@@ -1001,21 +1015,6 @@ export const TripsPage: React.FC = () => {
                 MDX
               </button>
             </div>
-
-            {addingEventTripId === tripId && (
-              <div className="rounded-md border border-emerald-100 bg-emerald-50/40 p-2">
-                <EventComposer
-                  defaultSource="trip"
-                  defaultTripId={trip.id}
-                  compact
-                  onSaved={(event) => {
-                    setAddingEventTripId(null);
-                    selectTripEvent(event.id);
-                  }}
-                  onCancel={() => setAddingEventTripId(null)}
-                />
-              </div>
-            )}
 
             <div className="rounded-md border border-slate-200 bg-slate-50/60 p-2">
               <div className="mb-2 flex items-center justify-between gap-2 px-1 text-xs">
@@ -1068,11 +1067,11 @@ export const TripsPage: React.FC = () => {
                             ? "border-emerald-300 bg-emerald-50"
                             : "border-slate-200 bg-white hover:border-slate-300"
                         }`}
-                        onClick={() => selectTripEvent(event.id)}
+                        onClick={() => focusTripEventOnMap(item.entry)}
                         onKeyDown={(keyEvent) => {
                           if (keyEvent.key === "Enter" || keyEvent.key === " ") {
                             keyEvent.preventDefault();
-                            selectTripEvent(event.id);
+                            focusTripEventOnMap(item.entry);
                           }
                         }}
                       >
@@ -1113,13 +1112,6 @@ export const TripsPage: React.FC = () => {
               </div>
             </div>
 
-            {selectedEvent && (
-              <EventInspector
-                event={selectedEvent}
-                onClose={() => setSelectedTripEventId(null)}
-                onDeleted={() => setSelectedTripEventId(null)}
-              />
-            )}
           </div>
         )}
       </div>

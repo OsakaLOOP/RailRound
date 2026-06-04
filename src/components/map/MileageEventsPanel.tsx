@@ -15,7 +15,6 @@ import { useShallow } from "zustand/react/shallow";
 import type { UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
 import {
   buildAppMileageLineContext,
-  createMileageEventFromCoordinates,
   eventsForLine,
   lineLabel,
   queryEventsNearPlace,
@@ -27,9 +26,19 @@ import { EventInspector } from "../mileage-events/EventInspector";
 import { EventList, MileageEventListEntry } from "../mileage-events/EventList";
 import { EventSearchPanel } from "../mileage-events/EventSearchPanel";
 import { useMileageEventActions } from "../mileage-events/useMileageEventActions";
-
-type PanelMode = "line" | "place" | "time" | "create";
-type PlaceSource = "station" | "map";
+import {
+  customEventDetail,
+  mileageEventUiEvents,
+  requestMileageEventsMapCenter,
+  selectMileageEventOnMap,
+  setActiveMileageLine,
+  type MileageEventSelectDetail,
+  type MileageEventsComposerSource,
+  type MileageEventsMapPointDetail,
+  type MileageEventsOpenDetail,
+  type MileageEventsPanelMode,
+  type MileageEventsPlaceSource,
+} from "../../utils/mileageEventUiBridge";
 
 export const MileageEventsPanel: React.FC = () => {
   const { t } = useTranslation();
@@ -39,7 +48,7 @@ export const MileageEventsPanel: React.FC = () => {
       mileageUserEvents: state.mileageUserEvents,
     }))
   );
-  const { importEvents, persistEvents } = useMileageEventActions();
+  const { importEvents } = useMileageEventActions();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const lineKeys = useMemo(() => Object.keys(railwayData).sort(), [railwayData]);
@@ -49,10 +58,25 @@ export const MileageEventsPanel: React.FC = () => {
   const [radiusMeters, setRadiusMeters] = useState(1000);
   const [timeFrom, setTimeFrom] = useState("08:00");
   const [timeTo, setTimeTo] = useState("09:00");
-  const [mode, setMode] = useState<PanelMode>("line");
-  const [placeSource, setPlaceSource] = useState<PlaceSource>("station");
+  const [mode, setMode] = useState<MileageEventsPanelMode>("line");
+  const [placeSource, setPlaceSource] = useState<MileageEventsPlaceSource>("station");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [selectedProjection, setSelectedProjection] = useState<{
+    lineKey?: string;
+    source?: MileageEventSelectDetail["source"];
+  } | null>(null);
   const [mapPoint, setMapPoint] = useState<{ lat: number; lng: number } | null>(null);
+  const [composerDraft, setComposerDraft] = useState<{
+    source: MileageEventsComposerSource;
+    tripId?: string | number;
+    lineKey?: string;
+    stationId?: string;
+    title?: string;
+    body?: string;
+    tags?: string[];
+    mediaUrl?: string;
+    resetKey: number;
+  }>({ source: "station", resetKey: 0 });
 
   const effectiveLineKey = lineKey || lineKeys[0] || "";
   const lineContext = useMemo(
@@ -64,15 +88,54 @@ export const MileageEventsPanel: React.FC = () => {
 
   useEffect(() => {
     const handleSelect = (event: Event) => {
-      const customEvent = event as CustomEvent<{ eventId?: string }>;
-      if (!customEvent.detail?.eventId) return;
+      const detail = customEventDetail<MileageEventSelectDetail>(event);
+      if (!detail.eventId) return;
       setOpen(true);
-      setSelectedEventId(customEvent.detail.eventId);
+      setSelectedEventId(detail.eventId);
+      setSelectedProjection({ lineKey: detail.lineKey, source: detail.source });
+      if (detail.lineKey && lineKeys.includes(detail.lineKey)) {
+        setLineKey(detail.lineKey);
+        setMode("line");
+      } else if (detail.source === "rail_graph_runtime") {
+        setActiveMileageLine({ lineKey: detail.lineKey ?? null, source: detail.source });
+      }
+    };
+    const handleOpen = (event: Event) => {
+      const detail = customEventDetail<MileageEventsOpenDetail>(event);
+      setOpen(true);
+      setSelectedEventId(detail.eventId ?? null);
+      if (!detail.eventId) setSelectedProjection(null);
+      if (detail.lineKey && lineKeys.includes(detail.lineKey)) {
+        setLineKey(detail.lineKey);
+      }
+      if (detail.mode) setMode(detail.mode);
+      if (!detail.create) return;
+
+      const create = detail.create;
+      const nextLineKey = create.lineKey || detail.lineKey;
+      if (nextLineKey && lineKeys.includes(nextLineKey)) setLineKey(nextLineKey);
+      if (create.stationId !== undefined) setStationId(create.stationId);
+      if (create.mapPoint) {
+        setMapPoint(create.mapPoint);
+        setPlaceSource("map");
+      }
+      setMode("create");
+      setComposerDraft((current) => ({
+        source: create.source ?? "station",
+        tripId: create.tripId,
+        lineKey: nextLineKey,
+        stationId: create.stationId,
+        title: create.title,
+        body: create.body,
+        tags: create.tags,
+        mediaUrl: create.mediaUrl,
+        resetKey: current.resetKey + 1,
+      }));
     };
     const handleMapPoint = (event: Event) => {
-      const customEvent = event as CustomEvent<{ lat?: number; lng?: number }>;
-      if (typeof customEvent.detail?.lat !== "number" || typeof customEvent.detail?.lng !== "number") return;
-      setMapPoint({ lat: customEvent.detail.lat, lng: customEvent.detail.lng });
+      const detail = customEventDetail<MileageEventsMapPointDetail>(event);
+      if (typeof detail.lat !== "number" || typeof detail.lng !== "number") return;
+      setMapPoint({ lat: detail.lat, lng: detail.lng });
       if (mode === "place") {
         setPlaceSource("map");
         return;
@@ -80,13 +143,15 @@ export const MileageEventsPanel: React.FC = () => {
       if (mode === "create") return;
       setMode("create");
     };
-    window.addEventListener("mileage-event:select", handleSelect);
-    window.addEventListener("mileage-events:map-point", handleMapPoint);
+    window.addEventListener(mileageEventUiEvents.select, handleSelect);
+    window.addEventListener(mileageEventUiEvents.open, handleOpen);
+    window.addEventListener(mileageEventUiEvents.mapPoint, handleMapPoint);
     return () => {
-      window.removeEventListener("mileage-event:select", handleSelect);
-      window.removeEventListener("mileage-events:map-point", handleMapPoint);
+      window.removeEventListener(mileageEventUiEvents.select, handleSelect);
+      window.removeEventListener(mileageEventUiEvents.open, handleOpen);
+      window.removeEventListener(mileageEventUiEvents.mapPoint, handleMapPoint);
     };
-  }, [mode]);
+  }, [lineKeys, mode]);
 
   const lineEntries = useMemo<MileageEventListEntry[]>(
     () =>
@@ -143,14 +208,27 @@ export const MileageEventsPanel: React.FC = () => {
   }, [mileageUserEvents]);
   const currentAxisLabel = effectiveLineKey ? lineLabel(effectiveLineKey) : t("mileageEvents.noLineLoaded", "No line loaded");
   const currentAxisEventCount = lineEntries.length;
+  const selectedLineColor = lineContext?.line.meta.color || "#0f766e";
+
+  useEffect(() => {
+    if (!open) {
+      setActiveMileageLine({ lineKey: null });
+      return;
+    }
+    if (selectedEvent && selectedProjection?.source === "rail_graph_runtime") {
+      setActiveMileageLine({
+        lineKey: selectedProjection.lineKey ?? null,
+        source: selectedProjection.source,
+      });
+      return;
+    }
+    setActiveMileageLine({ lineKey: lineContext ? effectiveLineKey : null });
+  }, [effectiveLineKey, lineContext, open, selectedEvent, selectedProjection]);
 
   const selectEvent = (eventId: string) => {
     setSelectedEventId(eventId);
-    window.dispatchEvent(
-      new CustomEvent("mileage-event:select", {
-        detail: { eventId },
-      }),
-    );
+    setSelectedProjection(lineContext ? { lineKey: effectiveLineKey, source: "legacy_app" } : null);
+    selectMileageEventOnMap({ eventId, lineKey: lineContext ? effectiveLineKey : undefined });
   };
 
   const focusEventOnMap = (entry: MileageEventListEntry) => {
@@ -208,28 +286,6 @@ export const MileageEventsPanel: React.FC = () => {
     reader.readAsText(file, "UTF-8");
   };
 
-  const convertLegacyPins = () => {
-    const pins = useStore.getState().pins;
-    if (!lineContext || pins.length === 0) return;
-    const created = pins
-      .map((pin) => {
-        const title = pin.comment || t("mileageEvents.legacyPinTitle", "Imported map pin");
-        const event = {
-          lineContext,
-          coordinates: [pin.lng, pin.lat] as [number, number],
-          title,
-          body: pin.imageUrl || undefined,
-          tags: ["legacy-pin"],
-          mediaUrl: pin.imageUrl,
-        };
-        return event;
-      });
-    const next = created
-      .map((draft) => createMileageEventFromCoordinates(draft))
-      .filter((event): event is UserEventV2 => event !== null);
-    if (next.length) persistEvents([...mileageUserEvents, ...next]);
-  };
-
   if (!open) {
     return (
       <button
@@ -266,7 +322,11 @@ export const MileageEventsPanel: React.FC = () => {
           </div>
           <div className="mt-2 rounded-md border border-slate-200 bg-white/80 px-2 py-1.5 text-[11px] text-slate-600">
             <div className="flex min-w-0 items-center justify-between gap-2">
-              <span className="truncate font-semibold">{currentAxisLabel}</span>
+              <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: selectedLineColor }} />
+                <span className="shrink-0 text-slate-400">{t("mileageEvents.selectedLine", "Selected line")}</span>
+                <span className="truncate">{currentAxisLabel}</span>
+              </span>
               <span className="shrink-0 text-slate-400">
                 {t("mileageEvents.axisEventCount", "{{count}} on axis", { count: currentAxisEventCount })}
               </span>
@@ -336,8 +396,14 @@ export const MileageEventsPanel: React.FC = () => {
           {selectedEvent ? (
             <EventInspector
               event={selectedEvent}
-              onClose={() => setSelectedEventId(null)}
-              onDeleted={() => setSelectedEventId(null)}
+              onClose={() => {
+                setSelectedEventId(null);
+                setSelectedProjection(null);
+              }}
+              onDeleted={() => {
+                setSelectedEventId(null);
+                setSelectedProjection(null);
+              }}
             />
           ) : lineKeys.length === 0 ? (
             <div className="rl-card-muted p-3 text-xs text-slate-500">
@@ -410,7 +476,7 @@ export const MileageEventsPanel: React.FC = () => {
                             <button
                               type="button"
                               className="rl-secondary-action mt-2 w-full px-2 py-1.5 text-[11px] font-semibold"
-                              onClick={() => window.dispatchEvent(new CustomEvent("mileage-events:request-map-center"))}
+                              onClick={requestMileageEventsMapCenter}
                             >
                               {t("mileageEvents.useMapCenter", "Use map center")}
                             </button>
@@ -484,27 +550,26 @@ export const MileageEventsPanel: React.FC = () => {
               )}
               {mode === "create" && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2">
                     <button
                       type="button"
                       className="rl-secondary-action px-2 py-2 text-xs font-semibold"
-                      onClick={() => window.dispatchEvent(new CustomEvent("mileage-events:request-map-center"))}
+                      onClick={requestMileageEventsMapCenter}
                     >
                       {t("mileageEvents.useMapCenter", "Use map center")}
-                    </button>
-                    <button
-                      type="button"
-                      className="rl-secondary-action px-2 py-2 text-xs font-semibold"
-                      onClick={convertLegacyPins}
-                    >
-                      {t("mileageEvents.convertPins", "Convert pins")}
                     </button>
                   </div>
                   <div className="rl-card p-3 shadow-sm">
                     <EventComposer
-                      defaultLineKey={effectiveLineKey}
-                      defaultStationId={effectiveStationId}
-                      defaultSource={mapPoint ? "map" : "station"}
+                      defaultLineKey={composerDraft.lineKey || effectiveLineKey}
+                      defaultStationId={composerDraft.stationId || effectiveStationId}
+                      defaultTripId={composerDraft.tripId}
+                      defaultSource={composerDraft.source || (mapPoint ? "map" : "station")}
+                      defaultTitle={composerDraft.title}
+                      defaultBody={composerDraft.body}
+                      defaultTags={composerDraft.tags}
+                      defaultMediaUrl={composerDraft.mediaUrl}
+                      resetKey={composerDraft.resetKey}
                       mapPoint={mapPoint}
                       onSaved={(event) => selectEvent(event.id)}
                     />

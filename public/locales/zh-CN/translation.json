@@ -214,6 +214,7 @@
       "railGraphProjectionHint": "用户事件按本次行程已保存的 rail-graph 运行快照排序。",
       "geoJsonProjectionHint": "用户事件按当前 GeoJSON app-line 里程轴排序。",
       "add": "添加事件",
+      "addOnMap": "在地图添加",
       "copy": "复制摘要",
       "empty": "本次行程没有事件",
       "replay": "行程回放",
@@ -327,7 +328,8 @@
     "placeholderMemo": "备注...",
     "placeholderUrl": "图片URL...",
     "btnCreate": "添加",
-    "btnUpdate": "更新"
+    "btnUpdate": "更新",
+    "createEvent": "创建用户事件"
   },
   "githubCard": {
     "title": "GitHub 个人资料装饰",
@@ -550,13 +552,12 @@
     "markerClusterWithSource": "{{count}} 个事件 · {{source}}",
     "markerSingleWithSource": "{{title}} · {{source}}",
     "useMapCenter": "使用地图中心",
-    "convertPins": "转换图钉",
-    "legacyPinTitle": "导入的地图图钉",
     "sourceCountRailGraph": "Rail graph {{count}}",
     "sourceCountLegacy": "GeoJSON {{count}}",
     "sourceRailGraph": "Rail graph 快照",
     "sourceLegacy": "GeoJSON 轴",
     "sourceMixed": "混合来源",
+    "selectedLine": "选中线路",
     "noLineLoaded": "未加载线路",
     "axisEventCount": "轴上 {{count}} 个",
     "axisSourceHint": "rail-graph 行程事件从已保存运行快照投影；GeoJSON 事件继续保留在 app-line 里程轴上。",

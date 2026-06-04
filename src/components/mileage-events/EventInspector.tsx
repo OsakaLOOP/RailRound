@@ -37,6 +37,7 @@ import { EventComposer } from "./EventComposer";
 import { useMileageEventActions } from "./useMileageEventActions";
 import { useAppNavigation } from "../../hooks/useAppNavigation";
 import { showConfirm } from "../../utils/alerts";
+import { selectMileageEventOnMap } from "../../utils/mileageEventUiBridge";
 
 interface Props {
   event: UserEventV2 | null;
@@ -94,11 +95,11 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
   const openInMap = () => {
     goToTab("map");
     window.setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent("mileage-event:select", {
-          detail: { eventId: event.id },
-        }),
-      );
+      selectMileageEventOnMap({
+        eventId: event.id,
+        lineKey: lineContext?.lineKey,
+        source: lineContext?.source,
+      });
       if (!bound?.coordinates) return;
       window.dispatchEvent(
         new CustomEvent("map:fly-to-location", {

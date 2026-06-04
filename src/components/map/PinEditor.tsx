@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { Move, Magnet, Camera, MessageSquare, Trash2, X } from 'lucide-react';
+import { Move, Magnet, Camera, MessageSquare, Trash2, X, MapPinned } from 'lucide-react';
 import { useStore, PinMode } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
 import { showConfirm } from '../../utils/alerts';
+import { openMileageEventsPanel } from '../../utils/mileageEventUiBridge';
 
 const COLOR_PALETTE = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#64748b'];
 
@@ -55,6 +56,22 @@ export const PinEditor: React.FC = () => {
         }
     };
 
+    const createEventFromPin = () => {
+        if (!editingPin) return;
+        openMileageEventsPanel({
+            mode: 'create',
+            lineKey: editingPin.lineKey,
+            create: {
+                source: 'map',
+                lineKey: editingPin.lineKey,
+                mapPoint: { lat: editingPin.lat, lng: editingPin.lng },
+                title: editingPin.comment || '',
+                mediaUrl: editingPin.imageUrl || '',
+                tags: ['pin'],
+            },
+        });
+    };
+
     useEffect(() => {
         if (!editingPin) return;
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -100,6 +117,14 @@ export const PinEditor: React.FC = () => {
             {editingPin.type === 'photo' && (
                 <input className="w-full p-2 border rounded text-sm mb-3" placeholder={t('pin.placeholderUrl', "图片URL...")} value={editingPin.imageUrl || ''} onChange={e => setEditingPin({ ...editingPin, imageUrl: e.target.value })} />
             )}
+            <button
+                type="button"
+                onClick={createEventFromPin}
+                className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+            >
+                <MapPinned size={16} />
+                {t('pin.createEvent', 'Create user event')}
+            </button>
             <div className="flex gap-2">
                 {!editingPin.isTemp && (
                     <button onClick={() => deletePin(editingPin.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">

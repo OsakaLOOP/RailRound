@@ -30,6 +30,11 @@ interface Props {
   defaultStationId?: string;
   defaultTripId?: string | number;
   defaultSource?: ComposerSource;
+  defaultTitle?: string;
+  defaultBody?: string;
+  defaultTags?: string[];
+  defaultMediaUrl?: string;
+  resetKey?: string | number;
   mapPoint?: { lat: number; lng: number } | null;
   compact?: boolean;
   onSaved?: (event: UserEventV2) => void;
@@ -42,6 +47,11 @@ export const EventComposer: React.FC<Props> = ({
   defaultStationId,
   defaultTripId,
   defaultSource = "station",
+  defaultTitle = "",
+  defaultBody = "",
+  defaultTags,
+  defaultMediaUrl = "",
+  resetKey,
   mapPoint,
   compact = false,
   onSaved,
@@ -55,6 +65,7 @@ export const EventComposer: React.FC<Props> = ({
     }))
   );
   const { addEvent, updateEvent } = useMileageEventActions();
+  const defaultTagsInput = tagsToInput(defaultTags);
 
   const lineKeys = useMemo(() => Object.keys(railwayData).sort(), [railwayData]);
   const eventLineKey = event ? findLineKeyForMileageEvent(event) : null;
@@ -66,12 +77,12 @@ export const EventComposer: React.FC<Props> = ({
   const [distanceKm, setDistanceKm] = useState(event ? (event.mileage.distanceMeters / 1000).toFixed(1) : "0");
   const [tripId, setTripId] = useState<string>(defaultTripId !== undefined ? String(defaultTripId) : "");
   const [tripRatio, setTripRatio] = useState("0.5");
-  const [title, setTitle] = useState(event?.title ?? "");
-  const [body, setBody] = useState(event?.body ?? "");
+  const [title, setTitle] = useState(event?.title ?? defaultTitle);
+  const [body, setBody] = useState(event?.body ?? defaultBody);
   const [kind, setKind] = useState(event?.kind ?? "user_note");
   const [visibility, setVisibility] = useState(event?.visibility ?? "private");
-  const [tagsInput, setTagsInput] = useState(tagsToInput(event?.tags));
-  const [mediaUrl, setMediaUrl] = useState(String(event?.payload?.mediaUrl ?? ""));
+  const [tagsInput, setTagsInput] = useState(event ? tagsToInput(event.tags) : defaultTagsInput);
+  const [mediaUrl, setMediaUrl] = useState(String(event?.payload?.mediaUrl ?? defaultMediaUrl));
   const [linkedTripId, setLinkedTripId] = useState<string>(String(event?.payload?.tripId ?? defaultTripId ?? ""));
 
   useEffect(() => {
@@ -92,6 +103,14 @@ export const EventComposer: React.FC<Props> = ({
     if (event) return;
     setSource(defaultSource);
   }, [defaultSource, event]);
+
+  useEffect(() => {
+    if (event) return;
+    setTitle(defaultTitle);
+    setBody(defaultBody);
+    setTagsInput(defaultTagsInput);
+    setMediaUrl(defaultMediaUrl);
+  }, [defaultBody, defaultMediaUrl, defaultTagsInput, defaultTitle, event, resetKey]);
 
   useEffect(() => {
     if (event) return;

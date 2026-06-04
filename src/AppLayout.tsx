@@ -48,6 +48,7 @@ import { useMeta } from "./contexts";
 import { useTranslation } from "react-i18next";
 import { showAlert, showConfirm } from "./utils/alerts";
 import { boundMileageEventForRichDisplay } from "./utils/mileageUserEvents";
+import { selectMileageEventOnMap } from "./utils/mileageEventUiBridge";
 import { tripToKmlPathItems, tripToProductSegments } from "./utils/tripProductProjection";
 import { buildTripDetailModel } from "./utils/railGraphTripDetailModel";
 import { useLocation } from "react-router-dom";
@@ -1885,11 +1886,11 @@ export const AppLayout: React.FC = () => {
           }),
         );
       }
-      window.dispatchEvent(
-        new CustomEvent("mileage-event:select", {
-          detail: { eventId },
-        }),
-      );
+      selectMileageEventOnMap({
+        eventId,
+        lineKey: projected?.lineContext.lineKey,
+        source: projected?.lineContext.source,
+      });
     }, 150);
   };
 

@@ -214,6 +214,7 @@
       "railGraphProjectionHint": "User events are ordered on the saved rail-graph run snapshot for this trip.",
       "geoJsonProjectionHint": "User events are ordered on the current GeoJSON app-line mileage axis.",
       "add": "Add event",
+      "addOnMap": "Add on map",
       "copy": "Copy summary",
       "empty": "No events on this trip",
       "replay": "Trip replay",
@@ -327,7 +328,8 @@
     "placeholderMemo": "Memo...",
     "placeholderUrl": "Image URL...",
     "btnCreate": "Add",
-    "btnUpdate": "Update"
+    "btnUpdate": "Update",
+    "createEvent": "Create user event"
   },
   "githubCard": {
     "title": "GitHub Profile Decoration",
@@ -550,13 +552,12 @@
     "markerClusterWithSource": "{{count}} events · {{source}}",
     "markerSingleWithSource": "{{title}} · {{source}}",
     "useMapCenter": "Use map center",
-    "convertPins": "Convert pins",
-    "legacyPinTitle": "Imported map pin",
     "sourceCountRailGraph": "Rail graph {{count}}",
     "sourceCountLegacy": "GeoJSON {{count}}",
     "sourceRailGraph": "Rail graph snapshot",
     "sourceLegacy": "GeoJSON axis",
     "sourceMixed": "Mixed sources",
+    "selectedLine": "Selected line",
     "noLineLoaded": "No line loaded",
     "axisEventCount": "{{count}} on axis",
     "axisSourceHint": "Rail-graph trip events project from saved run snapshots; GeoJSON events remain on app-line mileage axes.",

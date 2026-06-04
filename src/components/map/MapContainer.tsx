@@ -16,6 +16,14 @@ import toast from "react-hot-toast";
 import { useAppRouteState } from "../../hooks/useAppRouteState";
 import { boundMileageEventsForRichDisplay } from "../../utils/mileageUserEvents";
 import { tripToProductSegments } from "../../utils/tripProductProjection";
+import {
+  customEventDetail,
+  mileageEventUiEvents,
+  selectMileageEventOnMap,
+  setMileageEventsMapPoint,
+  type MileageEventSelectDetail,
+  type MileageEventsActiveLineDetail,
+} from "../../utils/mileageEventUiBridge";
 import i18next from "i18next";
 
 // 记录各域名最后一次报错的时间，用于节流
@@ -42,6 +50,7 @@ export const MapContainer: React.FC<Props> = ({
   const mapInstance = useRef<L.Map | null>(null);
   const pinsLayer = useRef<L.LayerGroup | null>(null);
   const baseLinesLayer = useRef<L.LayerGroup | null>(null);
+  const activeMileageLineLayer = useRef<L.LayerGroup | null>(null);
   const baseStationsLayer = useRef<L.LayerGroup | null>(null);
   const geoDataRef = useRef<CustomFeatureCollection | null>(null);
   const visitedStationsRef = useRef<Set<string>>(new Set());
@@ -55,6 +64,7 @@ export const MapContainer: React.FC<Props> = ({
 
   // Explicit SVG Renderers for pointer-events passthrough
   const baseLinesRendererRef = useRef<L.Renderer | null>(null);
+  const activeMileageLineRendererRef = useRef<L.Renderer | null>(null);
   const baseStationsRendererRef = useRef<L.Renderer | null>(null);
   const routeRendererRef = useRef<L.Renderer | null>(null);
   const visitedStationsRendererRef = useRef<L.Renderer | null>(null);
@@ -80,7 +90,21 @@ export const MapContainer: React.FC<Props> = ({
 
   const [isMapInitialized, setIsMapInitialized] = React.useState(false);
   const [selectedMileageEventId, setSelectedMileageEventId] = React.useState<string | null>(null);
+  const [activeMileageLineKey, setActiveMileageLineKey] = React.useState<string | null>(null);
   const { tab: activeTab } = useAppRouteState();
+
+  const featureLineKey = (feature: CustomGeoJSONFeature) => {
+    const company = feature.properties.company || feature.properties.operator;
+    const line = feature.properties.line || feature.properties.name;
+    return company && line ? `${company}:${line}` : null;
+  };
+
+  const isActiveRouteItem = (item: { lineKey?: string; source?: "rail_graph" | "legacy" | "walk" }) => {
+    if (!activeMileageLineKey || item.source === "walk") return false;
+    if (item.lineKey && activeMileageLineKey === item.lineKey) return true;
+    if (item.lineKey && activeMileageLineKey === `rail-graph:${item.lineKey}`) return true;
+    return item.source === "rail_graph" && activeMileageLineKey.startsWith("rail-graph:");
+  };
 
   const flyToLocation = (detail: Partial<FlyToLocationDetail> | null | undefined) => {
     if (typeof detail?.lat !== "number" || typeof detail.lng !== "number") return;
@@ -196,8 +220,9 @@ export const MapContainer: React.FC<Props> = ({
     geoDataRef.current = geoData;
     if (isMapInitialized && leafletReady && geoData) {
       renderBaseMap(geoData);
+      renderActiveMileageLine(geoData);
     }
-  }, [geoData, leafletReady, isMapInitialized, railwayData]);
+  }, [geoData, leafletReady, isMapInitialized, railwayData, activeMileageLineKey]);
 
   useEffect(() => {
     visitedStationsRef.current = visitedStations;
@@ -210,7 +235,7 @@ export const MapContainer: React.FC<Props> = ({
     if (isMapInitialized && leafletReady && tripSegmentsGeometry) {
       renderTripRoutes();
     }
-  }, [tripSegmentsGeometry, leafletReady, mapZoom, isMapInitialized]);
+  }, [tripSegmentsGeometry, leafletReady, mapZoom, isMapInitialized, activeMileageLineKey]);
 
   // 仅在坐标集发生实质变化时缩放适配视口范围 / Fit bounds only when coordinates change
   useEffect(() => {
@@ -277,7 +302,7 @@ export const MapContainer: React.FC<Props> = ({
     if (isMapInitialized && leafletReady) {
       renderMileageEvents();
     }
-  }, [mileageUserEvents, railwayData, trips, mapZoom, selectedMileageEventId, leafletReady, isMapInitialized]);
+  }, [mileageUserEvents, railwayData, trips, mapZoom, selectedMileageEventId, activeMileageLineKey, leafletReady, isMapInitialized]);
 
   useEffect(() => {
     const handleCreateTempPin = () => {
@@ -297,18 +322,24 @@ export const MapContainer: React.FC<Props> = ({
     const handleRequestMapCenter = () => {
       if (!mapInstance.current) return;
       const center = mapInstance.current.getCenter();
-      window.dispatchEvent(
-        new CustomEvent("mileage-events:map-point", {
-          detail: { lat: center.lat, lng: center.lng },
-        }),
-      );
+      setMileageEventsMapPoint({ lat: center.lat, lng: center.lng });
     };
 
     const handleMileageEventSelect = (event: Event) => {
-      const customEvent = event as CustomEvent<{ eventId?: string }>;
-      if (customEvent.detail?.eventId) {
-        setSelectedMileageEventId(customEvent.detail.eventId);
+      const detail = customEventDetail<MileageEventSelectDetail>(event);
+      if (detail.eventId) {
+        setSelectedMileageEventId(detail.eventId);
       }
+      if (detail.lineKey) {
+        setActiveMileageLineKey(detail.lineKey);
+      } else if (detail.source === "rail_graph_runtime") {
+        setActiveMileageLineKey(null);
+      }
+    };
+
+    const handleActiveMileageLine = (event: Event) => {
+      const detail = customEventDetail<MileageEventsActiveLineDetail>(event);
+      setActiveMileageLineKey(detail.lineKey ?? null);
     };
 
     const handleFlyToLocation = (e: Event) => {
@@ -342,14 +373,16 @@ export const MapContainer: React.FC<Props> = ({
       };
 
     window.addEventListener("map:create-temp-pin", handleCreateTempPin);
-    window.addEventListener("mileage-events:request-map-center", handleRequestMapCenter);
-    window.addEventListener("mileage-event:select", handleMileageEventSelect);
+    window.addEventListener(mileageEventUiEvents.requestMapCenter, handleRequestMapCenter);
+    window.addEventListener(mileageEventUiEvents.select, handleMileageEventSelect);
+    window.addEventListener(mileageEventUiEvents.activeLine, handleActiveMileageLine);
     window.addEventListener("map:fly-to-location", handleFlyToLocation);
       window.addEventListener("map:show-nearby-stations", handleShowNearbyStations);
     return () => {
       window.removeEventListener("map:create-temp-pin", handleCreateTempPin);
-      window.removeEventListener("mileage-events:request-map-center", handleRequestMapCenter);
-      window.removeEventListener("mileage-event:select", handleMileageEventSelect);
+      window.removeEventListener(mileageEventUiEvents.requestMapCenter, handleRequestMapCenter);
+      window.removeEventListener(mileageEventUiEvents.select, handleMileageEventSelect);
+      window.removeEventListener(mileageEventUiEvents.activeLine, handleActiveMileageLine);
       window.removeEventListener("map:fly-to-location", handleFlyToLocation);
         window.removeEventListener("map:show-nearby-stations", handleShowNearbyStations);
     };
@@ -461,6 +494,11 @@ export const MapContainer: React.FC<Props> = ({
     routePane.style.zIndex = "410";
     routePane.style.pointerEvents = "none";
 
+    map.createPane("activeMileageLinePane", overlayPane);
+    const activeMileageLinePane = map.getPane("activeMileageLinePane")!;
+    activeMileageLinePane.style.zIndex = "415";
+    activeMileageLinePane.style.pointerEvents = "none";
+
     map.createPane("visitedStationsPane", overlayPane);
     const visitedStationsPane = map.getPane("visitedStationsPane")!;
     visitedStationsPane.style.zIndex = "420";
@@ -474,11 +512,13 @@ export const MapContainer: React.FC<Props> = ({
     mapInstance.current = map;
 
     baseLinesRendererRef.current = L.svg({ pane: "baseLinesPane" });
+    activeMileageLineRendererRef.current = L.svg({ pane: "activeMileageLinePane" });
     baseStationsRendererRef.current = L.svg({ pane: "baseStationsPane" });
     routeRendererRef.current = L.svg({ pane: "routePane" });
     visitedStationsRendererRef.current = L.svg({ pane: "visitedStationsPane" });
 
     baseLinesLayer.current = L.layerGroup();
+    activeMileageLineLayer.current = L.layerGroup().addTo(map);
     baseStationsLayer.current = L.layerGroup().addTo(map);
     routeLayer.current = L.layerGroup().addTo(map);
     pinsLayer.current = L.layerGroup().addTo(map);
@@ -567,11 +607,7 @@ export const MapContainer: React.FC<Props> = ({
         setEditingPin({ ...currentEditingPin, ...newPos });
       } else {
         setStationMenu(null);
-        window.dispatchEvent(
-          new CustomEvent("mileage-events:map-point", {
-            detail: { lat: e.latlng.lat, lng: e.latlng.lng },
-          }),
-        );
+        setMileageEventsMapPoint({ lat: e.latlng.lat, lng: e.latlng.lng });
       }
     });
 
@@ -1317,12 +1353,52 @@ export const MapContainer: React.FC<Props> = ({
         f.geometry.type === "MultiLineString",
     );
     L.geoJSON(lineFeatures as any, {
-      style: { color: "#475569", weight: 1, opacity: 0.3 },
+      style: (feature) => {
+        const lineKey = feature ? featureLineKey(feature as CustomGeoJSONFeature) : null;
+        const selected = !!activeMileageLineKey && lineKey === activeMileageLineKey;
+        const selectedColor =
+          (feature as CustomGeoJSONFeature | undefined)?.properties.stroke ||
+          (lineKey ? railwayData[lineKey]?.meta?.color : null) ||
+          "#0f766e";
+        return {
+          color: selected ? selectedColor : "#475569",
+          weight: selected ? 4 : 1,
+          opacity: selected ? 0.86 : activeMileageLineKey ? 0.18 : 0.3,
+          className: selected ? "base-line-active-mileage" : "base-line-muted-mileage",
+        };
+      },
       pane: "baseLinesPane",
       interactive: false,
       // @ts-ignore
       renderer: baseLinesRendererRef.current,
     }).addTo(baseLinesLayer.current);
+  };
+
+  const renderActiveMileageLine = (data: CustomFeatureCollection) => {
+    if (!activeMileageLineLayer.current) return;
+    activeMileageLineLayer.current.clearLayers();
+    if (!activeMileageLineKey || activeMileageLineKey.startsWith("rail-graph:")) return;
+
+    const lineFeatures = data.features.filter((feature: CustomGeoJSONFeature) => {
+      if (feature.geometry.type !== "LineString" && feature.geometry.type !== "MultiLineString") return false;
+      return featureLineKey(feature) === activeMileageLineKey;
+    });
+    if (lineFeatures.length === 0) return;
+
+    const lineColor = railwayData[activeMileageLineKey]?.meta?.color || "#0f766e";
+    L.geoJSON(lineFeatures as any, {
+      style: () => ({
+        color: lineColor,
+        weight: 7,
+        opacity: 0.95,
+        lineCap: "round",
+        className: "active-mileage-line-overlay",
+      }),
+      pane: "activeMileageLinePane",
+      interactive: false,
+      // @ts-ignore
+      renderer: activeMileageLineRendererRef.current,
+    }).addTo(activeMileageLineLayer.current);
   };
 
   const renderTripRoutes = () => {
@@ -1338,6 +1414,7 @@ export const MapContainer: React.FC<Props> = ({
       color: string;
       popup: string;
       fallback: boolean;
+      lineKey?: string;
       source?: "rail_graph" | "legacy" | "walk";
       isTransfer?: boolean;
     }
@@ -1352,6 +1429,7 @@ export const MapContainer: React.FC<Props> = ({
             color: seg.color,
             popup: seg.popup,
             fallback: seg.fallback,
+            lineKey: seg.lineKey,
             source: seg.source,
             isTransfer: seg.isTransfer,
           });
@@ -1363,6 +1441,7 @@ export const MapContainer: React.FC<Props> = ({
           color: seg.color,
           popup: seg.popup,
           fallback: seg.fallback,
+          lineKey: seg.lineKey,
           source: seg.source,
           isTransfer: seg.isTransfer,
         });
@@ -1379,6 +1458,7 @@ export const MapContainer: React.FC<Props> = ({
           color: t.walkType === "tree" ? "#16a34a" : "#9333ea", // Green vs Purple
           popup: `${t.walkType === "tree" ? "环保/步行" : "UFO/步行"}: ${t.date}`,
           fallback: true, // Forces dashArray '5, 10' later in the sync renderer
+          lineKey: undefined,
           source: "walk",
         });
       }
@@ -1390,15 +1470,19 @@ export const MapContainer: React.FC<Props> = ({
       (item) => item.id,
       (item) => {
         const isTransfer = item.isTransfer;
+        const activeRoute = isActiveRouteItem(item);
+        const dimRoute = !!activeMileageLineKey && !activeRoute && item.source !== "walk";
+        const targetWeight = activeRoute ? zoomWeight + 4 : zoomWeight;
+        const targetOpacity = activeRoute ? 1 : dimRoute ? 0.24 : isTransfer ? 0.5 : 0.9;
         const options = {
           renderer: routeRendererRef.current,
           color: item.color,
-          weight: zoomWeight,
-          opacity: isTransfer ? 0.5 : 0.9,
+          weight: targetWeight,
+          opacity: targetOpacity,
           lineCap: "round",
           smoothFactor: 0.2,
           dashArray: item.fallback ? "5, 10" : isTransfer ? "4, 8" : undefined,
-          className: `rail-route-line rail-route-${item.source ?? "legacy"}${item.fallback ? " rail-route-fallback" : ""}`,
+          className: `rail-route-line rail-route-${item.source ?? "legacy"}${item.fallback ? " rail-route-fallback" : ""}${activeRoute ? " rail-route-active-mileage" : ""}`,
           pane: "routePane",
         };
         const pl = L.polyline(
@@ -1425,25 +1509,33 @@ export const MapContainer: React.FC<Props> = ({
         const currentOpacity = (pl.options as L.PolylineOptions).opacity;
 
         const isTransfer = item.isTransfer;
+        const activeRoute = isActiveRouteItem(item);
+        const dimRoute = !!activeMileageLineKey && !activeRoute && item.source !== "walk";
+        const targetWeight = activeRoute ? zoomWeight + 4 : zoomWeight;
         const targetDash = item.fallback
           ? "5, 10"
           : isTransfer
             ? "4, 8"
             : undefined;
-        const targetOpacity = isTransfer ? 0.5 : 0.9;
+        const targetOpacity = activeRoute ? 1 : dimRoute ? 0.24 : isTransfer ? 0.5 : 0.9;
 
         if (
-          currentWeight !== zoomWeight ||
+          currentWeight !== targetWeight ||
           currentColor !== item.color ||
           currentDash !== targetDash ||
           currentOpacity !== targetOpacity
         ) {
           pl.setStyle({
             color: item.color,
-            weight: zoomWeight,
+            weight: targetWeight,
             dashArray: targetDash,
             opacity: targetOpacity,
           });
+        }
+
+        const routeElement = pl.getElement();
+        if (routeElement) {
+          routeElement.classList.toggle("rail-route-active-mileage", activeRoute);
         }
 
         if (pl.getPopup()?.getContent() !== item.popup) {
@@ -1571,8 +1663,16 @@ export const MapContainer: React.FC<Props> = ({
       lineKeys: Set<string>;
       sourceKinds: Set<"rail_graph" | "legacy">;
       selected: boolean;
+      activeLine: boolean;
+      dimmed: boolean;
       sumLat: number;
       sumLng: number;
+    };
+
+    const markerMatchesActiveLine = (lineKeys: Set<string>, sourceKinds: Set<"rail_graph" | "legacy">) => {
+      if (!activeMileageLineKey) return false;
+      if (lineKeys.has(activeMileageLineKey)) return true;
+      return sourceKinds.has("rail_graph") && activeMileageLineKey.startsWith("rail-graph:");
     };
 
     const grouped = new Map<string, EventMarkerItem>();
@@ -1584,6 +1684,7 @@ export const MapContainer: React.FC<Props> = ({
         : entry.lineContext.line.meta.color || "#059669";
       const lineColor = /^#[0-9a-f]{3,8}$/i.test(rawColor) ? rawColor : "#059669";
       const sourceKind = entry.lineContext.source === "rail_graph_runtime" ? "rail_graph" : "legacy";
+      const activeLine = markerMatchesActiveLine(new Set([entry.lineContext.lineKey]), new Set([sourceKind]));
       const layerPoint = map.latLngToLayerPoint([coordinates[1], coordinates[0]]);
       const key = zoom >= 15
         ? [
@@ -1603,6 +1704,8 @@ export const MapContainer: React.FC<Props> = ({
         existing.lineKeys.add(entry.lineContext.lineKey);
         existing.sourceKinds.add(sourceKind);
         existing.selected = existing.selected || entry.bound.event.id === selectedMileageEventId;
+        existing.activeLine = existing.activeLine || activeLine;
+        existing.dimmed = !!activeMileageLineKey && !existing.activeLine && !existing.selected;
         existing.sumLat += coordinates[1];
         existing.sumLng += coordinates[0];
         existing.lat = existing.sumLat / existing.eventIds.length;
@@ -1618,6 +1721,8 @@ export const MapContainer: React.FC<Props> = ({
           lineKeys: new Set([entry.lineContext.lineKey]),
           sourceKinds: new Set([sourceKind]),
           selected: entry.bound.event.id === selectedMileageEventId,
+          activeLine,
+          dimmed: !!activeMileageLineKey && !activeLine && entry.bound.event.id !== selectedMileageEventId,
           sumLat: coordinates[1],
           sumLng: coordinates[0],
         });
@@ -1632,7 +1737,7 @@ export const MapContainer: React.FC<Props> = ({
         const layer = L.marker([item.lat, item.lng], {
           pane: "mileageEventsPane",
           icon: createMileageEventIcon(item),
-          zIndexOffset: item.selected ? 1200 : item.eventIds.length > 1 ? 900 : 800,
+          zIndexOffset: item.selected ? 1200 : item.activeLine ? 980 : item.eventIds.length > 1 ? 900 : 800,
         });
 
         const title = mileageEventMarkerTitle(item);
@@ -1640,11 +1745,13 @@ export const MapContainer: React.FC<Props> = ({
         layer.on("click", (event) => {
           L.DomEvent.stopPropagation(event);
           setSelectedMileageEventId(item.eventIds[0]);
-          window.dispatchEvent(
-            new CustomEvent("mileage-event:select", {
-              detail: { eventId: item.eventIds[0] },
-            }),
-          );
+          selectMileageEventOnMap({
+            eventId: item.eventIds[0],
+            lineKey: item.lineKeys.size === 1
+              ? Array.from(item.lineKeys)[0]
+              : undefined,
+            source: item.sourceKinds.has("rail_graph") ? "rail_graph_runtime" : "legacy_app",
+          });
         });
         (layer as any)._cachedLat = item.lat;
         (layer as any)._cachedLng = item.lng;
@@ -1663,6 +1770,8 @@ export const MapContainer: React.FC<Props> = ({
           _cachedColor?: string;
           _cachedCount?: number;
           _cachedSelected?: boolean;
+          _cachedActiveLine?: boolean;
+          _cachedDimmed?: boolean;
           _cachedMultiLine?: boolean;
           _cachedSourceKey?: string;
           _cachedTitle?: string;
@@ -1679,14 +1788,18 @@ export const MapContainer: React.FC<Props> = ({
           marker._cachedColor !== item.color ||
           marker._cachedCount !== count ||
           marker._cachedSelected !== item.selected ||
+          marker._cachedActiveLine !== item.activeLine ||
+          marker._cachedDimmed !== item.dimmed ||
           marker._cachedMultiLine !== item.lineKeys.size > 1 ||
           marker._cachedSourceKey !== sourceKey
         ) {
           marker.setIcon(createMileageEventIcon(item));
-          marker.setZIndexOffset(item.selected ? 1200 : count > 1 ? 900 : 800);
+          marker.setZIndexOffset(item.selected ? 1200 : item.activeLine ? 980 : count > 1 ? 900 : 800);
           marker._cachedColor = item.color;
           marker._cachedCount = count;
           marker._cachedSelected = item.selected;
+          marker._cachedActiveLine = item.activeLine;
+          marker._cachedDimmed = item.dimmed;
           marker._cachedMultiLine = item.lineKeys.size > 1;
           marker._cachedSourceKey = sourceKey;
         }
@@ -1729,11 +1842,15 @@ export const MapContainer: React.FC<Props> = ({
     lineKeys: Set<string>;
     sourceKinds: Set<"rail_graph" | "legacy">;
     selected: boolean;
+    activeLine: boolean;
+    dimmed: boolean;
   }) => {
     const count = item.eventIds.length;
-    const size = item.selected ? 38 : count > 1 ? Math.min(38, 26 + Math.log2(count + 1) * 6) : 24;
+    const size = item.selected ? 38 : item.activeLine ? 30 : count > 1 ? Math.min(38, 26 + Math.log2(count + 1) * 6) : 24;
     const clusterClass = count > 1 ? "is-cluster" : "is-single";
     const selectedClass = item.selected ? "is-selected" : "";
+    const activeClass = item.activeLine ? "is-active-line" : "";
+    const dimmedClass = item.dimmed ? "is-dimmed" : "";
     const mixedClass = item.lineKeys.size > 1 ? "is-mixed" : "";
     const sourceClass = item.sourceKinds.size > 1
       ? "is-source-mixed"
@@ -1741,7 +1858,7 @@ export const MapContainer: React.FC<Props> = ({
         ? "is-rail-graph"
         : "is-legacy";
     const html = `
-      <div class="mileage-event-marker ${clusterClass} ${selectedClass} ${mixedClass} ${sourceClass}" style="--event-color:${item.color}; --event-size:${size}px">
+      <div class="mileage-event-marker ${clusterClass} ${selectedClass} ${activeClass} ${dimmedClass} ${mixedClass} ${sourceClass}" style="--event-color:${item.color}; --event-size:${size}px">
         <span class="mileage-event-marker-core">${count > 1 ? count : ""}</span>
       </div>
     `;

@@ -61,6 +61,7 @@ export const PinEditor: React.FC = () => {
         openMileageEventsPanel({
             mode: 'create',
             lineKey: editingPin.lineKey,
+            source: 'legacy_app',
             create: {
                 source: 'map',
                 lineKey: editingPin.lineKey,
@@ -70,6 +71,8 @@ export const PinEditor: React.FC = () => {
                 tags: ['pin'],
             },
         });
+        setEditingPin(null);
+        setPinMode(PinMode.Idle);
     };
 
     useEffect(() => {

@@ -31,10 +31,15 @@ export interface MileageEventSelectDetail {
   source?: MileageEventsProjectionSource;
 }
 
-export interface MileageEventsActiveLineDetail {
+export interface MileageEventsActiveAxisDetail {
   lineKey: string | null;
   source?: MileageEventsProjectionSource;
+  tripId?: string | number;
+  tripSegmentIndex?: number;
+  routeItemId?: string;
 }
+
+export type MileageEventsActiveLineDetail = MileageEventsActiveAxisDetail;
 
 export interface MileageEventsMapPointDetail {
   lat: number;
@@ -61,7 +66,7 @@ export function selectMileageEventOnMap(detail: MileageEventSelectDetail) {
   window.dispatchEvent(new CustomEvent(mileageEventUiEvents.select, { detail }));
 }
 
-export function setActiveMileageLine(detail: MileageEventsActiveLineDetail) {
+export function setActiveMileageLine(detail: MileageEventsActiveAxisDetail) {
   window.dispatchEvent(new CustomEvent(mileageEventUiEvents.activeLine, { detail }));
 }
 

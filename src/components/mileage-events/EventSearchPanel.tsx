@@ -1,21 +1,18 @@
 import React, { useMemo, useState } from "react";
-import { Combine, Filter, Search, Tag, Tags } from "lucide-react";
+import { Filter, Search, Tag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../../store";
 import { useShallow } from "zustand/react/shallow";
-import type { MileageUserEventVisibility, UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
+import type { UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
 import {
   boundMileageEventsForRichDisplay,
   findLineKeyForMileageEvent,
   lineLabel,
-  normalizeTags,
   searchMileageEvents,
   tagsFromInput,
-  updateMileageEventFromDraft,
 } from "../../utils/mileageUserEvents";
 import { EventList, MileageEventListEntry } from "./EventList";
 import { eventKindLabel, eventVisibilityLabel, mileageEventKinds, mileageEventVisibilities } from "./display";
-import { useMileageEventActions } from "./useMileageEventActions";
 
 interface Props {
   events?: readonly UserEventV2[];
@@ -40,7 +37,6 @@ export const EventSearchPanel: React.FC<Props> = ({
       trips: state.trips,
     }))
   );
-  const { persistEvents } = useMileageEventActions();
   const sourceEvents = events ?? mileageUserEvents;
   const lineKeys = useMemo(() => {
     const keys = new Set(Object.keys(railwayData));
@@ -52,10 +48,6 @@ export const EventSearchPanel: React.FC<Props> = ({
   }, [railwayData, sourceEvents]);
   const [query, setQuery] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
-  const [bulkTags, setBulkTags] = useState("");
-  const [bulkVisibility, setBulkVisibility] = useState<MileageUserEventVisibility>("private");
   const [tags, setTags] = useState("");
   const [kind, setKind] = useState("all");
   const [visibility, setVisibility] = useState("all");
@@ -87,104 +79,6 @@ export const EventSearchPanel: React.FC<Props> = ({
       }),
     [matchedEvents, railwayData, sourceFilter, trips],
   );
-  const selectedEntries = useMemo(
-    () => entries.filter((entry) => selectedEventIds.has(entry.bound.event.id)),
-    [entries, selectedEventIds],
-  );
-  const allVisibleSelected = entries.length > 0 && entries.every((entry) => selectedEventIds.has(entry.bound.event.id));
-
-  const toggleSelected = (entry: MileageEventListEntry) => {
-    setSelectedEventIds((current) => {
-      const next = new Set(current);
-      if (next.has(entry.bound.event.id)) next.delete(entry.bound.event.id);
-      else next.add(entry.bound.event.id);
-      return next;
-    });
-  };
-
-  const toggleAllVisible = () => {
-    setSelectedEventIds((current) => {
-      const next = new Set(current);
-      if (allVisibleSelected) {
-        entries.forEach((entry) => next.delete(entry.bound.event.id));
-      } else {
-        entries.forEach((entry) => next.add(entry.bound.event.id));
-      }
-      return next;
-    });
-  };
-
-  const applyBulkTags = () => {
-    const tagsToAdd = tagsFromInput(bulkTags);
-    if (!tagsToAdd?.length || selectedEventIds.size === 0) return;
-    const next = mileageUserEvents.map((event) => {
-      if (!selectedEventIds.has(event.id)) return event;
-      return updateMileageEventFromDraft(event, {
-        tags: normalizeTags([...(event.tags ?? []), ...tagsToAdd]),
-      });
-    });
-    persistEvents(next);
-    setBulkTags("");
-  };
-
-  const applyBulkVisibility = () => {
-    if (selectedEventIds.size === 0) return;
-    persistEvents(
-      mileageUserEvents.map((event) =>
-        selectedEventIds.has(event.id)
-          ? updateMileageEventFromDraft(event, { visibility: bulkVisibility })
-          : event,
-      ),
-    );
-  };
-
-  const mergeSelectedDuplicates = () => {
-    if (selectedEntries.length < 2) return;
-    const groups = new Map<string, UserEventV2[]>();
-    selectedEntries.forEach((entry) => {
-      const event = entry.bound.event;
-      const key = [
-        event.mileage.systemRef,
-        event.mileage.lineRef ?? "",
-        findLineKeyForMileageEvent(event) ?? "",
-        Math.round(event.mileage.distanceMeters / 10),
-      ].join("|");
-      groups.set(key, [...(groups.get(key) ?? []), event]);
-    });
-
-    const replacements = new Map<string, UserEventV2>();
-    const removed = new Set<string>();
-    groups.forEach((group) => {
-      if (group.length < 2) return;
-      const [base, ...duplicates] = group.sort((left, right) => (left.createdAt ?? "").localeCompare(right.createdAt ?? ""));
-      const mergedBody = [base.body, ...duplicates.map((event) => event.body)].filter(Boolean).join("\n\n");
-      const mergedTags = normalizeTags(group.flatMap((event) => event.tags ?? []));
-      const mergedPayload = group.reduce<Record<string, unknown>>(
-        (payload, event) => ({ ...payload, ...(event.payload ?? {}) }),
-        {},
-      );
-      replacements.set(base.id, {
-        ...base,
-        body: mergedBody || undefined,
-        tags: mergedTags,
-        payload: mergedPayload,
-        updatedAt: new Date().toISOString(),
-      });
-      duplicates.forEach((event) => removed.add(event.id));
-    });
-
-    if (replacements.size === 0) return;
-    persistEvents(
-      mileageUserEvents
-        .filter((event) => !removed.has(event.id))
-        .map((event) => replacements.get(event.id) ?? event),
-    );
-    setSelectedEventIds((current) => {
-      const next = new Set(current);
-      removed.forEach((id) => next.delete(id));
-      return next;
-    });
-  };
 
   return (
     <div className="space-y-3">
@@ -207,16 +101,6 @@ export const EventSearchPanel: React.FC<Props> = ({
           title={t("mileageEvents.advancedFilters", "Advanced filters")}
         >
           <Filter size={15} />
-        </button>
-        <button
-          type="button"
-          className={`rounded-md border px-2 py-2 text-slate-500 hover:bg-slate-50 ${
-            bulkOpen ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200"
-          }`}
-          onClick={() => setBulkOpen((value) => !value)}
-          title={t("mileageEvents.bulk.title", "Batch actions")}
-        >
-          <Tags size={15} />
         </button>
       </div>
 
@@ -320,81 +204,11 @@ export const EventSearchPanel: React.FC<Props> = ({
         {t("mileageEvents.searchCount", "{{count}} events", { count: entries.length })}
       </div>
 
-      {bulkOpen && (
-        <div className="space-y-2 rounded-md border border-emerald-100 bg-emerald-50/40 p-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <button
-              type="button"
-              className="rounded-md border border-emerald-200 bg-white px-2 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
-              onClick={toggleAllVisible}
-              disabled={entries.length === 0}
-            >
-              {allVisibleSelected
-                ? t("mileageEvents.bulk.clearVisible", "Clear visible")
-                : t("mileageEvents.bulk.selectVisible", "Select visible")}
-            </button>
-            <span className="text-xs font-semibold text-emerald-700">
-              {t("mileageEvents.bulk.selectedCount", "{{count}} selected", { count: selectedEventIds.size })}
-            </span>
-          </div>
-          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-            <input
-              className="rounded-md border border-emerald-200 bg-white px-2 py-1.5 text-sm"
-              value={bulkTags}
-              onChange={(event) => setBulkTags(event.target.value)}
-              placeholder={t("mileageEvents.bulk.tagsPlaceholder", "Add tags to selected")}
-            />
-            <button
-              type="button"
-              className="inline-flex items-center justify-center gap-1 rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:bg-slate-300"
-              onClick={applyBulkTags}
-              disabled={selectedEventIds.size === 0 || !bulkTags.trim()}
-            >
-              <Tag size={13} />
-              {t("mileageEvents.bulk.addTags", "Add tags")}
-            </button>
-          </div>
-          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
-            <select
-              className="rounded-md border border-emerald-200 bg-white px-2 py-1.5 text-sm"
-              value={bulkVisibility}
-              onChange={(event) => setBulkVisibility(event.target.value as MileageUserEventVisibility)}
-            >
-              {mileageEventVisibilities.map((item) => (
-                <option key={item} value={item}>
-                  {eventVisibilityLabel(item, t)}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className="rounded-md border border-emerald-200 bg-white px-2 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:text-slate-300"
-              onClick={applyBulkVisibility}
-              disabled={selectedEventIds.size === 0}
-            >
-              {t("mileageEvents.bulk.applyVisibility", "Apply visibility")}
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center justify-center gap-1 rounded-md border border-emerald-200 bg-white px-2 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:text-slate-300"
-              onClick={mergeSelectedDuplicates}
-              disabled={selectedEntries.length < 2}
-            >
-              <Combine size={13} />
-              {t("mileageEvents.bulk.mergeDuplicates", "Merge duplicates")}
-            </button>
-          </div>
-        </div>
-      )}
-
       <EventList
         entries={entries}
         selectedId={selectedId}
-        selectedIds={selectedEventIds}
         compact={compact}
-        selectable={bulkOpen}
         onSelect={onSelect}
-        onToggleSelect={toggleSelected}
         onViewMap={onViewMap}
       />
     </div>

@@ -8,10 +8,6 @@ import {
   Plus,
   MapPin,
   Upload,
-  ArrowRightLeft,
-  GitMerge,
-  Split,
-  Repeat,
   ChevronDown,
   ChevronUp,
   Clipboard,
@@ -20,6 +16,7 @@ import {
   Filter,
   FileJson,
   MapPinned,
+  Route,
   Tag,
 } from "lucide-react";
 import { useStore } from "../store";
@@ -48,7 +45,7 @@ import {
   tagsFromInput,
 } from "../utils/mileageUserEvents";
 import type { MileageEventListEntry } from "../components/mileage-events/EventList";
-import { eventKindLabel, eventSourceLabel, eventSourceTone, eventVisibilityLabel, mileageEventKinds, mileageEventVisibilities, timestampLabel } from "../components/mileage-events/display";
+import { eventKindLabel, eventLineLabel, eventSourceLabel, eventSourceTone, eventStationLabel, eventVisibilityLabel, mileageEventKinds, mileageEventVisibilities } from "../components/mileage-events/display";
 import {
   tripLineSummary as productTripLineSummary,
   tripToProductSegments,
@@ -59,6 +56,7 @@ import {
   type TripDetailModel,
 } from "../utils/railGraphTripDetailModel";
 import { openMileageEventsPanel, selectMileageEventOnMap } from "../utils/mileageEventUiBridge";
+import { RailGraphBadge, RailGraphEventPill, RailGraphSymbol, railGraphEventIcon } from "../components/rail-graph/RailGraphBadges";
 
 const RouteSlice = React.memo(
   ({ segments }: { segments: any[] }) => {
@@ -558,15 +556,17 @@ export const TripsPage: React.FC = () => {
   };
 
   const renderEventIcon = (event: NetworkMetaEvent) => {
-    if (event.type === "transfer")
-      return <ArrowRightLeft size={12} className="text-amber-500" />;
-    if (event.type === "reverse_operation")
-      return <Repeat size={12} className="text-sky-500" />;
-    if (event.type === "formation_operation")
-      return <GitMerge size={12} className="text-violet-500" />;
-    if (event.type === "service_class_switch")
-      return <Split size={12} className="text-cyan-600" />;
-    return <ArrowRightLeft size={12} className="text-gray-400" />;
+    const color =
+      event.type === "transfer"
+        ? "text-amber-500"
+        : event.type === "reverse_operation"
+          ? "text-sky-500"
+          : event.type === "formation_operation"
+            ? "text-violet-500"
+            : event.type === "service_class_switch"
+              ? "text-cyan-600"
+              : "text-gray-400";
+    return <RailGraphSymbol name={railGraphEventIcon(event.type)} className={`h-3 w-3 ${color}`} />;
   };
 
   const tripLineSummary = (trip: (typeof trips)[number]) => {
@@ -709,6 +709,21 @@ export const TripsPage: React.FC = () => {
   const formatMinutes = (minutes?: number) =>
     t("tripsPage.railGraph.minutes", "{{count}} min", { count: Math.max(0, minutes || 0) });
 
+  const compactRailGraphRef = (value?: unknown) => {
+    const text = String(value ?? "").trim();
+    if (!text) return "";
+    const cut = Math.max(text.lastIndexOf(":"), text.lastIndexOf("/"), text.lastIndexOf("#"));
+    const label = cut >= 0 ? text.slice(cut + 1) : text;
+    return label || text;
+  };
+
+  const railGraphChipValue = (values: Array<string | undefined>, maxItems = 2) => {
+    const unique = Array.from(new Set(values.filter((value): value is string => !!value?.trim())));
+    if (unique.length === 0) return "";
+    const visible = unique.slice(0, maxItems).join(" / ");
+    return unique.length > maxItems ? `${visible} +${unique.length - maxItems}` : visible;
+  };
+
   const renderRailGraphRunSummary = (detail: TripDetailModel, compact = false) => {
     if (detail.kind !== "rail_graph") return null;
     const keyEvents = tripDetailKeyEvents(detail, compact ? 3 : 5);
@@ -716,31 +731,28 @@ export const TripsPage: React.FC = () => {
     return (
       <div className="mt-3 border-t border-emerald-100 pt-3">
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
-          <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-700">
-            <GitMerge size={12} />
-            {t("tripsPage.railGraph.run", "Rail graph run")}
-          </span>
-          {firstSegment?.serviceType && (
-            <span className="rounded bg-slate-50 px-1.5 py-0.5">
-              {firstSegment.serviceType}
-            </span>
+          <RailGraphBadge
+            icon="snapshot"
+            value={t("tripsPage.railGraph.run", "Rail graph run")}
+            tone="emerald"
+            className="rounded"
+          />
+          {!compact && firstSegment?.serviceType && (
+            <RailGraphBadge icon="service" value={firstSegment.serviceType} tone="sky" className="rounded" />
           )}
-          {firstSegment?.direction && (
-            <span className="rounded bg-slate-50 px-1.5 py-0.5">
-              {railGraphDirectionLabel(firstSegment.direction)}
-            </span>
+          {!compact && firstSegment?.direction && (
+            <RailGraphBadge icon="direction" value={railGraphDirectionLabel(firstSegment.direction)} tone="amber" className="rounded" />
           )}
-          <span className="rounded bg-slate-50 px-1.5 py-0.5">
-            {formatDistanceKm(detail.overview.totalDistanceKm)}
-          </span>
+          <RailGraphBadge icon="distance" value={formatDistanceKm(detail.overview.totalDistanceKm)} tone="slate" className="rounded" />
           {detail.overview.totalTimeMinutes !== undefined && (
-            <span className="rounded bg-slate-50 px-1.5 py-0.5">
-              {formatMinutes(detail.overview.totalTimeMinutes)}
-            </span>
+            <RailGraphBadge icon="duration" value={formatMinutes(detail.overview.totalTimeMinutes)} tone="slate" className="rounded" />
           )}
-          <span className="rounded bg-slate-50 px-1.5 py-0.5">
-            {t("tripsPage.railGraph.userEvents", "{{count}} user events", { count: detail.overview.userEventCount })}
-          </span>
+          <RailGraphBadge
+            icon="userEvent"
+            value={t("tripsPage.railGraph.userEvents", "{{count}} user events", { count: detail.overview.userEventCount })}
+            tone="violet"
+            className="rounded"
+          />
         </div>
 
         {!compact && (
@@ -758,16 +770,27 @@ export const TripsPage: React.FC = () => {
                     {segment.fromName} <span className="text-slate-300">→</span> {segment.toName}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-slate-500">
-                    <span className="rounded bg-slate-50 px-1.5 py-0.5">
-                      {t("tripsPage.railGraph.stopPass", "{{stops}} stops / {{passes}} pass", { stops: segment.stopCount, passes: segment.passCount })}
-                    </span>
-                    <span className="rounded bg-slate-50 px-1.5 py-0.5">
-                      {t("tripsPage.railGraph.via", "{{count}} via", { count: segment.viaStationCount })}
-                    </span>
+                    <RailGraphBadge
+                      icon="stops"
+                      value={t("tripsPage.railGraph.stopPass", "{{stops}} stops / {{passes}} pass", { stops: segment.stopCount, passes: segment.passCount })}
+                      tone="slate"
+                      className="rounded"
+                    />
+                    <RailGraphBadge
+                      icon="via"
+                      value={t("tripsPage.railGraph.via", "{{count}} via", { count: segment.viaStationCount })}
+                      tone="slate"
+                      className="rounded"
+                    />
                     {segment.patternRef && (
-                      <span className="max-w-[12rem] truncate rounded bg-slate-50 px-1.5 py-0.5">
-                        {String(segment.patternRef)}
-                      </span>
+                      <RailGraphBadge
+                        icon="pattern"
+                        label={t("mileageEvents.inspector.pattern", "Pattern")}
+                        value={compactRailGraphRef(segment.patternRef)}
+                        tone="indigo"
+                        className="max-w-[12rem] rounded"
+                        title={String(segment.patternRef)}
+                      />
                     )}
                   </div>
                 </div>
@@ -779,9 +802,12 @@ export const TripsPage: React.FC = () => {
         {keyEvents.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {keyEvents.map((event) => (
-              <span key={event.id} className="max-w-[13rem] truncate rounded border border-emerald-100 bg-white px-1.5 py-0.5 text-[10px] text-slate-600">
-                {railGraphEventTypeLabel(event.type)} · {event.label}
-              </span>
+              <RailGraphEventPill
+                key={event.id}
+                type={event.type}
+                label={`${railGraphEventTypeLabel(event.type)} · ${event.label}`}
+                title={event.label}
+              />
             ))}
           </div>
         )}
@@ -1058,6 +1084,8 @@ export const TripsPage: React.FC = () => {
 
                   const event = item.entry.bound.event;
                   const selected = selectedTripEventId === event.id;
+                  const eventLine = eventLineLabel(item.entry.bound, item.entry.lineContext);
+                  const eventStation = eventStationLabel(item.entry.bound, item.entry.lineContext);
                   return (
                     <div key={item.id} className="grid grid-cols-[4.5rem_1rem_minmax(0,1fr)] gap-2 text-xs">
                       <div className="pt-2 text-right font-mono text-[11px] text-slate-500">
@@ -1103,7 +1131,13 @@ export const TripsPage: React.FC = () => {
                           <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${eventSourceTone(item.entry.lineContext)}`}>
                             {eventSourceLabel(item.entry.lineContext, t)}
                           </span>
-                          <span>{timestampLabel(item.entry.bound.timestampInference, item.entry.bound.timestamp, t)}</span>
+                          {eventLine && (
+                            <span className="inline-flex max-w-[12rem] items-center gap-1 truncate">
+                              <Route size={12} className="shrink-0 text-slate-400" />
+                              <span className="truncate">{eventLine}</span>
+                            </span>
+                          )}
+                          {eventStation && <span className="max-w-[10rem] truncate">{eventStation}</span>}
                           {event.tags?.slice(0, 3).map((tag) => (
                             <span key={tag} className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
                               <Tag size={10} />
@@ -1276,7 +1310,15 @@ export const TripsPage: React.FC = () => {
     const detail = buildTripDetailModel({ trip, railwayData, userEvents: mileageUserEvents });
     const isWalk = trip.isWalk;
     const hasRailGraphSnapshot = detail.kind === "rail_graph";
-    const firstRailGraphSegment = hasRailGraphSnapshot ? detail.segments[0] : null;
+    const railGraphPatternText = hasRailGraphSnapshot
+      ? railGraphChipValue(detail.segments.map((segment) => compactRailGraphRef(segment.patternRef)))
+      : "";
+    const railGraphServiceText = hasRailGraphSnapshot
+      ? railGraphChipValue(detail.segments.map((segment) => segment.serviceType))
+      : "";
+    const railGraphDirectionText = hasRailGraphSnapshot
+      ? railGraphChipValue(detail.segments.map((segment) => segment.direction ? railGraphDirectionLabel(segment.direction) : undefined))
+      : "";
 
     if (isWalk) {
       let startName = trip.fromId || "";
@@ -1381,21 +1423,47 @@ export const TripsPage: React.FC = () => {
         data-year-month={isFirstInMonth ? trip.date.slice(0, 7) : undefined}
         className="rl-card p-4 transition-colors duration-200 hover:border-slate-300 hover:shadow-md"
       >
-        <div className="flex justify-between mb-2 pb-2 border-b border-gray-50">
-          <span className="text-xs font-bold text-gray-400">{trip.date}</span>
-          <div className="flex items-center gap-2">
+        <div className="mb-2 flex items-start justify-between gap-3 border-b border-gray-50 pb-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-xs font-bold text-gray-400">{trip.date}</span>
             {hasRailGraphSnapshot && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700"
+              <RailGraphBadge
+                icon="snapshot"
+                value={t("tripsPage.railGraphSource", "Rail graph")}
+                tone="emerald"
                 title={t("tripsPage.railGraphSourceTitle", "Saved rail-graph route snapshot")}
-              >
-                <GitMerge size={10} />
-                <span className="max-w-[8rem] truncate">
-                  {firstRailGraphSegment?.serviceType || t("tripsPage.railGraphSource", "Rail graph")}
-                  {firstRailGraphSegment?.direction ? ` · ${railGraphDirectionLabel(firstRailGraphSegment.direction)}` : ""}
-                </span>
-              </span>
+                className="max-w-[8rem]"
+              />
             )}
+            {railGraphPatternText && (
+              <RailGraphBadge
+                icon="pattern"
+                label={t("mileageEvents.inspector.pattern", "Pattern")}
+                value={railGraphPatternText}
+                tone="indigo"
+                className="max-w-[11rem]"
+              />
+            )}
+            {railGraphServiceText && (
+              <RailGraphBadge
+                icon="service"
+                label={t("mileageEvents.inspector.service", "Service")}
+                value={railGraphServiceText}
+                tone="sky"
+                className="max-w-[10rem]"
+              />
+            )}
+            {railGraphDirectionText && (
+              <RailGraphBadge
+                icon="direction"
+                label={t("mileageEvents.inspector.direction", "Direction")}
+                value={railGraphDirectionText}
+                tone="amber"
+                className="max-w-[10rem]"
+              />
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
             {(trip.cost || 0) > 0 && (
               <span className="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
                 ¥{trip.cost}

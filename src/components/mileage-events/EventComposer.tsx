@@ -5,7 +5,7 @@ import { useStore } from "../../store";
 import { useShallow } from "zustand/react/shallow";
 import type { UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
 import { getTripRailGraphSnapshot } from "../../utils/railGraphTripPersistence";
-import { tripLineSummary } from "../../utils/tripProductProjection";
+import { tripLineSummary, tripToProductSegments } from "../../utils/tripProductProjection";
 import {
   buildAppMileageLineContext,
   createMileageEventAtDistance,
@@ -153,9 +153,25 @@ export const EventComposer: React.FC<Props> = ({
     [tripId, trips],
   );
   const selectedTripUsesRailGraph = !!(selectedTrip && getTripRailGraphSnapshot(selectedTrip));
+  const selectedTripSegments = useMemo(
+    () => (selectedTrip ? tripToProductSegments(selectedTrip, railwayData) : []),
+    [railwayData, selectedTrip],
+  );
+  const effectiveTripSegmentIndex = selectedTripSegments.length > 0
+    ? Math.max(0, Math.min(selectedTripSegments.length - 1, tripSegmentIndex))
+    : 0;
+  const selectedTripSegment = selectedTripSegments[effectiveTripSegmentIndex] ?? null;
+  const tripRatioNumber = Number.isFinite(Number(tripRatio))
+    ? Math.max(0, Math.min(1, Number(tripRatio)))
+    : 0;
   const stations = lineContext?.line.stations ?? [];
   const effectiveStationId = stationId || stations[0]?.id || "";
   const editableLocation = !event;
+
+  useEffect(() => {
+    if (event || selectedTripSegments.length === 0) return;
+    setTripSegmentIndex((current) => Math.max(0, Math.min(selectedTripSegments.length - 1, current)));
+  }, [event, selectedTripSegments.length]);
 
   const tripOptionLabel = (trip: typeof trips[number]) => {
     const source = getTripRailGraphSnapshot(trip)
@@ -197,8 +213,8 @@ export const EventComposer: React.FC<Props> = ({
         ? createMileageEventFromTripPosition({
             railwayData,
             trip,
-            segmentIndex: tripSegmentIndex,
-            ratio: Number(tripRatio),
+            segmentIndex: effectiveTripSegmentIndex,
+            ratio: tripRatioNumber,
             ...draft,
           })
         : null;
@@ -323,7 +339,7 @@ export const EventComposer: React.FC<Props> = ({
       )}
 
       {editableLocation && source === "trip" && (
-        <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2">
+        <div className="space-y-2">
           <label className="block text-xs font-medium text-slate-600">
             {t("mileageEvents.trip", "Trip")}
             <select
@@ -344,15 +360,49 @@ export const EventComposer: React.FC<Props> = ({
                 : t("mileageEvents.tripSourceHintLegacy", "Creates the event on the current GeoJSON mileage axis.")}
             </span>
           </label>
-          <label className="block text-xs font-medium text-slate-600">
-            {t("mileageEvents.position", "Position")}
-            <input
-              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-              value={tripRatio}
-              inputMode="decimal"
-              onChange={(changeEvent) => setTripRatio(changeEvent.target.value)}
-            />
-          </label>
+          <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+            <label className="block text-xs font-medium text-slate-600">
+              {t("mileageEvents.tripSegment", "Segment")}
+              <select
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                value={effectiveTripSegmentIndex}
+                onChange={(changeEvent) => setTripSegmentIndex(Number(changeEvent.target.value))}
+              >
+                {selectedTripSegments.map((segment, index) => (
+                  <option key={`${segment.id}:${index}`} value={index}>
+                    {index + 1}. {segment.lineLabel || lineLabel(segment.lineKey)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs font-medium text-slate-600">
+              {t("mileageEvents.position", "Position")}
+              <input
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                value={`${Math.round(tripRatioNumber * 100)}%`}
+                readOnly
+              />
+            </label>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={tripRatioNumber}
+            onChange={(changeEvent) => setTripRatio(changeEvent.target.value)}
+            className="w-full accent-emerald-600"
+            aria-label={t("mileageEvents.tripPositionPercent", "Trip position percentage")}
+          />
+          {selectedTripSegment && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] text-slate-500">
+              {t("mileageEvents.tripSegmentSummary", "{{from}} to {{to}} · {{distance}} km", {
+                from: selectedTripSegment.fromName || selectedTripSegment.fromId,
+                to: selectedTripSegment.toName || selectedTripSegment.toId,
+                distance: Math.max(0, selectedTripSegment.distanceKm || 0).toFixed(1),
+              })}
+            </div>
+          )}
         </div>
       )}
 

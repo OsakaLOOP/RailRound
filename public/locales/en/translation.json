@@ -329,7 +329,10 @@
     "placeholderUrl": "Image URL...",
     "btnCreate": "Add",
     "btnUpdate": "Update",
-    "createEvent": "Create user event"
+    "createEvent": "Create user event",
+    "eventAxis": "Event axis",
+    "eventAxisHint": "Uses {{line}} as the GeoJSON mileage axis.",
+    "eventAxisMissing": "Load GeoJSON line data before creating a pin event."
   },
   "githubCard": {
     "title": "GitHub Profile Decoration",

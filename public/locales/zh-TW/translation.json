@@ -329,7 +329,10 @@
     "placeholderUrl": "圖片URL...",
     "btnCreate": "添加",
     "btnUpdate": "更新",
-    "createEvent": "建立使用者事件"
+    "createEvent": "建立使用者事件",
+    "eventAxis": "事件軸",
+    "eventAxisHint": "使用 {{line}} 作為 GeoJSON 里程軸。",
+    "eventAxisMissing": "請先載入 GeoJSON 線路資料，再從圖釘建立事件。"
   },
   "githubCard": {
     "title": "GitHub 個人資料裝飾",

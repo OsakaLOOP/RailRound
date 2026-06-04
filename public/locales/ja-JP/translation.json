@@ -329,7 +329,10 @@
     "placeholderUrl": "画像URL...",
     "btnCreate": "追加",
     "btnUpdate": "更新",
-    "createEvent": "ユーザーイベントを作成"
+    "createEvent": "ユーザーイベントを作成",
+    "eventAxis": "イベント軸",
+    "eventAxisHint": "{{line}} を GeoJSON キロ程軸として使用します。",
+    "eventAxisMissing": "ピンからイベントを作成するには、先に GeoJSON 路線データを読み込んでください。"
   },
   "githubCard": {
     "title": "GitHub プロフィール装飾",

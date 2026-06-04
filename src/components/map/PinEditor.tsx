@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Move, Magnet, Camera, MessageSquare, Trash2, X, MapPinned } from 'lucide-react';
 import { useStore, PinMode } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -6,24 +6,35 @@ import { useUserData } from '../../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
 import { showConfirm } from '../../utils/alerts';
 import { openMileageEventsPanel } from '../../utils/mileageEventUiBridge';
+import { findNearestPointOnLine } from '../../core/railwayRouting';
+import { lineLabel } from '../../utils/mileageUserEvents';
+import { RailGraphBadge } from '../rail-graph/RailGraphBadges';
 
 const COLOR_PALETTE = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#64748b'];
 
 export const PinEditor: React.FC = () => {
-    const { editingPin, pinMode, pins, user, trips, folders, badgeSettings } = useStore(useShallow(state => ({
+    const { editingPin, pinMode, pins, user, trips, folders, badgeSettings, railwayData } = useStore(useShallow(state => ({
         editingPin: state.editingPin,
         pinMode: state.pinMode,
         pins: state.pins,
         user: state.user,
         trips: state.trips,
         folders: state.folders,
-        badgeSettings: state.badgeSettings
+        badgeSettings: state.badgeSettings,
+        railwayData: state.railwayData
     })));
     const setEditingPin = useStore(state => state.setEditingPin);
     const setPinMode = useStore(state => state.setPinMode);
     const setPins = useStore(state => state.setPins);
     const { saveData } = useUserData();
     const { t } = useTranslation();
+    const eventLineKey = useMemo(() => {
+        if (!editingPin) return '';
+        if (editingPin.lineKey && railwayData[editingPin.lineKey]) return editingPin.lineKey;
+        const nearest = findNearestPointOnLine(railwayData, editingPin.lat, editingPin.lng);
+        return nearest.lineKey || Object.keys(railwayData).sort()[0] || '';
+    }, [editingPin, railwayData]);
+    const eventAxisLabel = eventLineKey ? lineLabel(eventLineKey) : '';
 
     const savePin = () => {
         if (!editingPin) return;
@@ -57,14 +68,14 @@ export const PinEditor: React.FC = () => {
     };
 
     const createEventFromPin = () => {
-        if (!editingPin) return;
+        if (!editingPin || !eventLineKey) return;
         openMileageEventsPanel({
             mode: 'create',
-            lineKey: editingPin.lineKey,
+            lineKey: eventLineKey,
             source: 'legacy_app',
             create: {
                 source: 'map',
-                lineKey: editingPin.lineKey,
+                lineKey: eventLineKey,
                 mapPoint: { lat: editingPin.lat, lng: editingPin.lng },
                 title: editingPin.comment || '',
                 mediaUrl: editingPin.imageUrl || '',
@@ -123,11 +134,26 @@ export const PinEditor: React.FC = () => {
             <button
                 type="button"
                 onClick={createEventFromPin}
-                className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+                disabled={!eventLineKey}
+                className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
             >
                 <MapPinned size={16} />
                 {t('pin.createEvent', 'Create user event')}
             </button>
+            <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                <RailGraphBadge
+                    icon="legacy"
+                    label={t('pin.eventAxis', 'Event axis')}
+                    value={eventAxisLabel || t('mileageEvents.unknown', 'Unknown')}
+                    tone="slate"
+                    className="max-w-full rounded bg-white"
+                />
+                <span className="min-w-0">
+                    {eventLineKey
+                        ? t('pin.eventAxisHint', 'Uses {{line}} as the GeoJSON mileage axis.', { line: eventAxisLabel })
+                        : t('pin.eventAxisMissing', 'Load GeoJSON line data before creating a pin event.')}
+                </span>
+            </div>
             <div className="flex gap-2">
                 {!editingPin.isTemp && (
                     <button onClick={() => deletePin(editingPin.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">

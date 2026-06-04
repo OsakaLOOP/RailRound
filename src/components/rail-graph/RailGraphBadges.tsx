@@ -17,6 +17,9 @@ export type RailGraphBadgeIcon =
   | "formation"
   | "serviceSwitch"
   | "scenic"
+  | "warning"
+  | "operation"
+  | "custom"
   | "stop"
   | "pass"
   | "note"
@@ -48,6 +51,10 @@ export const railGraphEventTone = (type: string): RailGraphBadgeTone => {
   if (type === "formation_operation") return "violet";
   if (type === "service_class_switch") return "sky";
   if (type === "scenic") return "sky";
+  if (type === "warning") return "amber";
+  if (type === "operation_hint") return "violet";
+  if (type === "custom") return "slate";
+  if (type === "user_note") return "emerald";
   if (type === "user_event" || type === "note") return "violet";
   if (type === "pass") return "slate";
   return "indigo";
@@ -61,6 +68,10 @@ export const railGraphEventIcon = (type: string): RailGraphBadgeIcon => {
   if (type === "formation_operation") return "formation";
   if (type === "service_class_switch") return "serviceSwitch";
   if (type === "scenic") return "scenic";
+  if (type === "warning") return "warning";
+  if (type === "operation_hint") return "operation";
+  if (type === "custom") return "custom";
+  if (type === "user_note") return "note";
   if (type === "stop") return "stop";
   if (type === "pass") return "pass";
   if (type === "user_event") return "userEvent";
@@ -192,6 +203,26 @@ export const RailGraphSymbol: React.FC<{
           <path {...common} d="M2.5 11.5 6 6l2.2 3 1.3-1.7 4 4.2" />
           <circle cx="10.8" cy="4.2" r="1.2" fill="currentColor" />
           <path {...common} d="M2.5 12.5h11" />
+        </>
+      )}
+      {name === "warning" && (
+        <>
+          <path {...common} d="M8 2.8 14 13H2z" />
+          <path {...common} d="M8 6.2v3.2" />
+          <circle cx="8" cy="11.2" r="0.7" fill="currentColor" />
+        </>
+      )}
+      {name === "operation" && (
+        <>
+          <path {...common} d="M3 11.5h10M4 8h8M5 4.5h6" />
+          <path {...common} d="m10 2.8 3 2.7-3 2.7M6 13.2 3 10.5 6 7.8" />
+        </>
+      )}
+      {name === "custom" && (
+        <>
+          <path {...common} d="M4 3.5h8v9H4z" />
+          <path {...common} d="M6 6h4M6 8h4M6 10h2" />
+          <circle cx="12" cy="3.5" r="1.1" fill="currentColor" />
         </>
       )}
       {name === "stop" && (

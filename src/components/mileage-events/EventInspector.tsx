@@ -1,11 +1,9 @@
 import React, { useMemo, useState } from "react";
 import {
   Copy,
-  Download,
   Edit2,
   Eye,
   FileJson,
-  GitMerge,
   Link2Off,
   MapPinned,
   Route,
@@ -39,6 +37,7 @@ import { useMileageEventActions } from "./useMileageEventActions";
 import { useAppNavigation } from "../../hooks/useAppNavigation";
 import { showConfirm } from "../../utils/alerts";
 import { selectMileageEventOnMap } from "../../utils/mileageEventUiBridge";
+import { RailGraphBadge, RailGraphEventPill } from "../rail-graph/RailGraphBadges";
 
 interface Props {
   event: UserEventV2 | null;
@@ -81,6 +80,12 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
   const trip = trips.find((candidate) => String(candidate.id) === String(event.payload?.tripId));
   const mediaUrl = typeof event.payload?.mediaUrl === "string" ? event.payload.mediaUrl : "";
   const createdFrom = typeof event.payload?.createdFrom === "string" ? event.payload.createdFrom : "";
+  const compactRailGraphRef = (value?: unknown) => {
+    const text = String(value ?? "");
+    if (!text) return "";
+    const last = text.split(/[/:#]/).filter(Boolean).pop();
+    return last && last.length < text.length ? last : text;
+  };
 
   const deleteEvent = async () => {
     const confirmed = await showConfirm(
@@ -161,31 +166,49 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
       const profile = lineContext.segment.mileageProfile;
       return (
         <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-2.5 text-xs">
-          <div className="flex items-center gap-1.5 font-semibold text-emerald-800">
-            <GitMerge size={14} />
-            {t("mileageEvents.inspector.railGraphContext", "Saved rail-graph run")}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <RailGraphBadge
+              icon="snapshot"
+              value={t("mileageEvents.inspector.railGraphContext", "Saved rail-graph run")}
+              tone="emerald"
+              className="rounded"
+            />
+            <RailGraphBadge
+              icon="stops"
+              label={t("mileageEvents.inspector.segment", "Segment")}
+              value={lineContext.segmentIndex + 1}
+              tone="slate"
+              className="rounded"
+            />
           </div>
-          <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] font-semibold text-slate-600">
-            <span className="rounded bg-white px-1.5 py-0.5 text-emerald-700">
-              {t("mileageEvents.sourceRailGraph", "Rail graph snapshot")}
-            </span>
-            <span className="rounded bg-white px-1.5 py-0.5">
-              {t("mileageEvents.inspector.segment", "Segment")} {lineContext.segmentIndex + 1}
-            </span>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             {profile.serviceType && (
-              <span className="rounded bg-white px-1.5 py-0.5">
-                {t("mileageEvents.inspector.service", "Service")} {profile.serviceType}
-              </span>
+              <RailGraphBadge
+                icon="service"
+                label={t("mileageEvents.inspector.service", "Service")}
+                value={profile.serviceType}
+                tone="sky"
+                className="rounded bg-white"
+              />
             )}
             {profile.direction && (
-              <span className="rounded bg-white px-1.5 py-0.5">
-                {t("mileageEvents.inspector.direction", "Direction")} {profile.direction}
-              </span>
+              <RailGraphBadge
+                icon="direction"
+                label={t("mileageEvents.inspector.direction", "Direction")}
+                value={profile.direction}
+                tone="amber"
+                className="rounded bg-white"
+              />
             )}
             {profile.patternRef && (
-              <span className="max-w-full truncate rounded bg-white px-1.5 py-0.5">
-                {t("mileageEvents.inspector.pattern", "Pattern")} {String(profile.patternRef)}
-              </span>
+              <RailGraphBadge
+                icon="pattern"
+                label={t("mileageEvents.inspector.pattern", "Pattern")}
+                value={compactRailGraphRef(profile.patternRef)}
+                tone="indigo"
+                className="max-w-full rounded bg-white"
+                title={String(profile.patternRef)}
+              />
             )}
           </div>
         </div>
@@ -193,13 +216,22 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
     }
     return (
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs">
-        <div className="flex items-center gap-1.5 font-semibold text-slate-700">
-          <Route size={14} />
-          {t("mileageEvents.inspector.legacyContext", "GeoJSON mileage axis")}
-        </div>
-        <div className="mt-1 text-[11px] text-slate-500">
-          {t("mileageEvents.sourceLegacy", "GeoJSON axis")}
-          {lineName ? ` · ${lineName}` : ""}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <RailGraphBadge
+            icon="legacy"
+            value={t("mileageEvents.inspector.legacyContext", "GeoJSON mileage axis")}
+            tone="slate"
+            className="rounded bg-white"
+          />
+          {lineName && (
+            <RailGraphBadge
+              icon="distance"
+              label={t("mileageEvents.inspector.line", "Line")}
+              value={lineName}
+              tone="slate"
+              className="max-w-full rounded bg-white"
+            />
+          )}
         </div>
       </div>
     );
@@ -235,9 +267,7 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
       <header className="flex items-start justify-between gap-2 border-b border-slate-200 p-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-              {eventKindLabel(event.kind, t)}
-            </span>
+            <RailGraphEventPill type={event.kind} label={eventKindLabel(event.kind, t)} className="max-w-[8rem]" />
             <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
               {eventVisibilityLabel(event.visibility, t)}
             </span>

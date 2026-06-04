@@ -27,6 +27,7 @@ import { EventInspector } from "../mileage-events/EventInspector";
 import { EventList, MileageEventListEntry } from "../mileage-events/EventList";
 import { EventSearchPanel } from "../mileage-events/EventSearchPanel";
 import { useMileageEventActions } from "../mileage-events/useMileageEventActions";
+import { RailGraphBadge } from "../rail-graph/RailGraphBadges";
 import {
   customEventDetail,
   mileageEventUiEvents,
@@ -243,6 +244,7 @@ export const MileageEventsPanel: React.FC = () => {
     (effectiveLineKey ? lineLabel(effectiveLineKey) : t("mileageEvents.noLineLoaded", "No line loaded"));
   const currentAxisEventCount = currentRailGraphAxis?.count ?? lineEntries.length;
   const selectedLineColor = currentRailGraphAxis?.color ?? lineContext?.line.meta.color ?? "#0f766e";
+  const currentAxisSource = currentRailGraphAxis ? "rail_graph" : "legacy";
 
   useEffect(() => {
     if (!open) {
@@ -359,19 +361,32 @@ export const MileageEventsPanel: React.FC = () => {
           <div className="mt-1 truncate text-xs text-slate-500">
             {t("mileageEvents.panelSubtitle", "Search, project and edit events on the mileage axis")}
           </div>
-          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold">
-            <span className="rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
-              {t("mileageEvents.sourceCountRailGraph", "Rail graph {{count}}", { count: sourceCounts.railGraph })}
-            </span>
-            <span className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-slate-500">
-              {t("mileageEvents.sourceCountLegacy", "GeoJSON {{count}}", { count: sourceCounts.legacy })}
-            </span>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <RailGraphBadge
+              icon="snapshot"
+              value={t("mileageEvents.sourceCountRailGraph", "Rail graph {{count}}", { count: sourceCounts.railGraph })}
+              tone="emerald"
+              className="rounded bg-white"
+            />
+            <RailGraphBadge
+              icon="legacy"
+              value={t("mileageEvents.sourceCountLegacy", "GeoJSON {{count}}", { count: sourceCounts.legacy })}
+              tone="slate"
+              className="rounded bg-white"
+            />
           </div>
           <div className="mt-2 rounded-md border border-slate-200 bg-white/80 px-2 py-1.5 text-[11px] text-slate-600">
             <div className="flex min-w-0 items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: selectedLineColor }} />
-                <span className="shrink-0 text-slate-400">{t("mileageEvents.selectedLine", "Selected line")}</span>
+                <RailGraphBadge
+                  icon={currentAxisSource === "rail_graph" ? "snapshot" : "legacy"}
+                  value={currentAxisSource === "rail_graph"
+                    ? t("mileageEvents.sourceRailGraph", "Rail graph snapshot")
+                    : t("mileageEvents.sourceLegacy", "GeoJSON axis")}
+                  tone={currentAxisSource === "rail_graph" ? "emerald" : "slate"}
+                  className="shrink-0 rounded bg-white"
+                />
                 <span className="truncate">{currentAxisLabel}</span>
               </span>
               <span className="shrink-0 text-slate-400">

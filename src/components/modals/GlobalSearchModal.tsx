@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     CalendarDays,
     Building2,
-    Clock,
-    GitMerge,
     ListFilter,
     Map as MapIcon,
     MapPin,
@@ -26,13 +24,11 @@ import {
     eventKindLabel,
     eventLineLabel,
     eventMileageLabel,
-    eventSourceLabel,
-    eventSourceTone,
     eventStationLabel,
-    timestampLabel,
 } from '../mileage-events/display';
 import { tripSearchText, tripToProductSegments } from '../../utils/tripProductProjection';
 import { buildTripDetailModel } from '../../utils/railGraphTripDetailModel';
+import { RailGraphBadge, RailGraphEventPill } from '../rail-graph/RailGraphBadges';
 
 interface Props {
     isOpen: boolean;
@@ -63,6 +59,12 @@ export const GlobalSearchModal: React.FC<Props> = ({
     const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
+    const compactRailGraphRef = (value?: unknown) => {
+        const text = String(value ?? '');
+        if (!text) return '';
+        const last = text.split(/[/:#]/).filter(Boolean).pop();
+        return last && last.length < text.length ? last : text;
+    };
 
     useEffect(() => {
         if (isOpen) {
@@ -236,13 +238,11 @@ export const GlobalSearchModal: React.FC<Props> = ({
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                                                            {eventKindLabel(bound.event.kind, t)}
-                                                        </span>
+                                                        <RailGraphEventPill type={bound.event.kind} label={eventKindLabel(bound.event.kind, t)} className="max-w-[8rem]" />
                                                         <div className="truncate font-bold text-gray-800">{bound.event.title}</div>
                                                     </div>
-                                                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
-                                                        <span>{eventMileageLabel(bound)}</span>
+                                                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+                                                        <RailGraphBadge icon="distance" value={eventMileageLabel(bound)} tone="slate" className="rounded" />
                                                         {eventStationLabel(bound, lineContext) && <span>{eventStationLabel(bound, lineContext)}</span>}
                                                         {eventLineLabel(bound, lineContext) && (
                                                             <span className="inline-flex items-center gap-1">
@@ -250,13 +250,14 @@ export const GlobalSearchModal: React.FC<Props> = ({
                                                                 {eventLineLabel(bound, lineContext)}
                                                             </span>
                                                         )}
-                                                        <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${eventSourceTone(lineContext)}`}>
-                                                            {eventSourceLabel(lineContext, t)}
-                                                        </span>
-                                                        <span className="inline-flex items-center gap-1">
-                                                            <Clock size={11} />
-                                                            {timestampLabel(bound.timestampInference, bound.timestamp, t)}
-                                                        </span>
+                                                        <RailGraphBadge
+                                                            icon={lineContext.source === 'rail_graph_runtime' ? 'snapshot' : 'legacy'}
+                                                            value={lineContext.source === 'rail_graph_runtime'
+                                                                ? t('mileageEvents.sourceRailGraph', 'Rail graph snapshot')
+                                                                : t('mileageEvents.sourceLegacy', 'GeoJSON axis')}
+                                                            tone={lineContext.source === 'rail_graph_runtime' ? 'emerald' : 'slate'}
+                                                            className="rounded"
+                                                        />
                                                     </div>
                                                 </div>
                                             </button>
@@ -297,10 +298,12 @@ export const GlobalSearchModal: React.FC<Props> = ({
                                                         <div className="flex min-w-0 items-center gap-2">
                                                             <div className="font-bold text-gray-800">{trip.date}</div>
                                                             {detail.kind === 'rail_graph' && (
-                                                                <span className="inline-flex shrink-0 items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                                                                    <GitMerge size={10} />
-                                                                    {firstDetailSegment?.serviceType || t('search.railGraphTrip', 'Rail graph')}
-                                                                </span>
+                                                                <RailGraphBadge
+                                                                    icon="snapshot"
+                                                                    value={firstDetailSegment?.serviceType || t('search.railGraphTrip', 'Rail graph')}
+                                                                    tone="emerald"
+                                                                    className="shrink-0 rounded"
+                                                                />
                                                             )}
                                                         </div>
                                                         <div className="text-xs text-gray-500 truncate">
@@ -308,21 +311,22 @@ export const GlobalSearchModal: React.FC<Props> = ({
                                                             {segments.length > 1 ? ` +${segments.length - 1}` : ''}
                                                         </div>
                                                         {detail.kind === 'rail_graph' && (
-                                                            <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-gray-500">
-                                                                <span className="rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-700">
-                                                                    {t('search.railGraphSnapshot', 'Saved snapshot')}
-                                                                </span>
+                                                            <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-gray-500">
+                                                                <RailGraphBadge icon="snapshot" value={t('search.railGraphSnapshot', 'Saved snapshot')} tone="emerald" className="rounded" />
                                                                 {firstDetailSegment?.direction && (
-                                                                    <span className="rounded bg-slate-100 px-1.5 py-0.5">
-                                                                        {firstDetailSegment.direction}
-                                                                    </span>
+                                                                    <RailGraphBadge icon="direction" value={firstDetailSegment.direction} tone="amber" className="rounded" />
                                                                 )}
-                                                                <span className="rounded bg-slate-100 px-1.5 py-0.5">
-                                                                    {t('search.km', '{{value}} km', { value: detail.overview.totalDistanceKm.toFixed(1) })}
-                                                                </span>
-                                                                <span className="rounded bg-slate-100 px-1.5 py-0.5">
-                                                                    {t('search.userEvents', '{{count}} user events', { count: detail.overview.userEventCount })}
-                                                                </span>
+                                                                {firstDetailSegment?.patternRef && (
+                                                                    <RailGraphBadge
+                                                                        icon="pattern"
+                                                                        value={compactRailGraphRef(firstDetailSegment.patternRef)}
+                                                                        tone="indigo"
+                                                                        className="max-w-[10rem] rounded"
+                                                                        title={String(firstDetailSegment.patternRef)}
+                                                                    />
+                                                                )}
+                                                                <RailGraphBadge icon="distance" value={t('search.km', '{{value}} km', { value: detail.overview.totalDistanceKm.toFixed(1) })} tone="slate" className="rounded" />
+                                                                <RailGraphBadge icon="userEvent" value={t('search.userEvents', '{{count}} user events', { count: detail.overview.userEventCount })} tone="violet" className="rounded" />
                                                             </div>
                                                         )}
                                                     </div>

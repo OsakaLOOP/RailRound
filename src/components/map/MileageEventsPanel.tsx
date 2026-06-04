@@ -69,6 +69,8 @@ export const MileageEventsPanel: React.FC = () => {
   const [composerDraft, setComposerDraft] = useState<{
     source: MileageEventsComposerSource;
     tripId?: string | number;
+    tripSegmentIndex?: number;
+    tripRatio?: number;
     lineKey?: string;
     stationId?: string;
     title?: string;
@@ -104,7 +106,9 @@ export const MileageEventsPanel: React.FC = () => {
       const detail = customEventDetail<MileageEventsOpenDetail>(event);
       setOpen(true);
       setSelectedEventId(detail.eventId ?? null);
-      if (!detail.eventId) setSelectedProjection(null);
+      if (!detail.eventId) {
+        setSelectedProjection(detail.lineKey || detail.source ? { lineKey: detail.lineKey, source: detail.source } : null);
+      }
       if (detail.lineKey && lineKeys.includes(detail.lineKey)) {
         setLineKey(detail.lineKey);
       }
@@ -123,6 +127,8 @@ export const MileageEventsPanel: React.FC = () => {
       setComposerDraft((current) => ({
         source: create.source ?? "station",
         tripId: create.tripId,
+        tripSegmentIndex: create.tripSegmentIndex,
+        tripRatio: create.tripRatio,
         lineKey: nextLineKey,
         stationId: create.stationId,
         title: create.title,
@@ -215,7 +221,7 @@ export const MileageEventsPanel: React.FC = () => {
       setActiveMileageLine({ lineKey: null });
       return;
     }
-    if (selectedEvent && selectedProjection?.source === "rail_graph_runtime") {
+    if (selectedProjection?.source === "rail_graph_runtime") {
       setActiveMileageLine({
         lineKey: selectedProjection.lineKey ?? null,
         source: selectedProjection.source,
@@ -229,6 +235,19 @@ export const MileageEventsPanel: React.FC = () => {
     setSelectedEventId(eventId);
     setSelectedProjection(lineContext ? { lineKey: effectiveLineKey, source: "legacy_app" } : null);
     selectMileageEventOnMap({ eventId, lineKey: lineContext ? effectiveLineKey : undefined });
+  };
+
+  const selectComposerEvent = (event: UserEventV2) => {
+    if (composerDraft.source === "trip" && selectedProjection?.source === "rail_graph_runtime") {
+      setSelectedEventId(event.id);
+      selectMileageEventOnMap({
+        eventId: event.id,
+        lineKey: selectedProjection.lineKey,
+        source: selectedProjection.source,
+      });
+      return;
+    }
+    selectEvent(event.id);
   };
 
   const focusEventOnMap = (entry: MileageEventListEntry) => {
@@ -564,6 +583,8 @@ export const MileageEventsPanel: React.FC = () => {
                       defaultLineKey={composerDraft.lineKey || effectiveLineKey}
                       defaultStationId={composerDraft.stationId || effectiveStationId}
                       defaultTripId={composerDraft.tripId}
+                      defaultTripSegmentIndex={composerDraft.tripSegmentIndex}
+                      defaultTripRatio={composerDraft.tripRatio}
                       defaultSource={composerDraft.source || (mapPoint ? "map" : "station")}
                       defaultTitle={composerDraft.title}
                       defaultBody={composerDraft.body}
@@ -571,7 +592,7 @@ export const MileageEventsPanel: React.FC = () => {
                       defaultMediaUrl={composerDraft.mediaUrl}
                       resetKey={composerDraft.resetKey}
                       mapPoint={mapPoint}
-                      onSaved={(event) => selectEvent(event.id)}
+                      onSaved={selectComposerEvent}
                     />
                   </div>
                 </div>

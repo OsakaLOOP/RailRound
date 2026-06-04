@@ -387,6 +387,12 @@
 .rail-route-line.rail-route-fallback {
   filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.28));
 }
+.rail-route-line:not(.rail-route-walk) {
+  cursor: pointer;
+}
+.rail-route-line.rail-route-active-mileage {
+  filter: drop-shadow(0 0 7px rgba(16, 185, 129, 0.55));
+}
 .rail-route-popup {
   min-width: 220px;
   max-width: 280px;

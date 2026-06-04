@@ -538,6 +538,7 @@
     "tags": "タグ",
     "tagsPlaceholder": "タグ（カンマ区切り）",
     "mediaPlaceholder": "写真 URL または添付プレースホルダー",
+    "routeDraftTitle": "路線イベント",
     "linkedTrip": "連携旅程",
     "noLinkedTrip": "連携旅程なし",
     "trip": "旅程",

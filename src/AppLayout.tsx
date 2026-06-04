@@ -1196,6 +1196,9 @@ export const AppLayout: React.FC = () => {
                 isMulti: false,
                 fallback: false,
                 source: "rail_graph",
+                lineKey: `rail-graph:${seg.patternRef ?? seg.id}`,
+                tripId: trip.id,
+                segmentIndex: i,
                 popup: buildRoutePopupHtml({
                   sourceLabel: t("map.route.sourceRailGraph", "Rail graph snapshot"),
                   sourceKind: "rail_graph",
@@ -1232,6 +1235,9 @@ export const AppLayout: React.FC = () => {
                 id: seg.id || key,
                 ...cached,
                 source: "legacy",
+                lineKey: seg.lineKey,
+                tripId: trip.id,
+                segmentIndex: i,
                 popup: buildRoutePopupHtml({
                   sourceLabel: cached.fallback
                     ? t("map.route.sourceFallback", "Geometry fallback")

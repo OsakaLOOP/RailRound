@@ -538,6 +538,7 @@
     "tags": "Tags",
     "tagsPlaceholder": "Tags, separated by comma",
     "mediaPlaceholder": "Photo URL or attachment placeholder",
+    "routeDraftTitle": "Route event",
     "linkedTrip": "Linked trip",
     "noLinkedTrip": "No linked trip",
     "trip": "Trip",

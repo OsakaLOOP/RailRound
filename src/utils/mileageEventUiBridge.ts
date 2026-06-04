@@ -8,10 +8,13 @@ export type MileageEventsProjectionSource = MileageLineContextLike["source"] | "
 export interface MileageEventsOpenDetail {
   mode?: MileageEventsPanelMode;
   lineKey?: string;
+  source?: MileageEventsProjectionSource;
   eventId?: string;
   create?: {
     source?: MileageEventsComposerSource;
     tripId?: string | number;
+    tripSegmentIndex?: number;
+    tripRatio?: number;
     lineKey?: string;
     stationId?: string;
     mapPoint?: { lat: number; lng: number };

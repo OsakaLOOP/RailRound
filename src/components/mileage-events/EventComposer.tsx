@@ -29,6 +29,8 @@ interface Props {
   defaultLineKey?: string;
   defaultStationId?: string;
   defaultTripId?: string | number;
+  defaultTripSegmentIndex?: number;
+  defaultTripRatio?: number;
   defaultSource?: ComposerSource;
   defaultTitle?: string;
   defaultBody?: string;
@@ -46,6 +48,8 @@ export const EventComposer: React.FC<Props> = ({
   defaultLineKey,
   defaultStationId,
   defaultTripId,
+  defaultTripSegmentIndex,
+  defaultTripRatio,
   defaultSource = "station",
   defaultTitle = "",
   defaultBody = "",
@@ -76,7 +80,8 @@ export const EventComposer: React.FC<Props> = ({
   const [stationId, setStationId] = useState(defaultStationId || "");
   const [distanceKm, setDistanceKm] = useState(event ? (event.mileage.distanceMeters / 1000).toFixed(1) : "0");
   const [tripId, setTripId] = useState<string>(defaultTripId !== undefined ? String(defaultTripId) : "");
-  const [tripRatio, setTripRatio] = useState("0.5");
+  const [tripSegmentIndex, setTripSegmentIndex] = useState(defaultTripSegmentIndex ?? 0);
+  const [tripRatio, setTripRatio] = useState(defaultTripRatio !== undefined ? defaultTripRatio.toFixed(3) : "0.5");
   const [title, setTitle] = useState(event?.title ?? defaultTitle);
   const [body, setBody] = useState(event?.body ?? defaultBody);
   const [kind, setKind] = useState(event?.kind ?? "user_note");
@@ -135,7 +140,9 @@ export const EventComposer: React.FC<Props> = ({
       setTripId(nextTripId);
       setLinkedTripId(nextTripId);
     }
-  }, [defaultTripId, event]);
+    if (defaultTripSegmentIndex !== undefined) setTripSegmentIndex(defaultTripSegmentIndex);
+    if (defaultTripRatio !== undefined) setTripRatio(defaultTripRatio.toFixed(3));
+  }, [defaultTripId, defaultTripRatio, defaultTripSegmentIndex, event]);
 
   const lineContext = useMemo(
     () => (lineKey ? buildAppMileageLineContext(railwayData, lineKey) : null),
@@ -190,6 +197,7 @@ export const EventComposer: React.FC<Props> = ({
         ? createMileageEventFromTripPosition({
             railwayData,
             trip,
+            segmentIndex: tripSegmentIndex,
             ratio: Number(tripRatio),
             ...draft,
           })

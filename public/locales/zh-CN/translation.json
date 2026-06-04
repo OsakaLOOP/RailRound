@@ -538,6 +538,7 @@
     "tags": "标签",
     "tagsPlaceholder": "标签，用逗号分隔",
     "mediaPlaceholder": "照片 URL 或附件占位",
+    "routeDraftTitle": "线路事件",
     "linkedTrip": "关联行程",
     "noLinkedTrip": "未关联行程",
     "trip": "行程",

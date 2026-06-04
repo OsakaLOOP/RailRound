@@ -19,7 +19,9 @@ import { tripToProductSegments } from "../../utils/tripProductProjection";
 import {
   customEventDetail,
   mileageEventUiEvents,
+  openMileageEventsPanel,
   selectMileageEventOnMap,
+  setActiveMileageLine,
   setMileageEventsMapPoint,
   type MileageEventSelectDetail,
   type MileageEventsActiveLineDetail,
@@ -102,8 +104,7 @@ export const MapContainer: React.FC<Props> = ({
   const isActiveRouteItem = (item: { lineKey?: string; source?: "rail_graph" | "legacy" | "walk" }) => {
     if (!activeMileageLineKey || item.source === "walk") return false;
     if (item.lineKey && activeMileageLineKey === item.lineKey) return true;
-    if (item.lineKey && activeMileageLineKey === `rail-graph:${item.lineKey}`) return true;
-    return item.source === "rail_graph" && activeMileageLineKey.startsWith("rail-graph:");
+    return item.source === "rail_graph" && activeMileageLineKey.startsWith("rail-graph:") && !item.lineKey;
   };
 
   const flyToLocation = (detail: Partial<FlyToLocationDetail> | null | undefined) => {
@@ -1417,6 +1418,8 @@ export const MapContainer: React.FC<Props> = ({
       lineKey?: string;
       source?: "rail_graph" | "legacy" | "walk";
       isTransfer?: boolean;
+      tripId?: string | number;
+      segmentIndex?: number;
     }
     const routeItems: RouteItem[] = [];
 
@@ -1432,6 +1435,8 @@ export const MapContainer: React.FC<Props> = ({
             lineKey: seg.lineKey,
             source: seg.source,
             isTransfer: seg.isTransfer,
+            tripId: seg.tripId,
+            segmentIndex: seg.segmentIndex,
           });
         });
       } else {
@@ -1444,6 +1449,8 @@ export const MapContainer: React.FC<Props> = ({
           lineKey: seg.lineKey,
           source: seg.source,
           isTransfer: seg.isTransfer,
+          tripId: seg.tripId,
+          segmentIndex: seg.segmentIndex,
         });
       }
     });
@@ -1463,6 +1470,66 @@ export const MapContainer: React.FC<Props> = ({
         });
       }
     });
+
+    const ratioAtRoutePoint = (item: RouteItem, latlng: L.LatLng) => {
+      if (!mapInstance.current || item.coords.length < 2) return 0;
+      const clickPoint = mapInstance.current.latLngToLayerPoint(latlng);
+      const points = item.coords.map((coord) => mapInstance.current!.latLngToLayerPoint(coord as L.LatLngExpression));
+      let total = 0;
+      const segmentLengths: number[] = [];
+      for (let index = 1; index < points.length; index++) {
+        const length = points[index - 1].distanceTo(points[index]);
+        segmentLengths.push(length);
+        total += length;
+      }
+      if (total <= 0) return 0;
+
+      let bestDistance = Number.POSITIVE_INFINITY;
+      let bestAlong = 0;
+      let cursor = 0;
+      for (let index = 1; index < points.length; index++) {
+        const start = points[index - 1];
+        const end = points[index];
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const lengthSq = dx * dx + dy * dy;
+        const localT = lengthSq <= 0
+          ? 0
+          : Math.max(0, Math.min(1, ((clickPoint.x - start.x) * dx + (clickPoint.y - start.y) * dy) / lengthSq));
+        const projected = L.point(start.x + dx * localT, start.y + dy * localT);
+        const distance = clickPoint.distanceTo(projected);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestAlong = cursor + segmentLengths[index - 1] * localT;
+        }
+        cursor += segmentLengths[index - 1];
+      }
+      return Math.max(0, Math.min(1, bestAlong / total));
+    };
+
+    const activateRouteItem = (item: RouteItem, event: L.LeafletMouseEvent) => {
+      if (item.source === "walk" || item.isTransfer) return;
+      L.DomEvent.stopPropagation(event);
+      const projectionSource = item.source === "rail_graph" ? "rail_graph_runtime" : "legacy_app";
+      const mapPoint = { lat: event.latlng.lat, lng: event.latlng.lng };
+      const tripRatio = ratioAtRoutePoint(item, event.latlng);
+      setActiveMileageLine({ lineKey: item.lineKey ?? null, source: projectionSource });
+      openMileageEventsPanel({
+        mode: "create",
+        lineKey: item.lineKey,
+        source: projectionSource,
+        create: {
+          source: item.source === "rail_graph" ? "trip" : "map",
+          tripId: item.tripId,
+          tripSegmentIndex: item.segmentIndex,
+          tripRatio,
+          lineKey: item.source === "legacy" ? item.lineKey : undefined,
+          mapPoint,
+          title: i18next.t("mileageEvents.routeDraftTitle", "Route event"),
+          tags: ["trip-event"],
+        },
+      });
+    };
 
     syncLeafletLayerGroup<RouteItem>(
       routeLayer.current,
@@ -1489,11 +1556,19 @@ export const MapContainer: React.FC<Props> = ({
           item.coords,
           options as L.PolylineOptions,
         ).bindPopup(item.popup);
+        if (item.source !== "walk" && !item.isTransfer) {
+          const routeClickHandler = (event: L.LeafletMouseEvent) => activateRouteItem(item, event);
+          pl.on("click", routeClickHandler);
+          (pl as any)._routeClickHandler = routeClickHandler;
+        }
         (pl as any)._cachedCoords = item.coords;
         return pl;
       },
       (layer, item) => {
-        const pl = layer as L.Polyline & { _cachedCoords?: any[] };
+        const pl = layer as L.Polyline & {
+          _cachedCoords?: any[];
+          _routeClickHandler?: (event: L.LeafletMouseEvent) => void;
+        };
 
         // setLatLngs is an extremely expensive operation in Leaflet.
         // Only call it if the coordinates actually changed (reference check).
@@ -1540,6 +1615,16 @@ export const MapContainer: React.FC<Props> = ({
 
         if (pl.getPopup()?.getContent() !== item.popup) {
           pl.bindPopup(item.popup);
+        }
+
+        if (pl._routeClickHandler) {
+          pl.off("click", pl._routeClickHandler);
+          pl._routeClickHandler = undefined;
+        }
+        if (item.source !== "walk" && !item.isTransfer) {
+          const routeClickHandler = (event: L.LeafletMouseEvent) => activateRouteItem(item, event);
+          pl.on("click", routeClickHandler);
+          pl._routeClickHandler = routeClickHandler;
         }
       },
     );

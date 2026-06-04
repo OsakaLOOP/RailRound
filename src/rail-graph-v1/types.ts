@@ -22,6 +22,7 @@ export type * from "./community.types";
 export type * from "./source.types";
 export type * from "./snapshot.types";
 export type * from "./service-template-validation";
+export type * from "./transfer-scorer";
 
 export {
   assertServicePatternValidForTopology,
@@ -42,6 +43,13 @@ export { generateRunEvents } from "./events";
 export { buildDeployedSystem, deployedContentInput, publishServiceTemplates } from "./deployment";
 export { buildPathPresets, buildPresetRunIdMap, pathPresetContentInput } from "./presets";
 export { buildTripResult, planTrip } from "./trip-planner";
+export {
+  DEFAULT_TRANSFER_COST_METERS,
+  DEFAULT_TRANSFER_MINUTE_COST_METERS,
+  mergeTransferScoringPolicies,
+  scoreTransfer,
+  transferPolicyFromTopologyRelations,
+} from "./transfer-scorer";
 export { canonicalJson, fingerprint, sha256Hex } from "./fingerprint";
 export {
   buildRailGraph,

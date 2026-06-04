@@ -13,6 +13,7 @@ import type { Diagnostic } from "./diagnostic-types";
 import type { SystemContext } from "./graph.types";
 import type { EntityRef, ISODateTime } from "./primitives";
 import type { ServicePattern } from "./service-template.types";
+import type { TransferScoringPolicy } from "./transfer-scorer";
 import type { StationMeta } from "./user-facing.types";
 import { fingerprint } from "./fingerprint";
 import { resolveServicePatternGeometry } from "./render-geometry";
@@ -28,6 +29,7 @@ export interface BuildDeployedSystemArgs {
   version: string;
   createdAt?: ISODateTime;
   defaultTimetables?: TimetableSet[];
+  transferPolicy?: TransferScoringPolicy;
   contributions?: ContributionStore;
 }
 
@@ -66,6 +68,7 @@ export function buildDeployedSystem(args: BuildDeployedSystemArgs): BuildDeploye
     relations,
     defaultTimetables,
     generatedPresets: presetResult.presets,
+    transferPolicy: args.transferPolicy,
     contributions: args.contributions,
     contentHash: fingerprint(deployedContentInput({
       sourceGraphId: args.system.graphId,
@@ -74,6 +77,7 @@ export function buildDeployedSystem(args: BuildDeployedSystemArgs): BuildDeploye
       relations,
       defaultTimetables,
       presets: presetResult.presets,
+      transferPolicy: args.transferPolicy,
     })),
     presetHashes,
   };
@@ -94,6 +98,7 @@ export function deployedContentInput(args: {
   relations: readonly BaseTopologyRelation[];
   defaultTimetables: readonly TimetableSet[];
   presets: Readonly<DeployedSystem["generatedPresets"]>;
+  transferPolicy?: TransferScoringPolicy;
 }): unknown {
   return {
     sourceGraphId: args.sourceGraphId,
@@ -102,6 +107,7 @@ export function deployedContentInput(args: {
     relations: args.relations,
     defaultTimetables: args.defaultTimetables,
     presets: args.presets.map(pathPresetContentInput),
+    transferPolicy: args.transferPolicy,
   };
 }
 

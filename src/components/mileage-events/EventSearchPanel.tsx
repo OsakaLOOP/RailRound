@@ -5,7 +5,7 @@ import { useStore } from "../../store";
 import { useShallow } from "zustand/react/shallow";
 import type { MileageUserEventVisibility, UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
 import {
-  boundMileageEventsForDisplay,
+  boundMileageEventsForRichDisplay,
   findLineKeyForMileageEvent,
   lineLabel,
   normalizeTags,
@@ -33,15 +33,23 @@ export const EventSearchPanel: React.FC<Props> = ({
   onViewMap,
 }) => {
   const { t } = useTranslation();
-  const { railwayData, mileageUserEvents } = useStore(
+  const { railwayData, mileageUserEvents, trips } = useStore(
     useShallow((state) => ({
       railwayData: state.railwayData,
       mileageUserEvents: state.mileageUserEvents,
+      trips: state.trips,
     }))
   );
   const { persistEvents } = useMileageEventActions();
   const sourceEvents = events ?? mileageUserEvents;
-  const lineKeys = useMemo(() => Object.keys(railwayData).sort(), [railwayData]);
+  const lineKeys = useMemo(() => {
+    const keys = new Set(Object.keys(railwayData));
+    sourceEvents.forEach((event) => {
+      const key = findLineKeyForMileageEvent(event);
+      if (key) keys.add(key);
+    });
+    return Array.from(keys).sort();
+  }, [railwayData, sourceEvents]);
   const [query, setQuery] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -70,8 +78,8 @@ export const EventSearchPanel: React.FC<Props> = ({
   );
 
   const entries = useMemo(
-    () => boundMileageEventsForDisplay(matchedEvents, railwayData),
-    [matchedEvents, railwayData],
+    () => boundMileageEventsForRichDisplay(matchedEvents, railwayData, trips),
+    [matchedEvents, railwayData, trips],
   );
   const selectedEntries = useMemo(
     () => entries.filter((entry) => selectedEventIds.has(entry.bound.event.id)),

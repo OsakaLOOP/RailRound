@@ -150,6 +150,9 @@ export interface TripTransferEvent {
   toLine?: string;
   transferMode?: "alight" | "through";
   walkMinutes?: number;
+  waitMinutes?: number;
+  costMeters?: number;
+  reason?: string;
 }
 
 export interface TripScenicEvent {

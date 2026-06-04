@@ -31,6 +31,9 @@ dist-ssr
 !public/edgeone.json
 !public/changelog.json
 !public/company_data.json
+!public/rail-graph/
+!public/rail-graph/deployed-system.json
+!public/rail-graph/deployed-system.meta.json
 !public/locales/**/*.json
 *.geojson
 

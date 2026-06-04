@@ -26,6 +26,8 @@
   - rail graph v1 实施计划: docs/rail-graph-v1-plan/11-完全集成实施计划.md
   - rail graph 产品契约偏离审计: docs/rail-graph-v1-plan/12-原始设计偏离审计与产品接入修正.md
   - rail graph 阶段验收与最终成品总结: docs/rail-graph-v1-plan/13-阶段变更验收与最终成品总结.md
+  - rail graph 70% 推进与用户端 90% 执行计划: docs/rail-graph-v1-plan/14-70-percent-user-90-execution-plan.md
+  - rail graph 主应用数据与交互流程: docs/rail-graph-v1-plan/15-main-app-data-and-interaction-flow.md
   - mileage-centric UserEvent 接入文档: docs/rail-graph-v1/user-event-mileage-layer.md
 - rail graph MVP 工作台:
   - standalone HTML: rail-graph-mvp.html
@@ -192,23 +194,42 @@
   - src/rail-graph-v1/user-facing.types.ts
   - src/rail-graph-v1/deployment.types.ts
   - src/rail-graph-v1/trip-planner.ts
+  - src/rail-graph-v1/transfer-scorer.ts
 - app/runtime bridge:
+  - src/AppLayout.tsx (default deployment load + railGraphLoadState)
+  - src/store/index.ts (railGraphRuntime / railGraphLoadState)
   - src/utils/railGraphTripAdapter.ts
   - src/utils/railGraphTripPersistence.ts
+  - src/utils/railGraphTripDetailModel.ts
   - src/utils/tripProductProjection.ts
   - src/services/railGraphDeploymentLoader.ts
   - src/utils/appRoutePlanner.ts
   - src/utils/mileageUserEvents.ts
 - product consumers:
   - src/core/tripCalculator.js
+  - src/components/Chest.jsx
+  - src/components/map/MapContainer.tsx
+  - src/pages/TripsPage.tsx
   - src/pages/StatsPage.tsx
+  - src/components/mileage-events/EventComposer.tsx
+  - src/components/mileage-events/EventInspector.tsx
+  - src/components/mileage-events/EventSearchPanel.tsx
   - src/components/modals/GlobalSearchModal.tsx
+  - src/components/modals/ExportRouteModal.tsx
 - deployment publishing:
   - scripts/build-rail-graph-deployment-bundle.ts
   - npm run rail:deployment:build -- --aggregate-key <key>
   - production build requires aggregate mode compiled-topology; use --allow-no-direction-verify only for .verify bundles
+  - scripts/build-minimal-rail-graph-deployment.ts
+  - npm run rail:deployment:build:minimal
+  - default app bundle: public/rail-graph/deployed-system.json
+  - default app bundle metadata: public/rail-graph/deployed-system.meta.json
+  - scripts/assert-rail-graph-deployment.mjs
+  - npm run rail:deployment:assert
   - scripts/export-rail-graph-deployment.mjs
   - npm run rail:deployment:export -- --input <bundle.json>
+  - scripts/smoke-rail-graph-export-load.ts
+  - npm run rail:exports:load-smoke
 - app auto-route consumers:
   - src/AppLayout.tsx
   - src/components/modals/TripEditor.tsx
@@ -217,12 +238,18 @@
   - docs/rail-graph-v1-plan/12-原始设计偏离审计与产品接入修正.md
 - stage acceptance:
   - docs/rail-graph-v1-plan/13-阶段变更验收与最终成品总结.md
+- 70% / user-facing 90% execution plan:
+  - docs/rail-graph-v1-plan/14-70-percent-user-90-execution-plan.md
+- main app data and interaction flow:
+  - docs/rail-graph-v1-plan/15-main-app-data-and-interaction-flow.md
 - tests:
   - src/__tests__/rail-graph-trip-planner.test.ts
-  - src/__tests__/rail-graph-app-route-planner.test.ts
+  - src/__tests__/rail-graph-app-route-planner.test.ts (default bundle + current GeoJSON app planner smoke; load state)
+  - src/__tests__/rail-graph-trip-detail-model.test.ts
   - src/__tests__/rail-graph-saved-trip-roundtrip.test.ts
+  - src/__tests__/rail-graph-export-load-smoke.test.ts
   - src/__tests__/rail-graph-deployment-export-script.test.ts
-  - src/__tests__/mileage-events-runtime-adapter.test.ts
+  - src/__tests__/mileage-events-runtime-adapter.test.ts (rail-graph TripResult and legacy direct GeoJSON app-line regression)
   - src/__tests__/trip-product-projection.test.ts
 
 ### E. API contract related updates

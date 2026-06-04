@@ -181,6 +181,13 @@ export interface RailGraphRuntimeState {
   loadedAt: string;
 }
 
+export interface RailGraphLoadState {
+  status: 'idle' | 'loading' | 'loaded' | 'not_found' | 'invalid' | 'error';
+  reason?: string;
+  fallbackReason?: string;
+  loadedAt?: string;
+}
+
 export interface Pin {
   id: ID;
   lat: number;
@@ -259,6 +266,7 @@ export interface GlobalStore {
   // Data Slice
   railwayData: RailwayMap;
   railGraphRuntime: RailGraphRuntimeState | null;
+  railGraphLoadState: RailGraphLoadState;
   companyDB: CompanyDB;
   geoData: CustomFeatureCollection;
   segmentGeometries: Map<string, any>;
@@ -266,6 +274,7 @@ export interface GlobalStore {
   visitedStations: Set<string>;
   setRailwayData: (updater: RailwayMap | ((prev: RailwayMap) => RailwayMap)) => void;
   setRailGraphRuntime: (runtime: RailGraphRuntimeState | null) => void;
+  setRailGraphLoadState: (loadState: RailGraphLoadState) => void;
   clearRailGraphRuntime: () => void;
   setCompanyDB: (db: CompanyDB | ((prev: CompanyDB) => CompanyDB)) => void;
   setGeoData: (data: CustomFeatureCollection | ((prev: CustomFeatureCollection) => CustomFeatureCollection)) => void;
@@ -375,6 +384,7 @@ export const useStore = create<GlobalStore>()(
       // --- Data Slice ---
       railwayData: {},
       railGraphRuntime: null,
+      railGraphLoadState: { status: 'idle' },
       companyDB: {},
       geoData: { type: 'FeatureCollection', features: [] },
       segmentGeometries: new Map(),
@@ -382,8 +392,14 @@ export const useStore = create<GlobalStore>()(
       visitedStations: new Set<string>(),
 
       setRailwayData: (input) => set((state) => ({ railwayData: typeof input === 'function' ? input(state.railwayData) : input })),
-      setRailGraphRuntime: (runtime) => set({ railGraphRuntime: runtime }),
-      clearRailGraphRuntime: () => set({ railGraphRuntime: null }),
+      setRailGraphRuntime: (runtime) => set({
+        railGraphRuntime: runtime,
+        railGraphLoadState: runtime
+          ? { status: 'loaded', loadedAt: runtime.loadedAt }
+          : { status: 'idle' },
+      }),
+      setRailGraphLoadState: (loadState) => set({ railGraphLoadState: loadState }),
+      clearRailGraphRuntime: () => set({ railGraphRuntime: null, railGraphLoadState: { status: 'idle' } }),
       setCompanyDB: (input) => set((state) => ({ companyDB: typeof input === 'function' ? input(state.companyDB) : input })),
       setGeoData: (input) => set((state) => ({ geoData: typeof input === 'function' ? input(state.geoData) : input })),
       setSegmentGeometries: (data) => set({ segmentGeometries: data }),

@@ -18,11 +18,12 @@ import { useStore } from "../../store";
 import { useShallow } from "zustand/react/shallow";
 import type { UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
 import {
-  boundMileageEventForDisplay,
+  boundMileageEventForRichDisplay,
   formatKm,
   lineLabel,
-  mileageEventProjectionStatus,
+  mileageEventProjectionStatusForDisplay,
   updateMileageEventFromDraft,
+  type MileageEventProjectionStatus,
 } from "../../utils/mileageUserEvents";
 import {
   eventKindLabel,
@@ -56,12 +57,12 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
   const [editing, setEditing] = useState(false);
 
   const projected = useMemo(
-    () => (event ? boundMileageEventForDisplay(event, railwayData) : null),
-    [event, railwayData],
+    () => (event ? boundMileageEventForRichDisplay(event, railwayData, trips) : null),
+    [event, railwayData, trips],
   );
   const projectionStatus = useMemo(
-    () => (event ? mileageEventProjectionStatus(event, railwayData) : null),
-    [event, railwayData],
+    () => (event ? mileageEventProjectionStatusForDisplay(event, railwayData, trips) : null),
+    [event, railwayData, trips],
   );
 
   if (!event) {
@@ -232,7 +233,7 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
         )}
 
         <dl className="space-y-1 text-xs text-slate-600">
-          <InfoRow label={t("mileageEvents.linkedTrip", "Linked trip")} value={trip ? `${trip.date} · ${String(trip.id)}` : t("mileageEvents.noLinkedTrip", "No linked trip")} />
+          <InfoRow label={t("mileageEvents.linkedTrip", "Linked trip")} value={trip ? `${trip.date} - ${String(trip.id)}` : t("mileageEvents.noLinkedTrip", "No linked trip")} />
           {createdFrom && <InfoRow label={t("mileageEvents.inspector.source", "Source")} value={t(`mileageEvents.source.${createdFrom}`, createdFrom)} />}
           {mediaUrl && (
             <InfoRow
@@ -273,7 +274,7 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
 };
 
 const ProjectionStatusNotice: React.FC<{
-  status: ReturnType<typeof mileageEventProjectionStatus>;
+  status: MileageEventProjectionStatus;
 }> = ({ status }) => {
   const { t } = useTranslation();
   const distance = formatKm(status.distanceMeters);

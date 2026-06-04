@@ -8,6 +8,7 @@ import type { EventPolicyRef } from "./event.types";
 import type { DirectionLabel, EntityRef, ISODateTime } from "./primitives";
 import type { ResolvedGeoJsonPath, RunSpec } from "./runtime.types";
 import type { ServiceType } from "./service-template.types";
+import type { TransferScoringPolicy } from "./transfer-scorer";
 import type { RouteFingerprint, StationMeta, TripResult, TripRuntimeArtifacts } from "./user-facing.types";
 
 export interface SavedTrip {
@@ -62,8 +63,9 @@ export interface DeployedSystem {
   relations: BaseTopologyRelation[];
   defaultTimetables: TimetableSet[];
   generatedPresets: PathPreset[];
+  transferPolicy?: TransferScoringPolicy;
   contributions?: ContributionStore;
-  contentHash: string;  // sha256(canonicalJson(templates + stations + relations + timetables + presets))
+  contentHash: string;  // sha256(canonicalJson(templates + stations + relations + timetables + presets + transferPolicy))
   presetHashes: Record<string, string>;
 }
 
@@ -105,6 +107,7 @@ export interface TripPlanRequest {
   endStationRef: EntityRef;
   viaRefs?: EntityRef[];
   directionPreference?: string;
+  transferPolicy?: TransferScoringPolicy;
   date?: string;
 }
 

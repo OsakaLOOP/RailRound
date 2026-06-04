@@ -1,0 +1,1284 @@
+{
+  "system": {
+    "graphId": "ad3fb97707454acc16ed5d031c81fe985eabbe11af0c8351fcdeee9c13b52297",
+    "graph": {
+      "schemaVersion": "rail-graph-v1",
+      "topo": {
+        "base": {
+          "nodes": [
+            {
+              "id": "railround:minimal:node:0",
+              "kind": "line_endpoint",
+              "name": "西舞鶴",
+              "coordinates": [
+                135.3305,
+                35.44155
+              ]
+            },
+            {
+              "id": "railround:minimal:node:1",
+              "kind": "junction",
+              "name": "四所",
+              "coordinates": [
+                135.2905,
+                35.44619
+              ]
+            },
+            {
+              "id": "railround:minimal:node:2",
+              "kind": "junction",
+              "name": "東雲",
+              "coordinates": [
+                135.2848,
+                35.47572
+              ]
+            },
+            {
+              "id": "railround:minimal:node:3",
+              "kind": "line_endpoint",
+              "name": "丹後神崎",
+              "coordinates": [
+                135.2937,
+                35.50611
+              ]
+            }
+          ],
+          "edges": [
+            {
+              "id": "railround:minimal:edge:0",
+              "fromNodeRef": "railround:minimal:node:0",
+              "toNodeRef": "railround:minimal:node:1",
+              "traversal": "both",
+              "role": "main",
+              "name": "西舞鶴-四所",
+              "geometryRef": "railround:minimal:edge:0",
+              "lengthMeters": 3660,
+              "coordinates": [
+                [
+                  135.3305,
+                  35.44155
+                ],
+                [
+                  135.2905,
+                  35.44619
+                ]
+              ],
+              "physicalKind": "main",
+              "functionalUse": [
+                "through",
+                "stopping"
+              ],
+              "directionRole": "bidirectional",
+              "sourceTags": {
+                "lineKey": "WILLER TRAINS:宮津線",
+                "source": "legacy_geojson_minimal"
+              }
+            },
+            {
+              "id": "railround:minimal:edge:1",
+              "fromNodeRef": "railround:minimal:node:1",
+              "toNodeRef": "railround:minimal:node:2",
+              "traversal": "both",
+              "role": "main",
+              "name": "四所-東雲",
+              "geometryRef": "railround:minimal:edge:1",
+              "lengthMeters": 3324,
+              "coordinates": [
+                [
+                  135.2905,
+                  35.44619
+                ],
+                [
+                  135.2848,
+                  35.47572
+                ]
+              ],
+              "physicalKind": "main",
+              "functionalUse": [
+                "through",
+                "stopping"
+              ],
+              "directionRole": "bidirectional",
+              "sourceTags": {
+                "lineKey": "WILLER TRAINS:宮津線",
+                "source": "legacy_geojson_minimal"
+              }
+            },
+            {
+              "id": "railround:minimal:edge:2",
+              "fromNodeRef": "railround:minimal:node:2",
+              "toNodeRef": "railround:minimal:node:3",
+              "traversal": "both",
+              "role": "main",
+              "name": "東雲-丹後神崎",
+              "geometryRef": "railround:minimal:edge:2",
+              "lengthMeters": 3474,
+              "coordinates": [
+                [
+                  135.2848,
+                  35.47572
+                ],
+                [
+                  135.2937,
+                  35.50611
+                ]
+              ],
+              "physicalKind": "main",
+              "functionalUse": [
+                "through",
+                "stopping"
+              ],
+              "directionRole": "bidirectional",
+              "sourceTags": {
+                "lineKey": "WILLER TRAINS:宮津線",
+                "source": "legacy_geojson_minimal"
+              }
+            }
+          ],
+          "adjacency": {
+            "outEdges": {
+              "railround:minimal:node:0": [
+                "railround:minimal:edge:0"
+              ],
+              "railround:minimal:node:1": [
+                "railround:minimal:edge:0",
+                "railround:minimal:edge:1"
+              ],
+              "railround:minimal:node:2": [
+                "railround:minimal:edge:1",
+                "railround:minimal:edge:2"
+              ],
+              "railround:minimal:node:3": [
+                "railround:minimal:edge:2"
+              ]
+            },
+            "inEdges": {
+              "railround:minimal:node:0": [
+                "railround:minimal:edge:0"
+              ],
+              "railround:minimal:node:1": [
+                "railround:minimal:edge:0",
+                "railround:minimal:edge:1"
+              ],
+              "railround:minimal:node:2": [
+                "railround:minimal:edge:1",
+                "railround:minimal:edge:2"
+              ],
+              "railround:minimal:node:3": [
+                "railround:minimal:edge:2"
+              ]
+            }
+          },
+          "stations": [
+            {
+              "id": "WILLER TRAINS:宮津線:西舞鶴",
+              "name": "西舞鶴",
+              "nameJa": "西舞鶴",
+              "platformRefs": [
+                "railround:minimal:platform:0"
+              ],
+              "positionRef": "railround:minimal:node:0"
+            },
+            {
+              "id": "WILLER TRAINS:宮津線:四所",
+              "name": "四所",
+              "nameJa": "四所",
+              "platformRefs": [
+                "railround:minimal:platform:1"
+              ],
+              "positionRef": "railround:minimal:node:1"
+            },
+            {
+              "id": "WILLER TRAINS:宮津線:東雲",
+              "name": "東雲",
+              "nameJa": "東雲",
+              "platformRefs": [
+                "railround:minimal:platform:2"
+              ],
+              "positionRef": "railround:minimal:node:2"
+            },
+            {
+              "id": "WILLER TRAINS:宮津線:丹後神崎",
+              "name": "丹後神崎",
+              "nameJa": "丹後神崎",
+              "platformRefs": [
+                "railround:minimal:platform:3"
+              ],
+              "positionRef": "railround:minimal:node:3"
+            }
+          ],
+          "platforms": [
+            {
+              "id": "railround:minimal:platform:0",
+              "stationRef": "WILLER TRAINS:宮津線:西舞鶴",
+              "type": "unknown",
+              "name": "西舞鶴",
+              "number": 1
+            },
+            {
+              "id": "railround:minimal:platform:1",
+              "stationRef": "WILLER TRAINS:宮津線:四所",
+              "type": "unknown",
+              "name": "四所",
+              "number": 2
+            },
+            {
+              "id": "railround:minimal:platform:2",
+              "stationRef": "WILLER TRAINS:宮津線:東雲",
+              "type": "unknown",
+              "name": "東雲",
+              "number": 3
+            },
+            {
+              "id": "railround:minimal:platform:3",
+              "stationRef": "WILLER TRAINS:宮津線:丹後神崎",
+              "type": "unknown",
+              "name": "丹後神崎",
+              "number": 4
+            }
+          ],
+          "platformTrackBindings": [
+            {
+              "id": "railround:minimal:binding:0",
+              "stationRef": "WILLER TRAINS:宮津線:西舞鶴",
+              "platformRef": "railround:minimal:platform:0",
+              "edgeRef": "railround:minimal:edge:0",
+              "side": "unknown",
+              "servingDirection": "down"
+            },
+            {
+              "id": "railround:minimal:binding:1",
+              "stationRef": "WILLER TRAINS:宮津線:四所",
+              "platformRef": "railround:minimal:platform:1",
+              "edgeRef": "railround:minimal:edge:0",
+              "side": "unknown",
+              "servingDirection": "down"
+            },
+            {
+              "id": "railround:minimal:binding:2",
+              "stationRef": "WILLER TRAINS:宮津線:東雲",
+              "platformRef": "railround:minimal:platform:2",
+              "edgeRef": "railround:minimal:edge:1",
+              "side": "unknown",
+              "servingDirection": "down"
+            },
+            {
+              "id": "railround:minimal:binding:3",
+              "stationRef": "WILLER TRAINS:宮津線:丹後神崎",
+              "platformRef": "railround:minimal:platform:3",
+              "edgeRef": "railround:minimal:edge:2",
+              "side": "unknown",
+              "servingDirection": "down"
+            }
+          ],
+          "stoppingPoints": [
+            {
+              "id": "railround:minimal:stop:0",
+              "stationRef": "WILLER TRAINS:宮津線:西舞鶴",
+              "platformRef": "railround:minimal:platform:0",
+              "edgeRef": "railround:minimal:edge:0",
+              "direction": "both",
+              "measure": 0,
+              "confirmation": "imported_confirmed"
+            },
+            {
+              "id": "railround:minimal:stop:1",
+              "stationRef": "WILLER TRAINS:宮津線:四所",
+              "platformRef": "railround:minimal:platform:1",
+              "edgeRef": "railround:minimal:edge:0",
+              "direction": "both",
+              "measure": 1,
+              "confirmation": "imported_confirmed"
+            },
+            {
+              "id": "railround:minimal:stop:2",
+              "stationRef": "WILLER TRAINS:宮津線:東雲",
+              "platformRef": "railround:minimal:platform:2",
+              "edgeRef": "railround:minimal:edge:1",
+              "direction": "both",
+              "measure": 1,
+              "confirmation": "imported_confirmed"
+            },
+            {
+              "id": "railround:minimal:stop:3",
+              "stationRef": "WILLER TRAINS:宮津線:丹後神崎",
+              "platformRef": "railround:minimal:platform:3",
+              "edgeRef": "railround:minimal:edge:2",
+              "direction": "both",
+              "measure": 1,
+              "confirmation": "imported_confirmed"
+            }
+          ],
+          "signals": [],
+          "specialSections": [],
+          "doubleTrackPairs": [],
+          "relations": [],
+          "hardConstraints": []
+        },
+        "serviceTemplates": {
+          "servicePatterns": [
+            {
+              "patternId": "railround:minimal:pattern:willer-main",
+              "lineRef": "WILLER TRAINS:宮津線",
+              "systemRef": "railround:minimal:system:willer",
+              "companyRef": "WILLER TRAINS",
+              "serviceType": "local",
+              "topologyType": "linear",
+              "directionConvention": {
+                "forwardLabel": "down",
+                "reverseLabel": "up",
+                "forwardDirection": "down",
+                "reverseDirection": "up"
+              },
+              "edgeSequence": [
+                "railround:minimal:edge:0",
+                "railround:minimal:edge:1",
+                "railround:minimal:edge:2"
+              ],
+              "traceSequence": [
+                {
+                  "orderIndex": 0,
+                  "passageType": "stop",
+                  "stopType": "mandatory_stop",
+                  "stationRef": "WILLER TRAINS:宮津線:西舞鶴",
+                  "platformRef": "railround:minimal:platform:0",
+                  "edgeRef": "railround:minimal:edge:0",
+                  "stoppingPointRef": "railround:minimal:stop:0",
+                  "measure": 0,
+                  "platformNumber": 1,
+                  "platformName": "西舞鶴"
+                },
+                {
+                  "orderIndex": 1,
+                  "passageType": "stop",
+                  "stopType": "mandatory_stop",
+                  "stationRef": "WILLER TRAINS:宮津線:四所",
+                  "platformRef": "railround:minimal:platform:1",
+                  "edgeRef": "railround:minimal:edge:0",
+                  "stoppingPointRef": "railround:minimal:stop:1",
+                  "measure": 1,
+                  "platformNumber": 2,
+                  "platformName": "四所"
+                },
+                {
+                  "orderIndex": 2,
+                  "passageType": "stop",
+                  "stopType": "mandatory_stop",
+                  "stationRef": "WILLER TRAINS:宮津線:東雲",
+                  "platformRef": "railround:minimal:platform:2",
+                  "edgeRef": "railround:minimal:edge:1",
+                  "stoppingPointRef": "railround:minimal:stop:2",
+                  "measure": 1,
+                  "platformNumber": 3,
+                  "platformName": "東雲"
+                },
+                {
+                  "orderIndex": 3,
+                  "passageType": "stop",
+                  "stopType": "mandatory_stop",
+                  "stationRef": "WILLER TRAINS:宮津線:丹後神崎",
+                  "platformRef": "railround:minimal:platform:3",
+                  "edgeRef": "railround:minimal:edge:2",
+                  "stoppingPointRef": "railround:minimal:stop:3",
+                  "measure": 1,
+                  "platformNumber": 4,
+                  "platformName": "丹後神崎"
+                }
+              ],
+              "pathSegments": [
+                {
+                  "orderIndex": 0,
+                  "edgeRef": "railround:minimal:edge:0",
+                  "fromNodeRef": "railround:minimal:node:0",
+                  "toNodeRef": "railround:minimal:node:1",
+                  "measureRange": {
+                    "startMeasure": 0,
+                    "endMeasure": 1
+                  },
+                  "distanceMeters": 3660,
+                  "geometryRef": "railround:minimal:edge:0"
+                },
+                {
+                  "orderIndex": 1,
+                  "edgeRef": "railround:minimal:edge:1",
+                  "fromNodeRef": "railround:minimal:node:1",
+                  "toNodeRef": "railround:minimal:node:2",
+                  "measureRange": {
+                    "startMeasure": 0,
+                    "endMeasure": 1
+                  },
+                  "distanceMeters": 3324,
+                  "geometryRef": "railround:minimal:edge:1"
+                },
+                {
+                  "orderIndex": 2,
+                  "edgeRef": "railround:minimal:edge:2",
+                  "fromNodeRef": "railround:minimal:node:2",
+                  "toNodeRef": "railround:minimal:node:3",
+                  "measureRange": {
+                    "startMeasure": 0,
+                    "endMeasure": 1
+                  },
+                  "distanceMeters": 3474,
+                  "geometryRef": "railround:minimal:edge:2"
+                }
+              ],
+              "displayName": "WILLER TRAINS 宮津線",
+              "displayColor": "#FF0000"
+            }
+          ]
+        }
+      },
+      "geometryStore": {
+        "edgeGeometries": {
+          "railround:minimal:edge:0": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                135.3305,
+                35.44155
+              ],
+              [
+                135.2905,
+                35.44619
+              ]
+            ]
+          },
+          "railround:minimal:edge:1": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                135.2905,
+                35.44619
+              ],
+              [
+                135.2848,
+                35.47572
+              ]
+            ]
+          },
+          "railround:minimal:edge:2": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                135.2848,
+                35.47572
+              ],
+              [
+                135.2937,
+                35.50611
+              ]
+            ]
+          }
+        },
+        "nodePositions": {
+          "railround:minimal:node:0": [
+            135.3305,
+            35.44155
+          ],
+          "railround:minimal:node:1": [
+            135.2905,
+            35.44619
+          ],
+          "railround:minimal:node:2": [
+            135.2848,
+            35.47572
+          ],
+          "railround:minimal:node:3": [
+            135.2937,
+            35.50611
+          ]
+        },
+        "platformGeometries": {},
+        "sectionGeometries": {}
+      },
+      "displayStore": {
+        "patternDisplay": {
+          "railround:minimal:pattern:willer-main": {
+            "displayName": "WILLER TRAINS 宮津線",
+            "displayColor": "#FF0000"
+          }
+        },
+        "stationDisplay": {
+          "WILLER TRAINS:宮津線:西舞鶴": {
+            "stationRef": "WILLER TRAINS:宮津線:西舞鶴",
+            "name": "西舞鶴",
+            "nameJa": "西舞鶴",
+            "coordinates": [
+              135.3305,
+              35.44155
+            ]
+          },
+          "WILLER TRAINS:宮津線:四所": {
+            "stationRef": "WILLER TRAINS:宮津線:四所",
+            "name": "四所",
+            "nameJa": "四所",
+            "coordinates": [
+              135.2905,
+              35.44619
+            ]
+          },
+          "WILLER TRAINS:宮津線:東雲": {
+            "stationRef": "WILLER TRAINS:宮津線:東雲",
+            "name": "東雲",
+            "nameJa": "東雲",
+            "coordinates": [
+              135.2848,
+              35.47572
+            ]
+          },
+          "WILLER TRAINS:宮津線:丹後神崎": {
+            "stationRef": "WILLER TRAINS:宮津線:丹後神崎",
+            "name": "丹後神崎",
+            "nameJa": "丹後神崎",
+            "coordinates": [
+              135.2937,
+              35.50611
+            ]
+          }
+        }
+      },
+      "eventLayer": {
+        "anchors": [],
+        "policies": []
+      },
+      "indexes": {
+        "nodeById": {
+          "railround:minimal:node:0": {
+            "id": "railround:minimal:node:0",
+            "kind": "line_endpoint",
+            "name": "西舞鶴",
+            "coordinates": [
+              135.3305,
+              35.44155
+            ]
+          },
+          "railround:minimal:node:1": {
+            "id": "railround:minimal:node:1",
+            "kind": "junction",
+            "name": "四所",
+            "coordinates": [
+              135.2905,
+              35.44619
+            ]
+          },
+          "railround:minimal:node:2": {
+            "id": "railround:minimal:node:2",
+            "kind": "junction",
+            "name": "東雲",
+            "coordinates": [
+              135.2848,
+              35.47572
+            ]
+          },
+          "railround:minimal:node:3": {
+            "id": "railround:minimal:node:3",
+            "kind": "line_endpoint",
+            "name": "丹後神崎",
+            "coordinates": [
+              135.2937,
+              35.50611
+            ]
+          }
+        },
+        "edgeById": {
+          "railround:minimal:edge:0": {
+            "id": "railround:minimal:edge:0",
+            "fromNodeRef": "railround:minimal:node:0",
+            "toNodeRef": "railround:minimal:node:1",
+            "traversal": "both",
+            "role": "main",
+            "name": "西舞鶴-四所",
+            "geometryRef": "railround:minimal:edge:0",
+            "lengthMeters": 3660,
+            "coordinates": [
+              [
+                135.3305,
+                35.44155
+              ],
+              [
+                135.2905,
+                35.44619
+              ]
+            ],
+            "physicalKind": "main",
+            "functionalUse": [
+              "through",
+              "stopping"
+            ],
+            "directionRole": "bidirectional",
+            "sourceTags": {
+              "lineKey": "WILLER TRAINS:宮津線",
+              "source": "legacy_geojson_minimal"
+            }
+          },
+          "railround:minimal:edge:1": {
+            "id": "railround:minimal:edge:1",
+            "fromNodeRef": "railround:minimal:node:1",
+            "toNodeRef": "railround:minimal:node:2",
+            "traversal": "both",
+            "role": "main",
+            "name": "四所-東雲",
+            "geometryRef": "railround:minimal:edge:1",
+            "lengthMeters": 3324,
+            "coordinates": [
+              [
+                135.2905,
+                35.44619
+              ],
+              [
+                135.2848,
+                35.47572
+              ]
+            ],
+            "physicalKind": "main",
+            "functionalUse": [
+              "through",
+              "stopping"
+            ],
+            "directionRole": "bidirectional",
+            "sourceTags": {
+              "lineKey": "WILLER TRAINS:宮津線",
+              "source": "legacy_geojson_minimal"
+            }
+          },
+          "railround:minimal:edge:2": {
+            "id": "railround:minimal:edge:2",
+            "fromNodeRef": "railround:minimal:node:2",
+            "toNodeRef": "railround:minimal:node:3",
+            "traversal": "both",
+            "role": "main",
+            "name": "東雲-丹後神崎",
+            "geometryRef": "railround:minimal:edge:2",
+            "lengthMeters": 3474,
+            "coordinates": [
+              [
+                135.2848,
+                35.47572
+              ],
+              [
+                135.2937,
+                35.50611
+              ]
+            ],
+            "physicalKind": "main",
+            "functionalUse": [
+              "through",
+              "stopping"
+            ],
+            "directionRole": "bidirectional",
+            "sourceTags": {
+              "lineKey": "WILLER TRAINS:宮津線",
+              "source": "legacy_geojson_minimal"
+            }
+          }
+        },
+        "stationById": {
+          "WILLER TRAINS:宮津線:西舞鶴": {
+            "id": "WILLER TRAINS:宮津線:西舞鶴",
+            "name": "西舞鶴",
+            "nameJa": "西舞鶴",
+            "platformRefs": [
+              "railround:minimal:platform:0"
+            ],
+            "positionRef": "railround:minimal:node:0"
+          },
+          "WILLER TRAINS:宮津線:四所": {
+            "id": "WILLER TRAINS:宮津線:四所",
+            "name": "四所",
+            "nameJa": "四所",
+            "platformRefs": [
+              "railround:minimal:platform:1"
+            ],
+            "positionRef": "railround:minimal:node:1"
+          },
+          "WILLER TRAINS:宮津線:東雲": {
+            "id": "WILLER TRAINS:宮津線:東雲",
+            "name": "東雲",
+            "nameJa": "東雲",
+            "platformRefs": [
+              "railround:minimal:platform:2"
+            ],
+            "positionRef": "railround:minimal:node:2"
+          },
+          "WILLER TRAINS:宮津線:丹後神崎": {
+            "id": "WILLER TRAINS:宮津線:丹後神崎",
+            "name": "丹後神崎",
+            "nameJa": "丹後神崎",
+            "platformRefs": [
+              "railround:minimal:platform:3"
+            ],
+            "positionRef": "railround:minimal:node:3"
+          }
+        },
+        "platformById": {
+          "railround:minimal:platform:0": {
+            "id": "railround:minimal:platform:0",
+            "stationRef": "WILLER TRAINS:宮津線:西舞鶴",
+            "type": "unknown",
+            "name": "西舞鶴",
+            "number": 1
+          },
+          "railround:minimal:platform:1": {
+            "id": "railround:minimal:platform:1",
+            "stationRef": "WILLER TRAINS:宮津線:四所",
+            "type": "unknown",
+            "name": "四所",
+            "number": 2
+          },
+          "railround:minimal:platform:2": {
+            "id": "railround:minimal:platform:2",
+            "stationRef": "WILLER TRAINS:宮津線:東雲",
+            "type": "unknown",
+            "name": "東雲",
+            "number": 3
+          },
+          "railround:minimal:platform:3": {
+            "id": "railround:minimal:platform:3",
+            "stationRef": "WILLER TRAINS:宮津線:丹後神崎",
+            "type": "unknown",
+            "name": "丹後神崎",
+            "number": 4
+          }
+        },
+        "stoppingPointById": {
+          "railround:minimal:stop:0": {
+            "id": "railround:minimal:stop:0",
+            "stationRef": "WILLER TRAINS:宮津線:西舞鶴",
+            "platformRef": "railround:minimal:platform:0",
+            "edgeRef": "railround:minimal:edge:0",
+            "direction": "both",
+            "measure": 0,
+            "confirmation": "imported_confirmed"
+          },
+          "railround:minimal:stop:1": {
+            "id": "railround:minimal:stop:1",
+            "stationRef": "WILLER TRAINS:宮津線:四所",
+            "platformRef": "railround:minimal:platform:1",
+            "edgeRef": "railround:minimal:edge:0",
+            "direction": "both",
+            "measure": 1,
+            "confirmation": "imported_confirmed"
+          },
+          "railround:minimal:stop:2": {
+            "id": "railround:minimal:stop:2",
+            "stationRef": "WILLER TRAINS:宮津線:東雲",
+            "platformRef": "railround:minimal:platform:2",
+            "edgeRef": "railround:minimal:edge:1",
+            "direction": "both",
+            "measure": 1,
+            "confirmation": "imported_confirmed"
+          },
+          "railround:minimal:stop:3": {
+            "id": "railround:minimal:stop:3",
+            "stationRef": "WILLER TRAINS:宮津線:丹後神崎",
+            "platformRef": "railround:minimal:platform:3",
+            "edgeRef": "railround:minimal:edge:2",
+            "direction": "both",
+            "measure": 1,
+            "confirmation": "imported_confirmed"
+          }
+        },
+        "sectionById": {},
+        "patternById": {
+          "railround:minimal:pattern:willer-main": {
+            "patternId": "railround:minimal:pattern:willer-main",
+            "lineRef": "WILLER TRAINS:宮津線",
+            "systemRef": "railround:minimal:system:willer",
+            "companyRef": "WILLER TRAINS",
+            "serviceType": "local",
+            "topologyType": "linear",
+            "directionConvention": {
+              "forwardLabel": "down",
+              "reverseLabel": "up",
+              "forwardDirection": "down",
+              "reverseDirection": "up"
+            },
+            "edgeSequence": [
+              "railround:minimal:edge:0",
+              "railround:minimal:edge:1",
+              "railround:minimal:edge:2"
+            ],
+            "traceSequence": [
+              {
+                "orderIndex": 0,
+                "passageType": "stop",
+                "stopType": "mandatory_stop",
+                "stationRef": "WILLER TRAINS:宮津線:西舞鶴",
+                "platformRef": "railround:minimal:platform:0",
+                "edgeRef": "railround:minimal:edge:0",
+                "stoppingPointRef": "railround:minimal:stop:0",
+                "measure": 0,
+                "platformNumber": 1,
+                "platformName": "西舞鶴"
+              },
+              {
+                "orderIndex": 1,
+                "passageType": "stop",
+                "stopType": "mandatory_stop",
+                "stationRef": "WILLER TRAINS:宮津線:四所",
+                "platformRef": "railround:minimal:platform:1",
+                "edgeRef": "railround:minimal:edge:0",
+                "stoppingPointRef": "railround:minimal:stop:1",
+                "measure": 1,
+                "platformNumber": 2,
+                "platformName": "四所"
+              },
+              {
+                "orderIndex": 2,
+                "passageType": "stop",
+                "stopType": "mandatory_stop",
+                "stationRef": "WILLER TRAINS:宮津線:東雲",
+                "platformRef": "railround:minimal:platform:2",
+                "edgeRef": "railround:minimal:edge:1",
+                "stoppingPointRef": "railround:minimal:stop:2",
+                "measure": 1,
+                "platformNumber": 3,
+                "platformName": "東雲"
+              },
+              {
+                "orderIndex": 3,
+                "passageType": "stop",
+                "stopType": "mandatory_stop",
+                "stationRef": "WILLER TRAINS:宮津線:丹後神崎",
+                "platformRef": "railround:minimal:platform:3",
+                "edgeRef": "railround:minimal:edge:2",
+                "stoppingPointRef": "railround:minimal:stop:3",
+                "measure": 1,
+                "platformNumber": 4,
+                "platformName": "丹後神崎"
+              }
+            ],
+            "pathSegments": [
+              {
+                "orderIndex": 0,
+                "edgeRef": "railround:minimal:edge:0",
+                "fromNodeRef": "railround:minimal:node:0",
+                "toNodeRef": "railround:minimal:node:1",
+                "measureRange": {
+                  "startMeasure": 0,
+                  "endMeasure": 1
+                },
+                "distanceMeters": 3660,
+                "geometryRef": "railround:minimal:edge:0"
+              },
+              {
+                "orderIndex": 1,
+                "edgeRef": "railround:minimal:edge:1",
+                "fromNodeRef": "railround:minimal:node:1",
+                "toNodeRef": "railround:minimal:node:2",
+                "measureRange": {
+                  "startMeasure": 0,
+                  "endMeasure": 1
+                },
+                "distanceMeters": 3324,
+                "geometryRef": "railround:minimal:edge:1"
+              },
+              {
+                "orderIndex": 2,
+                "edgeRef": "railround:minimal:edge:2",
+                "fromNodeRef": "railround:minimal:node:2",
+                "toNodeRef": "railround:minimal:node:3",
+                "measureRange": {
+                  "startMeasure": 0,
+                  "endMeasure": 1
+                },
+                "distanceMeters": 3474,
+                "geometryRef": "railround:minimal:edge:2"
+              }
+            ],
+            "displayName": "WILLER TRAINS 宮津線",
+            "displayColor": "#FF0000"
+          }
+        },
+        "bindingsByEdge": {
+          "railround:minimal:edge:0": [
+            "railround:minimal:binding:0",
+            "railround:minimal:binding:1"
+          ],
+          "railround:minimal:edge:1": [
+            "railround:minimal:binding:2"
+          ],
+          "railround:minimal:edge:2": [
+            "railround:minimal:binding:3"
+          ]
+        },
+        "stoppingPointsByEdge": {
+          "railround:minimal:edge:0": [
+            "railround:minimal:stop:0",
+            "railround:minimal:stop:1"
+          ],
+          "railround:minimal:edge:1": [
+            "railround:minimal:stop:2"
+          ],
+          "railround:minimal:edge:2": [
+            "railround:minimal:stop:3"
+          ]
+        },
+        "stoppingPointsByPlatform": {
+          "railround:minimal:platform:0": [
+            "railround:minimal:stop:0"
+          ],
+          "railround:minimal:platform:1": [
+            "railround:minimal:stop:1"
+          ],
+          "railround:minimal:platform:2": [
+            "railround:minimal:stop:2"
+          ],
+          "railround:minimal:platform:3": [
+            "railround:minimal:stop:3"
+          ]
+        },
+        "doubleTrackPairsByEdge": {},
+        "patternsByEdge": {
+          "railround:minimal:edge:0": [
+            "railround:minimal:pattern:willer-main"
+          ],
+          "railround:minimal:edge:1": [
+            "railround:minimal:pattern:willer-main"
+          ],
+          "railround:minimal:edge:2": [
+            "railround:minimal:pattern:willer-main"
+          ]
+        },
+        "patternsByStation": {
+          "WILLER TRAINS:宮津線:西舞鶴": [
+            "railround:minimal:pattern:willer-main"
+          ],
+          "WILLER TRAINS:宮津線:四所": [
+            "railround:minimal:pattern:willer-main"
+          ],
+          "WILLER TRAINS:宮津線:東雲": [
+            "railround:minimal:pattern:willer-main"
+          ],
+          "WILLER TRAINS:宮津線:丹後神崎": [
+            "railround:minimal:pattern:willer-main"
+          ]
+        },
+        "edgesBySection": {}
+      },
+      "provenance": [
+        {
+          "entityRef": "railround:minimal:system:willer",
+          "sourceRef": "public/geojson/WILLER TRAINS.geojson",
+          "sourceType": "legacy_geojson",
+          "importedAt": "2026-06-04T00:46:31.047Z",
+          "confidence": "derived"
+        }
+      ],
+      "diagnostics": []
+    },
+    "fingerprints": {
+      "topoHash": "ad3fb97707454acc16ed5d031c81fe985eabbe11af0c8351fcdeee9c13b52297",
+      "geometryHash": "c040017fb7e96cfd3af097f5a0d24e2722d2e0c2db4f70204e9a2de661d2c819",
+      "displayHash": "9b418880820a7f1123f2cbd07debbda2f3e3b78e6de42d8fdbadb126ab1ec35e",
+      "eventHash": "433197c0735ec0f2a80a5ef14c133740dc1b12fbcfe29d0485461ac76bf6bf8f",
+      "provenanceHash": "65f8b859dc16560b42104ffb7d88c61bc728f3c6eed74bfadae68088cf236b4d"
+    },
+    "diagnostics": [],
+    "createdAt": "2026-06-04T00:46:31.047Z"
+  },
+  "deployed": {
+    "systemId": "railround:minimal:system:willer",
+    "version": "minimal-2026-06-04",
+    "createdAt": "2026-06-04T00:46:31.047Z",
+    "sourceGraphId": "ad3fb97707454acc16ed5d031c81fe985eabbe11af0c8351fcdeee9c13b52297",
+    "templates": [
+      {
+        "templateId": "published:template:b2428a4b45a49c41",
+        "sourceGraphId": "ad3fb97707454acc16ed5d031c81fe985eabbe11af0c8351fcdeee9c13b52297",
+        "patternRef": "railround:minimal:pattern:willer-main",
+        "lineRef": "WILLER TRAINS:宮津線",
+        "systemRef": "railround:minimal:system:willer",
+        "companyRef": "WILLER TRAINS",
+        "serviceType": "local",
+        "direction": "down",
+        "resolvedPath": {
+          "pathId": "resolved:path:0621f0c29648c9bc",
+          "sourceGraphId": "ad3fb97707454acc16ed5d031c81fe985eabbe11af0c8351fcdeee9c13b52297",
+          "patternRef": "railround:minimal:pattern:willer-main",
+          "direction": "down",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                135.3305,
+                35.44155
+              ],
+              [
+                135.2905,
+                35.44619
+              ],
+              [
+                135.2848,
+                35.47572
+              ],
+              [
+                135.2937,
+                35.50611
+              ]
+            ]
+          },
+          "segments": [
+            {
+              "orderIndex": 0,
+              "edgeRef": "railround:minimal:edge:0",
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    135.3305,
+                    35.44155
+                  ],
+                  [
+                    135.2905,
+                    35.44619
+                  ]
+                ]
+              },
+              "geometryRef": "railround:minimal:edge:0",
+              "geometrySource": "geometry_store",
+              "measureRange": {
+                "startMeasure": 0,
+                "endMeasure": 1
+              },
+              "distanceMeters": 3660
+            },
+            {
+              "orderIndex": 1,
+              "edgeRef": "railround:minimal:edge:1",
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    135.2905,
+                    35.44619
+                  ],
+                  [
+                    135.2848,
+                    35.47572
+                  ]
+                ]
+              },
+              "geometryRef": "railround:minimal:edge:1",
+              "geometrySource": "geometry_store",
+              "measureRange": {
+                "startMeasure": 0,
+                "endMeasure": 1
+              },
+              "distanceMeters": 3324
+            },
+            {
+              "orderIndex": 2,
+              "edgeRef": "railround:minimal:edge:2",
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    135.2848,
+                    35.47572
+                  ],
+                  [
+                    135.2937,
+                    35.50611
+                  ]
+                ]
+              },
+              "geometryRef": "railround:minimal:edge:2",
+              "geometrySource": "geometry_store",
+              "measureRange": {
+                "startMeasure": 0,
+                "endMeasure": 1
+              },
+              "distanceMeters": 3474
+            }
+          ],
+          "stationPassages": [
+            {
+              "orderIndex": 0,
+              "passageType": "stop",
+              "stationRef": "WILLER TRAINS:宮津線:西舞鶴",
+              "edgeRef": "railround:minimal:edge:0",
+              "platformRef": "railround:minimal:platform:0",
+              "stoppingPointRef": "railround:minimal:stop:0",
+              "distanceMetersFromStart": 0
+            },
+            {
+              "orderIndex": 1,
+              "passageType": "stop",
+              "stationRef": "WILLER TRAINS:宮津線:四所",
+              "edgeRef": "railround:minimal:edge:0",
+              "platformRef": "railround:minimal:platform:1",
+              "stoppingPointRef": "railround:minimal:stop:1",
+              "distanceMetersFromStart": 3660
+            },
+            {
+              "orderIndex": 2,
+              "passageType": "stop",
+              "stationRef": "WILLER TRAINS:宮津線:東雲",
+              "edgeRef": "railround:minimal:edge:1",
+              "platformRef": "railround:minimal:platform:2",
+              "stoppingPointRef": "railround:minimal:stop:2",
+              "distanceMetersFromStart": 6984
+            },
+            {
+              "orderIndex": 3,
+              "passageType": "stop",
+              "stationRef": "WILLER TRAINS:宮津線:丹後神崎",
+              "edgeRef": "railround:minimal:edge:2",
+              "platformRef": "railround:minimal:platform:3",
+              "stoppingPointRef": "railround:minimal:stop:3",
+              "distanceMetersFromStart": 10458
+            }
+          ],
+          "semanticRefs": [
+            {
+              "kind": "station",
+              "entityRef": "WILLER TRAINS:宮津線:西舞鶴",
+              "orderIndex": 0
+            },
+            {
+              "kind": "platform",
+              "entityRef": "railround:minimal:platform:0",
+              "orderIndex": 0
+            },
+            {
+              "kind": "stopping_point",
+              "entityRef": "railround:minimal:stop:0",
+              "orderIndex": 0
+            },
+            {
+              "kind": "station",
+              "entityRef": "WILLER TRAINS:宮津線:四所",
+              "orderIndex": 1
+            },
+            {
+              "kind": "platform",
+              "entityRef": "railround:minimal:platform:1",
+              "orderIndex": 1
+            },
+            {
+              "kind": "stopping_point",
+              "entityRef": "railround:minimal:stop:1",
+              "orderIndex": 1
+            },
+            {
+              "kind": "station",
+              "entityRef": "WILLER TRAINS:宮津線:東雲",
+              "orderIndex": 2
+            },
+            {
+              "kind": "platform",
+              "entityRef": "railround:minimal:platform:2",
+              "orderIndex": 2
+            },
+            {
+              "kind": "stopping_point",
+              "entityRef": "railround:minimal:stop:2",
+              "orderIndex": 2
+            },
+            {
+              "kind": "station",
+              "entityRef": "WILLER TRAINS:宮津線:丹後神崎",
+              "orderIndex": 3
+            },
+            {
+              "kind": "platform",
+              "entityRef": "railround:minimal:platform:3",
+              "orderIndex": 3
+            },
+            {
+              "kind": "stopping_point",
+              "entityRef": "railround:minimal:stop:3",
+              "orderIndex": 3
+            }
+          ],
+          "totalDistanceMeters": 10458,
+          "diagnostics": []
+        },
+        "displayName": "WILLER TRAINS 宮津線",
+        "displayColor": "#FF0000",
+        "mutableSemantics": {
+          "displayName": "WILLER TRAINS 宮津線",
+          "displayColor": "#FF0000",
+          "serviceLabel": "WILLER TRAINS 宮津線"
+        }
+      }
+    ],
+    "stations": [
+      {
+        "stationRef": "WILLER TRAINS:宮津線:丹後神崎",
+        "name": "丹後神崎",
+        "nameJa": "丹後神崎",
+        "coordinates": [
+          135.2937,
+          35.50611
+        ]
+      },
+      {
+        "stationRef": "WILLER TRAINS:宮津線:東雲",
+        "name": "東雲",
+        "nameJa": "東雲",
+        "coordinates": [
+          135.2848,
+          35.47572
+        ]
+      },
+      {
+        "stationRef": "WILLER TRAINS:宮津線:四所",
+        "name": "四所",
+        "nameJa": "四所",
+        "coordinates": [
+          135.2905,
+          35.44619
+        ]
+      },
+      {
+        "stationRef": "WILLER TRAINS:宮津線:西舞鶴",
+        "name": "西舞鶴",
+        "nameJa": "西舞鶴",
+        "coordinates": [
+          135.3305,
+          35.44155
+        ]
+      }
+    ],
+    "relations": [],
+    "defaultTimetables": [],
+    "generatedPresets": [
+      {
+        "presetId": "preset:8a51544815880d3a",
+        "label": "西舞鶴 - 丹後神崎",
+        "shortLabel": "西舞鶴-丹後神崎",
+        "serviceLabel": "WILLER TRAINS 宮津線",
+        "displayColor": "#FF0000",
+        "patternRef": "railround:minimal:pattern:willer-main",
+        "startStation": "WILLER TRAINS:宮津線:西舞鶴",
+        "endStation": "WILLER TRAINS:宮津線:丹後神崎",
+        "viaStations": [
+          "WILLER TRAINS:宮津線:四所",
+          "WILLER TRAINS:宮津線:東雲"
+        ],
+        "landmarkLabels": [],
+        "directionLabel": "down",
+        "estimatedTimeMinutes": 10,
+        "distanceKm": 10.458,
+        "runSpec": {
+          "systemId": "railround:minimal:system:willer",
+          "patternRef": "railround:minimal:pattern:willer-main",
+          "startStationRef": "WILLER TRAINS:宮津線:西舞鶴",
+          "endStationRef": "WILLER TRAINS:宮津線:丹後神崎",
+          "viaRefs": [
+            "WILLER TRAINS:宮津線:四所",
+            "WILLER TRAINS:宮津線:東雲"
+          ],
+          "directionHint": "down"
+        }
+      }
+    ],
+    "contentHash": "08b4646a3e73d2a67400fc4f76716ed050b60314d85d337a2547d0a1ec16f1d0",
+    "presetHashes": {
+      "preset:8a51544815880d3a": "run:ce10c5cbac311587"
+    }
+  }
+}

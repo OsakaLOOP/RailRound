@@ -14,7 +14,7 @@ import { cachedTileLayer } from "../../utils/CachedTileLayer";
 import { useShallow } from "zustand/react/shallow";
 import toast from "react-hot-toast";
 import { useAppRouteState } from "../../hooks/useAppRouteState";
-import { boundMileageEventsForDisplay } from "../../utils/mileageUserEvents";
+import { boundMileageEventsForRichDisplay } from "../../utils/mileageUserEvents";
 import { tripToProductSegments } from "../../utils/tripProductProjection";
 import i18next from "i18next";
 
@@ -155,6 +155,7 @@ export const MapContainer: React.FC<Props> = ({
     pinMode,
     railwayData,
     mileageUserEvents,
+    trips,
     setEditingPin,
     setPinMode,
     visitedStations,
@@ -171,6 +172,7 @@ export const MapContainer: React.FC<Props> = ({
       pinMode: state.pinMode,
       railwayData: state.railwayData,
       mileageUserEvents: state.mileageUserEvents,
+      trips: state.trips,
       setEditingPin: state.setEditingPin,
       setPinMode: state.setPinMode,
       visitedStations: state.visitedStations,
@@ -275,7 +277,7 @@ export const MapContainer: React.FC<Props> = ({
     if (isMapInitialized && leafletReady) {
       renderMileageEvents();
     }
-  }, [mileageUserEvents, railwayData, mapZoom, selectedMileageEventId, leafletReady, isMapInitialized]);
+  }, [mileageUserEvents, railwayData, trips, mapZoom, selectedMileageEventId, leafletReady, isMapInitialized]);
 
   useEffect(() => {
     const handleCreateTempPin = () => {
@@ -1336,6 +1338,7 @@ export const MapContainer: React.FC<Props> = ({
       color: string;
       popup: string;
       fallback: boolean;
+      source?: "rail_graph" | "legacy" | "walk";
       isTransfer?: boolean;
     }
     const routeItems: RouteItem[] = [];
@@ -1349,6 +1352,7 @@ export const MapContainer: React.FC<Props> = ({
             color: seg.color,
             popup: seg.popup,
             fallback: seg.fallback,
+            source: seg.source,
             isTransfer: seg.isTransfer,
           });
         });
@@ -1359,6 +1363,7 @@ export const MapContainer: React.FC<Props> = ({
           color: seg.color,
           popup: seg.popup,
           fallback: seg.fallback,
+          source: seg.source,
           isTransfer: seg.isTransfer,
         });
       }
@@ -1374,6 +1379,7 @@ export const MapContainer: React.FC<Props> = ({
           color: t.walkType === "tree" ? "#16a34a" : "#9333ea", // Green vs Purple
           popup: `${t.walkType === "tree" ? "环保/步行" : "UFO/步行"}: ${t.date}`,
           fallback: true, // Forces dashArray '5, 10' later in the sync renderer
+          source: "walk",
         });
       }
     });
@@ -1392,6 +1398,7 @@ export const MapContainer: React.FC<Props> = ({
           lineCap: "round",
           smoothFactor: 0.2,
           dashArray: item.fallback ? "5, 10" : isTransfer ? "4, 8" : undefined,
+          className: `rail-route-line rail-route-${item.source ?? "legacy"}${item.fallback ? " rail-route-fallback" : ""}`,
           pane: "routePane",
         };
         const pl = L.polyline(
@@ -1551,7 +1558,7 @@ export const MapContainer: React.FC<Props> = ({
     const map = mapInstance.current;
     const zoom = map.getZoom() ?? mapZoom;
     const cellPx = zoom < 9 ? 132 : zoom < 11 ? 104 : zoom < 13 ? 76 : zoom < 15 ? 52 : 1;
-    const projected = boundMileageEventsForDisplay(mileageUserEvents, railwayData)
+    const projected = boundMileageEventsForRichDisplay(mileageUserEvents, railwayData, trips)
       .filter((entry) => entry.bound.coordinates);
 
     type EventMarkerItem = {
@@ -1562,6 +1569,7 @@ export const MapContainer: React.FC<Props> = ({
       eventIds: string[];
       titles: string[];
       lineKeys: Set<string>;
+      sourceKinds: Set<"rail_graph" | "legacy">;
       selected: boolean;
       sumLat: number;
       sumLng: number;
@@ -1571,8 +1579,11 @@ export const MapContainer: React.FC<Props> = ({
     projected.forEach((entry) => {
       const coordinates = entry.bound.coordinates;
       if (!coordinates) return;
-      const rawColor = entry.lineContext.line.meta.color || "#059669";
+      const rawColor = entry.lineContext.source === "rail_graph_runtime"
+        ? entry.lineContext.segment.displayColor || "#059669"
+        : entry.lineContext.line.meta.color || "#059669";
       const lineColor = /^#[0-9a-f]{3,8}$/i.test(rawColor) ? rawColor : "#059669";
+      const sourceKind = entry.lineContext.source === "rail_graph_runtime" ? "rail_graph" : "legacy";
       const layerPoint = map.latLngToLayerPoint([coordinates[1], coordinates[0]]);
       const key = zoom >= 15
         ? [
@@ -1590,6 +1601,7 @@ export const MapContainer: React.FC<Props> = ({
         existing.eventIds.push(entry.bound.event.id);
         existing.titles.push(entry.bound.event.title);
         existing.lineKeys.add(entry.lineContext.lineKey);
+        existing.sourceKinds.add(sourceKind);
         existing.selected = existing.selected || entry.bound.event.id === selectedMileageEventId;
         existing.sumLat += coordinates[1];
         existing.sumLng += coordinates[0];
@@ -1604,6 +1616,7 @@ export const MapContainer: React.FC<Props> = ({
           eventIds: [entry.bound.event.id],
           titles: [entry.bound.event.title],
           lineKeys: new Set([entry.lineContext.lineKey]),
+          sourceKinds: new Set([sourceKind]),
           selected: entry.bound.event.id === selectedMileageEventId,
           sumLat: coordinates[1],
           sumLng: coordinates[0],
@@ -1622,9 +1635,7 @@ export const MapContainer: React.FC<Props> = ({
           zIndexOffset: item.selected ? 1200 : item.eventIds.length > 1 ? 900 : 800,
         });
 
-        const title = item.eventIds.length > 1
-          ? i18next.t("mileageEvents.markerCluster", "{{count}} events", { count: item.eventIds.length })
-          : item.titles[0];
+        const title = mileageEventMarkerTitle(item);
         layer.bindTooltip(title, { className: "mileage-event-tooltip", direction: "top", offset: [0, -10] });
         layer.on("click", (event) => {
           L.DomEvent.stopPropagation(event);
@@ -1641,6 +1652,7 @@ export const MapContainer: React.FC<Props> = ({
         (layer as any)._cachedCount = item.eventIds.length;
         (layer as any)._cachedSelected = item.selected;
         (layer as any)._cachedMultiLine = item.lineKeys.size > 1;
+        (layer as any)._cachedSourceKey = Array.from(item.sourceKinds).sort().join(":");
         (layer as any)._cachedTitle = title;
         return layer;
       },
@@ -1652,12 +1664,12 @@ export const MapContainer: React.FC<Props> = ({
           _cachedCount?: number;
           _cachedSelected?: boolean;
           _cachedMultiLine?: boolean;
+          _cachedSourceKey?: string;
           _cachedTitle?: string;
         };
         const count = item.eventIds.length;
-        const title = count > 1
-          ? i18next.t("mileageEvents.markerCluster", "{{count}} events", { count })
-          : item.titles[0];
+        const sourceKey = Array.from(item.sourceKinds).sort().join(":");
+        const title = mileageEventMarkerTitle(item);
         if (marker._cachedLat !== item.lat || marker._cachedLng !== item.lng) {
           marker.setLatLng([item.lat, item.lng]);
           marker._cachedLat = item.lat;
@@ -1667,7 +1679,8 @@ export const MapContainer: React.FC<Props> = ({
           marker._cachedColor !== item.color ||
           marker._cachedCount !== count ||
           marker._cachedSelected !== item.selected ||
-          marker._cachedMultiLine !== item.lineKeys.size > 1
+          marker._cachedMultiLine !== item.lineKeys.size > 1 ||
+          marker._cachedSourceKey !== sourceKey
         ) {
           marker.setIcon(createMileageEventIcon(item));
           marker.setZIndexOffset(item.selected ? 1200 : count > 1 ? 900 : 800);
@@ -1675,6 +1688,7 @@ export const MapContainer: React.FC<Props> = ({
           marker._cachedCount = count;
           marker._cachedSelected = item.selected;
           marker._cachedMultiLine = item.lineKeys.size > 1;
+          marker._cachedSourceKey = sourceKey;
         }
         if (marker._cachedTitle !== title) {
           marker.unbindTooltip();
@@ -1685,10 +1699,35 @@ export const MapContainer: React.FC<Props> = ({
     );
   };
 
+  const mileageEventMarkerSourceLabel = (sourceKinds: Set<"rail_graph" | "legacy">) => {
+    if (sourceKinds.size > 1) return i18next.t("mileageEvents.sourceMixed", "Mixed sources");
+    if (sourceKinds.has("rail_graph")) return i18next.t("mileageEvents.sourceRailGraph", "Rail graph snapshot");
+    return i18next.t("mileageEvents.sourceLegacy", "GeoJSON axis");
+  };
+
+  const mileageEventMarkerTitle = (item: {
+    eventIds: string[];
+    titles: string[];
+    sourceKinds: Set<"rail_graph" | "legacy">;
+  }) => {
+    const source = mileageEventMarkerSourceLabel(item.sourceKinds);
+    if (item.eventIds.length > 1) {
+      return i18next.t("mileageEvents.markerClusterWithSource", "{{count}} events · {{source}}", {
+        count: item.eventIds.length,
+        source,
+      });
+    }
+    return i18next.t("mileageEvents.markerSingleWithSource", "{{title}} · {{source}}", {
+      title: item.titles[0],
+      source,
+    });
+  };
+
   const createMileageEventIcon = (item: {
     color: string;
     eventIds: string[];
     lineKeys: Set<string>;
+    sourceKinds: Set<"rail_graph" | "legacy">;
     selected: boolean;
   }) => {
     const count = item.eventIds.length;
@@ -1696,8 +1735,13 @@ export const MapContainer: React.FC<Props> = ({
     const clusterClass = count > 1 ? "is-cluster" : "is-single";
     const selectedClass = item.selected ? "is-selected" : "";
     const mixedClass = item.lineKeys.size > 1 ? "is-mixed" : "";
+    const sourceClass = item.sourceKinds.size > 1
+      ? "is-source-mixed"
+      : item.sourceKinds.has("rail_graph")
+        ? "is-rail-graph"
+        : "is-legacy";
     const html = `
-      <div class="mileage-event-marker ${clusterClass} ${selectedClass} ${mixedClass}" style="--event-color:${item.color}; --event-size:${size}px">
+      <div class="mileage-event-marker ${clusterClass} ${selectedClass} ${mixedClass} ${sourceClass}" style="--event-color:${item.color}; --event-size:${size}px">
         <span class="mileage-event-marker-core">${count > 1 ? count : ""}</span>
       </div>
     `;

@@ -2,13 +2,15 @@ import React from "react";
 import { Clock, MapPinned, Route, Tag, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { BoundMileageEvent } from "../../rail-graph-v1/mileage-event.types";
-import type { AppMileageLineContext } from "../../utils/mileageUserEvents";
+import type { MileageLineContextLike } from "../../utils/mileageUserEvents";
 import { formatKm } from "../../utils/mileageUserEvents";
 import {
   eventKindLabel,
   eventKindTone,
   eventLineLabel,
   eventMileageLabel,
+  eventSourceLabel,
+  eventSourceTone,
   eventStationLabel,
   eventVisibilityLabel,
   timestampLabel,
@@ -16,7 +18,7 @@ import {
 
 export interface MileageEventListEntry {
   bound: BoundMileageEvent;
-  lineContext?: AppMileageLineContext | null;
+  lineContext?: MileageLineContextLike | null;
 }
 
 interface Props {
@@ -64,6 +66,7 @@ export const EventList: React.FC<Props> = ({
         const checked = selectedIds?.has(event.id) ?? false;
         const stationLabel = eventStationLabel(entry.bound, entry.lineContext);
         const line = eventLineLabel(entry.bound, entry.lineContext);
+        const sourceLabel = eventSourceLabel(entry.lineContext, t);
         return (
           <article
             key={`${event.id}:${entry.bound.distanceMetersFromRunStart}`}
@@ -118,6 +121,9 @@ export const EventList: React.FC<Props> = ({
                         {line}
                       </span>
                     )}
+                    <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${eventSourceTone(entry.lineContext)}`}>
+                      {sourceLabel}
+                    </span>
                     <span className="inline-flex items-center gap-1">
                       <Clock size={12} />
                       {timestampLabel(entry.bound.timestampInference, entry.bound.timestamp, t)}

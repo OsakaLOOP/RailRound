@@ -47,8 +47,9 @@ import DistanceWorker from "./workers/distance.worker.js?worker";
 import { useMeta } from "./contexts";
 import { useTranslation } from "react-i18next";
 import { showAlert, showConfirm } from "./utils/alerts";
-import { boundMileageEventForDisplay } from "./utils/mileageUserEvents";
+import { boundMileageEventForRichDisplay } from "./utils/mileageUserEvents";
 import { tripToKmlPathItems, tripToProductSegments } from "./utils/tripProductProjection";
+import { buildTripDetailModel } from "./utils/railGraphTripDetailModel";
 import { useLocation } from "react-router-dom";
 import { useAppRouteState } from "./hooks/useAppRouteState";
 import { useAppNavigation } from "./hooks/useAppNavigation";
@@ -57,6 +58,44 @@ import { getRouteInfoFromPath, toI18nLang } from "./utils/routes";
 import { loadDefaultRailGraphDeployment } from "./services/railGraphDeploymentLoader";
 
 const CURRENT_VERSION = meta["currentVersion"];
+
+function escapePopupHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildRoutePopupHtml(args: {
+  sourceLabel: string;
+  sourceKind: "rail_graph" | "legacy" | "fallback" | "transfer";
+  title: string;
+  subtitle: string;
+  rows?: Array<[string, string | number | undefined | null]>;
+  chips?: string[];
+}): string {
+  const rows = (args.rows ?? []).filter(([, value]) => value !== undefined && value !== null && value !== "");
+  const chips = (args.chips ?? []).filter(Boolean);
+  return [
+    `<div class="rail-route-popup rail-route-popup-${escapePopupHtml(args.sourceKind)}">`,
+    `<div class="rail-route-popup-source">${escapePopupHtml(args.sourceLabel)}</div>`,
+    `<div class="rail-route-popup-title">${escapePopupHtml(args.title)}</div>`,
+    `<div class="rail-route-popup-subtitle">${escapePopupHtml(args.subtitle)}</div>`,
+    rows.length
+      ? `<dl class="rail-route-popup-rows">${rows
+          .map(([label, value]) => `<div><dt>${escapePopupHtml(label)}</dt><dd>${escapePopupHtml(value)}</dd></div>`)
+          .join("")}</dl>`
+      : "",
+    chips.length
+      ? `<div class="rail-route-popup-chips">${chips
+          .map((chip) => `<span>${escapePopupHtml(chip)}</span>`)
+          .join("")}</div>`
+      : "",
+    `</div>`,
+  ].join("");
+}
 
 export const AppLayout: React.FC = () => {
   const location = useLocation();
@@ -69,6 +108,7 @@ export const AppLayout: React.FC = () => {
     setCompanyDB,
     setRailwayData,
     setRailGraphRuntime,
+    setRailGraphLoadState,
     setGeoData,
     trips,
     pins,
@@ -98,6 +138,7 @@ export const AppLayout: React.FC = () => {
       setCompanyDB: state.setCompanyDB,
       setRailwayData: state.setRailwayData,
       setRailGraphRuntime: state.setRailGraphRuntime,
+      setRailGraphLoadState: state.setRailGraphLoadState,
       setGeoData: state.setGeoData,
       trips: state.trips,
       pins: state.pins,
@@ -156,8 +197,17 @@ export const AppLayout: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
+    setRailGraphLoadState({ status: "loading", reason: "Loading default rail graph deployment bundle." });
     loadDefaultRailGraphDeployment().then((result) => {
-      if (cancelled || result.status !== "loaded") return;
+      if (cancelled) return;
+      if (result.status !== "loaded") {
+        setRailGraphLoadState({
+          status: result.status,
+          reason: result.reason,
+          fallbackReason: result.reason,
+        });
+        return;
+      }
       const runtime = result.runtime;
       if (!runtime) return;
       setRailGraphRuntime(runtime);
@@ -166,12 +216,20 @@ export const AppLayout: React.FC = () => {
         graphId: runtime.system.graphId,
       });
     }).catch((error) => {
+      if (!cancelled) {
+        const reason = error instanceof Error ? error.message : "Rail graph deployment bundle could not be loaded.";
+        setRailGraphLoadState({
+          status: "error",
+          reason,
+          fallbackReason: reason,
+        });
+      }
       console.warn("[RailGraph] Failed to load deployed runtime bundle", error);
     });
     return () => {
       cancelled = true;
     };
-  }, [setRailGraphRuntime]);
+  }, [setRailGraphLoadState, setRailGraphRuntime]);
 
   // --- April Fool's initialization ---
   useEffect(() => {
@@ -1058,6 +1116,20 @@ export const AppLayout: React.FC = () => {
         segments: tripToProductSegments(trip, railwayData),
       }));
       const allSegments = productTrips.flatMap((item) => item.segments);
+      const detailByTripId = new Map(
+        productTrips.map(({ trip }) => [
+          String(trip.id),
+          buildTripDetailModel({ trip, railwayData, userEvents: mileageUserEvents }),
+        ]),
+      );
+      const directionLabel = (direction?: string) => {
+        if (!direction) return t("map.route.unknown", "Unknown");
+        if (direction === "up") return t("map.route.direction.up", "Up");
+        if (direction === "down") return t("map.route.direction.down", "Down");
+        if (direction === "clockwise") return t("map.route.direction.clockwise", "Clockwise");
+        if (direction === "counterclockwise") return t("map.route.direction.counterclockwise", "Counterclockwise");
+        return direction;
+      };
 
       // Extract visited stations logic
       const visited = new Set<string>();
@@ -1111,8 +1183,10 @@ export const AppLayout: React.FC = () => {
       const buildRenderList = (cache: Map<string, any>) => {
         const list: any[] = [];
         productTrips.forEach(({ trip, segments: segs }) => {
+          const detail = detailByTripId.get(String(trip.id));
           for (let i = 0; i < segs.length; i++) {
             const seg = segs[i];
+            const detailSegment = detail?.segments[i];
             if (seg.source === "rail_graph" && seg.geometry?.length) {
               list.push({
                 id: seg.id || `rail-graph_${trip.id}_${i}`,
@@ -1120,7 +1194,28 @@ export const AppLayout: React.FC = () => {
                 color: seg.displayColor || "#94a3b8",
                 isMulti: false,
                 fallback: false,
-                popup: `${seg.lineLabel || seg.lineKey}: ${seg.fromName || seg.fromId} → ${seg.toName || seg.toId}`,
+                source: "rail_graph",
+                popup: buildRoutePopupHtml({
+                  sourceLabel: t("map.route.sourceRailGraph", "Rail graph snapshot"),
+                  sourceKind: "rail_graph",
+                  title: seg.lineLabel || seg.lineKey,
+                  subtitle: `${seg.fromName || seg.fromId} -> ${seg.toName || seg.toId}`,
+                  rows: [
+                    [t("map.route.service", "Service"), seg.serviceType],
+                    [t("map.route.directionLabel", "Direction"), directionLabel(seg.direction)],
+                    [t("map.route.pattern", "Pattern"), seg.patternRef ? String(seg.patternRef) : undefined],
+                    [t("map.route.distance", "Distance"), t("map.route.km", "{{value}} km", { value: Math.max(0, seg.distanceKm).toFixed(1) })],
+                    [t("map.route.userEvents", "User events"), detailSegment?.userEventCount ?? 0],
+                    [t("map.route.geoSource", "Geometry"), t("map.route.geoRailGraph", "Saved rail-graph geometry")],
+                  ],
+                  chips: [
+                    t("map.route.stopPass", "{{stops}} stops / {{passes}} pass", {
+                      stops: detailSegment?.stopCount ?? seg.stopCount ?? 0,
+                      passes: detailSegment?.passCount ?? seg.passCount ?? 0,
+                    }),
+                    t("map.route.via", "{{count}} via", { count: detailSegment?.viaStationCount ?? seg.viaStationCount ?? 0 }),
+                  ],
+                }),
               });
               continue;
             }
@@ -1134,8 +1229,22 @@ export const AppLayout: React.FC = () => {
             if (cached) {
               list.push({
                 id: seg.id || key,
-                popup: `${seg.lineKey}: ${s1?.name_ja || seg.fromId} → ${s2?.name_ja || seg.toId}`,
                 ...cached,
+                source: "legacy",
+                popup: buildRoutePopupHtml({
+                  sourceLabel: cached.fallback
+                    ? t("map.route.sourceFallback", "Geometry fallback")
+                    : t("map.route.sourceLegacy", "Legacy GeoJSON"),
+                  sourceKind: cached.fallback ? "fallback" : "legacy",
+                  title: seg.lineLabel || seg.lineKey,
+                  subtitle: `${s1?.name_ja || seg.fromId} -> ${s2?.name_ja || seg.toId}`,
+                  rows: [
+                    [t("map.route.geoSource", "Geometry"), cached.fallback
+                      ? t("map.route.geoFallback", "Station-to-station fallback")
+                      : t("map.route.geoJson", "Loaded GeoJSON path")],
+                    [t("map.route.userEvents", "User events"), detailSegment?.userEventCount ?? 0],
+                  ],
+                }),
               });
             }
 
@@ -1159,7 +1268,13 @@ export const AppLayout: React.FC = () => {
                   isMulti: false,
                   fallback: false,
                   isTransfer: true,
-                  popup: `换乘: ${s2.name_ja} → ${nextS1.name_ja}`,
+                  source: "legacy",
+                  popup: buildRoutePopupHtml({
+                    sourceLabel: t("map.route.sourceTransfer", "Transfer"),
+                    sourceKind: "transfer",
+                    title: t("map.route.transfer", "Transfer"),
+                    subtitle: `${s2.name_ja} -> ${nextS1.name_ja}`,
+                  }),
                 });
               }
             }
@@ -1283,7 +1398,7 @@ export const AppLayout: React.FC = () => {
     }, 100); // 100ms 延时/防抖
 
     return () => clearTimeout(timerId);
-  }, [trips, geoData, railwayData, segmentGeometries]);
+  }, [trips, geoData, railwayData, segmentGeometries, mileageUserEvents, t]);
 
   useEffect(() => {
     if (!hasInitializedRef.current) {
@@ -1756,7 +1871,7 @@ export const AppLayout: React.FC = () => {
   const handleGlobalSearchEventSelect = (eventId: string) => {
     setModalState({ isGlobalSearchOpen: false });
     const event = mileageUserEvents.find((candidate) => candidate.id === eventId);
-    const projected = event ? boundMileageEventForDisplay(event, railwayData) : null;
+    const projected = event ? boundMileageEventForRichDisplay(event, railwayData, trips) : null;
     goToTab("map");
     window.setTimeout(() => {
       if (projected?.bound.coordinates) {

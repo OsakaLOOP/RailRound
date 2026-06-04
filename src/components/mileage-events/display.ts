@@ -4,7 +4,7 @@ import type {
   MileageUserEventKind,
   MileageUserEventVisibility,
 } from "../../rail-graph-v1/mileage-event.types";
-import type { AppMileageLineContext } from "../../utils/mileageUserEvents";
+import type { MileageLineContextLike } from "../../utils/mileageUserEvents";
 import {
   findLineKeyForMileageEvent,
   formatKm,
@@ -61,12 +61,15 @@ export function timestampLabel(
   return t("mileageEvents.timeUnknown", "No time bound");
 }
 
-export function eventLineLabel(bound: BoundMileageEvent | null | undefined, lineContext: AppMileageLineContext | null | undefined): string {
+export function eventLineLabel(bound: BoundMileageEvent | null | undefined, lineContext: MileageLineContextLike | null | undefined): string {
+  if (lineContext?.source === "rail_graph_runtime") {
+    return lineContext.segment.lineLabel || lineLabel(lineContext.lineKey);
+  }
   const lineKey = lineContext?.lineKey ?? (bound ? findLineKeyForMileageEvent(bound.event) : null);
   return lineKey ? lineLabel(lineKey) : "";
 }
 
-export function eventStationLabel(bound: BoundMileageEvent | null | undefined, lineContext: AppMileageLineContext | null | undefined): string {
+export function eventStationLabel(bound: BoundMileageEvent | null | undefined, lineContext: MileageLineContextLike | null | undefined): string {
   if (!bound || !lineContext) return "";
   return stationNameForBoundEvent(bound, lineContext) ?? "";
 }
@@ -74,6 +77,23 @@ export function eventStationLabel(bound: BoundMileageEvent | null | undefined, l
 export function eventMileageLabel(bound: BoundMileageEvent | null | undefined): string {
   if (!bound) return "";
   return formatKm(bound.event.mileage.distanceMeters);
+}
+
+export function eventSourceLabel(
+  lineContext: MileageLineContextLike | null | undefined,
+  t: (key: string, fallback: string) => string,
+): string {
+  if (lineContext?.source === "rail_graph_runtime") {
+    return t("mileageEvents.sourceRailGraph", "Rail graph snapshot");
+  }
+  return t("mileageEvents.sourceLegacy", "GeoJSON axis");
+}
+
+export function eventSourceTone(lineContext: MileageLineContextLike | null | undefined): string {
+  if (lineContext?.source === "rail_graph_runtime") {
+    return "bg-emerald-50 text-emerald-700 border-emerald-100";
+  }
+  return "bg-slate-100 text-slate-600 border-slate-200";
 }
 
 export function eventKindTone(kind: MileageUserEventKind): string {

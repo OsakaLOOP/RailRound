@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Edit2, Plus, X, ListFilter, AlertTriangle, ArrowRightLeft, ArrowDown, Search, Loader2 } from 'lucide-react';
-import { useStore, EditorMode } from '../../store';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Edit2, Plus, X, ListFilter, AlertTriangle, ArrowRightLeft, ArrowDown, Search, Loader2, CheckCircle2, GitMerge, Route, Clock, MapPinned } from 'lucide-react';
+import { useStore, EditorMode, type Trip } from '../../store';
 import { DropZone } from '../DragContext';
 import { StationLineSearchModal, SearchModalMode } from './StationSearchModal';
 import { LineLogo } from '../LineLogo';
@@ -11,12 +11,29 @@ import { useUserData } from '../../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
 import { showAlert, showConfirm } from '../../utils/alerts';
 import { buildNetworkDisplayModel } from '../../utils/networkDisplay';
-import { planAppRoute } from '../../utils/appRoutePlanner';
+import { planAppRouteCandidates, type AppRouteCandidate } from '../../utils/appRoutePlanner';
 import { tripResultToLegacyTrip } from '../../utils/railGraphTripAdapter';
+import { buildTripDetailModel, tripDetailKeyEvents } from '../../utils/railGraphTripDetailModel';
+
+type AutoPlanStatus =
+    | { kind: 'rail_graph'; count?: number }
+    | { kind: 'legacy'; reason?: string }
+    | { kind: 'error'; source: 'legacy' | 'rail_graph'; reason?: string };
+
+type PlannerBadgeTone = 'ready' | 'loading' | 'fallback' | 'error';
+type PlannerBadgeIcon = 'ready' | 'loading' | 'fallback' | 'error';
+
+interface PlannerBadge {
+    tone: PlannerBadgeTone;
+    icon: PlannerBadgeIcon;
+    label: string;
+    title?: string;
+    spin?: boolean;
+}
 
 export const TripEditor: React.FC = () => {
     const {
-        isOpen, isEditing, form, editorMode, autoForm, isRouteSearching, railwayData, railGraphRuntime, segmentGeometries, trips, pins, folders, badgeSettings, user, isAprilFool, autoRouteEasterEggType
+        isOpen, isEditing, form, editorMode, autoForm, isRouteSearching, railwayData, railGraphRuntime, railGraphLoadState, segmentGeometries, trips, pins, folders, badgeSettings, user, isAprilFool, autoRouteEasterEggType, mileageUserEvents
     } = useStore(useShallow(state => ({
         isOpen: state.isTripEditing,
         isEditing: !!state.editingTripId,
@@ -26,6 +43,7 @@ export const TripEditor: React.FC = () => {
         isRouteSearching: state.isRouteSearching,
         railwayData: state.railwayData,
         railGraphRuntime: state.railGraphRuntime,
+        railGraphLoadState: state.railGraphLoadState,
         segmentGeometries: state.segmentGeometries,
         trips: state.trips,
         pins: state.pins,
@@ -33,7 +51,8 @@ export const TripEditor: React.FC = () => {
         badgeSettings: state.badgeSettings,
         user: state.user,
         isAprilFool: state.isAprilFool,
-        autoRouteEasterEggType: state.autoRouteEasterEggType
+        autoRouteEasterEggType: state.autoRouteEasterEggType,
+        mileageUserEvents: state.mileageUserEvents
     })));
 
     const setForm = useStore(state => state.setTripForm);
@@ -49,6 +68,46 @@ export const TripEditor: React.FC = () => {
     const [stationModalMode, setStationModalMode] = useState<SearchModalMode>('line');
     const [selectorTarget, setSelectorTarget] = useState<{ type: string; index?: number } | null>(null);
     const [allowedLines, setAllowedLines] = useState<string[] | null>(null);
+    const [autoPlanStatus, setAutoPlanStatus] = useState<AutoPlanStatus | null>(null);
+    const [autoPlanCandidates, setAutoPlanCandidates] = useState<AppRouteCandidate[]>([]);
+
+    const setManualSegmentsForm = (next: Parameters<typeof setForm>[0]) => {
+        setAutoPlanStatus(null);
+        setAutoPlanCandidates([]);
+        setForm(next);
+    };
+
+    useEffect(() => {
+        if (!isOpen) {
+            setAutoPlanStatus(null);
+            setAutoPlanCandidates([]);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        setAutoPlanStatus(null);
+        setAutoPlanCandidates([]);
+    }, [autoForm.startLine, autoForm.startStation, autoForm.endLine, autoForm.endStation]);
+
+    const currentTripDetail = useMemo(() => {
+        if (!form.railGraph?.tripResult) return null;
+        const detailTrip: Trip = {
+            id: form.id ?? form.railGraph.tripResult.tripId ?? 'trip-editor-draft',
+            date: form.date || new Date().toISOString().split('T')[0],
+            cost: form.cost || 0,
+            memo: form.memo || '',
+            segments: form.segments || [],
+            railGraph: form.railGraph,
+            lineKey: form.lineKey,
+            fromId: form.fromId,
+            toId: form.toId,
+        };
+        return buildTripDetailModel({
+            trip: detailTrip,
+            railwayData,
+            userEvents: mileageUserEvents,
+        });
+    }, [form, railwayData, mileageUserEvents]);
 
     const onSave = async () => {
         // Validation logic
@@ -190,9 +249,11 @@ export const TripEditor: React.FC = () => {
             return; // `useEffect` will take over
         }
 
+        setAutoPlanStatus(null);
+        setAutoPlanCandidates([]);
         setIsRouteSearching(true);
         setTimeout(() => {
-            const result = planAppRoute({
+            const result = planAppRouteCandidates({
                 startLineKey: startLine,
                 startStationId: startStation,
                 endLineKey: endLine,
@@ -203,6 +264,12 @@ export const TripEditor: React.FC = () => {
             });
             if (result.status === 'error') {
                 setIsRouteSearching(false);
+                setAutoPlanCandidates([]);
+                setAutoPlanStatus({
+                    kind: 'error',
+                    source: result.source,
+                    reason: result.railGraphFallbackReason || result.error
+                });
                 if (!isInfinite && result.error.includes("超出最大换乘次数")) {
                     setTimeout(async () => {
                         const wantRetry = await showConfirm(
@@ -220,23 +287,47 @@ export const TripEditor: React.FC = () => {
                 }
             }
             else {
-                const resultSegments = result.segments ?? [];
-                if (resultSegments.length > 20) { setIsRouteSearching(false); showAlert(t("tripEdit.pathTooLong", "路径过长"), '', 'warning'); return; }
-                if (result.source === 'rail_graph') {
-                    const plannedTrip = tripResultToLegacyTrip(result.trip.tripResult, result.trip.runtimeArtifacts);
-                    setForm({
-                        ...plannedTrip,
-                        date: form.date || plannedTrip.date,
-                        memo: form.memo || plannedTrip.memo,
-                        cost: form.cost ?? plannedTrip.cost,
-                    });
-                } else {
-                    setForm({ segments: resultSegments, railGraph: undefined });
+                const resultSegments = result.best.segments ?? [];
+                if (resultSegments.length > 20) {
+                    setIsRouteSearching(false);
+                    setAutoPlanCandidates([]);
+                    setAutoPlanStatus({ kind: 'error', source: result.source, reason: t("tripEdit.pathTooLong", "路径过长") });
+                    showAlert(t("tripEdit.pathTooLong", "路径过长"), '', 'warning');
+                    return;
                 }
-                setEditorMode(EditorMode.Manual);
+                setAutoPlanCandidates(result.candidates);
+                setAutoPlanStatus(result.source === 'rail_graph'
+                    ? { kind: 'rail_graph', count: result.candidates.length }
+                    : { kind: 'legacy', reason: result.railGraphFallbackReason });
                 setTimeout(() => setIsRouteSearching(false), 200);
             }
         }, 1000);
+    };
+
+    useEffect(() => {
+        const handleAutoSearchRequest = () => {
+            if (!useStore.getState().isTripEditing) return;
+            window.setTimeout(() => onAutoSearch(false), 0);
+        };
+        window.addEventListener('trip-editor:auto-search-request', handleAutoSearchRequest);
+        return () => window.removeEventListener('trip-editor:auto-search-request', handleAutoSearchRequest);
+    }, [onAutoSearch]);
+
+    const applyRouteCandidate = (candidate: AppRouteCandidate) => {
+        if (candidate.source === 'rail_graph') {
+            const plannedTrip = tripResultToLegacyTrip(candidate.trip.tripResult, candidate.trip.runtimeArtifacts);
+            setForm({
+                ...plannedTrip,
+                date: form.date || plannedTrip.date,
+                memo: form.memo || plannedTrip.memo,
+                cost: form.cost ?? plannedTrip.cost,
+            });
+            setAutoPlanStatus({ kind: 'rail_graph', count: autoPlanCandidates.filter(item => item.source === 'rail_graph').length || 1 });
+        } else {
+            setForm({ segments: candidate.segments, railGraph: undefined });
+            setAutoPlanStatus({ kind: 'legacy', reason: candidate.railGraphFallbackReason });
+        }
+        setEditorMode(EditorMode.Manual);
     };
 
     useEffect(() => {
@@ -253,6 +344,393 @@ export const TripEditor: React.FC = () => {
     }, [isOpen, closeEditor, onSave, onAutoSearch, editorMode]);
 
     if (!isOpen) return null;
+
+    const plannerBadgeClasses: Record<PlannerBadgeTone, string> = {
+        ready: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+        loading: 'bg-sky-50 text-sky-700 border-sky-100',
+        fallback: 'bg-amber-50 text-amber-700 border-amber-100',
+        error: 'bg-red-50 text-red-700 border-red-100',
+    };
+
+    const plannerReasonTitle = (reason?: string) => reason
+        ? t('tripEdit.plannerReason', 'Reason: {{reason}}', { reason })
+        : undefined;
+
+    const renderPlannerIcon = (badge: PlannerBadge) => {
+        if (badge.icon === 'loading') return <Loader2 size={12} className={badge.spin ? 'animate-spin' : undefined} />;
+        if (badge.icon === 'ready') return <CheckCircle2 size={12} />;
+        if (badge.icon === 'fallback') return <GitMerge size={12} />;
+        return <AlertTriangle size={12} />;
+    };
+
+    const renderPlannerBadge = (badge: PlannerBadge, compact = false) => (
+        <div
+            className={`inline-flex items-center gap-1.5 border rounded-full ${compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]'} font-semibold ${plannerBadgeClasses[badge.tone]}`}
+            title={badge.title}
+            aria-live="polite"
+        >
+            {renderPlannerIcon(badge)}
+            <span>{badge.label}</span>
+        </div>
+    );
+
+    const autoPlannerBadge: PlannerBadge = (() => {
+        if (isRouteSearching) {
+            return {
+                tone: 'loading',
+                icon: 'loading',
+                spin: true,
+                label: t('tripEdit.plannerSearching', 'Searching route')
+            };
+        }
+        if (autoPlanStatus?.kind === 'rail_graph') {
+            return {
+                tone: 'ready',
+                icon: 'ready',
+                label: t('tripEdit.plannerRailGraphCandidates', '{{count}} rail graph candidates', { count: autoPlanStatus.count || autoPlanCandidates.length || 1 })
+            };
+        }
+        if (autoPlanStatus?.kind === 'legacy') {
+            return {
+                tone: 'fallback',
+                icon: 'fallback',
+                label: t('tripEdit.plannerLegacyResult', 'Planned by legacy search'),
+                title: plannerReasonTitle(autoPlanStatus.reason)
+            };
+        }
+        if (autoPlanStatus?.kind === 'error') {
+            return {
+                tone: 'error',
+                icon: 'error',
+                label: t('tripEdit.plannerError', 'Planner error'),
+                title: plannerReasonTitle(autoPlanStatus.reason)
+            };
+        }
+        if (railGraphRuntime) {
+            return {
+                tone: 'ready',
+                icon: 'ready',
+                label: t('tripEdit.plannerReady', 'Rail graph ready')
+            };
+        }
+        if (railGraphLoadState.status === 'idle' || railGraphLoadState.status === 'loading') {
+            return {
+                tone: 'loading',
+                icon: 'loading',
+                spin: railGraphLoadState.status === 'loading',
+                label: t('tripEdit.plannerLoading', 'Rail graph loading')
+            };
+        }
+        return {
+            tone: 'fallback',
+            icon: 'fallback',
+            label: t('tripEdit.plannerFallback', 'Legacy planner'),
+            title: plannerReasonTitle(railGraphLoadState.fallbackReason || railGraphLoadState.reason)
+        };
+    })();
+
+    const headerPlannerBadge: PlannerBadge | null = form.railGraph?.tripResult
+        ? {
+            tone: 'ready',
+            icon: 'ready',
+            label: t('tripEdit.railGraphSnapshot', 'Rail graph snapshot')
+        }
+        : autoPlanStatus?.kind === 'legacy'
+            ? {
+                tone: 'fallback',
+                icon: 'fallback',
+                label: t('tripEdit.plannerLegacyResult', 'Planned by legacy search'),
+                title: plannerReasonTitle(autoPlanStatus.reason)
+            }
+            : autoPlanStatus?.kind === 'error'
+                ? {
+                    tone: 'error',
+                    icon: 'error',
+                    label: t('tripEdit.plannerError', 'Planner error'),
+                    title: plannerReasonTitle(autoPlanStatus.reason)
+                }
+                : null;
+
+    const directionText = (direction?: string) => {
+        if (!direction) return t('tripEdit.detailUnknown', 'Unknown');
+        if (direction === 'up') return t('tripEdit.direction.up', 'Up');
+        if (direction === 'down') return t('tripEdit.direction.down', 'Down');
+        if (direction === 'clockwise') return t('tripEdit.direction.clockwise', 'Clockwise');
+        if (direction === 'counterclockwise') return t('tripEdit.direction.counterclockwise', 'Counterclockwise');
+        return direction;
+    };
+
+    const candidateKindLabel = (candidate: AppRouteCandidate) => {
+        if (candidate.candidateKind === 'preset') return t('tripEdit.candidatePreset', 'Preset');
+        if (candidate.candidateKind === 'pattern') return t('tripEdit.candidatePattern', 'Pattern');
+        if (candidate.candidateKind === 'auto') return t('tripEdit.candidateAuto', 'Auto');
+        return t('tripEdit.candidateLegacy', 'Legacy');
+    };
+
+    const eventTypeLabel = (type: string) => {
+        if (type === 'departure') return t('tripEdit.event.departure', 'Departure');
+        if (type === 'arrival') return t('tripEdit.event.arrival', 'Arrival');
+        if (type === 'transfer') return t('tripEdit.event.transfer', 'Transfer');
+        if (type === 'scenic') return t('tripEdit.event.scenic', 'Scenic');
+        if (type === 'stop') return t('tripEdit.event.stop', 'Stop');
+        if (type === 'pass') return t('tripEdit.event.pass', 'Pass');
+        if (type === 'user_event') return t('tripEdit.event.user', 'User event');
+        if (type === 'note') return t('tripEdit.event.note', 'Note');
+        return type;
+    };
+
+    const formatKm = (value?: number) => t('tripEdit.km', '{{value}} km', { value: Math.max(0, value || 0).toFixed(1) });
+    const formatMinutes = (value?: number) => t('tripEdit.minutes', '{{count}} min', { count: Math.max(0, value || 0) });
+    const patternCount = railGraphRuntime ? Object.keys(railGraphRuntime.system.graph.indexes.patternById).length : 0;
+    const railGraphCandidateCount = autoPlanCandidates.filter(candidate => candidate.source === 'rail_graph').length;
+    const legacyCandidateCount = autoPlanCandidates.filter(candidate => candidate.source === 'legacy').length;
+
+    const renderPlannerSourceStrip = () => {
+        const fallbackReason = autoPlanStatus?.kind === 'legacy'
+            ? autoPlanStatus.reason
+            : autoPlanStatus?.kind === 'error'
+                ? autoPlanStatus.reason
+                : railGraphLoadState.fallbackReason || railGraphLoadState.reason;
+        return (
+            <div className="grid gap-2 rounded-lg border border-slate-200 bg-white/80 p-3 text-[11px] text-slate-600 sm:grid-cols-2">
+                <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                        <GitMerge size={13} className={railGraphRuntime ? 'text-emerald-600' : 'text-slate-400'} />
+                        {t('tripEdit.railGraphPlannerSource', 'Rail graph runtime')}
+                    </div>
+                    <div className="mt-1 leading-relaxed text-slate-500">
+                        {railGraphRuntime
+                            ? t('tripEdit.railGraphPlannerReadyDetail', '{{presets}} presets · {{patterns}} patterns loaded', {
+                                presets: railGraphRuntime.deployed.generatedPresets.length,
+                                patterns: patternCount,
+                            })
+                            : t('tripEdit.railGraphPlannerUnavailableDetail', 'Not loaded; auto routing can still use legacy GeoJSON.')}
+                    </div>
+                    {fallbackReason && (
+                        <div className="mt-1 line-clamp-2 text-amber-700">
+                            {t('tripEdit.plannerReason', 'Reason: {{reason}}', { reason: fallbackReason })}
+                        </div>
+                    )}
+                </div>
+                <div className="min-w-0 border-t border-slate-100 pt-2 sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                        <Route size={13} className="text-blue-600" />
+                        {t('tripEdit.currentPlannerOutput', 'Current output')}
+                    </div>
+                    <div className="mt-1 leading-relaxed text-slate-500">
+                        {autoPlanCandidates.length > 0
+                            ? t('tripEdit.candidateSourceSummary', '{{railGraph}} rail graph · {{legacy}} legacy', {
+                                railGraph: railGraphCandidateCount,
+                                legacy: legacyCandidateCount,
+                            })
+                            : t('tripEdit.candidateSourceEmpty', 'Search to compare rail-graph candidates and legacy fallback.')}
+                    </div>
+                    <div className="mt-1 text-slate-400">
+                        {t('tripEdit.savedSnapshotHint', 'Choosing a rail-graph candidate saves a run snapshot; manual edits return to GeoJSON segments.')}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderRouteCandidates = () => {
+        if (autoPlanCandidates.length === 0) return null;
+        return (
+            <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-bold text-slate-600">
+                        {t('tripEdit.candidatesTitle', 'Route candidates')}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                        {t('tripEdit.candidatesCount', '{{count}} options', { count: autoPlanCandidates.length })}
+                    </div>
+                </div>
+                <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {autoPlanCandidates.map((candidate) => (
+                        <button
+                            key={candidate.candidateId}
+                            type="button"
+                            className={`w-full rounded-lg border bg-white p-3 text-left shadow-sm transition active:scale-[0.99] ${
+                                candidate.source === 'rail_graph'
+                                    ? 'border-emerald-100 hover:border-emerald-200 hover:bg-emerald-50/40'
+                                    : 'border-amber-100 hover:border-amber-200 hover:bg-amber-50/40'
+                            }`}
+                            onClick={() => applyRouteCandidate(candidate)}
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${candidate.source === 'rail_graph' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                                            {candidateKindLabel(candidate)}
+                                        </span>
+                                        <span className="truncate text-sm font-bold text-slate-800">{candidate.label}</span>
+                                    </div>
+                                        {candidate.description && (
+                                            <div className="mt-0.5 truncate text-[11px] text-slate-400">{candidate.description}</div>
+                                        )}
+                                    </div>
+                                <div className="flex shrink-0 flex-col items-end gap-1">
+                                    <span className={candidate.source === 'rail_graph'
+                                        ? 'rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white'
+                                        : 'rounded-md bg-amber-600 px-2 py-1 text-xs font-semibold text-white'}
+                                    >
+                                        {t('tripEdit.useCandidate', 'Use')}
+                                    </span>
+                                    <span className={candidate.source === 'rail_graph'
+                                        ? 'rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700'
+                                        : 'rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700'}
+                                    >
+                                        {candidate.source === 'rail_graph'
+                                            ? t('tripEdit.candidateSavesSnapshot', 'Saves snapshot')
+                                            : t('tripEdit.candidateUsesLegacy', 'GeoJSON fallback')}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
+                                {candidate.source === 'rail_graph' ? (
+                                    <>
+                                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
+                                            <Route size={12} />
+                                            {candidate.serviceType || t('tripEdit.detailUnknown', 'Unknown')}
+                                        </span>
+                                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
+                                            <GitMerge size={12} />
+                                            {directionText(candidate.directionLabel || candidate.direction)}
+                                        </span>
+                                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
+                                            <MapPinned size={12} />
+                                            {t('tripEdit.viaStationCount', '{{count}} via', { count: candidate.viaStationCount })}
+                                        </span>
+                                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
+                                            <Clock size={12} />
+                                            {formatMinutes(candidate.totalTimeMinutes)}
+                                        </span>
+                                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
+                                            {formatKm(candidate.totalDistanceKm)}
+                                        </span>
+                                        {candidate.patternRef && (
+                                            <span className="inline-flex max-w-[12rem] items-center gap-1 truncate rounded bg-slate-50 px-1.5 py-0.5" title={String(candidate.patternRef)}>
+                                                {t('tripEdit.candidatePatternRef', 'Pattern ref')}: {String(candidate.patternRef).split(':').slice(-1)[0]}
+                                            </span>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
+                                            <GitMerge size={12} />
+                                            {t('tripEdit.plannerLegacyResult', 'Planned by legacy search')}
+                                        </span>
+                                        {candidate.estimatedTime !== undefined && (
+                                            <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-1.5 py-0.5">
+                                                <Clock size={12} />
+                                                {formatMinutes(candidate.estimatedTime)}
+                                            </span>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                            {candidate.source === 'rail_graph' && candidate.keyEventLabels.length > 0 && (
+                                <div className="mt-2 flex flex-wrap items-center gap-1">
+                                    <span className="text-[10px] font-bold uppercase text-emerald-700">
+                                        {t('tripEdit.keyEvents', 'Events')}
+                                    </span>
+                                    {candidate.keyEventLabels.map((label) => (
+                                        <span key={label} className="max-w-[10rem] truncate rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700">
+                                            {label}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                            {candidate.source === 'legacy' && candidate.railGraphFallbackReason && (
+                                <div className="mt-2 line-clamp-2 text-[11px] text-amber-700">
+                                    {t('tripEdit.plannerReason', 'Reason: {{reason}}', { reason: candidate.railGraphFallbackReason })}
+                                </div>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const renderRailGraphSnapshotDetail = () => {
+        if (!currentTripDetail || currentTripDetail.kind !== 'rail_graph') return null;
+        const keyEvents = tripDetailKeyEvents(currentTripDetail, 4);
+        return (
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 p-3">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                            <GitMerge size={14} />
+                            {t('tripEdit.snapshotDetailTitle', 'Rail graph run')}
+                        </div>
+                        <div className="mt-1 truncate text-sm font-semibold text-slate-800">
+                            {currentTripDetail.overview.title}
+                        </div>
+                    </div>
+                    <div className="shrink-0 text-right text-[11px] text-slate-500">
+                        <div>{formatKm(currentTripDetail.overview.totalDistanceKm)}</div>
+                        {currentTripDetail.overview.totalTimeMinutes !== undefined && (
+                            <div>{formatMinutes(currentTripDetail.overview.totalTimeMinutes)}</div>
+                        )}
+                    </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
+                    <span className="rounded bg-white px-1.5 py-0.5">
+                        {t('tripEdit.snapshotPersistence', 'Saved as trip snapshot')}
+                    </span>
+                    <span className="rounded bg-white px-1.5 py-0.5">
+                        {t('tripEdit.planUsed', 'Plan')}: {currentTripDetail.overview.planUsed || t('tripEdit.detailUnknown', 'Unknown')}
+                    </span>
+                    {currentTripDetail.overview.presetId && (
+                        <span className="max-w-[12rem] truncate rounded bg-white px-1.5 py-0.5">
+                            {t('tripEdit.presetId', 'Preset')}: {currentTripDetail.overview.presetId}
+                        </span>
+                    )}
+                    <span className="rounded bg-white px-1.5 py-0.5">
+                        {t('tripEdit.userEventCount', '{{count}} user events', { count: currentTripDetail.overview.userEventCount })}
+                    </span>
+                </div>
+                <div className="mt-3 space-y-2">
+                    {currentTripDetail.segments.map((segment) => (
+                        <div key={segment.id} className="rounded-md border border-emerald-100 bg-white px-2 py-2">
+                            <div className="flex min-w-0 items-center gap-2 text-xs">
+                                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: segment.displayColor || '#10b981' }} />
+                                <span className="truncate font-bold text-slate-800">{segment.lineLabel}</span>
+                                <span className="shrink-0 text-slate-400">{directionText(segment.direction)}</span>
+                                {segment.serviceType && <span className="shrink-0 text-slate-400">{segment.serviceType}</span>}
+                            </div>
+                            <div className="mt-1 truncate pl-4 text-[11px] text-slate-600">
+                                {segment.fromName} <span className="text-slate-300">→</span> {segment.toName}
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-1 pl-4 text-[10px] text-slate-500">
+                                <span className="rounded bg-slate-50 px-1.5 py-0.5">
+                                    {t('tripEdit.stopPassSummary', '{{stops}} stops / {{passes}} pass', { stops: segment.stopCount, passes: segment.passCount })}
+                                </span>
+                                <span className="rounded bg-slate-50 px-1.5 py-0.5">
+                                    {t('tripEdit.viaStationCount', '{{count}} via', { count: segment.viaStationCount })}
+                                </span>
+                                {segment.userEventCount > 0 && (
+                                    <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
+                                        {t('tripEdit.userEventCount', '{{count}} user events', { count: segment.userEventCount })}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                {keyEvents.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1">
+                        {keyEvents.map((event) => (
+                            <span key={event.id} className="max-w-[13rem] truncate rounded border border-emerald-100 bg-white px-1.5 py-0.5 text-[10px] text-slate-600">
+                                {eventTypeLabel(event.type)} · {event.label}
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     const openSelector = (targetType: string, index: number | null = null, allowed: string[] | null = null) => {
         setSelectorTarget({ type: targetType, index: index !== null ? index : undefined });
@@ -285,7 +763,7 @@ export const TripEditor: React.FC = () => {
                 }
             }
             newSegs[index] = seg;
-            setForm({ segments: newSegs, railGraph: undefined });
+            setManualSegmentsForm({ segments: newSegs, railGraph: undefined });
         } else if (type === 'autoStart') {
             setAutoForm({ ...autoForm, startLine: lineKey, startStation: stationId || '' });
         } else if (type === 'autoEnd') {
@@ -316,7 +794,7 @@ export const TripEditor: React.FC = () => {
         }
 
         const newSegs = [...currentSegments, { id: Date.now().toString(), lineKey: '', fromId: '', toId: '', loopVia: 'auto' as const }];
-        setForm({ segments: newSegs, railGraph: undefined });
+        setManualSegmentsForm({ segments: newSegs, railGraph: undefined });
 
         // Auto open the line selector for the newly added segment
         openSelector('segment', currentSegments.length, currentAllowed);
@@ -336,12 +814,12 @@ export const TripEditor: React.FC = () => {
             newSegs[idx + 1] = { ...newSegs[idx + 1], lineKey: '', fromId: '', toId: '' };
         }
         newSegs[idx] = seg;
-        setForm({ segments: newSegs, railGraph: undefined });
+        setManualSegmentsForm({ segments: newSegs, railGraph: undefined });
     };
 
     const removeSegment = (idx: number) => {
         if (!form.segments) return;
-        setForm({ segments: form.segments.filter((_, i) => i !== idx), railGraph: undefined });
+        setManualSegmentsForm({ segments: form.segments.filter((_, i) => i !== idx), railGraph: undefined });
     };
 
     return (
@@ -428,6 +906,11 @@ export const TripEditor: React.FC = () => {
                             <button onClick={() => setEditorMode(EditorMode.Manual)} className={`py-1.5 text-sm font-bold rounded-md z-10 transition-colors duration-300 ${editorMode === EditorMode.Manual ? 'text-gray-800' : 'text-gray-500'}`}>{t('tripEdit.manual', '手动输入')}</button>
                             <button onClick={() => setEditorMode(EditorMode.Auto)} className={`py-1.5 text-sm font-bold rounded-md z-10 transition-colors duration-300 ${editorMode === EditorMode.Auto ? 'text-blue-600' : 'text-slate-500'}`}>{t('tripEdit.auto', '自动规划')}</button>
                         </div>
+                        {headerPlannerBadge && (
+                            <div className="mt-2 flex justify-end">
+                                {renderPlannerBadge(headerPlannerBadge, true)}
+                            </div>
+                        )}
                     </div>
 
                     {editorMode === EditorMode.Manual && (
@@ -438,6 +921,8 @@ export const TripEditor: React.FC = () => {
                                 <label className="block text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><span className="font-bold text-gray-600">¥</span> {t('tripEdit.money', '金额 (JPY)')}</label>
                                 <input type="number" className="w-full p-2 border rounded text-sm" placeholder="0" value={form.cost || ''} onChange={e => setForm({ cost: parseInt(e.target.value) || 0 })} />
                             </div>
+
+                            {renderRailGraphSnapshotDetail()}
 
                             <div className="space-y-3">
                                 {form.segments?.map((segment, idx) => {
@@ -511,7 +996,7 @@ export const TripEditor: React.FC = () => {
                                                     if (item.type === 'station') {
                                                         const newSegs = [...form.segments!];
                                                         newSegs[idx] = { ...newSegs[idx], lineKey: item.lineKey, fromId: item.id };
-                                                        setForm({ segments: newSegs, railGraph: undefined });
+                                                        setManualSegmentsForm({ segments: newSegs, railGraph: undefined });
                                                     }
                                                 }}>
                                                     <select className="w-full p-2 border rounded text-xs bg-white" value={segment.fromId} onChange={e => updateSegment(idx, 'fromId', e.target.value)}>
@@ -525,7 +1010,7 @@ export const TripEditor: React.FC = () => {
                                                     onClick={() => {
                                                         const newSegs = [...form.segments!];
                                                         newSegs[idx] = { ...newSegs[idx], fromId: segment.toId, toId: segment.fromId };
-                                                        setForm({ segments: newSegs, railGraph: undefined });
+                                                        setManualSegmentsForm({ segments: newSegs, railGraph: undefined });
                                                     }}
                                                 >
                                                     <ArrowRightLeft size={12} />
@@ -541,7 +1026,7 @@ export const TripEditor: React.FC = () => {
                                                             update.fromId = '';
                                                         }
                                                         newSegs[idx] = update;
-                                                        setForm({ segments: newSegs, railGraph: undefined });
+                                                        setManualSegmentsForm({ segments: newSegs, railGraph: undefined });
                                                     }
                                                 }}>
                                                     <select className="w-full p-2 border rounded bg-white text-xs" value={segment.toId} onChange={e => updateSegment(idx, 'toId', e.target.value)}>
@@ -598,9 +1083,16 @@ export const TripEditor: React.FC = () => {
                     )}
 
                     {editorMode === EditorMode.Auto && (
-                        <div className="p-6 space-y-6 flex-1 transition-opacity duration-300">
+                        <div className="p-6 space-y-6 flex-1 overflow-y-auto transition-opacity duration-300">
                             <div id="auto-planning-form" className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-100 relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-300 via-blue-500 to-blue-300 opacity-50"></div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                                        {t('tripEdit.plannerStatus', 'Planner')}
+                                    </span>
+                                    {renderPlannerBadge(autoPlannerBadge)}
+                                </div>
+                                {renderPlannerSourceStrip()}
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 mb-1">{t('tripEdit.start', '出发地')}</label>
                                     <div className="grid grid-cols-2 gap-2">
@@ -627,6 +1119,7 @@ export const TripEditor: React.FC = () => {
                                 {isRouteSearching ? <Loader2 className="animate-spin" /> : <Search className="group-hover:scale-110 transition-transform duration-300" size={18} />}
                                 {isRouteSearching ? t('tripEdit.planning', '规划中...') : t('tripEdit.searchRoute', '搜索推荐路线')}
                             </button>
+                            {renderRouteCandidates()}
                             <div className="text-xs text-center text-slate-400">{t('tripEdit.autoWarning', '仅支持同一公司或JR集团内的换乘搜索')}</div>
                         </div>
                     )}

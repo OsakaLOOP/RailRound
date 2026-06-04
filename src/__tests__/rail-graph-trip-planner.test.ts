@@ -195,6 +195,85 @@ describe("rail-graph trip planner", () => {
     ]);
     expect(Object.keys(result.trip.segments[1])).not.toContain("resolvedPath");
   });
+
+  it("scores explicit transfer relations without changing fixed topology", () => {
+    const local = fixturePattern();
+    const branch = fixtureBranchPatternFromB();
+    const system = buildSystemContext({
+      baseTopology: fixtureTopologyWithBranch(),
+      servicePatterns: [local, branch],
+      displayStore: {
+        patternDisplay: {
+          [local.patternId]: { displayName: "Local A-C", displayColor: "#2563eb" },
+          [branch.patternId]: { displayName: "Branch B-D", displayColor: "#dc2626" },
+        },
+      },
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const baseRequest = {
+      systemId: "manual:system:test",
+      startStationRef: "manual:station:a" as EntityRef,
+      endStationRef: "manual:station:d" as EntityRef,
+    };
+    const defaultResult = planTrip({ system, request: baseRequest });
+    expect(defaultResult.status).toBe("ok");
+    if (defaultResult.status !== "ok") return;
+    expect(defaultResult.trip.segments[0].toStation.stationRef).toBe("manual:station:b");
+
+    const penalized = planTrip({
+      system,
+      request: {
+        ...baseRequest,
+        transferPolicy: {
+          relations: [{
+            fromPatternRef: local.patternId,
+            toPatternRef: branch.patternId,
+            stationRef: "manual:station:b" as EntityRef,
+            penaltyMeters: 1000,
+            reason: "crowded concourse",
+          }, {
+            fromPatternRef: local.patternId,
+            toPatternRef: branch.patternId,
+            stationRef: "manual:station:c" as EntityRef,
+            walkMinutes: 2,
+            waitMinutes: 3,
+            penaltyMeters: 40,
+            reason: "signed transfer",
+          }],
+        },
+      },
+    });
+    expect(penalized.status).toBe("ok");
+    if (penalized.status !== "ok") return;
+    expect(penalized.trip.segments[0].toStation.stationRef).toBe("manual:station:c");
+    expect(penalized.trip.segments[1].events[0]).toMatchObject({
+      type: "transfer",
+      walkMinutes: 2,
+      waitMinutes: 3,
+      costMeters: 740,
+      reason: "signed transfer",
+    });
+
+    const forbidden = planTrip({
+      system,
+      request: {
+        ...baseRequest,
+        transferPolicy: {
+          relations: [{
+            fromPatternRef: local.patternId,
+            toPatternRef: branch.patternId,
+            stationRef: "manual:station:b" as EntityRef,
+            forbidden: true,
+            reason: "closed passage",
+          }],
+        },
+      },
+    });
+    expect(forbidden.status).toBe("ok");
+    if (forbidden.status !== "ok") return;
+    expect(forbidden.trip.segments[0].toStation.stationRef).toBe("manual:station:c");
+  });
 });
 
 function fixtureDeployment(): {
@@ -494,6 +573,74 @@ function fixtureBranchPattern(): ServicePattern {
     pathSegments: [
       {
         orderIndex: 0,
+        edgeRef: "manual:edge:e3" as EntityRef,
+        fromNodeRef: "manual:node:c" as EntityRef,
+        toNodeRef: "manual:node:d" as EntityRef,
+        measureRange: { startMeasure: 0, endMeasure: 1 },
+        distanceMeters: 400,
+        geometryRef: "manual:edge:e3" as EntityRef,
+      },
+    ],
+  };
+}
+
+function fixtureBranchPatternFromB(): ServicePattern {
+  return {
+    patternId: "manual:pattern:branch-from-b" as EntityRef,
+    lineRef: "manual:line:branch" as EntityRef,
+    systemRef: "manual:system:test" as EntityRef,
+    serviceType: "local",
+    topologyType: "linear",
+    directionConvention: {
+      forwardLabel: "down",
+      reverseLabel: "up",
+      forwardDirection: "down",
+      reverseDirection: "up",
+    },
+    edgeSequence: ["manual:edge:e2" as EntityRef, "manual:edge:e3" as EntityRef],
+    traceSequence: [
+      {
+        orderIndex: 0,
+        passageType: "pass",
+        stopType: "pass_through",
+        stationRef: "manual:station:b" as EntityRef,
+        platformRef: "manual:platform:b" as EntityRef,
+        edgeRef: "manual:edge:e2" as EntityRef,
+        measureRange: { startMeasure: 0, endMeasure: 0 },
+      },
+      {
+        orderIndex: 1,
+        passageType: "stop",
+        stopType: "mandatory_stop",
+        stationRef: "manual:station:c" as EntityRef,
+        platformRef: "manual:platform:c" as EntityRef,
+        edgeRef: "manual:edge:e3" as EntityRef,
+        stoppingPointRef: "manual:stop:c" as EntityRef,
+        measure: 0,
+      },
+      {
+        orderIndex: 2,
+        passageType: "stop",
+        stopType: "mandatory_stop",
+        stationRef: "manual:station:d" as EntityRef,
+        platformRef: "manual:platform:d" as EntityRef,
+        edgeRef: "manual:edge:e3" as EntityRef,
+        stoppingPointRef: "manual:stop:d" as EntityRef,
+        measure: 1,
+      },
+    ],
+    pathSegments: [
+      {
+        orderIndex: 0,
+        edgeRef: "manual:edge:e2" as EntityRef,
+        fromNodeRef: "manual:node:b" as EntityRef,
+        toNodeRef: "manual:node:c" as EntityRef,
+        measureRange: { startMeasure: 0, endMeasure: 1 },
+        distanceMeters: 200,
+        geometryRef: "manual:edge:e2" as EntityRef,
+      },
+      {
+        orderIndex: 1,
         edgeRef: "manual:edge:e3" as EntityRef,
         fromNodeRef: "manual:node:c" as EntityRef,
         toNodeRef: "manual:node:d" as EntityRef,

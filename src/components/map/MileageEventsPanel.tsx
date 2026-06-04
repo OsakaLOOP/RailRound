@@ -128,6 +128,21 @@ export const MileageEventsPanel: React.FC = () => {
     () => mileageUserEvents.find((event) => event.id === selectedEventId) ?? null,
     [mileageUserEvents, selectedEventId],
   );
+  const sourceCounts = useMemo(() => {
+    let railGraph = 0;
+    let legacy = 0;
+    mileageUserEvents.forEach((event) => {
+      const contextSource = event.payload?.contextSource;
+      if (contextSource === "rail_graph_runtime" || String(event.payload?.lineKey ?? "").startsWith("rail-graph:")) {
+        railGraph += 1;
+      } else {
+        legacy += 1;
+      }
+    });
+    return { railGraph, legacy };
+  }, [mileageUserEvents]);
+  const currentAxisLabel = effectiveLineKey ? lineLabel(effectiveLineKey) : t("mileageEvents.noLineLoaded", "No line loaded");
+  const currentAxisEventCount = lineEntries.length;
 
   const selectEvent = (eventId: string) => {
     setSelectedEventId(eventId);
@@ -241,6 +256,25 @@ export const MileageEventsPanel: React.FC = () => {
           <div className="mt-1 truncate text-xs text-slate-500">
             {t("mileageEvents.panelSubtitle", "Search, project and edit events on the mileage axis")}
           </div>
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold">
+            <span className="rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
+              {t("mileageEvents.sourceCountRailGraph", "Rail graph {{count}}", { count: sourceCounts.railGraph })}
+            </span>
+            <span className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-slate-500">
+              {t("mileageEvents.sourceCountLegacy", "GeoJSON {{count}}", { count: sourceCounts.legacy })}
+            </span>
+          </div>
+          <div className="mt-2 rounded-md border border-slate-200 bg-white/80 px-2 py-1.5 text-[11px] text-slate-600">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <span className="truncate font-semibold">{currentAxisLabel}</span>
+              <span className="shrink-0 text-slate-400">
+                {t("mileageEvents.axisEventCount", "{{count}} on axis", { count: currentAxisEventCount })}
+              </span>
+            </div>
+            <div className="mt-0.5 line-clamp-2 text-[10px] text-slate-400">
+              {t("mileageEvents.axisSourceHint", "Rail-graph trip events project from saved run snapshots; GeoJSON events remain on app-line mileage axes.")}
+            </div>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -305,6 +339,10 @@ export const MileageEventsPanel: React.FC = () => {
               onClose={() => setSelectedEventId(null)}
               onDeleted={() => setSelectedEventId(null)}
             />
+          ) : lineKeys.length === 0 ? (
+            <div className="rl-card-muted p-3 text-xs text-slate-500">
+              {t("mileageEvents.noLineData", "Load GeoJSON line data before creating mileage events. Saved rail-graph trip events will appear when their snapshot can be projected.")}
+            </div>
           ) : (
             <>
               {mode !== "create" && (

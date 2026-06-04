@@ -1,12 +1,17 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { BaseTopologyLayer, TopologyEdge } from "../rail-graph-v1/base-topology.types";
 import type { EntityRef } from "../rail-graph-v1/primitives";
 import type { ServicePattern } from "../rail-graph-v1/service-template.types";
 import type { RailwayMap, RailGraphRuntimeState } from "../store";
+import { useStore } from "../store";
+import { parseGeoJsonBatch } from "../core/parser";
 import { buildAdjacency } from "../rail-graph-v1/topology";
 import { buildDeployedSystem, buildSystemContext } from "../rail-graph-v1/types";
-import { parseRailGraphDeploymentBundle } from "../services/railGraphDeploymentLoader";
-import { planAppRoute } from "../utils/appRoutePlanner";
+import { loadDefaultRailGraphDeployment, parseRailGraphDeploymentBundle } from "../services/railGraphDeploymentLoader";
+import { planAppRoute, planAppRouteCandidates } from "../utils/appRoutePlanner";
+import { tripResultToLegacyTrip } from "../utils/railGraphTripAdapter";
 
 describe("rail-graph app route planner facade", () => {
   it("uses rail-graph runtime before legacy routing when the result is app-consumable", () => {
@@ -31,6 +36,37 @@ describe("rail-graph app route planner facade", () => {
     });
   });
 
+  it("returns app-consumable rail-graph route candidates for TripEditor selection", () => {
+    const runtime = fixtureRuntime();
+    const result = planAppRouteCandidates({
+      startLineKey: "manual:line:test",
+      startStationId: "manual:station:a",
+      endLineKey: "manual:line:test",
+      endStationId: "manual:station:c",
+      railwayData: fixtureRailwayData(),
+      railGraphRuntime: runtime,
+    });
+
+    expect(result.status).toBe("ok");
+    expect(result.source).toBe("rail_graph");
+    if (result.status !== "ok") return;
+    expect(result.candidates.length).toBeGreaterThan(0);
+    expect(result.best.source).toBe("rail_graph");
+    if (result.best.source !== "rail_graph") return;
+    expect(result.best).toMatchObject({
+      candidateKind: expect.stringMatching(/preset|pattern|auto/),
+      patternRef: "manual:pattern:local",
+      direction: "down",
+      serviceType: "local",
+      viaStationCount: 1,
+    });
+    expect(result.best.segments[0]).toMatchObject({
+      lineKey: "manual:line:test",
+      fromId: "manual:station:a",
+      toId: "manual:station:c",
+    });
+  });
+
   it("falls back to legacy routing when no rail-graph runtime is loaded", () => {
     const result = planAppRoute({
       startLineKey: "manual:line:test",
@@ -47,6 +83,24 @@ describe("rail-graph app route planner facade", () => {
       lineKey: "manual:line:test",
       fromId: "manual:station:a",
       toId: "manual:station:c",
+    });
+  });
+
+  it("returns a legacy candidate when rail-graph runtime is absent", () => {
+    const result = planAppRouteCandidates({
+      startLineKey: "manual:line:test",
+      startStationId: "manual:station:a",
+      endLineKey: "manual:line:test",
+      endStationId: "manual:station:c",
+      railwayData: fixtureRailwayData(),
+    });
+
+    expect(result.status).toBe("ok");
+    expect(result.source).toBe("legacy");
+    if (result.status !== "ok") return;
+    expect(result.best).toMatchObject({
+      source: "legacy",
+      candidateKind: "legacy",
     });
   });
 
@@ -89,7 +143,93 @@ describe("rail-graph app route planner facade", () => {
     });
     expect(invalid).toBeNull();
   });
+
+  it("loads the default bundle and plans against current GeoJSON railwayData through rail-graph", async () => {
+    const bundle = readJson(path.resolve("public", "rail-graph", "deployed-system.json"));
+    const loaded = await loadDefaultRailGraphDeployment({
+      url: "/rail-graph/deployed-system.json",
+      now: () => "2026-06-04T00:00:00.000Z",
+      fetchImpl: (async () => new Response(JSON.stringify(bundle), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })) as typeof fetch,
+    });
+    expect(loaded.status).toBe("loaded");
+    if (loaded.status !== "loaded") return;
+
+    const preset = loaded.runtime.deployed.generatedPresets[0];
+    expect(preset).toBeTruthy();
+    const template = loaded.runtime.deployed.templates.find((candidate) => candidate.patternRef === preset.patternRef);
+    expect(template).toBeTruthy();
+    if (!preset || !template) return;
+
+    const railwayData = loadWillerRailwayData();
+    const result = planAppRoute({
+      startLineKey: String(template.lineRef),
+      startStationId: String(preset.startStation),
+      endLineKey: String(template.lineRef),
+      endStationId: String(preset.endStation),
+      railwayData,
+      railGraphRuntime: loaded.runtime,
+    });
+
+    expect(result.status).toBe("ok");
+    expect(result.source).toBe("rail_graph");
+    if (result.status !== "ok" || result.source !== "rail_graph") return;
+    expect(result.trip.tripResult.segments.length).toBeGreaterThan(0);
+    expect(result.trip.tripResult.totalDistanceKm).toBeGreaterThan(0);
+    expect(result.trip.segments[0].geometry.length).toBeGreaterThan(1);
+
+    const savedTrip = tripResultToLegacyTrip(result.trip.tripResult);
+    expect(savedTrip.railGraph?.tripResult.routeFingerprint).toBe(result.trip.tripResult.routeFingerprint);
+    expect(savedTrip.railGraph?.runtimeArtifacts).toBeUndefined();
+  });
+
+  it("tracks runtime load status and fallback reason separately from legacy routing", () => {
+    const initialState = useStore.getState();
+    useStore.setState(initialState, true);
+    const runtime = fixtureRuntime();
+
+    useStore.getState().setRailGraphLoadState({
+      status: "loading",
+      reason: "loading default deployment",
+    });
+    expect(useStore.getState().railGraphLoadState).toMatchObject({
+      status: "loading",
+      reason: "loading default deployment",
+    });
+
+    useStore.getState().setRailGraphRuntime(runtime);
+    expect(useStore.getState().railGraphLoadState).toMatchObject({
+      status: "loaded",
+      loadedAt: runtime.loadedAt,
+    });
+
+    useStore.getState().setRailGraphLoadState({
+      status: "invalid",
+      reason: "bad deployment bundle",
+      fallbackReason: "bad deployment bundle",
+    });
+    expect(useStore.getState().railGraphRuntime).toBe(runtime);
+    expect(useStore.getState().railGraphLoadState).toMatchObject({
+      status: "invalid",
+      fallbackReason: "bad deployment bundle",
+    });
+
+    useStore.getState().clearRailGraphRuntime();
+    expect(useStore.getState().railGraphRuntime).toBeNull();
+    expect(useStore.getState().railGraphLoadState.status).toBe("idle");
+  });
 });
+
+function loadWillerRailwayData(): RailwayMap {
+  const source = readJson(path.resolve("public", "geojson", "WILLER TRAINS.geojson"));
+  return parseGeoJsonBatch([{ json: source, company: "WILLER TRAINS" }]).railwayUpdates;
+}
+
+function readJson(filePath: string): unknown {
+  return JSON.parse(fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
+}
 
 function fixtureRuntime(): RailGraphRuntimeState {
   const system = buildSystemContext({

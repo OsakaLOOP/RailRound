@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAppNavigation } from '../hooks/useAppNavigation';
-import { Github, Folder, TrendingUp, Move, MapPin, Map as MapIcon, Globe, MessageSquare, Shield, AlertTriangle, CheckCircle2, MapPinned, Tags } from 'lucide-react';
+import { Github, Folder, TrendingUp, Move, MapPin, Map as MapIcon, Globe, MessageSquare, Shield, AlertTriangle, CheckCircle2, MapPinned, Tags, TrainFront, Route, GitMerge } from 'lucide-react';
 import { useStore } from '../store';
 import { calcDist } from '../core/tripCalculator';
 import * as turf from '@turf/turf';
@@ -13,6 +13,7 @@ import { buildAppPathForLanguage, normalizeAppLang } from '../utils/routes';
 import { mileageEventStats, lineLabel } from '../utils/mileageUserEvents';
 import { tripToProductSegments } from '../utils/tripProductProjection';
 import { eventKindLabel, eventVisibilityLabel } from '../components/mileage-events/display';
+import { buildTripDetailModel } from '../utils/railGraphTripDetailModel';
 
 const CITIES = {
     China: [ // Translations are handled below in rendering
@@ -137,9 +138,49 @@ export const StatsPage: React.FC = () => {
     }, [railwayData]);
 
     const eventStats = useMemo(
-        () => mileageEventStats(mileageUserEvents, railwayData),
-        [mileageUserEvents, railwayData],
+        () => mileageEventStats(mileageUserEvents, railwayData, trips),
+        [mileageUserEvents, railwayData, trips],
     );
+
+    const railGraphRunStats = useMemo(() => {
+        const serviceTypes = new Map<string, number>();
+        const directions = new Map<string, number>();
+        const patterns = new Map<string, number>();
+        let railGraphTrips = 0;
+        let legacyTrips = 0;
+        let userEventsOnRailGraph = 0;
+        let railGraphSegments = 0;
+
+        trips.forEach((trip) => {
+            const detail = buildTripDetailModel({ trip, railwayData, userEvents: mileageUserEvents });
+            if (detail.kind !== 'rail_graph') {
+                legacyTrips += 1;
+                return;
+            }
+            railGraphTrips += 1;
+            userEventsOnRailGraph += detail.overview.userEventCount;
+            railGraphSegments += detail.segments.length;
+            detail.segments.forEach((segment) => {
+                const serviceType = segment.serviceType || t('statsPage.railGraph.unknownService', 'Unknown service');
+                const direction = segment.direction || t('statsPage.railGraph.unknownDirection', 'Unknown direction');
+                const pattern = segment.patternRef ? String(segment.patternRef) : t('statsPage.railGraph.unknownPattern', 'Unknown pattern');
+                serviceTypes.set(serviceType, (serviceTypes.get(serviceType) ?? 0) + 1);
+                directions.set(direction, (directions.get(direction) ?? 0) + 1);
+                patterns.set(pattern, (patterns.get(pattern) ?? 0) + 1);
+            });
+        });
+
+        const top = (map: Map<string, number>) => Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        return {
+            railGraphTrips,
+            legacyTrips,
+            userEventsOnRailGraph,
+            railGraphSegments,
+            serviceTypes: top(serviceTypes),
+            directions: top(directions),
+            patterns: top(patterns),
+        };
+    }, [mileageUserEvents, railwayData, trips, t]);
 
     const qualityIssueCount = eventStats.quality.missingTitle
         + eventStats.quality.missingTags
@@ -197,6 +238,55 @@ export const StatsPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-102 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">{t('statsPage.totalTrips', '记录数')}</div><div className="text-3xl font-bold text-gray-800">{totalTrips}</div></div>
                 <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-102 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">{t('statsPage.uniqueLines', '制霸路线')}</div><div className="text-3xl font-bold text-indigo-600">{uniqueLines}</div></div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div className="p-3 border-b bg-slate-50 flex items-center justify-between gap-2">
+                    <div className="font-bold text-sm text-slate-700 flex items-center gap-2">
+                        <TrainFront size={16} className="text-emerald-600" />
+                        {t('statsPage.railGraph.title', 'Rail graph runs in records')}
+                    </div>
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded">
+                        {railGraphRunStats.railGraphTrips}/{totalTrips}
+                    </span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 p-3">
+                    <div className="rounded-lg bg-emerald-50 p-3">
+                        <div className="text-[11px] text-emerald-700 mb-1">{t('statsPage.railGraph.savedSnapshots', 'Saved snapshots')}</div>
+                        <div className="text-2xl font-bold text-emerald-800">{railGraphRunStats.railGraphTrips}</div>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-3">
+                        <div className="text-[11px] text-slate-400 mb-1">{t('statsPage.railGraph.legacyTrips', 'Legacy GeoJSON')}</div>
+                        <div className="text-2xl font-bold text-slate-800">{railGraphRunStats.legacyTrips}</div>
+                    </div>
+                    <div className="rounded-lg bg-sky-50 p-3">
+                        <div className="text-[11px] text-sky-700 mb-1">{t('statsPage.railGraph.eventsOnSnapshots', 'User events')}</div>
+                        <div className="text-2xl font-bold text-sky-800">{railGraphRunStats.userEventsOnRailGraph}</div>
+                    </div>
+                </div>
+                {railGraphRunStats.railGraphTrips === 0 ? (
+                    <div className="px-3 pb-3 text-xs text-slate-500">
+                        {t('statsPage.railGraph.noRailGraphTrips', 'No saved rail-graph snapshots yet. Legacy GeoJSON trips remain fully supported.')}
+                    </div>
+                ) : (
+                    <div className="grid gap-3 border-t border-slate-100 p-3 md:grid-cols-3">
+                        <RailGraphStatsList
+                            icon={<Route size={14} />}
+                            title={t('statsPage.railGraph.patterns', 'Patterns')}
+                            rows={railGraphRunStats.patterns}
+                        />
+                        <RailGraphStatsList
+                            icon={<GitMerge size={14} />}
+                            title={t('statsPage.railGraph.directions', 'Directions')}
+                            rows={railGraphRunStats.directions}
+                        />
+                        <RailGraphStatsList
+                            icon={<TrainFront size={14} />}
+                            title={t('statsPage.railGraph.serviceTypes', 'Service types')}
+                            rows={railGraphRunStats.serviceTypes}
+                        />
+                    </div>
+                )}
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -435,3 +525,26 @@ export const StatsPage: React.FC = () => {
         </div>
     );
 };
+
+const RailGraphStatsList: React.FC<{
+    icon: React.ReactNode;
+    title: string;
+    rows: Array<[string, number]>;
+}> = ({ icon, title, rows }) => (
+    <div className="rounded-lg border border-slate-100 p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-500">
+            {icon}
+            {title}
+        </div>
+        <div className="space-y-1">
+            {rows.length > 0 ? rows.map(([label, count]) => (
+                <div key={label} className="flex items-center justify-between gap-3 text-xs text-slate-600">
+                    <span className="truncate">{label}</span>
+                    <span className="font-bold text-slate-400">{count}</span>
+                </div>
+            )) : (
+                <span className="text-xs text-slate-400">-</span>
+            )}
+        </div>
+    </div>
+);

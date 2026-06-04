@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { X, Copy, Download, CheckCircle2, Loader2 } from "lucide-react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { X, Copy, Download, CheckCircle2, Loader2, GitMerge, Route, Clock, MapPinned } from "lucide-react";
 import { useStore } from "../../store";
 import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
@@ -8,17 +8,19 @@ import { generateRouteMdx } from "../../utils/codeGenerator";
 import type { RouteSliceData } from "../../utils/routeExportTypes";
 import { RouteSlicePreview } from "@blog-src/components/mdx/RouteSlicePreviewStatic";
 import { tripToProductRouteSegments, tripToRouteSliceData } from "../../utils/tripProductProjection";
+import { buildTripDetailModel, tripDetailKeyEvents } from "../../utils/railGraphTripDetailModel";
 
 const LOCALES = ["en", "ja", "zh-cn", "zh-tw"] as const;
 const HEIGHTS = ["300px", "400px", "500px", "600px"] as const;
 
 export const ExportRouteModal: React.FC = () => {
-  const { isOpen, trip, railwayData, geoData } = useStore(
+  const { isOpen, trip, railwayData, geoData, mileageUserEvents } = useStore(
     useShallow((state) => ({
       isOpen: state.modals.exportRouteModalOpen,
       trip: state.modals.currentTripForExport,
       railwayData: state.railwayData,
       geoData: state.geoData,
+      mileageUserEvents: state.mileageUserEvents,
     })),
   );
   const setModalState = useStore((state) => state.setModalState);
@@ -34,6 +36,11 @@ export const ExportRouteModal: React.FC = () => {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [routeMode, setRouteMode] = useState<"manual" | "auto">("manual");
   const [copied, setCopied] = useState(false);
+  const tripDetail = useMemo(() => {
+    if (!trip) return null;
+    return buildTripDetailModel({ trip, railwayData, userEvents: mileageUserEvents });
+  }, [trip, railwayData, mileageUserEvents]);
+  const isRailGraphExport = tripDetail?.kind === "rail_graph";
 
   const onClose = useCallback(() => {
     setModalState({ exportRouteModalOpen: false, currentTripForExport: null });
@@ -59,6 +66,10 @@ export const ExportRouteModal: React.FC = () => {
 
   useEffect(() => {
     if (!isOpen || !trip) return;
+    if (trip.railGraph?.tripResult) {
+      setRouteMode("manual");
+      return;
+    }
     const hasSegments = tripToProductRouteSegments(trip, railwayData).length > 0;
     setRouteMode(hasSegments ? "manual" : "auto");
   }, [isOpen, trip, railwayData]);
@@ -83,6 +94,13 @@ export const ExportRouteModal: React.FC = () => {
         if (segments.length === 0) throw new Error("No segments found in this trip");
         const firstSegment = segments[0];
         const lastSegment = segments[segments.length - 1];
+        const startLineKey = firstSegment.lineKey;
+        const startStationId = firstSegment.fromId;
+        const endLineKey = lastSegment.lineKey;
+        const endStationId = lastSegment.toId;
+        if (!startLineKey || !startStationId || !endLineKey || !endStationId) {
+          throw new Error("No segments found in this trip");
+        }
 
         const result =
           routeMode === "manual"
@@ -99,10 +117,10 @@ export const ExportRouteModal: React.FC = () => {
               })
             : await computeAndSerializeRoute({
                 mode: "auto",
-                startLineKey: firstSegment.lineKey,
-                startStationId: firstSegment.fromId,
-                endLineKey: lastSegment.lineKey,
-                endStationId: lastSegment.toId,
+                startLineKey,
+                startStationId,
+                endLineKey,
+                endStationId,
                 railwayData,
                 geoData,
               });
@@ -152,6 +170,87 @@ export const ExportRouteModal: React.FC = () => {
     return "English";
   };
 
+  const directionLabel = (direction?: string) => {
+    if (!direction) return t("exportRoute.unknown", "Unknown");
+    if (direction === "up") return t("exportRoute.direction.up", "Up");
+    if (direction === "down") return t("exportRoute.direction.down", "Down");
+    if (direction === "clockwise") return t("exportRoute.direction.clockwise", "Clockwise");
+    if (direction === "counterclockwise") return t("exportRoute.direction.counterclockwise", "Counterclockwise");
+    return direction;
+  };
+
+  const renderSourceSummary = () => {
+    if (!tripDetail) return null;
+    if (tripDetail.kind === "rail_graph") {
+      const firstSegment = tripDetail.segments[0];
+      const keyEvents = tripDetailKeyEvents(tripDetail, 3);
+      return (
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                <GitMerge size={14} />
+                {t("exportRoute.railGraphSource", "Rail graph snapshot")}
+              </div>
+              <div className="mt-1 truncate text-sm font-semibold text-slate-800">
+                {tripDetail.overview.title}
+              </div>
+            </div>
+            <div className="shrink-0 text-right text-[11px] text-slate-500">
+              <div>{t("exportRoute.km", "{{value}} km", { value: tripDetail.overview.totalDistanceKm.toFixed(1) })}</div>
+              {tripDetail.overview.totalTimeMinutes !== undefined && (
+                <div>{t("exportRoute.minutes", "{{count}} min", { count: tripDetail.overview.totalTimeMinutes })}</div>
+              )}
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
+            {firstSegment?.serviceType && (
+              <span className="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5">
+                <Route size={12} />
+                {firstSegment.serviceType}
+              </span>
+            )}
+            {firstSegment?.direction && (
+              <span className="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5">
+                <GitMerge size={12} />
+                {directionLabel(firstSegment.direction)}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5">
+              <MapPinned size={12} />
+              {t("exportRoute.geoSourceRailGraph", "Saved geometry")}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5">
+              <Clock size={12} />
+              {t("exportRoute.userEvents", "{{count}} user events", { count: tripDetail.overview.userEventCount })}
+            </span>
+          </div>
+          {keyEvents.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {keyEvents.map((event) => (
+                <span key={event.id} className="max-w-[13rem] truncate rounded border border-emerald-100 bg-white px-1.5 py-0.5 text-[10px] text-slate-600">
+                  {event.label}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+          <Route size={14} />
+          {t("exportRoute.legacySource", "Legacy GeoJSON route")}
+        </div>
+        <div className="mt-1 text-[11px] text-slate-500">
+          {t("exportRoute.legacySourceDesc", "The preview is computed from current GeoJSON line data.")}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto mx-4 flex flex-col">
@@ -168,6 +267,8 @@ export const ExportRouteModal: React.FC = () => {
         </div>
 
         <div className="p-6 space-y-5">
+          {renderSourceSummary()}
+
           {loading && (
             <div className="flex items-center justify-center py-12 text-slate-500 gap-2">
               <Loader2 size={20} className="animate-spin" />
@@ -206,18 +307,24 @@ export const ExportRouteModal: React.FC = () => {
                 <label className="text-[10px] text-slate-500 mb-1 block">
                   {t("exportRoute.pathMode", "Path Mode")}
                 </label>
-                <select
-                  value={routeMode}
-                  onChange={(e) => setRouteMode(e.target.value as "manual" | "auto")}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                >
-                  <option value="manual">
-                    {t("exportRoute.pathModeManual", "Manual (Exact Segments)")}
-                  </option>
-                  <option value="auto">
-                    {t("exportRoute.pathModeAuto", "Auto Search")}
-                  </option>
-                </select>
+                {isRailGraphExport ? (
+                  <div className="w-full rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700">
+                    {t("exportRoute.pathModeRailGraph", "Saved rail graph")}
+                  </div>
+                ) : (
+                  <select
+                    value={routeMode}
+                    onChange={(e) => setRouteMode(e.target.value as "manual" | "auto")}
+                    className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  >
+                    <option value="manual">
+                      {t("exportRoute.pathModeManual", "Manual (Exact Segments)")}
+                    </option>
+                    <option value="auto">
+                      {t("exportRoute.pathModeAuto", "Auto Search")}
+                    </option>
+                  </select>
+                )}
               </div>
 
               <div>

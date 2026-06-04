@@ -3,6 +3,7 @@ import {
     CalendarDays,
     Building2,
     Clock,
+    GitMerge,
     ListFilter,
     Map as MapIcon,
     MapPin,
@@ -17,7 +18,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
 import { LineLogo } from '../LineLogo';
 import {
-    boundMileageEventsForDisplay,
+    boundMileageEventsForRichDisplay,
     lineLabel,
     searchMileageEvents,
 } from '../../utils/mileageUserEvents';
@@ -25,10 +26,13 @@ import {
     eventKindLabel,
     eventLineLabel,
     eventMileageLabel,
+    eventSourceLabel,
+    eventSourceTone,
     eventStationLabel,
     timestampLabel,
 } from '../mileage-events/display';
 import { tripSearchText, tripToProductSegments } from '../../utils/tripProductProjection';
+import { buildTripDetailModel } from '../../utils/railGraphTripDetailModel';
 
 interface Props {
     isOpen: boolean;
@@ -128,9 +132,10 @@ export const GlobalSearchModal: React.FC<Props> = ({
             })
             .slice(0, 50);
 
-        const matchedEventEntries = boundMileageEventsForDisplay(
+        const matchedEventEntries = boundMileageEventsForRichDisplay(
             searchMileageEvents(mileageUserEvents, railwayData, { query: normalizedQuery }),
             railwayData,
+            trips,
         ).slice(0, 50);
 
         const tagCounts = new Map<string, number>();
@@ -245,6 +250,9 @@ export const GlobalSearchModal: React.FC<Props> = ({
                                                                 {eventLineLabel(bound, lineContext)}
                                                             </span>
                                                         )}
+                                                        <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${eventSourceTone(lineContext)}`}>
+                                                            {eventSourceLabel(lineContext, t)}
+                                                        </span>
                                                         <span className="inline-flex items-center gap-1">
                                                             <Clock size={11} />
                                                             {timestampLabel(bound.timestampInference, bound.timestamp, t)}
@@ -267,6 +275,8 @@ export const GlobalSearchModal: React.FC<Props> = ({
                                         {results.trips.map((trip) => {
                                             const segments = tripToProductSegments(trip, railwayData);
                                             const firstSegment = segments[0];
+                                            const detail = buildTripDetailModel({ trip, railwayData, userEvents: mileageUserEvents });
+                                            const firstDetailSegment = detail.segments[0];
                                             const from = firstSegment?.fromName || firstSegment?.fromId || '';
                                             const to = firstSegment?.toName || firstSegment?.toId || '';
                                             return (
@@ -284,11 +294,37 @@ export const GlobalSearchModal: React.FC<Props> = ({
                                                         <CalendarDays size={12} className="text-sky-600" />
                                                     </div>
                                                     <div className="min-w-0 flex-1">
-                                                        <div className="font-bold text-gray-800">{trip.date}</div>
+                                                        <div className="flex min-w-0 items-center gap-2">
+                                                            <div className="font-bold text-gray-800">{trip.date}</div>
+                                                            {detail.kind === 'rail_graph' && (
+                                                                <span className="inline-flex shrink-0 items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                                                    <GitMerge size={10} />
+                                                                    {firstDetailSegment?.serviceType || t('search.railGraphTrip', 'Rail graph')}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <div className="text-xs text-gray-500 truncate">
                                                             {(firstSegment?.lineLabel || lineLabel(firstSegment?.lineKey || ''))} {from && to ? `${from} → ${to}` : String(trip.id)}
                                                             {segments.length > 1 ? ` +${segments.length - 1}` : ''}
                                                         </div>
+                                                        {detail.kind === 'rail_graph' && (
+                                                            <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-gray-500">
+                                                                <span className="rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-700">
+                                                                    {t('search.railGraphSnapshot', 'Saved snapshot')}
+                                                                </span>
+                                                                {firstDetailSegment?.direction && (
+                                                                    <span className="rounded bg-slate-100 px-1.5 py-0.5">
+                                                                        {firstDetailSegment.direction}
+                                                                    </span>
+                                                                )}
+                                                                <span className="rounded bg-slate-100 px-1.5 py-0.5">
+                                                                    {t('search.km', '{{value}} km', { value: detail.overview.totalDistanceKm.toFixed(1) })}
+                                                                </span>
+                                                                <span className="rounded bg-slate-100 px-1.5 py-0.5">
+                                                                    {t('search.userEvents', '{{count}} user events', { count: detail.overview.userEventCount })}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </button>
                                             );

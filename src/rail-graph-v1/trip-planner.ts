@@ -8,6 +8,7 @@ import type { RunContext, SystemContext } from "./graph.types";
 import type { EntityRef } from "./primitives";
 import type { RunSpec } from "./runtime.types";
 import type { ServicePattern, ServiceTraceEntry } from "./service-template.types";
+import type { TransferScore, TransferScoringPolicy } from "./transfer-scorer";
 import type {
   StationMeta,
   StationStop,
@@ -20,8 +21,11 @@ import type {
 } from "./user-facing.types";
 import { fingerprint } from "./fingerprint";
 import { resolveRunContext } from "./run-resolver";
-
-const TRANSFER_COST_METERS = 300;
+import {
+  mergeTransferScoringPolicies,
+  scoreTransfer,
+  transferPolicyFromTopologyRelations,
+} from "./transfer-scorer";
 
 export interface PlanTripArgs {
   system: SystemContext;
@@ -30,6 +34,7 @@ export interface PlanTripArgs {
 }
 
 export function planTrip(args: PlanTripArgs): PlanTripResult {
+  const transferPolicy = transferPolicyForPlan(args);
   const preset = args.request.presetId
     ? args.deployed?.generatedPresets.find((item) => item.presetId === args.request.presetId)
     : undefined;
@@ -42,8 +47,8 @@ export function planTrip(args: PlanTripArgs): PlanTripResult {
   }
 
   const plan = preset
-    ? { specs: [preset.runSpec], planUsed: "preset" as const, preset, transferStations: [] }
-    : resolvePlanFromRequest(args.system, args.request, args.deployed?.generatedPresets ?? []);
+    ? { specs: [preset.runSpec], planUsed: "preset" as const, preset, transfers: [] }
+    : resolvePlanFromRequest(args.system, args.request, args.deployed?.generatedPresets ?? [], transferPolicy);
   if ("error" in plan) return plan.error;
 
   const contexts = plan.specs.map((spec) => resolveRunContext({
@@ -64,7 +69,7 @@ export function planTrip(args: PlanTripArgs): PlanTripResult {
     contexts,
     preset: plan.preset,
     planUsed: plan.planUsed,
-    transferStations: plan.transferStations,
+    transfers: plan.transfers,
   });
 
   return {
@@ -85,7 +90,7 @@ export function buildTripResult(args: {
     contexts: [args.context],
     preset: args.preset,
     planUsed: args.planUsed,
-    transferStations: [],
+    transfers: [],
   });
 }
 
@@ -94,7 +99,7 @@ function buildTripResultFromContexts(args: {
   contexts: readonly RunContext[];
   preset?: PathPreset;
   planUsed: TripResult["planUsed"];
-  transferStations: readonly EntityRef[];
+  transfers: readonly TransferScore[];
 }): { trip: TripResult; runtimeArtifacts: TripRuntimeArtifacts } {
   if (args.contexts.length === 0) {
     throw new Error("Cannot build TripResult without at least one resolved run context.");
@@ -119,7 +124,7 @@ function buildTripResultFromContexts(args: {
     index === 0 ? result.segment : withTransferEvent({
       segment: result.segment,
       previous: segmentResults[index - 1].segment,
-      transferStationRef: args.transferStations[index - 1],
+      transfer: args.transfers[index - 1],
     })
   );
   const runtimeSegments = segmentResults.map((result) => result.runtimeArtifacts);
@@ -165,14 +170,23 @@ function buildTripResultFromContexts(args: {
   };
 }
 
+function transferPolicyForPlan(args: PlanTripArgs): TransferScoringPolicy | undefined {
+  return mergeTransferScoringPolicies(
+    args.deployed?.transferPolicy,
+    transferPolicyFromTopologyRelations(args.deployed?.relations ?? args.system.graph.topo.base.relations),
+    args.request.transferPolicy,
+  );
+}
+
 function resolvePlanFromRequest(
   system: SystemContext,
   request: TripPlanRequest,
   suggestions: readonly PathPreset[],
+  transferPolicy?: TransferScoringPolicy,
 ): {
   specs: RunSpec[];
   planUsed: "auto";
-  transferStations: EntityRef[];
+  transfers: TransferScore[];
   preset?: undefined;
 } | {
   error: Exclude<PlanTripResult, { status: "ok" }>;
@@ -186,7 +200,7 @@ function resolvePlanFromRequest(
       || left.patternId.localeCompare(right.patternId));
   const pattern = candidates[0];
   if (!pattern) {
-    const crossPattern = resolveCrossPatternPlan(system, request);
+    const crossPattern = resolveCrossPatternPlan(system, request, transferPolicy);
     if (crossPattern) return crossPattern;
     return unreachable("No deployed service pattern covers the requested station pair.", suggestions);
   }
@@ -200,17 +214,18 @@ function resolvePlanFromRequest(
       directionHint: directionPreferenceToHint(request.directionPreference),
     }],
     planUsed: "auto",
-    transferStations: [],
+    transfers: [],
   };
 }
 
 function resolveCrossPatternPlan(
   system: SystemContext,
   request: TripPlanRequest,
+  transferPolicy?: TransferScoringPolicy,
 ): {
   specs: RunSpec[];
   planUsed: "auto";
-  transferStations: EntityRef[];
+  transfers: TransferScore[];
   preset?: undefined;
 } | null {
   const patterns = Object.values(system.graph.indexes.patternById);
@@ -223,7 +238,7 @@ function resolveCrossPatternPlan(
     patternId: EntityRef;
     currentStation: EntityRef;
     specs: RunSpec[];
-    transferStations: EntityRef[];
+    transfers: TransferScore[];
     visitedPatternIds: EntityRef[];
     cost: number;
   }
@@ -232,7 +247,7 @@ function resolveCrossPatternPlan(
     patternId: pattern.patternId,
     currentStation: request.startStationRef,
     specs: [],
-    transferStations: [],
+    transfers: [],
     visitedPatternIds: [pattern.patternId],
     cost: 0,
   }));
@@ -268,16 +283,23 @@ function resolveCrossPatternPlan(
       if (!nextPattern) continue;
       for (const transferStation of relation.sharedStations) {
         if (!traceContainsStation(currentPattern, transferStation)) continue;
+        const transfer = scoreTransfer({
+          policy: transferPolicy,
+          fromPatternRef: currentPattern.patternId,
+          toPatternRef: nextPattern.patternId,
+          stationRef: transferStation,
+        });
+        if (!transfer.allowed) continue;
         const spec = specForPatternSlice(currentPattern, request.systemId, current.currentStation, transferStation, request.directionPreference);
         const cost = current.cost
           + patternSliceCost(currentPattern, current.currentStation, transferStation)
-          + TRANSFER_COST_METERS;
+          + transfer.costMeters;
         if (best && cost >= best.cost) continue;
         queue.push({
           patternId: nextPattern.patternId,
           currentStation: transferStation,
           specs: [...current.specs, spec],
-          transferStations: [...current.transferStations, transferStation],
+          transfers: [...current.transfers, transfer],
           visitedPatternIds: [...current.visitedPatternIds, nextPattern.patternId],
           cost,
         });
@@ -289,7 +311,7 @@ function resolveCrossPatternPlan(
   return {
     specs: best.specs,
     planUsed: "auto",
-    transferStations: best.transferStations,
+    transfers: best.transfers,
   };
 }
 
@@ -448,12 +470,13 @@ function buildTripResultSegment(args: {
 function withTransferEvent(args: {
   segment: TripResultSegment;
   previous: TripResultSegment;
-  transferStationRef: EntityRef | undefined;
+  transfer: TransferScore | undefined;
 }): TripResultSegment {
-  const transferStation = args.transferStationRef
-    ? args.segment.fromStation.stationRef === args.transferStationRef
+  const transferStationRef = args.transfer?.stationRef;
+  const transferStation = transferStationRef
+    ? args.segment.fromStation.stationRef === transferStationRef
       ? args.segment.fromStation
-      : args.previous.toStation.stationRef === args.transferStationRef
+      : args.previous.toStation.stationRef === transferStationRef
         ? args.previous.toStation
         : undefined
     : undefined;
@@ -464,8 +487,11 @@ function withTransferEvent(args: {
     timestamp: args.segment.viaStations[0]?.arrivalTime ?? args.segment.viaStations[0]?.departureTime,
     fromLine: args.previous.lineLabel,
     toLine: args.segment.lineLabel,
-    transferMode: "alight",
-    walkMinutes: 0,
+    transferMode: args.transfer?.transferMode ?? "alight",
+    walkMinutes: args.transfer?.walkMinutes ?? 0,
+    waitMinutes: args.transfer?.waitMinutes,
+    costMeters: args.transfer?.costMeters,
+    reason: args.transfer?.reason,
   };
   return {
     ...args.segment,

@@ -358,6 +358,10 @@ let globalSettings: MvpGlobalSettings = loadGlobalSettings();
 let scanResult: PathScanResult | null = null;
 let isAutoRunning = false;
 let showSettings = false;
+
+export type MvpWorkflowExportMode = "no_direction" | "forced_direction";
+
+const MVP_WORKFLOW_EXPORT_MODE: MvpWorkflowExportMode = "forced_direction";
 let showNewWorkspace = false;
 
 async function loadAllCleanDecisions(): Promise<void> {
@@ -1097,6 +1101,10 @@ export function exportDiagnostics(): Diagnostic[] {
 export interface SensekiDemoSnapshot {
   schemaVersion: "senseki-demo-v1" | "senseki-demo-v2";
   exportedAt: string;
+  workflow?: {
+    exportMode: MvpWorkflowExportMode;
+    noDirectionPathfindingExportable: boolean;
+  };
   app: {
     gitCommit?: string;
     sensekiDataHash?: string;
@@ -1135,6 +1143,10 @@ export function exportSensekiSnapshot(): SensekiDemoSnapshot {
   return {
     schemaVersion: "senseki-demo-v2",
     exportedAt: new Date().toISOString(),
+    workflow: {
+      exportMode: MVP_WORKFLOW_EXPORT_MODE,
+      noDirectionPathfindingExportable: true,
+    },
     app: {
       sensekiDataHash: hashSensekiData(),
     },

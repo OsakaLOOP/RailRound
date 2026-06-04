@@ -1,4 +1,5 @@
 import type { RailwayMap, Trip, TripSegment } from "../store";
+import type { DirectionLabel, EntityRef } from "../rail-graph-v1/primitives";
 import type { TripResult, TripResultSegment } from "../rail-graph-v1/user-facing.types";
 import { getTripRailGraphSnapshot } from "./railGraphTripPersistence";
 import { lineLabel } from "./mileageUserEvents";
@@ -19,6 +20,14 @@ export interface ProductTripSegment {
   distanceKm: number;
   geometry?: [number, number][];
   source: "rail_graph" | "legacy";
+  systemRef?: EntityRef;
+  lineRef?: EntityRef;
+  patternRef?: EntityRef;
+  direction?: DirectionLabel;
+  serviceType?: string;
+  stopCount?: number;
+  passCount?: number;
+  viaStationCount?: number;
 }
 
 export function tripToProductSegments(trip: Trip, railwayData?: RailwayMap): ProductTripSegment[] {
@@ -188,6 +197,14 @@ function railGraphSegmentToProductSegment(
     distanceKm: segment.distanceKm,
     geometry: segment.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
     source: "rail_graph",
+    systemRef: segment.mileageProfile.systemRef,
+    lineRef: segment.mileageProfile.lineRef,
+    patternRef: segment.mileageProfile.patternRef,
+    direction: segment.mileageProfile.direction,
+    serviceType: segment.mileageProfile.serviceType,
+    stopCount: segment.viaStations.filter((stop) => stop.stopType === "stop").length,
+    passCount: segment.viaStations.filter((stop) => stop.stopType === "pass").length,
+    viaStationCount: segment.viaStations.length,
   };
 }
 

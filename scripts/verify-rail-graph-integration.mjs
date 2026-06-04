@@ -16,6 +16,7 @@ const vitestTestFiles = [
   "src/__tests__/rail-graph-trip-planner.test.ts",
   "src/__tests__/rail-graph-app-route-planner.test.ts",
   "src/__tests__/rail-graph-saved-trip-roundtrip.test.ts",
+  "src/__tests__/rail-graph-export-load-smoke.test.ts",
   "src/__tests__/mileage-events-runtime-adapter.test.ts",
   "src/__tests__/trip-product-projection.test.ts",
   "src/__tests__/core/railwayRouting.test.ts",
@@ -38,6 +39,8 @@ const commands = [
     "src/rail-graph-aggregate/.verify/deployed-system.verify.json",
     "--allow-no-direction-verify",
   ], "Aggregate deployment bundle build verify"],
+  ["npm", ["run", "rail:deployment:assert"], "Default deployment bundle assert"],
+  ["npm", ["run", "rail:exports:load-smoke"], "MVP/aggregate export load smoke"],
   ["npx", ["vitest", "run", ...vitestTestFiles], "Runtime/app rail-graph vitest gate"],
   ["npx", ["tsc", "--noEmit", "-p", "tsconfig.json"], "TypeScript no-emit"],
   ["npm", ["run", "build"], "Root src/blog production build"],
@@ -118,8 +121,13 @@ function writeSummary(currentResults, failedLabel) {
   lines.push("- confirmed ServicePattern resolves geometry, timeline, and events.");
   lines.push("- deployed preset can be consumed by the trip planner.");
   lines.push("- aggregate workspace can build a deployment bundle; no-direction output remains explicit verify-only.");
+  lines.push("- default deployment bundle is present, app-consumable, and not built from no-direction verify data.");
+  lines.push("- MVP snapshot export/import and aggregate deployment export are loadable by real loaders.");
+  lines.push("- default deployment bundle can drive app route planning against current GeoJSON railwayData with source=rail_graph.");
+  lines.push("- railGraphLoadState records loaded/fallback status without disabling legacy fallback.");
+  lines.push("- transfer scorer supports explicit penalty, forbidden relations, walk/wait costs, and product transfer event diagnostics.");
   lines.push("- saved app trips preserve rail-graph TripResult product snapshots through API/load round-trip without default runtime artifacts.");
   lines.push("- records/search/stats product projections can consume saved rail-graph TripResult snapshots even when legacy segments are stale.");
-  lines.push("- mileage UserEvent projects to rail-graph TripResult and legacy app-line data remains compatible.");
+  lines.push("- mileage UserEvent projects to rail-graph TripResult and directly loaded legacy GeoJSON app-line data remains compatible.");
   fs.writeFileSync(summaryPath, `${lines.join("\n")}\n`, "utf8");
 }

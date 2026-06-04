@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { useStore } from "../../store";
 import { useShallow } from "zustand/react/shallow";
 import type { UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
+import { getTripRailGraphSnapshot } from "../../utils/railGraphTripPersistence";
+import { tripLineSummary } from "../../utils/tripProductProjection";
 import {
   buildAppMileageLineContext,
   createMileageEventAtDistance,
@@ -120,9 +122,21 @@ export const EventComposer: React.FC<Props> = ({
     () => (lineKey ? buildAppMileageLineContext(railwayData, lineKey) : null),
     [lineKey, railwayData],
   );
+  const selectedTrip = useMemo(
+    () => trips.find((candidate) => String(candidate.id) === tripId) ?? trips[0] ?? null,
+    [tripId, trips],
+  );
+  const selectedTripUsesRailGraph = !!(selectedTrip && getTripRailGraphSnapshot(selectedTrip));
   const stations = lineContext?.line.stations ?? [];
   const effectiveStationId = stationId || stations[0]?.id || "";
   const editableLocation = !event;
+
+  const tripOptionLabel = (trip: typeof trips[number]) => {
+    const source = getTripRailGraphSnapshot(trip)
+      ? t("mileageEvents.tripSourceRailGraph", "Rail graph")
+      : t("mileageEvents.tripSourceLegacy", "Legacy GeoJSON");
+    return `${trip.date} - ${source} - ${tripLineSummary(trip, railwayData)}`;
+  };
 
   const submit = () => {
     if (event) {
@@ -293,10 +307,15 @@ export const EventComposer: React.FC<Props> = ({
               <option value="">{t("mileageEvents.latestTrip", "Latest trip")}</option>
               {trips.map((trip) => (
                 <option key={String(trip.id)} value={String(trip.id)}>
-                  {trip.date} · {String(trip.id)}
+                  {tripOptionLabel(trip)}
                 </option>
               ))}
             </select>
+            <span className="mt-1 block text-[11px] text-slate-400">
+              {selectedTripUsesRailGraph
+                ? t("mileageEvents.tripSourceHintRailGraph", "Creates the event on the saved rail-graph run snapshot.")
+                : t("mileageEvents.tripSourceHintLegacy", "Creates the event on the current GeoJSON mileage axis.")}
+            </span>
           </label>
           <label className="block text-xs font-medium text-slate-600">
             {t("mileageEvents.position", "Position")}

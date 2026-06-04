@@ -1,8 +1,11 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { BaseTopologyLayer, TopologyEdge } from "../rail-graph-v1/base-topology.types";
 import type { EntityRef } from "../rail-graph-v1/primitives";
 import type { ServicePattern } from "../rail-graph-v1/service-template.types";
 import type { TripResult } from "../rail-graph-v1/user-facing.types";
+import { parseGeoJsonBatch } from "../core/parser";
 import {
   buildDeployedSystem,
   buildSystemContext,
@@ -12,9 +15,15 @@ import { buildAdjacency } from "../rail-graph-v1/topology";
 import {
   buildAppMileageLineContext,
   buildRailGraphMileageLineContext,
+  boundMileageEventForDisplay,
   createMileageEventFromPlace,
+  createMileageEventFromStation,
+  createMileageEventFromTripPosition,
+  mileageEventProjectionStatus,
+  nearestStationNameForEvent,
   projectEventsToTrip,
   queryEventsByMileage,
+  queryEventsByText,
   queryEventsByTime,
 } from "../utils/mileageUserEvents";
 import { tripResultToLegacyTrip } from "../utils/railGraphTripAdapter";
@@ -121,6 +130,34 @@ describe("mileage events runtime adapter", () => {
     });
   });
 
+  it("creates trip-position events on saved rail-graph snapshots", () => {
+    const trip = fixtureTripResult();
+    const savedTrip = tripResultToLegacyTrip(trip);
+    const event = createMileageEventFromTripPosition({
+      railwayData: {},
+      trip: savedTrip,
+      ratio: 0.5,
+      title: "Rail graph trip note",
+    });
+
+    expect(event).not.toBeNull();
+    if (!event) return;
+    expect(event.mileage).toMatchObject({
+      systemRef: "manual:system:test",
+      lineRef: "manual:line:test",
+      patternRef: "manual:pattern:local",
+      direction: "down",
+      distanceMeters: 150,
+    });
+    expect(event.payload).toMatchObject({
+      contextSource: "rail_graph_runtime",
+      source: "rail_graph",
+      tripId: savedTrip.id,
+      segmentIndex: 0,
+    });
+    expect(projectEventsToTrip([event], {}, savedTrip)).toHaveLength(1);
+  });
+
   it("keeps legacy app-line events compatible", () => {
     const lineKey = "app:test-line";
     const railwayData: RailwayMap = {
@@ -153,7 +190,57 @@ describe("mileage events runtime adapter", () => {
       segments: [{ id: "seg", lineKey, fromId: "a", toId: "b" }],
     })).toHaveLength(1);
   });
+
+  it("keeps directly loaded GeoJSON lines compatible with mileage event projection", () => {
+    const railwayData = loadWillerRailwayData();
+    const lineKey = "WILLER TRAINS:宮津線";
+    const line = railwayData[lineKey];
+    expect(line?.stations.length).toBeGreaterThan(3);
+    if (!line) return;
+
+    const lineContext = buildAppMileageLineContext(railwayData, lineKey);
+    expect(lineContext).not.toBeNull();
+    if (!lineContext) return;
+
+    const from = line.stations[0];
+    const to = line.stations[2];
+    const event = createMileageEventFromStation({
+      lineContext,
+      stationId: to.id,
+      title: "GeoJSON legacy time note",
+      tripId: "legacy-geojson-trip",
+    });
+    expect(event).not.toBeNull();
+    if (!event) return;
+
+    expect(event.mileage.lineRef).toBe(`app-line:${lineKey}`);
+    expect(event.payload?.contextSource).toBe("legacy_app");
+    expect(nearestStationNameForEvent(event, railwayData)).toBe(to.name_ja);
+    expect(queryEventsByText([event], railwayData, "GeoJSON")).toHaveLength(1);
+
+    const display = boundMileageEventForDisplay(event, railwayData);
+    expect(display?.lineContext.lineKey).toBe(lineKey);
+    expect(mileageEventProjectionStatus(event, railwayData)).toMatchObject({
+      state: "warning",
+      code: "linear_time",
+      lineKey,
+    });
+
+    const projected = projectEventsToTrip([event], railwayData, {
+      id: "legacy-geojson-trip",
+      date: "2026-06-04",
+      segments: [{ id: "geojson-seg", lineKey, fromId: from.id, toId: to.id }],
+    });
+    expect(projected).toHaveLength(1);
+    expect(projected[0].timestampInference).toBe("linear");
+  });
 });
+
+function loadWillerRailwayData(): RailwayMap {
+  const filePath = path.resolve("public", "geojson", "WILLER TRAINS.geojson");
+  const source = JSON.parse(fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
+  return parseGeoJsonBatch([{ json: source, company: "WILLER TRAINS" }]).railwayUpdates;
+}
 
 function fixtureTripResult(): TripResult {
   const pattern = fixturePattern();

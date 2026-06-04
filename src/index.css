@@ -377,6 +377,99 @@
 /* Leaflet map and marker customizations ported from legacy code */
 .leaflet-container { width: 100%; height: 100%; z-index: 0; background: #222; }
 .leaflet-popup-content-wrapper { border-radius: 8px; font-family: sans-serif; }
+.leaflet-popup-content { margin: 10px 12px; }
+.rail-route-line.rail-route-rail_graph {
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.28));
+}
+.rail-route-line.rail-route-legacy {
+  filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.18));
+}
+.rail-route-line.rail-route-fallback {
+  filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.28));
+}
+.rail-route-popup {
+  min-width: 220px;
+  max-width: 280px;
+  color: #0f172a;
+}
+.rail-route-popup-source {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  border: 1px solid #d1fae5;
+  background: #ecfdf5;
+  color: #047857;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.rail-route-popup-legacy .rail-route-popup-source {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+}
+.rail-route-popup-fallback .rail-route-popup-source {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+.rail-route-popup-transfer .rail-route-popup-source {
+  border-color: #e2e8f0;
+  background: #f1f5f9;
+  color: #64748b;
+}
+.rail-route-popup-title {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.rail-route-popup-subtitle {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.35;
+}
+.rail-route-popup-rows {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  font-size: 11px;
+}
+.rail-route-popup-rows div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rail-route-popup-rows dt {
+  color: #94a3b8;
+  font-weight: 700;
+}
+.rail-route-popup-rows dd {
+  margin: 0;
+  max-width: 150px;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #334155;
+  font-weight: 700;
+}
+.rail-route-popup-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.rail-route-popup-chips span {
+  border-radius: 5px;
+  background: #f1f5f9;
+  padding: 2px 5px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
 .leaflet-tooltip.tooltip-highlight { background-color: #ec4899; color: white; border-color: #be185d; font-weight: bold; transform: scale(1.1); transition: all 0.2s; z-index: 999; }
 .leaflet-tooltip.tooltip-highlight::before { border-top-color: #be185d; }
 .station-marker { background: white; border: 2px solid #6b7280; border-radius: 50%; width: 8px; height: 8px; }
@@ -468,6 +561,20 @@
 .mileage-event-marker.is-mixed {
   background:
     repeating-linear-gradient(135deg, var(--event-color) 0 7px, color-mix(in srgb, var(--event-color) 62%, #0f172a) 7px 14px);
+}
+
+.mileage-event-marker.is-rail-graph {
+  box-shadow:
+    0 10px 24px rgba(15,23,42,0.22),
+    0 0 0 3px rgba(16,185,129,0.2),
+    0 0 0 1px rgba(15,23,42,0.08);
+}
+
+.mileage-event-marker.is-source-mixed {
+  box-shadow:
+    0 10px 24px rgba(15,23,42,0.22),
+    0 0 0 3px rgba(245,158,11,0.24),
+    0 0 0 1px rgba(15,23,42,0.08);
 }
 
 .mileage-event-marker.is-selected {

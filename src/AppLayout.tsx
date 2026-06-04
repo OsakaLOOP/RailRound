@@ -1930,7 +1930,6 @@ export const AppLayout: React.FC = () => {
             <MapContainer
               setStationMenu={setStationMenu}
               isDraggingRef={isDraggingRef}
-              showDebugZoom={true}
             />
             <FabButton />
             <LocateButton />

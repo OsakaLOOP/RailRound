@@ -55,6 +55,11 @@ interface NormalizedStation {
 }
 
 const MAX_LOGO_SIZE_BYTES = 64 * 1024;
+export const ROUTE_EXPORT_ERRORS = {
+  missingLine: "Route export could not resolve one of the selected lines.",
+  missingStation: "Route export could not resolve one or more stations on the selected route.",
+  notFound: "Route export could not find a connected route for the selected stations.",
+} as const;
 
 async function imageUrlToDataUri(url: string): Promise<string | null> {
   try {
@@ -222,7 +227,7 @@ function buildDeterministicRouteData(
   for (const segment of segments) {
     const line = railwayData[segment.lineKey];
     if (!line) {
-      throw new Error(`Line not found: ${segment.lineKey}`);
+      throw new Error(ROUTE_EXPORT_ERRORS.missingLine);
     }
 
     const stations = line.stations.map(normalizeStation);
@@ -236,17 +241,13 @@ function buildDeterministicRouteData(
         : undefined) || findStationByName(stations, segment.toStation);
 
     if (!fromStation || !toStation) {
-      throw new Error(
-        `Station not found on ${segment.lineKey}: ${segment.fromId || segment.fromStation} -> ${segment.toId || segment.toStation}`,
-      );
+      throw new Error(ROUTE_EXPORT_ERRORS.missingStation);
     }
 
     const startIdx = stations.findIndex((s) => s.id === fromStation.id);
     const endIdx = stations.findIndex((s) => s.id === toStation.id);
     if (startIdx === -1 || endIdx === -1) {
-      throw new Error(
-        `Station not found on ${segment.lineKey}: ${fromStation.id} -> ${toStation.id}`,
-      );
+      throw new Error(ROUTE_EXPORT_ERRORS.missingStation);
     }
 
     const loopVia = resolveLoopVia(
@@ -363,7 +364,7 @@ export async function computeAndSerializeRoute(
       endStationId = params.endStationId;
     } else {
       const line = railwayData[params.lineKey];
-      if (!line) throw new Error(`Line not found: ${params.lineKey}`);
+      if (!line) throw new Error(ROUTE_EXPORT_ERRORS.missingLine);
 
       const startNode = line.stations.find(
         (s: any) => s.name_ja === params.startStation || s.name_en === params.startStation,
@@ -372,7 +373,7 @@ export async function computeAndSerializeRoute(
         (s: any) => s.name_ja === params.endStation || s.name_en === params.endStation,
       );
       if (!startNode || !endNode) {
-        throw new Error(`Station not found: ${params.startStation} or ${params.endStation}`);
+        throw new Error(ROUTE_EXPORT_ERRORS.missingStation);
       }
 
       startLineKey = params.lineKey;
@@ -390,10 +391,10 @@ export async function computeAndSerializeRoute(
       6,
     );
     if (!result || result.error || !result.segments) {
-      throw new Error(result?.error || "Route not found");
+      throw new Error(ROUTE_EXPORT_ERRORS.notFound);
     }
     if (result.segments.length === 0) {
-      throw new Error("Auto route has no segments");
+      throw new Error(ROUTE_EXPORT_ERRORS.notFound);
     }
 
     const autoSegments: ManualSegmentInput[] = result.segments.map((seg: any) => ({

@@ -10,11 +10,8 @@ import {
   Upload,
   ChevronDown,
   ChevronUp,
-  Clipboard,
-  Download,
   Eye,
   Filter,
-  FileJson,
   MapPinned,
   Route,
   Tag,
@@ -51,12 +48,24 @@ import {
   tripToProductSegments,
 } from "../utils/tripProductProjection";
 import {
+  productSegmentSelectionLineKey,
+  selectionFromProductSegment,
+} from "../utils/railGraphSelection";
+import {
   buildTripDetailModel,
   tripDetailKeyEvents,
   type TripDetailModel,
 } from "../utils/railGraphTripDetailModel";
 import { mileageEventTripId, openMileageEventsPanel, selectMileageEventOnMap } from "../utils/mileageEventUiBridge";
-import { RailGraphBadge, RailGraphEventPill, RailGraphSymbol, railGraphEventIcon } from "../components/rail-graph/RailGraphBadges";
+import {
+  RailGraphBadge,
+  RailGraphEventPill,
+  RailGraphRunBadges,
+  RailGraphSymbol,
+  compactRailGraphRef,
+  railGraphDirectionLabel as formatRailGraphDirection,
+  railGraphEventIcon,
+} from "../components/rail-graph/RailGraphBadges";
 
 const RouteSlice = React.memo(
   ({ segments }: { segments: any[] }) => {
@@ -182,6 +191,7 @@ export const TripsPage: React.FC = () => {
     folders,
     badgeSettings,
     mileageUserEvents,
+    setActiveRailGraphSelection,
   } = useStore(
     useShallow((state) => ({
       trips: state.trips,
@@ -192,6 +202,7 @@ export const TripsPage: React.FC = () => {
       folders: state.folders,
       badgeSettings: state.badgeSettings,
       mileageUserEvents: state.mileageUserEvents,
+      setActiveRailGraphSelection: state.setActiveRailGraphSelection,
     })),
   );
   const setModalState = useStore((state) => state.setModalState);
@@ -581,99 +592,84 @@ export const TripsPage: React.FC = () => {
       : entries;
   };
 
-  const copyTripEventSummary = async (trip: (typeof trips)[number], entries: MileageEventListEntry[]) => {
-    const lines = [
-      `# ${trip.date} ${tripLineSummary(trip)}`,
-      "",
-      ...entries.map(
-        (entry) =>
-          `- ${formatKm(entry.bound.distanceMetersFromRunStart)} ${entry.bound.event.title}${
-            entry.bound.event.tags?.length ? ` #${entry.bound.event.tags.join(" #")}` : ""
-          }`,
-      ),
-    ];
-    await navigator.clipboard?.writeText(lines.join("\n")).catch(() => undefined);
+  const segmentSelectionLineKey = (segment: any) => productSegmentSelectionLineKey(segment);
+
+  const eventEntryLineKey = (entry: MileageEventListEntry, segment?: any) =>
+    entry.lineContext?.lineKey ?? segmentSelectionLineKey(segment);
+
+  const setTripRouteSelection = (
+    trip: (typeof trips)[number],
+    segment: any,
+    index: number,
+    kind: "route" | "event" = "route",
+    eventId?: string,
+    entry?: MileageEventListEntry,
+  ) => {
+    if (!segment) return;
+    const selection = selectionFromProductSegment({
+      kind,
+      segment,
+      lineContext: entry?.lineContext,
+      tripId: trip.id,
+      tripSegmentIndex: index,
+      eventId,
+    });
+    if (selection) setActiveRailGraphSelection(selection);
   };
 
-  const exportTripEvents = (trip: (typeof trips)[number], entries: MileageEventListEntry[], format: "json" | "mdx") => {
-    const baseName = `railloop_trip_events_${String(trip.id).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
-    const content =
-      format === "json"
-        ? JSON.stringify({ trip, mileageEvents: entries.map((entry) => entry.bound.event) }, null, 2)
-        : [
-            `# ${trip.date} ${tripLineSummary(trip)}`,
-            "",
-            ...entries.map(
-              (entry) =>
-                `- **${formatKm(entry.bound.distanceMetersFromRunStart)}** ${entry.bound.event.title}${
-                  entry.bound.event.body ? `: ${entry.bound.event.body}` : ""
-                }`,
-            ),
-            "",
-          ].join("\n");
-    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${baseName}.${format === "json" ? "json" : "mdx"}`;
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => {
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 0);
-  };
-
-  const eventEntryLineKey = (entry: MileageEventListEntry) => entry.lineContext?.lineKey;
-
-  const selectTripEvent = (eventId: string, entry?: MileageEventListEntry) => {
+  const selectTripEvent = (eventId: string, trip?: (typeof trips)[number], entry?: MileageEventListEntry) => {
+    const segments = trip ? tripToProductSegments(trip, railwayData) : [];
+    const segmentIndex = typeof entry?.bound.orderIndex === "number" ? entry.bound.orderIndex : 0;
+    const segment = segments[segmentIndex] ?? segments[0];
     setSelectedTripEventId(eventId);
+    if (trip && entry && segment) {
+      setTripRouteSelection(trip, segment, segmentIndex, "event", eventId, entry);
+    }
     selectMileageEventOnMap({
       eventId,
-      lineKey: entry ? eventEntryLineKey(entry) : undefined,
+      lineKey: entry ? eventEntryLineKey(entry, segment) : undefined,
       source: entry?.lineContext?.source,
-      tripId: mileageEventTripId(entry?.bound.event.payload?.tripId),
-      tripSegmentIndex: entry?.bound.orderIndex,
+      tripId: mileageEventTripId(entry?.bound.event.payload?.tripId) ?? trip?.id,
+      tripSegmentIndex: entry?.bound.orderIndex ?? segmentIndex,
+      routeItemId: segment?.id,
     });
   };
 
   const openTripEventMapEditor = (trip: (typeof trips)[number]) => {
     const segments = tripToProductSegments(trip, railwayData);
-    const railGraphTrip = trip.railGraph?.tripResult ?? null;
-    const firstRailGraphSegment = railGraphTrip?.segments[0];
-    const firstLineKey = firstRailGraphSegment
-      ? `rail-graph:${firstRailGraphSegment.mileageProfile.patternRef ?? firstRailGraphSegment.segmentId}`
-      : segments.find((segment: any) => segment.lineKey)?.lineKey;
+    const firstSegment = segments.find((segment: any) => segment.lineKey || segment.id);
+    const firstSegmentIndex = Math.max(0, segments.findIndex((segment: any) => segment === firstSegment));
+    const firstLineKey = segmentSelectionLineKey(firstSegment);
+    if (firstSegment) {
+      setTripRouteSelection(trip, firstSegment, firstSegmentIndex, "route");
+    }
     goToTab("map");
     window.setTimeout(() => {
       openMileageEventsPanel({
-        mode: "create",
+        mode: "line",
         lineKey: firstLineKey,
-        source: firstRailGraphSegment ? "rail_graph_runtime" : "legacy_app",
+        source: firstSegment?.source === "rail_graph" ? "rail_graph_runtime" : "legacy_app",
         tripId: trip.id,
-        tripSegmentIndex: 0,
-        create: {
-          source: "trip",
-          tripId: trip.id,
-          tripSegmentIndex: 0,
-          tripRatio: 0.5,
-          lineKey: firstRailGraphSegment ? undefined : firstLineKey,
-          tags: ["trip-event"],
-        },
+        tripSegmentIndex: firstSegmentIndex,
+        routeItemId: firstSegment?.id,
       });
     }, 150);
   };
 
-  const focusTripEventOnMap = (entry: MileageEventListEntry) => {
-    selectTripEvent(entry.bound.event.id, entry);
+  const focusTripEventOnMap = (trip: (typeof trips)[number], entry: MileageEventListEntry) => {
+    selectTripEvent(entry.bound.event.id, trip, entry);
     goToTab("map");
     window.setTimeout(() => {
+      const segments = tripToProductSegments(trip, railwayData);
+      const segmentIndex = typeof entry.bound.orderIndex === "number" ? entry.bound.orderIndex : 0;
+      const segment = segments[segmentIndex] ?? segments[0];
       selectMileageEventOnMap({
         eventId: entry.bound.event.id,
-        lineKey: eventEntryLineKey(entry),
+        lineKey: eventEntryLineKey(entry, segment),
         source: entry.lineContext?.source,
-        tripId: mileageEventTripId(entry.bound.event.payload?.tripId),
-        tripSegmentIndex: entry.bound.orderIndex,
+        tripId: mileageEventTripId(entry.bound.event.payload?.tripId) ?? trip.id,
+        tripSegmentIndex: entry.bound.orderIndex ?? segmentIndex,
+        routeItemId: segment?.id,
       });
       if (!entry.bound.coordinates) return;
       window.dispatchEvent(
@@ -689,12 +685,7 @@ export const TripsPage: React.FC = () => {
   };
 
   const railGraphDirectionLabel = (direction?: string) => {
-    if (!direction) return t("tripsPage.railGraph.unknown", "Unknown");
-    if (direction === "up") return t("tripsPage.railGraph.direction.up", "Up");
-    if (direction === "down") return t("tripsPage.railGraph.direction.down", "Down");
-    if (direction === "clockwise") return t("tripsPage.railGraph.direction.clockwise", "Clockwise");
-    if (direction === "counterclockwise") return t("tripsPage.railGraph.direction.counterclockwise", "Counterclockwise");
-    return direction;
+    return formatRailGraphDirection(direction, t) || t("tripsPage.railGraph.unknown", "Unknown");
   };
 
   const railGraphEventTypeLabel = (type: string) => {
@@ -714,14 +705,6 @@ export const TripsPage: React.FC = () => {
 
   const formatMinutes = (minutes?: number) =>
     t("tripsPage.railGraph.minutes", "{{count}} min", { count: Math.max(0, minutes || 0) });
-
-  const compactRailGraphRef = (value?: unknown) => {
-    const text = String(value ?? "").trim();
-    if (!text) return "";
-    const cut = Math.max(text.lastIndexOf(":"), text.lastIndexOf("/"), text.lastIndexOf("#"));
-    const label = cut >= 0 ? text.slice(cut + 1) : text;
-    return label || text;
-  };
 
   const railGraphChipValue = (values: Array<string | undefined>, maxItems = 2) => {
     const unique = Array.from(new Set(values.filter((value): value is string => !!value?.trim())));
@@ -743,12 +726,15 @@ export const TripsPage: React.FC = () => {
             tone="emerald"
             className="rounded"
           />
-          {!compact && firstSegment?.serviceType && (
-            <RailGraphBadge icon="service" value={firstSegment.serviceType} tone="sky" className="rounded" />
-          )}
-          {!compact && firstSegment?.direction && (
-            <RailGraphBadge icon="direction" value={railGraphDirectionLabel(firstSegment.direction)} tone="amber" className="rounded" />
-          )}
+          <RailGraphRunBadges
+            meta={{
+              serviceType: firstSegment?.serviceType,
+              direction: firstSegment?.direction,
+              patternRef: firstSegment?.patternRef,
+            }}
+            badgeClassName="rounded"
+            patternClassName="max-w-[12rem]"
+          />
           <RailGraphBadge icon="distance" value={formatDistanceKm(detail.overview.totalDistanceKm)} tone="slate" className="rounded" />
           {detail.overview.totalTimeMinutes !== undefined && (
             <RailGraphBadge icon="duration" value={formatMinutes(detail.overview.totalTimeMinutes)} tone="slate" className="rounded" />
@@ -769,8 +755,10 @@ export const TripsPage: React.FC = () => {
                 <div className="min-w-0">
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="truncate font-semibold text-slate-800">{segment.lineLabel}</span>
-                    <span className="text-slate-400">{railGraphDirectionLabel(segment.direction)}</span>
-                    {segment.serviceType && <span className="text-slate-400">{segment.serviceType}</span>}
+                    <RailGraphRunBadges
+                      meta={{ serviceType: segment.serviceType, direction: segment.direction }}
+                      badgeClassName="rounded"
+                    />
                   </div>
                   <div className="truncate">
                     {segment.fromName} <span className="text-slate-300">→</span> {segment.toName}
@@ -788,16 +776,12 @@ export const TripsPage: React.FC = () => {
                       tone="slate"
                       className="rounded"
                     />
-                    {segment.patternRef && (
-                      <RailGraphBadge
-                        icon="pattern"
-                        label={t("mileageEvents.inspector.pattern", "Pattern")}
-                        value={compactRailGraphRef(segment.patternRef)}
-                        tone="indigo"
-                        className="max-w-[12rem] rounded"
-                        title={String(segment.patternRef)}
-                      />
-                    )}
+                    <RailGraphRunBadges
+                      meta={{ patternRef: segment.patternRef }}
+                      badgeClassName="rounded"
+                      patternClassName="max-w-[12rem]"
+                      showLabels
+                    />
                   </div>
                 </div>
               </div>
@@ -843,8 +827,8 @@ export const TripsPage: React.FC = () => {
 
     segments.forEach((segment: any, index: number) => {
       const lineName = segment.lineLabel || (segment.lineKey ? lineLabel(segment.lineKey) : "-");
-      const fromName = segment.fromName || segment.fromId || t("mileageEvents.unknown", "Unknown");
-      const toName = segment.toName || segment.toId || t("mileageEvents.unknown", "Unknown");
+      const fromName = segment.fromName || t("mileageEvents.unknown", "Unknown");
+      const toName = segment.toName || t("mileageEvents.unknown", "Unknown");
       const lineContext = segment.lineKey ? buildAppMileageLineContext(railwayData, segment.lineKey) : null;
       const fromMileage = lineContext?.context.stationMileage[appStationRef(segment.lineKey, segment.fromId)];
       const toMileage = lineContext?.context.stationMileage[appStationRef(segment.lineKey, segment.toId)];
@@ -898,24 +882,10 @@ export const TripsPage: React.FC = () => {
     return t("tripsPage.eventCenter.transfer", "Transfer");
   };
 
-  const countEventEntrySources = (entries: MileageEventListEntry[]) => {
-    let railGraph = 0;
-    let legacy = 0;
-    entries.forEach((entry) => {
-      if (entry.lineContext?.source === "rail_graph_runtime") {
-        railGraph += 1;
-      } else {
-        legacy += 1;
-      }
-    });
-    return { railGraph, legacy };
-  };
-
   const renderTripEventCenter = (trip: (typeof trips)[number]) => {
     const tripId = String(trip.id);
     const entries = tripEventEntries(trip);
     const allEntries = tripEventEntriesMap.get(tripId) ?? [];
-    const sourceCounts = countEventEntrySources(allEntries);
     const replayItems = tripReplayItems(trip, entries);
     const detail = buildTripDetailModel({ trip, railwayData, userEvents: mileageUserEvents });
     const isExpanded = expandedTripId === tripId;
@@ -931,16 +901,16 @@ export const TripsPage: React.FC = () => {
             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
               <MapPinned size={14} className="text-emerald-600" />
               {t("tripsPage.eventCenter.summary", "{{count}} events", { count: allEntries.length })}
-              {sourceCounts.railGraph > 0 && (
-                <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700">
-                  {t("tripsPage.eventCenter.railGraphCount", "{{count}} rail graph", { count: sourceCounts.railGraph })}
-                </span>
-              )}
-              {sourceCounts.legacy > 0 && (
-                <span className="rounded bg-white px-1.5 py-0.5 text-[10px] text-slate-500">
-                  {t("tripsPage.eventCenter.geoJsonCount", "{{count}} GeoJSON", { count: sourceCounts.legacy })}
-                </span>
-              )}
+              <RailGraphBadge
+                icon={detail.kind === "rail_graph" ? "snapshot" : "legacy"}
+                value={
+                  detail.kind === "rail_graph"
+                    ? t("tripsPage.eventCenter.snapshotAxis", "Saved snapshot axis")
+                    : t("tripsPage.eventCenter.geoJsonAxis", "GeoJSON mileage axis")
+                }
+                tone={detail.kind === "rail_graph" ? "emerald" : "slate"}
+                className="rounded bg-white"
+              />
               {filteredEventIds && allEntries.length !== entries.length && (
                 <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700">
                   {t("tripsPage.eventCenter.filteredCount", "{{count}} shown", { count: entries.length })}
@@ -974,91 +944,54 @@ export const TripsPage: React.FC = () => {
 
         {isExpanded && (
           <div className="mt-3 space-y-3 rounded-md border border-slate-200 bg-white p-3">
-            <div className="rounded-md border border-slate-200 bg-slate-50/70 p-2 text-xs">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="font-semibold text-slate-700">
-                  {t("tripsPage.eventCenter.projectionSource", "Projection source")}
-                </span>
-                <RailGraphBadge
-                  icon="snapshot"
-                  value={t("tripsPage.eventCenter.railGraphCount", "{{count}} rail graph", { count: sourceCounts.railGraph })}
-                  tone="emerald"
-                  className="rounded bg-white"
-                />
-                <RailGraphBadge
-                  icon="legacy"
-                  value={t("tripsPage.eventCenter.geoJsonCount", "{{count}} GeoJSON", { count: sourceCounts.legacy })}
-                  tone="slate"
-                  className="rounded bg-white"
-                />
-              </div>
-              <div className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                {detail.kind === "rail_graph"
-                  ? t("tripsPage.eventCenter.railGraphProjectionHint", "User events are ordered on the saved rail-graph run snapshot for this trip.")
-                  : t("tripsPage.eventCenter.geoJsonProjectionHint", "User events are ordered on the current GeoJSON app-line mileage axis.")}
-              </div>
-            </div>
-
             {renderRailGraphRunSummary(detail)}
 
             <div className="space-y-1">
               {tripToProductSegments(trip, railwayData).map((segment: any, index: number) => {
-                const from = segment.fromName || segment.fromId;
-                const to = segment.toName || segment.toId;
+                const from = segment.fromName || t("mileageEvents.unknown", "Unknown");
+                const to = segment.toName || t("mileageEvents.unknown", "Unknown");
+                const lineName = segment.lineLabel || (segment.lineKey ? lineLabel(segment.lineKey) : "-");
                 return (
-                  <div key={`${segment.lineKey}_${segment.fromId}_${segment.toId}_${index}`} className="flex items-center gap-2 text-[11px] text-slate-500">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    <span className="font-semibold text-slate-600">{segment.lineLabel || (segment.lineKey ? lineLabel(segment.lineKey) : "-")}</span>
-                    <span>{from}</span>
-                    <span className="text-slate-300">→</span>
-                    <span>{to}</span>
+                  <div key={`${segment.lineKey}_${segment.fromId}_${segment.toId}_${index}`} className="grid grid-cols-[0.5rem_minmax(0,1fr)] gap-2 text-[11px] text-slate-500">
+                    <span className="mt-1.5 h-2 w-2 rounded-full bg-emerald-500" />
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold text-slate-600" title={lineName}>{lineName}</div>
+                      <div className="truncate" title={`${from} -> ${to}`}>
+                        {from} <span className="text-slate-300">→</span> {to}
+                      </div>
+                    </div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50/70 p-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                <RailGraphBadge
+                  icon={detail.kind === "rail_graph" ? "snapshot" : "legacy"}
+                  value={
+                    detail.kind === "rail_graph"
+                      ? t("tripsPage.eventCenter.snapshotAxis", "Saved snapshot axis")
+                      : t("tripsPage.eventCenter.geoJsonAxis", "GeoJSON mileage axis")
+                  }
+                  tone={detail.kind === "rail_graph" ? "emerald" : "slate"}
+                  className="rounded bg-white"
+                />
+              </div>
               <button
                 type="button"
                 className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                 onClick={() => openTripEventMapEditor(trip)}
+                title={t("tripsPage.eventCenter.openMapEditor", "Open map editor")}
+                aria-label={t("tripsPage.eventCenter.openMapEditor", "Open map editor")}
               >
                 <MapPinned size={13} />
                 {t("tripsPage.eventCenter.openMapEditor", "Open map editor")}
               </button>
-              <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 p-1">
-                <button
-                  type="button"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded text-slate-500 hover:bg-white hover:text-slate-800"
-                  onClick={() => copyTripEventSummary(trip, entries)}
-                  title={t("tripsPage.eventCenter.copy", "Copy summary")}
-                  aria-label={t("tripsPage.eventCenter.copy", "Copy summary")}
-                >
-                  <Clipboard size={13} />
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded text-slate-500 hover:bg-white hover:text-slate-800"
-                  onClick={() => exportTripEvents(trip, entries, "json")}
-                  title={t("tripsPage.eventCenter.exportJson", "Export event JSON")}
-                  aria-label={t("tripsPage.eventCenter.exportJson", "Export event JSON")}
-                >
-                  <FileJson size={13} />
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded text-slate-500 hover:bg-white hover:text-slate-800"
-                  onClick={() => exportTripEvents(trip, entries, "mdx")}
-                  title={t("tripsPage.eventCenter.exportMdx", "Export event MDX")}
-                  aria-label={t("tripsPage.eventCenter.exportMdx", "Export event MDX")}
-                >
-                  <Download size={13} />
-                </button>
-              </div>
             </div>
 
             <div className="rounded-md border border-slate-200 bg-slate-50/60 p-2">
-              <div className="mb-2 flex items-center justify-between gap-2 px-1 text-xs">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs">
                 <div className="font-semibold text-slate-700">
                   {t("tripsPage.eventCenter.replay", "Trip replay")}
                 </div>
@@ -1111,11 +1044,11 @@ export const TripsPage: React.FC = () => {
                             ? "border-emerald-300 bg-emerald-50"
                             : "border-slate-200 bg-white hover:border-slate-300"
                         }`}
-                        onClick={() => focusTripEventOnMap(item.entry)}
+                        onClick={() => focusTripEventOnMap(trip, item.entry)}
                         onKeyDown={(keyEvent) => {
                           if (keyEvent.key === "Enter" || keyEvent.key === " ") {
                             keyEvent.preventDefault();
-                            focusTripEventOnMap(item.entry);
+                            focusTripEventOnMap(trip, item.entry);
                           }
                         }}
                       >
@@ -1127,9 +1060,10 @@ export const TripsPage: React.FC = () => {
                             className="ml-auto shrink-0 rounded p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-700"
                             onClick={(clickEvent) => {
                               clickEvent.stopPropagation();
-                              focusTripEventOnMap(item.entry);
+                              focusTripEventOnMap(trip, item.entry);
                             }}
                             title={t("mileageEvents.action.viewMap", "View map")}
+                            aria-label={t("mileageEvents.action.viewMap", "View map")}
                           >
                             <MapPinned size={13} />
                           </button>
@@ -1331,8 +1265,8 @@ export const TripsPage: React.FC = () => {
       : "";
 
     if (isWalk) {
-      let startName = trip.fromId || "";
-      let endName = trip.toId || "";
+      let startName = t("mileageEvents.unknown", "Unknown");
+      let endName = t("mileageEvents.unknown", "Unknown");
       Object.values(railwayData).forEach((line) => {
         const s = line.stations.find((st) => st.id === trip.fromId);
         if (s) startName = s.name_ja;
@@ -1527,7 +1461,7 @@ export const TripsPage: React.FC = () => {
               const line = railwayData[seg.lineKey];
               const icon = line?.meta?.icon;
               const getSt = (id: string) =>
-                line?.stations.find((s) => s.id === id)?.name_ja || id;
+                line?.stations.find((s) => s.id === id)?.name_ja || t("mileageEvents.unknown", "Unknown");
               const displayModel = seg.source === "legacy"
                 ? buildNetworkDisplayModel({
                     id: seg.id,
@@ -1559,7 +1493,7 @@ export const TripsPage: React.FC = () => {
                           />
                         )}
                         <span className="font-bold text-emerald-700 text-xs">
-                          {seg.lineLabel || seg.lineKey}
+                          {seg.lineLabel || lineLabel(seg.lineKey)}
                         </span>
                       </div>
                       <div className="pl-5 font-medium text-gray-700">

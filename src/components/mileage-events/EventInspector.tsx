@@ -37,7 +37,9 @@ import { useMileageEventActions } from "./useMileageEventActions";
 import { useAppNavigation } from "../../hooks/useAppNavigation";
 import { showConfirm } from "../../utils/alerts";
 import { mileageEventTripId, selectMileageEventOnMap } from "../../utils/mileageEventUiBridge";
-import { RailGraphBadge, RailGraphEventPill } from "../rail-graph/RailGraphBadges";
+import { RailGraphBadge, RailGraphEventPill, RailGraphRunBadges } from "../rail-graph/RailGraphBadges";
+import { tripLineSummary, tripToProductSegments } from "../../utils/tripProductProjection";
+import { selectionFromProductSegment } from "../../utils/railGraphSelection";
 
 interface Props {
   event: UserEventV2 | null;
@@ -48,10 +50,11 @@ interface Props {
 export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) => {
   const { t } = useTranslation();
   const { goToTab } = useAppNavigation();
-  const { railwayData, trips } = useStore(
+  const { railwayData, trips, setActiveRailGraphSelection } = useStore(
     useShallow((state) => ({
       railwayData: state.railwayData,
       trips: state.trips,
+      setActiveRailGraphSelection: state.setActiveRailGraphSelection,
     }))
   );
   const { removeEvent, updateEvent } = useMileageEventActions();
@@ -78,15 +81,18 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
   const lineContext = projected?.lineContext ?? null;
   const lineName = eventLineLabel(bound, lineContext) || (projectionStatus?.lineKey ? lineLabel(projectionStatus.lineKey) : "");
   const trip = trips.find((candidate) => String(candidate.id) === String(event.payload?.tripId));
+  const linkedTripLabel = trip
+    ? `${trip.date} - ${
+        trip.railGraph?.tripResult
+          ? t("mileageEvents.tripSourceRailGraph", "Rail graph")
+          : t("mileageEvents.tripSourceLegacy", "Legacy GeoJSON")
+      } - ${tripLineSummary(trip, railwayData)}`
+    : t("mileageEvents.noLinkedTrip", "No linked trip");
   const mediaUrl = typeof event.payload?.mediaUrl === "string" ? event.payload.mediaUrl : "";
   const createdFrom = typeof event.payload?.createdFrom === "string" ? event.payload.createdFrom : "";
-  const compactRailGraphRef = (value?: unknown) => {
-    const text = String(value ?? "");
-    if (!text) return "";
-    const last = text.split(/[/:#]/).filter(Boolean).pop();
-    return last && last.length < text.length ? last : text;
-  };
-
+  const createdFromLabel = createdFrom
+    ? t(`mileageEvents.source.${createdFrom}`, t("mileageEvents.unknown", "Unknown"))
+    : "";
   const deleteEvent = async () => {
     const confirmed = await showConfirm(
       t("mileageEvents.action.delete", "Delete"),
@@ -99,14 +105,30 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
   };
 
   const openInMap = () => {
+    const tripId = mileageEventTripId(event.payload?.tripId);
+    const tripSegments = trip ? tripToProductSegments(trip, railwayData) : [];
+    const segmentIndex = typeof bound?.orderIndex === "number" ? bound.orderIndex : 0;
+    const segment = tripSegments[segmentIndex] ?? tripSegments[0];
+    const selection = selectionFromProductSegment({
+      kind: "event",
+      segment,
+      lineContext,
+      tripId,
+      tripSegmentIndex: bound?.orderIndex ?? segmentIndex,
+      eventId: event.id,
+      label: segment?.lineLabel || lineName || undefined,
+    });
+    if (selection) setActiveRailGraphSelection(selection);
+    const lineKey = selection?.lineKey ?? lineContext?.lineKey ?? segment?.lineKey;
     goToTab("map");
     window.setTimeout(() => {
       selectMileageEventOnMap({
         eventId: event.id,
-        lineKey: lineContext?.lineKey,
+        lineKey: lineKey ?? undefined,
         source: lineContext?.source,
-        tripId: mileageEventTripId(event.payload?.tripId),
-        tripSegmentIndex: bound?.orderIndex,
+        tripId,
+        tripSegmentIndex: bound?.orderIndex ?? segmentIndex,
+        routeItemId: segment?.id,
       });
       if (!bound?.coordinates) return;
       window.dispatchEvent(
@@ -184,34 +206,15 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
             />
           </div>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {profile.serviceType && (
-              <RailGraphBadge
-                icon="service"
-                label={t("mileageEvents.inspector.service", "Service")}
-                value={profile.serviceType}
-                tone="sky"
-                className="rounded bg-white"
-              />
-            )}
-            {profile.direction && (
-              <RailGraphBadge
-                icon="direction"
-                label={t("mileageEvents.inspector.direction", "Direction")}
-                value={profile.direction}
-                tone="amber"
-                className="rounded bg-white"
-              />
-            )}
-            {profile.patternRef && (
-              <RailGraphBadge
-                icon="pattern"
-                label={t("mileageEvents.inspector.pattern", "Pattern")}
-                value={compactRailGraphRef(profile.patternRef)}
-                tone="indigo"
-                className="max-w-full rounded bg-white"
-                title={String(profile.patternRef)}
-              />
-            )}
+            <RailGraphRunBadges
+              meta={{
+                serviceType: profile.serviceType,
+                direction: profile.direction,
+                patternRef: profile.patternRef,
+              }}
+              patternClassName="max-w-full"
+              showLabels
+            />
           </div>
         </div>
       );
@@ -288,7 +291,7 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
       </header>
 
       <div className="space-y-3 p-3">
-        <dl className="grid grid-cols-2 gap-2 text-xs">
+        <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
           <InfoTerm label={t("mileageEvents.inspector.mileage", "Mileage")} value={bound ? eventMileageLabel(bound) : formatKm(event.mileage.distanceMeters)} />
           <InfoTerm label={t("mileageEvents.inspector.station", "Nearby station")} value={eventStationLabel(bound, lineContext) || t("mileageEvents.unknown", "Unknown")} />
           <InfoTerm label={t("mileageEvents.inspector.line", "Line")} value={lineName || t("mileageEvents.unknown", "Unknown")} />
@@ -319,8 +322,8 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
         )}
 
         <dl className="space-y-1 text-xs text-slate-600">
-          <InfoRow label={t("mileageEvents.linkedTrip", "Linked trip")} value={trip ? `${trip.date} - ${String(trip.id)}` : t("mileageEvents.noLinkedTrip", "No linked trip")} />
-          {createdFrom && <InfoRow label={t("mileageEvents.inspector.source", "Source")} value={t(`mileageEvents.source.${createdFrom}`, createdFrom)} />}
+          <InfoRow label={t("mileageEvents.linkedTrip", "Linked trip")} value={linkedTripLabel} />
+          {createdFromLabel && <InfoRow label={t("mileageEvents.inspector.source", "Source")} value={createdFromLabel} />}
           {mediaUrl && (
             <InfoRow
               label={t("mileageEvents.inspector.media", "Media")}
@@ -344,7 +347,7 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
           </details>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <ActionButton icon={<Edit2 size={14} />} label={t("mileageEvents.action.edit", "Edit")} onClick={() => setEditing(true)} />
           <ActionButton icon={<Trash2 size={14} />} label={t("mileageEvents.action.delete", "Delete")} onClick={deleteEvent} danger />
           <ActionButton icon={<MapPinned size={14} />} label={t("mileageEvents.action.viewMap", "View map")} onClick={openInMap} />
@@ -418,7 +421,7 @@ const ProjectionStatusNotice: React.FC<{
 const InfoTerm: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
   <div className="rounded-md bg-slate-50 p-2">
     <dt className="text-[10px] font-semibold uppercase text-slate-400">{label}</dt>
-    <dd className="mt-0.5 truncate font-medium text-slate-700">{value}</dd>
+    <dd className="mt-0.5 min-w-0 truncate font-medium text-slate-700" title={typeof value === "string" ? value : undefined}>{value}</dd>
   </div>
 );
 
@@ -440,6 +443,8 @@ const ActionButton: React.FC<{
     type="button"
     onClick={onClick}
     disabled={disabled}
+    title={label}
+    aria-label={label}
     className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
       danger
         ? "border-red-100 bg-red-50 text-red-700 hover:bg-red-100"

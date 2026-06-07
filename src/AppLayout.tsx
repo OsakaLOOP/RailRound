@@ -47,9 +47,10 @@ import DistanceWorker from "./workers/distance.worker.js?worker";
 import { useMeta } from "./contexts";
 import { useTranslation } from "react-i18next";
 import { showAlert, showConfirm } from "./utils/alerts";
-import { boundMileageEventForRichDisplay } from "./utils/mileageUserEvents";
+import { boundMileageEventForRichDisplay, lineLabel } from "./utils/mileageUserEvents";
 import { mileageEventTripId, mileageEventUiEvents, selectMileageEventOnMap } from "./utils/mileageEventUiBridge";
-import { tripToKmlPathItems, tripToProductSegments } from "./utils/tripProductProjection";
+import { tripLineSummary, tripToKmlPathItems, tripToProductSegments } from "./utils/tripProductProjection";
+import { selectionFromProductSegment } from "./utils/railGraphSelection";
 import { buildTripDetailModel } from "./utils/railGraphTripDetailModel";
 import { useLocation } from "react-router-dom";
 import { useAppRouteState } from "./hooks/useAppRouteState";
@@ -57,6 +58,13 @@ import { useAppNavigation } from "./hooks/useAppNavigation";
 import { AppSEO } from "./components/layout/AppSEO";
 import { getRouteInfoFromPath, toI18nLang } from "./utils/routes";
 import { loadDefaultRailGraphDeployment } from "./services/railGraphDeploymentLoader";
+import {
+  compactRailGraphRef,
+  railGraphBadgeHtml,
+  railGraphDirectionLabel,
+  type RailGraphBadgeIcon,
+  type RailGraphBadgeTone,
+} from "./components/rail-graph/RailGraphBadges";
 
 const CURRENT_VERSION = meta["currentVersion"];
 
@@ -74,16 +82,56 @@ function buildRoutePopupHtml(args: {
   sourceKind: "rail_graph" | "legacy" | "fallback" | "transfer";
   title: string;
   subtitle: string;
+  accentColor?: string | null;
+  badges?: Array<{
+    icon: RailGraphBadgeIcon;
+    value: string | number | undefined | null;
+    tone?: RailGraphBadgeTone;
+    label?: string;
+    title?: string;
+  }>;
   rows?: Array<[string, string | number | undefined | null]>;
   chips?: string[];
 }): string {
   const rows = (args.rows ?? []).filter(([, value]) => value !== undefined && value !== null && value !== "");
+  const badges = (args.badges ?? []).filter((badge) => badge.value !== undefined && badge.value !== null && badge.value !== "");
   const chips = (args.chips ?? []).filter(Boolean);
+  const sourceVisual: Record<typeof args.sourceKind, { icon: RailGraphBadgeIcon; tone: RailGraphBadgeTone }> = {
+    rail_graph: { icon: "snapshot", tone: "emerald" },
+    legacy: { icon: "legacy", tone: "slate" },
+    fallback: { icon: "distance", tone: "amber" },
+    transfer: { icon: "via", tone: "slate" },
+  };
+  const accentColor = typeof args.accentColor === "string" && /^#[0-9a-f]{3,8}$/i.test(args.accentColor)
+    ? args.accentColor
+    : "";
+  const visual = sourceVisual[args.sourceKind];
   return [
     `<div class="rail-route-popup rail-route-popup-${escapePopupHtml(args.sourceKind)}">`,
-    `<div class="rail-route-popup-source">${escapePopupHtml(args.sourceLabel)}</div>`,
+    `<div class="rail-route-popup-head">`,
+    accentColor ? `<span class="rail-route-popup-color" style="background:${escapePopupHtml(accentColor)}"></span>` : "",
+    railGraphBadgeHtml({
+      icon: visual.icon,
+      value: args.sourceLabel,
+      tone: visual.tone,
+      className: "rail-route-popup-source-badge",
+    }),
+    `</div>`,
     `<div class="rail-route-popup-title">${escapePopupHtml(args.title)}</div>`,
     `<div class="rail-route-popup-subtitle">${escapePopupHtml(args.subtitle)}</div>`,
+    badges.length
+      ? `<div class="rail-route-popup-badges">${badges
+          .map((badge) =>
+            railGraphBadgeHtml({
+              icon: badge.icon,
+              value: badge.value as string | number,
+              tone: badge.tone,
+              label: badge.label,
+              title: badge.title,
+            }),
+          )
+          .join("")}</div>`
+      : "",
     rows.length
       ? `<dl class="rail-route-popup-rows">${rows
           .map(([label, value]) => `<div><dt>${escapePopupHtml(label)}</dt><dd>${escapePopupHtml(value)}</dd></div>`)
@@ -126,6 +174,7 @@ export const AppLayout: React.FC = () => {
     setTripSegmentsGeometry,
     segmentGeometries,
     setVisitedStations,
+    setActiveRailGraphSelection,
     isLoginOpen,
     isHydrated,
     isTripEditing,
@@ -155,6 +204,7 @@ export const AppLayout: React.FC = () => {
       setSegmentGeometries: state.setSegmentGeometries,
       setTripSegmentsGeometry: state.setTripSegmentsGeometry,
       setVisitedStations: state.setVisitedStations,
+      setActiveRailGraphSelection: state.setActiveRailGraphSelection,
       segmentGeometries: state.segmentGeometries,
       isLoginOpen: state.modals.isLoginOpen,
       isHydrated: state.isHydrated,
@@ -1134,13 +1184,10 @@ export const AppLayout: React.FC = () => {
         ]),
       );
       const directionLabel = (direction?: string) => {
-        if (!direction) return t("map.route.unknown", "Unknown");
-        if (direction === "up") return t("map.route.direction.up", "Up");
-        if (direction === "down") return t("map.route.direction.down", "Down");
-        if (direction === "clockwise") return t("map.route.direction.clockwise", "Clockwise");
-        if (direction === "counterclockwise") return t("map.route.direction.counterclockwise", "Counterclockwise");
-        return direction;
+        return railGraphDirectionLabel(direction, t) || t("map.route.unknown", "Unknown");
       };
+      const unknownRouteLabel = t("map.route.unknown", "Unknown");
+      const stationDisplayName = (name?: string | null) => name || unknownRouteLabel;
 
       // Extract visited stations logic
       const visited = new Set<string>();
@@ -1199,6 +1246,7 @@ export const AppLayout: React.FC = () => {
             const seg = segs[i];
             const detailSegment = detail?.segments[i];
             if (seg.source === "rail_graph" && seg.geometry?.length) {
+              const routeLineName = seg.lineLabel || unknownRouteLabel;
               list.push({
                 id: seg.id || `rail-graph_${trip.id}_${i}`,
                 coords: seg.geometry,
@@ -1209,25 +1257,55 @@ export const AppLayout: React.FC = () => {
                 lineKey: `rail-graph:${seg.patternRef ?? seg.id}`,
                 tripId: trip.id,
                 segmentIndex: i,
+                label: routeLineName,
+                patternRef: seg.patternRef ? String(seg.patternRef) : undefined,
+                direction: seg.direction,
+                serviceType: seg.serviceType,
+                geometrySource: "saved_snapshot",
                 popup: buildRoutePopupHtml({
                   sourceLabel: t("map.route.sourceRailGraph", "Rail graph snapshot"),
                   sourceKind: "rail_graph",
-                  title: seg.lineLabel || seg.lineKey,
-                  subtitle: `${seg.fromName || seg.fromId} -> ${seg.toName || seg.toId}`,
-                  rows: [
-                    [t("map.route.service", "Service"), seg.serviceType],
-                    [t("map.route.directionLabel", "Direction"), directionLabel(seg.direction)],
-                    [t("map.route.pattern", "Pattern"), seg.patternRef ? String(seg.patternRef) : undefined],
-                    [t("map.route.distance", "Distance"), t("map.route.km", "{{value}} km", { value: Math.max(0, seg.distanceKm).toFixed(1) })],
-                    [t("map.route.userEvents", "User events"), detailSegment?.userEventCount ?? 0],
-                    [t("map.route.geoSource", "Geometry"), t("map.route.geoRailGraph", "Saved rail-graph geometry")],
-                  ],
-                  chips: [
-                    t("map.route.stopPass", "{{stops}} stops / {{passes}} pass", {
+                  title: routeLineName,
+                  subtitle: `${stationDisplayName(seg.fromName)} -> ${stationDisplayName(seg.toName)}`,
+                  accentColor: seg.displayColor,
+                  badges: [
+                    { icon: "service", value: seg.serviceType, tone: "sky" },
+                    { icon: "direction", value: seg.direction ? directionLabel(seg.direction) : undefined, tone: "amber" },
+                    {
+                      icon: "pattern",
+                      value: seg.patternRef ? compactRailGraphRef(seg.patternRef) : undefined,
+                      tone: "indigo",
+                      title: seg.patternRef ? String(seg.patternRef) : undefined,
+                    },
+                    {
+                      icon: "distance",
+                      value: t("map.route.km", "{{value}} km", { value: Math.max(0, seg.distanceKm).toFixed(1) }),
+                      tone: "slate",
+                    },
+                    {
+                      icon: "userEvent",
+                      label: t("map.route.userEvents", "User events"),
+                      value: detailSegment?.userEventCount ?? 0,
+                      tone: "violet",
+                    },
+                    {
+                      icon: "snapshot",
+                      value: t("map.route.geoRailGraph", "Saved rail-graph geometry"),
+                      tone: "emerald",
+                    },
+                    {
+                      icon: "stops",
+                      value: t("map.route.stopPass", "{{stops}} stops / {{passes}} pass", {
                       stops: detailSegment?.stopCount ?? seg.stopCount ?? 0,
                       passes: detailSegment?.passCount ?? seg.passCount ?? 0,
-                    }),
-                    t("map.route.via", "{{count}} via", { count: detailSegment?.viaStationCount ?? seg.viaStationCount ?? 0 }),
+                      }),
+                      tone: "slate",
+                    },
+                    {
+                      icon: "via",
+                      value: t("map.route.via", "{{count}} via", { count: detailSegment?.viaStationCount ?? seg.viaStationCount ?? 0 }),
+                      tone: "slate",
+                    },
                   ],
                 }),
               });
@@ -1239,6 +1317,7 @@ export const AppLayout: React.FC = () => {
             const line = railwayData[seg.lineKey];
             const s1 = line?.stations.find((s: any) => s.id === seg.fromId);
             const s2 = line?.stations.find((s: any) => s.id === seg.toId);
+            const routeLineName = seg.lineLabel || (seg.lineKey ? lineLabel(seg.lineKey) : unknownRouteLabel);
 
             if (cached) {
               list.push({
@@ -1248,18 +1327,31 @@ export const AppLayout: React.FC = () => {
                 lineKey: seg.lineKey,
                 tripId: trip.id,
                 segmentIndex: i,
+                label: routeLineName,
+                geometrySource: cached.fallback ? "fallback" : "geojson",
                 popup: buildRoutePopupHtml({
                   sourceLabel: cached.fallback
                     ? t("map.route.sourceFallback", "Geometry fallback")
                     : t("map.route.sourceLegacy", "Legacy GeoJSON"),
                   sourceKind: cached.fallback ? "fallback" : "legacy",
-                  title: seg.lineLabel || seg.lineKey,
-                  subtitle: `${s1?.name_ja || seg.fromId} -> ${s2?.name_ja || seg.toId}`,
-                  rows: [
-                    [t("map.route.geoSource", "Geometry"), cached.fallback
-                      ? t("map.route.geoFallback", "Station-to-station fallback")
-                      : t("map.route.geoJson", "Loaded GeoJSON path")],
-                    [t("map.route.userEvents", "User events"), detailSegment?.userEventCount ?? 0],
+                  title: routeLineName,
+                  subtitle: `${stationDisplayName(s1?.name_ja)} -> ${stationDisplayName(s2?.name_ja)}`,
+                  accentColor: line?.meta?.color,
+                  badges: [
+                    {
+                      icon: cached.fallback ? "distance" : "legacy",
+                      label: t("map.route.geoSource", "Geometry"),
+                      value: cached.fallback
+                        ? t("map.route.geoFallback", "Station-to-station fallback")
+                        : t("map.route.geoJson", "Loaded GeoJSON path"),
+                      tone: cached.fallback ? "amber" : "slate",
+                    },
+                    {
+                      icon: "userEvent",
+                      label: t("map.route.userEvents", "User events"),
+                      value: detailSegment?.userEventCount ?? 0,
+                      tone: "violet",
+                    },
                   ],
                 }),
               });
@@ -1478,7 +1570,8 @@ export const AppLayout: React.FC = () => {
         // 最简单的方法是重用现有的 segmentGeometries 缓存！
         trips.forEach((trip) => {
           if (trip.isWalk) return; // Exclude walk trips
-          const tripName = `${trip.date} - Trip ${trip.id}`;
+          const tripSummary = tripLineSummary(trip, railwayData);
+          const tripName = tripSummary === "Unknown" ? trip.date : `${trip.date} - ${tripSummary}`;
           const productPaths = tripToKmlPathItems(trip, railwayData);
           if (productPaths.length > 0) {
             allPaths.push(...productPaths);
@@ -1889,6 +1982,25 @@ export const AppLayout: React.FC = () => {
     setModalState({ isGlobalSearchOpen: false });
     const event = mileageUserEvents.find((candidate) => candidate.id === eventId);
     const projected = event ? boundMileageEventForRichDisplay(event, railwayData, trips) : null;
+    const tripId = mileageEventTripId(event?.payload?.tripId);
+    const trip = tripId !== undefined
+      ? trips.find((candidate) => String(candidate.id) === String(tripId))
+      : null;
+    const productSegments = trip ? tripToProductSegments(trip, railwayData) : [];
+    const segmentIndex = typeof projected?.bound.orderIndex === "number" ? projected.bound.orderIndex : 0;
+    const segment = productSegments[segmentIndex] ?? productSegments[0];
+    const selection = selectionFromProductSegment({
+      kind: "event",
+      segment,
+      lineContext: projected?.lineContext,
+      tripId,
+      tripSegmentIndex: projected?.bound.orderIndex ?? segmentIndex,
+      eventId,
+    });
+    if (selection) {
+      setActiveRailGraphSelection(selection);
+    }
+    const lineKey = selection?.lineKey ?? projected?.lineContext.lineKey ?? segment?.lineKey;
     goToTab("map");
     window.setTimeout(() => {
       if (projected?.bound.coordinates) {
@@ -1904,10 +2016,11 @@ export const AppLayout: React.FC = () => {
       }
       selectMileageEventOnMap({
         eventId,
-        lineKey: projected?.lineContext.lineKey,
+        lineKey: lineKey ?? undefined,
         source: projected?.lineContext.source,
-        tripId: mileageEventTripId(event?.payload?.tripId),
-        tripSegmentIndex: projected?.bound.orderIndex,
+        tripId,
+        tripSegmentIndex: projected?.bound.orderIndex ?? segmentIndex,
+        routeItemId: segment?.id,
       });
     }, 150);
   };

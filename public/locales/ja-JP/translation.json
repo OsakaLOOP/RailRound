@@ -205,26 +205,18 @@
     "eventCenter": {
       "summary": "{{count}} 件のイベント",
       "filteredCount": "{{count}} 件を表示",
-      "railGraphCount": "rail graph {{count}} 件",
-      "geoJsonCount": "GeoJSON {{count}} 件",
       "noEvents": "キロ程イベントはありません",
       "trip": "旅程",
       "lines": "路線",
-      "projectionSource": "投影元",
-      "railGraphProjectionHint": "ユーザーイベントは、この旅程の保存済み rail-graph 運行スナップショット上で並びます。",
-      "geoJsonProjectionHint": "ユーザーイベントは、現在の GeoJSON app-line キロ程軸上で並びます。",
-      "add": "イベントを追加",
-      "addOnMap": "地図で追加",
-      "copy": "概要をコピー",
+      "snapshotAxis": "保存済みスナップショット軸",
+      "geoJsonAxis": "GeoJSON キロ程軸",
       "empty": "この旅程にはイベントがありません",
       "replay": "旅程リプレイ",
       "sortedByMileage": "旅程キロ程順",
       "departure": "出発",
       "transfer": "乗換",
       "arrival": "到着",
-      "openMapEditor": "マップ編集を開く",
-      "exportJson": "イベント JSON をエクスポート",
-      "exportMdx": "イベント MDX をエクスポート"
+      "openMapEditor": "マップ編集を開く"
     },
     "eventFilters": {
       "title": "旅程イベントフィルター",
@@ -544,7 +536,6 @@
     "tags": "タグ",
     "tagsPlaceholder": "タグ（カンマ区切り）",
     "mediaPlaceholder": "写真 URL または添付プレースホルダー",
-    "routeDraftTitle": "路線イベント",
     "linkedTrip": "連携旅程",
     "noLinkedTrip": "連携旅程なし",
     "trip": "旅程",
@@ -568,15 +559,19 @@
     "markerClusterWithSource": "{{count}} 件のイベント · {{source}}",
     "markerSingleWithSource": "{{title}} · {{source}}",
     "useMapCenter": "地図中心を使用",
-    "sourceCountRailGraph": "Rail graph {{count}}",
-    "sourceCountLegacy": "GeoJSON {{count}}",
     "sourceRailGraph": "Rail graph スナップショット",
     "sourceLegacy": "GeoJSON 軸",
     "sourceMixed": "混在ソース",
     "selectedLine": "選択中の路線",
     "noLineLoaded": "路線未読み込み",
     "axisEventCount": "軸上 {{count}} 件",
-    "axisSourceHint": "rail-graph 旅程イベントは保存済み運行スナップショットから投影され、GeoJSON イベントは app-line キロ程軸に残ります。",
+    "selectedRoute": "選択中のルート区間",
+    "selectedEvent": "選択中のイベント",
+    "selectedAxis": "選択中のキロ程軸",
+    "geometrySavedSnapshot": "保存済みジオメトリ",
+    "geometryGeoJson": "GeoJSON ジオメトリ",
+    "geometryFallback": "フォールバックジオメトリ",
+    "snapshotAxisSearchHint": "場所・時刻検索は GeoJSON キロ程軸で使用します。スナップショットのルートイベントは選択中の区間に保持されます。",
     "noLineData": "キロ程イベントを作成する前に GeoJSON 路線データを読み込んでください。保存済み rail-graph 旅程イベントは、スナップショットを投影できる時に表示されます。",
     "unknown": "不明",
     "deleteConfirm": "このキロ程イベントを削除しますか？",
@@ -604,6 +599,27 @@
       "map": "地図",
       "mileage": "キロ程",
       "trip": "旅程"
+    },
+    "createSourceHint": {
+      "station": "選択中のキロ程軸上の駅にイベントを合わせます。",
+      "map": "現在の地図ポイントをキロ程軸へ投影します。",
+      "mileage": "正確なキロ程値でイベントを配置します。",
+      "trip": "保存済み旅程区間上の位置にイベントを結び付けます。"
+    },
+    "sourceTarget": {
+      "geoJsonAxis": "GeoJSON 軸",
+      "noAxis": "軸未読み込み",
+      "railGraphTrip": "保存済みスナップショット",
+      "legacyTrip": "従来旅程",
+      "noProjectableTrip": "投影可能な区間なし",
+      "noTrip": "旅程未選択"
+    },
+    "disabledReason": {
+      "noTrip": "旅程位置からイベントを作成する前に旅程を追加してください。",
+      "noTripSegment": "選択中の旅程にはキロ程イベントを受け取れる区間がありません。",
+      "noLineAxis": "この軸にイベントを作成する前に GeoJSON 路線データを読み込んでください。",
+      "noStation": "先に駅を選択してください。",
+      "noMapPoint": "先に地図をクリックするか、地図中心を使用してください。"
     },
     "action": {
       "create": "イベントを作成",
@@ -643,6 +659,7 @@
     "source": {
       "station": "駅",
       "mileage": "キロ程",
+      "edge": "ルートエッジ",
       "map_point": "地図ポイント",
       "trip_position": "旅程位置"
     },
@@ -743,6 +760,13 @@
     "title": "ルートプレビューをエクスポート",
     "preview": "プレビュー",
     "loading": "ルートデータを計算中...",
+    "errors": {
+      "missingLine": "選択した路線の一部を解決できないため、書き出せません。",
+      "missingStation": "選択したルート上の駅を一部解決できないため、書き出せません。",
+      "notFound": "選択した駅を結ぶルートを見つけられませんでした。",
+      "noSegments": "この行程には書き出せるルート区間がありません。",
+      "computeFailed": "ルート計算に失敗しました。"
+    },
     "railGraphSource": "Rail graph スナップショット",
     "legacySource": "従来 GeoJSON ルート",
     "legacySourceDesc": "プレビューは現在の GeoJSON 路線データから計算されます。",

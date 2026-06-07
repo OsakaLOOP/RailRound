@@ -21,6 +21,7 @@ import {
 } from "../../utils/mileageUserEvents";
 import { eventKindLabel, eventVisibilityLabel, mileageEventKinds, mileageEventVisibilities } from "./display";
 import { useMileageEventActions } from "./useMileageEventActions";
+import { requestMileageEventsMapCenter } from "../../utils/mileageEventUiBridge";
 
 type ComposerSource = "station" | "map" | "mileage" | "trip";
 
@@ -179,6 +180,90 @@ export const EventComposer: React.FC<Props> = ({
       : t("mileageEvents.tripSourceLegacy", "Legacy GeoJSON");
     return `${trip.date} - ${source} - ${tripLineSummary(trip, railwayData)}`;
   };
+  const sourceTargetLabel = (key: ComposerSource) => {
+    if (key === "trip") {
+      if (!selectedTrip) return t("mileageEvents.sourceTarget.noTrip", "No trip selected");
+      if (selectedTripSegments.length === 0) {
+        return t("mileageEvents.sourceTarget.noProjectableTrip", "No projectable segment");
+      }
+      return selectedTripUsesRailGraph
+        ? t("mileageEvents.sourceTarget.railGraphTrip", "Saved snapshot")
+        : t("mileageEvents.sourceTarget.legacyTrip", "Legacy trip");
+    }
+    return lineContext
+      ? t("mileageEvents.sourceTarget.geoJsonAxis", "GeoJSON axis")
+      : t("mileageEvents.sourceTarget.noAxis", "No axis loaded");
+  };
+  const sourceCards = [
+    {
+      key: "station",
+      Icon: TrainFront,
+      label: t("mileageEvents.createSource.station", "Station"),
+      hint: t("mileageEvents.createSourceHint.station", "Snap the event to a station on the selected mileage axis."),
+      tone: "text-sky-700",
+      ring: "ring-sky-200",
+      bg: "bg-sky-50",
+    },
+    {
+      key: "map",
+      Icon: MapPinned,
+      label: t("mileageEvents.createSource.map", "Map"),
+      hint: t("mileageEvents.createSourceHint.map", "Project the current map point to the mileage axis."),
+      tone: "text-emerald-700",
+      ring: "ring-emerald-200",
+      bg: "bg-emerald-50",
+    },
+    {
+      key: "mileage",
+      Icon: Navigation,
+      label: t("mileageEvents.createSource.mileage", "Mileage"),
+      hint: t("mileageEvents.createSourceHint.mileage", "Place the event by an exact kilometer value."),
+      tone: "text-amber-700",
+      ring: "ring-amber-200",
+      bg: "bg-amber-50",
+    },
+    {
+      key: "trip",
+      Icon: Route,
+      label: t("mileageEvents.createSource.trip", "Trip"),
+      hint: t("mileageEvents.createSourceHint.trip", "Attach the event to a position on a saved trip segment."),
+      tone: "text-indigo-700",
+      ring: "ring-indigo-200",
+      bg: "bg-indigo-50",
+    },
+  ] satisfies Array<{
+    key: ComposerSource;
+    Icon: typeof TrainFront;
+    label: string;
+    hint: string;
+    tone: string;
+    ring: string;
+    bg: string;
+  }>;
+  const sourceBlockedReason = (key: ComposerSource) => {
+    if (event) return "";
+    if (key === "trip") {
+      if (trips.length === 0 || !selectedTrip) {
+        return t("mileageEvents.disabledReason.noTrip", "Add a trip before creating an event from trip position.");
+      }
+      if (selectedTripSegments.length === 0) {
+        return t("mileageEvents.disabledReason.noTripSegment", "The selected trip has no segment that can receive a mileage event.");
+      }
+      return "";
+    }
+    if (!lineContext) {
+      return t("mileageEvents.disabledReason.noLineAxis", "Load GeoJSON line data before creating an event on this axis.");
+    }
+    if (key === "station" && !effectiveStationId) {
+      return t("mileageEvents.disabledReason.noStation", "Select a station before creating this event.");
+    }
+    if (key === "map" && !mapPoint) {
+      return t("mileageEvents.disabledReason.noMapPoint", "Click the map or use the map center before creating this event.");
+    }
+    return "";
+  };
+  const createBlockedReason = sourceBlockedReason(source);
+  const createDisabled = !event && !!createBlockedReason;
 
   const submit = () => {
     if (event) {
@@ -254,25 +339,52 @@ export const EventComposer: React.FC<Props> = ({
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       {editableLocation && (
-        <div className="grid grid-cols-4 gap-1 rounded-md bg-slate-100 p-1">
-          {[
-            ["station", TrainFront, t("mileageEvents.createSource.station", "Station")] as const,
-            ["map", MapPinned, t("mileageEvents.createSource.map", "Map")] as const,
-            ["mileage", Navigation, t("mileageEvents.createSource.mileage", "Mileage")] as const,
-            ["trip", Route, t("mileageEvents.createSource.trip", "Trip")] as const,
-          ].map(([key, Icon, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setSource(key)}
-              className={`flex min-w-0 items-center justify-center gap-1 rounded px-1.5 py-1.5 text-[11px] font-semibold ${
-                source === key ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <Icon size={13} />
-              <span className="truncate">{label}</span>
-            </button>
-          ))}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {sourceCards.map(({ key, Icon, label, hint, tone, ring, bg }) => {
+            const selected = source === key;
+            const cardBlockedReason = sourceBlockedReason(key);
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSource(key)}
+                aria-pressed={selected}
+                aria-describedby={cardBlockedReason ? `mileage-event-source-${key}-reason` : undefined}
+                className={`min-w-0 rounded-md border p-2 text-left transition ${
+                  selected
+                    ? `border-transparent bg-white shadow-sm ring-2 ${ring}`
+                    : cardBlockedReason
+                      ? "border-amber-200 bg-amber-50/50 hover:border-amber-300 hover:bg-white"
+                      : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white"
+                }`}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded ${selected ? bg : "bg-white"} ${tone}`}>
+                    <Icon size={15} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className={`block break-words text-xs font-semibold ${selected ? "text-slate-900" : "text-slate-600"}`}>
+                      {label}
+                    </span>
+                    <span className={`mt-0.5 block break-words text-[10px] font-semibold leading-tight ${cardBlockedReason ? "text-amber-600" : "text-slate-400"}`}>
+                      {sourceTargetLabel(key)}
+                    </span>
+                  </span>
+                </span>
+                <span className="mt-1.5 line-clamp-2 block min-h-[2.1em] text-[10px] leading-snug text-slate-500">
+                  {hint}
+                </span>
+                {cardBlockedReason && (
+                  <span
+                    id={`mileage-event-source-${key}-reason`}
+                    className="mt-1.5 block rounded border border-amber-200 bg-white/80 px-1.5 py-1 text-[10px] font-semibold leading-snug text-amber-700"
+                  >
+                    {cardBlockedReason}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -331,10 +443,19 @@ export const EventComposer: React.FC<Props> = ({
       )}
 
       {editableLocation && source === "map" && (
-        <div className="rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
-          {mapPoint
-            ? t("mileageEvents.mapPointReady", "Current map point will be projected to mileage.")
-            : t("mileageEvents.mapPointMissing", "Click the map or use the current map center first.")}
+        <div className="rounded-md border border-emerald-100 bg-emerald-50/70 p-2 text-xs text-slate-600">
+          <div>
+            {mapPoint
+              ? t("mileageEvents.mapPointReady", "Current map point will be projected to mileage.")
+              : t("mileageEvents.mapPointMissing", "Click the map or use the current map center first.")}
+          </div>
+          <button
+            type="button"
+            className="rl-secondary-action mt-2 w-full px-2 py-1.5 text-[11px] font-semibold"
+            onClick={requestMileageEventsMapCenter}
+          >
+            {t("mileageEvents.useMapCenter", "Use map center")}
+          </button>
         </div>
       )}
 
@@ -397,8 +518,8 @@ export const EventComposer: React.FC<Props> = ({
           {selectedTripSegment && (
             <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] text-slate-500">
               {t("mileageEvents.tripSegmentSummary", "{{from}} to {{to}} · {{distance}} km", {
-                from: selectedTripSegment.fromName || selectedTripSegment.fromId,
-                to: selectedTripSegment.toName || selectedTripSegment.toId,
+                from: selectedTripSegment.fromName || t("mileageEvents.unknown", "Unknown"),
+                to: selectedTripSegment.toName || t("mileageEvents.unknown", "Unknown"),
                 distance: Math.max(0, selectedTripSegment.distanceKm || 0).toFixed(1),
               })}
             </div>
@@ -470,7 +591,7 @@ export const EventComposer: React.FC<Props> = ({
           <option value="">{t("mileageEvents.noLinkedTrip", "No linked trip")}</option>
           {trips.map((trip) => (
             <option key={String(trip.id)} value={String(trip.id)}>
-              {trip.date} · {String(trip.id)}
+              {tripOptionLabel(trip)}
             </option>
           ))}
         </select>
@@ -490,16 +611,17 @@ export const EventComposer: React.FC<Props> = ({
           type="button"
           className={`${onCancel ? "" : "col-span-2"} flex items-center justify-center gap-1 rounded-md bg-emerald-600 px-2 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:bg-slate-300`}
           onClick={submit}
-          disabled={!event && (
-            source === "trip"
-              ? trips.length === 0
-              : (!lineContext || (source === "station" && !effectiveStationId) || (source === "map" && !mapPoint))
-          )}
+          disabled={createDisabled}
         >
           <Plus size={14} />
           {event ? t("mileageEvents.action.save", "Save") : t("mileageEvents.action.create", "Create event")}
         </button>
       </div>
+      {createBlockedReason && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-700">
+          {createBlockedReason}
+        </div>
+      )}
     </div>
   );
 };

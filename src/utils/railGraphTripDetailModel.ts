@@ -333,11 +333,13 @@ function legacyBoundaryEvents(
   segmentStartMeters: number,
 ): TripDetailEvent[] {
   const segmentMeters = Math.round(Math.max(0, segment.distanceKm) * 1000);
+  const fromLabel = segment.fromName || "Unknown";
+  const toLabel = segment.toName || "Unknown";
   return [{
     id: `${segment.id}:departure`,
     source: "system",
     type: segmentIndex === 0 ? "departure" : "transfer",
-    label: segment.fromName || segment.fromId,
+    label: fromLabel,
     segmentIndex,
     distanceMeters: segmentStartMeters,
     stationName: segment.fromName,
@@ -346,7 +348,7 @@ function legacyBoundaryEvents(
     id: `${segment.id}:arrival`,
     source: "system",
     type: "arrival",
-    label: segment.toName || segment.toId,
+    label: toLabel,
     segmentIndex,
     distanceMeters: segmentStartMeters + segmentMeters,
     stationName: segment.toName,

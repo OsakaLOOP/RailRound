@@ -110,9 +110,16 @@ Required badge families:
 
 Badges should carry metadata, not repeat surrounding title/time text. Raw refs can appear in tooltip or detail rows, not as the primary label.
 
+Current shared entry points:
+
+- `RailGraphRunBadges` for React service / direction / pattern metadata.
+- `railGraphRunBadgeItems` for converting the same metadata to badge records.
+- `railGraphBadgeHtml` for Leaflet route tooltip HTML with the same icon/tone semantics.
+- `railGraphDirectionLabel` for direction translation across React and Leaflet surfaces.
+
 ## 7. Current Progress
 
-Current implementation is approximately 55-60 percent complete for the main-app UI goal.
+Current implementation is approximately 65-68 percent complete for the main-app UI goal.
 
 Done:
 
@@ -122,13 +129,18 @@ Done:
 - GlobalSearch, EventInspector, MileageEventsPanel, TripEditor, ExportRouteModal now use the shared badge language.
 - Map route click and pin create can open the标注 panel with a usable mileage axis.
 - Active mileage line / route dimming infrastructure exists in `MapContainer`.
+- `activeRailGraphSelection` is the shared non-persistent UI selection across Map route click, TripPage jump, GlobalSearch event jump, EventInspector map jump, and MileageEventsPanel.
+- Map event marker clicks preserve trip id, segment index, and route context when projection data is available.
+- `railGraphSelection.ts` centralizes bridge source conversion plus ProductTripSegment / event projection context / Map route item selection payloads, including legacy GeoJSON compatibility and explicit rail-graph source overrides.
+- TripPage event center has moved toward read-only overview and map jump instead of competing event editing/export tooling.
+- Route metadata uses the shared badge visual language in React surfaces and Leaflet HTML.
 
 Still incomplete:
 
-- TripPage still exposes too much event-management surface and should become read-only overview plus map jump.
-- Map route selection, selected segment, active axis, and panel state are not yet one explicit state model.
-- EventComposer still has plain source tabs and weak source/projection explanation.
-- Route popup still uses HTML text chips instead of the same visual hierarchy.
+- Window bridge events and store `activeRailGraphSelection` still coexist; the bridge should shrink further to native Leaflet / DOM event boundaries.
+- Map selected route, selected event marker, dimmed routes, hover metadata, and touch metadata still need visual QA.
+- EventComposer and MileageEventsPanel need more narrow-screen polish and disabled-reason QA.
+- TripPage still needs replay/route visualization simplification and more top-level run summary polish.
 - Visual QA for mobile/desktop has not been completed.
 
 ## 8. PR Plan

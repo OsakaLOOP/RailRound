@@ -188,6 +188,28 @@ export interface RailGraphLoadState {
   loadedAt?: string;
 }
 
+export interface RailGraphActiveSelection {
+  kind: 'route' | 'event' | 'axis';
+  source: 'rail_graph_snapshot' | 'legacy_geojson';
+  lineKey?: string | null;
+  tripId?: ID;
+  tripSegmentIndex?: number;
+  routeItemId?: string;
+  eventId?: string;
+  label?: string;
+  color?: string;
+  patternRef?: string;
+  direction?: string;
+  serviceType?: string;
+  geometrySource?: 'saved_snapshot' | 'geojson' | 'fallback';
+  anchor?: {
+    lat?: number;
+    lng?: number;
+    tripRatio?: number;
+  };
+  updatedAt: number;
+}
+
 export interface Pin {
   id: ID;
   lat: number;
@@ -334,6 +356,9 @@ export interface GlobalStore {
   setMapZoom: (zoom: number) => void;
   leafletReady: boolean;
   setLeafletReady: (ready: boolean) => void;
+  activeRailGraphSelection: RailGraphActiveSelection | null;
+  setActiveRailGraphSelection: (selection: Omit<RailGraphActiveSelection, 'updatedAt'> | null) => void;
+  clearActiveRailGraphSelection: () => void;
 
   isTripEditing: boolean;
   editingTripId: ID | null;
@@ -462,6 +487,11 @@ export const useStore = create<GlobalStore>()(
       setMapZoom: (zoom) => set({ mapZoom: zoom }),
       leafletReady: false,
       setLeafletReady: (ready) => set({ leafletReady: ready }),
+      activeRailGraphSelection: null,
+      setActiveRailGraphSelection: (selection) => set({
+        activeRailGraphSelection: selection ? { ...selection, updatedAt: Date.now() } : null,
+      }),
+      clearActiveRailGraphSelection: () => set({ activeRailGraphSelection: null }),
 
       isTripEditing: false,
       editingTripId: null,

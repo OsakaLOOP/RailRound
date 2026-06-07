@@ -3,16 +3,17 @@ import { X, Copy, Download, CheckCircle2, Loader2, Moon, Sun } from "lucide-reac
 import { useStore } from "../../store";
 import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
-import { computeAndSerializeRoute } from "../../utils/routeSerializer";
+import { computeAndSerializeRoute, ROUTE_EXPORT_ERRORS } from "../../utils/routeSerializer";
 import { generateRouteMdx } from "../../utils/codeGenerator";
 import type { RouteSliceData } from "../../utils/routeExportTypes";
 import { RouteSlicePreview } from "@blog-src/components/mdx/RouteSlicePreviewStatic";
 import { tripToProductRouteSegments, tripToRouteSliceData } from "../../utils/tripProductProjection";
 import { buildTripDetailModel, tripDetailKeyEvents } from "../../utils/railGraphTripDetailModel";
-import { RailGraphBadge, RailGraphEventPill } from "../rail-graph/RailGraphBadges";
+import { RailGraphBadge, RailGraphEventPill, RailGraphRunBadges } from "../rail-graph/RailGraphBadges";
 
 const LOCALES = ["en", "ja", "zh-cn", "zh-tw"] as const;
 const HEIGHTS = ["300px", "400px", "500px", "600px"] as const;
+const NO_TRIP_SEGMENTS_ERROR = "No segments found in this trip";
 
 export const ExportRouteModal: React.FC = () => {
   const { isOpen, trip, railwayData, geoData, mileageUserEvents } = useStore(
@@ -47,6 +48,22 @@ export const ExportRouteModal: React.FC = () => {
     setModalState({ exportRouteModalOpen: false, currentTripForExport: null });
   }, [setModalState]);
 
+  const routeErrorMessage = useCallback((message?: string) => {
+    if (message === ROUTE_EXPORT_ERRORS.missingLine) {
+      return t("exportRoute.errors.missingLine", ROUTE_EXPORT_ERRORS.missingLine);
+    }
+    if (message === ROUTE_EXPORT_ERRORS.missingStation) {
+      return t("exportRoute.errors.missingStation", ROUTE_EXPORT_ERRORS.missingStation);
+    }
+    if (message === ROUTE_EXPORT_ERRORS.notFound) {
+      return t("exportRoute.errors.notFound", ROUTE_EXPORT_ERRORS.notFound);
+    }
+    if (message === NO_TRIP_SEGMENTS_ERROR) {
+      return t("exportRoute.errors.noSegments", "This trip has no route segments to export.");
+    }
+    return t("exportRoute.errors.computeFailed", "Failed to compute route.");
+  }, [t]);
+
   useEffect(() => {
     if (!isOpen) return;
     const lang = navigator.language?.toLowerCase() || "en";
@@ -76,7 +93,7 @@ export const ExportRouteModal: React.FC = () => {
   }, [isOpen, trip, railwayData]);
 
   useEffect(() => {
-    if (!isOpen || !trip || !railwayData || !geoData) return;
+    if (!isOpen || !trip || !railwayData) return;
 
     let cancelled = false;
     setLoading(true);
@@ -92,7 +109,7 @@ export const ExportRouteModal: React.FC = () => {
         }
 
         const segments = tripToProductRouteSegments(trip, railwayData);
-        if (segments.length === 0) throw new Error("No segments found in this trip");
+        if (segments.length === 0) throw new Error(NO_TRIP_SEGMENTS_ERROR);
         const firstSegment = segments[0];
         const lastSegment = segments[segments.length - 1];
         const startLineKey = firstSegment.lineKey;
@@ -100,7 +117,7 @@ export const ExportRouteModal: React.FC = () => {
         const endLineKey = lastSegment.lineKey;
         const endStationId = lastSegment.toId;
         if (!startLineKey || !startStationId || !endLineKey || !endStationId) {
-          throw new Error("No segments found in this trip");
+          throw new Error(NO_TRIP_SEGMENTS_ERROR);
         }
 
         const result =
@@ -128,7 +145,7 @@ export const ExportRouteModal: React.FC = () => {
 
         if (!cancelled) setRouteData(result);
       } catch (e: any) {
-        if (!cancelled) setError(e.message || "Failed to compute route");
+        if (!cancelled) setError(routeErrorMessage(e.message));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -136,7 +153,7 @@ export const ExportRouteModal: React.FC = () => {
 
     compute();
     return () => { cancelled = true; };
-  }, [isOpen, trip, railwayData, geoData, routeMode]);
+  }, [isOpen, trip, railwayData, geoData, routeMode, routeErrorMessage]);
 
   const handleCopy = async () => {
     if (!routeData) return;
@@ -171,23 +188,6 @@ export const ExportRouteModal: React.FC = () => {
     return "English";
   };
 
-  const directionLabel = (direction?: string) => {
-    if (!direction) return t("exportRoute.unknown", "Unknown");
-    if (direction === "up") return t("exportRoute.direction.up", "Up");
-    if (direction === "down") return t("exportRoute.direction.down", "Down");
-    if (direction === "clockwise") return t("exportRoute.direction.clockwise", "Clockwise");
-    if (direction === "counterclockwise") return t("exportRoute.direction.counterclockwise", "Counterclockwise");
-    return direction;
-  };
-
-  const compactRailGraphRef = (value?: unknown) => {
-    const text = String(value ?? "").trim();
-    if (!text) return "";
-    const cut = Math.max(text.lastIndexOf(":"), text.lastIndexOf("/"), text.lastIndexOf("#"));
-    const label = cut >= 0 ? text.slice(cut + 1) : text;
-    return label || text;
-  };
-
   const renderSourceSummary = () => {
     if (!tripDetail) return null;
     if (tripDetail.kind === "rail_graph") {
@@ -217,22 +217,15 @@ export const ExportRouteModal: React.FC = () => {
             </div>
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
-            {firstSegment?.serviceType && (
-              <RailGraphBadge icon="service" value={firstSegment.serviceType} tone="sky" className="rounded bg-white" />
-            )}
-            {firstSegment?.direction && (
-              <RailGraphBadge icon="direction" value={directionLabel(firstSegment.direction)} tone="amber" className="rounded bg-white" />
-            )}
-            {firstSegment?.patternRef && (
-              <RailGraphBadge
-                icon="pattern"
-                label={t("mileageEvents.inspector.pattern", "Pattern")}
-                value={compactRailGraphRef(firstSegment.patternRef)}
-                tone="indigo"
-                title={String(firstSegment.patternRef)}
-                className="max-w-[12rem] rounded bg-white"
-              />
-            )}
+            <RailGraphRunBadges
+              meta={{
+                serviceType: firstSegment?.serviceType,
+                direction: firstSegment?.direction,
+                patternRef: firstSegment?.patternRef,
+              }}
+              patternClassName="max-w-[12rem]"
+              showLabels
+            />
             <RailGraphBadge icon="distance" value={t("exportRoute.geoSourceRailGraph", "Saved geometry")} tone="slate" className="rounded bg-white" />
             <RailGraphBadge
               icon="userEvent"

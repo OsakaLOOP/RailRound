@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 export type RailGraphBadgeIcon =
   | "snapshot"
@@ -43,6 +44,130 @@ const toneClasses: Record<RailGraphBadgeTone, string> = {
   rose: "border-rose-100 bg-rose-50 text-rose-700",
   slate: "border-slate-200 bg-slate-50 text-slate-600",
 };
+
+const htmlToneClasses: Record<RailGraphBadgeTone, string> = {
+  emerald: "rail-graph-html-badge-emerald",
+  indigo: "rail-graph-html-badge-indigo",
+  sky: "rail-graph-html-badge-sky",
+  amber: "rail-graph-html-badge-amber",
+  violet: "rail-graph-html-badge-violet",
+  rose: "rail-graph-html-badge-rose",
+  slate: "rail-graph-html-badge-slate",
+};
+
+export const railGraphToneClassName = (tone: RailGraphBadgeTone) => toneClasses[tone];
+
+export const compactRailGraphRef = (value?: unknown) => {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  const cut = Math.max(text.lastIndexOf(":"), text.lastIndexOf("/"), text.lastIndexOf("#"));
+  const label = cut >= 0 ? text.slice(cut + 1) : text;
+  return label || text;
+};
+
+type RailGraphTranslate = (key: string, fallback: string) => string;
+
+export const railGraphDirectionLabel = (direction?: string | null, t?: RailGraphTranslate) => {
+  const text = String(direction ?? "").trim();
+  if (!text) return "";
+  const translate = t ?? ((_, fallback) => fallback);
+  if (text === "up") return translate("tripsPage.railGraph.direction.up", "Up");
+  if (text === "down") return translate("tripsPage.railGraph.direction.down", "Down");
+  if (text === "clockwise") return translate("tripsPage.railGraph.direction.clockwise", "Clockwise");
+  if (text === "counterclockwise") return translate("tripsPage.railGraph.direction.counterclockwise", "Counterclockwise");
+  return text;
+};
+
+export interface RailGraphRunMeta {
+  serviceType?: string | null;
+  direction?: string | null;
+  patternRef?: unknown;
+}
+
+export interface RailGraphRunBadgeItem {
+  icon: RailGraphBadgeIcon;
+  value: string;
+  tone: RailGraphBadgeTone;
+  title?: string;
+}
+
+export const railGraphRunBadgeItems = (
+  meta: RailGraphRunMeta,
+  t?: RailGraphTranslate,
+): RailGraphRunBadgeItem[] => {
+  const items: RailGraphRunBadgeItem[] = [];
+  if (meta.serviceType) {
+    items.push({ icon: "service", value: String(meta.serviceType), tone: "sky" });
+  }
+  const direction = railGraphDirectionLabel(meta.direction, t);
+  if (direction) {
+    items.push({ icon: "direction", value: direction, tone: "amber" });
+  }
+  const pattern = compactRailGraphRef(meta.patternRef);
+  if (pattern) {
+    items.push({ icon: "pattern", value: pattern, tone: "indigo", title: String(meta.patternRef) });
+  }
+  return items;
+};
+
+const escapeHtml = (value: unknown) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const railGraphSymbolHtml = (name: RailGraphBadgeIcon) => {
+  const common = `fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"`;
+  const body = (() => {
+    if (name === "snapshot") {
+      return `<path ${common} d="M3 4.5 8 2l5 2.5v7L8 14l-5-2.5z"/><path ${common} d="M8 2v12M3 4.5l5 2.5 5-2.5"/>`;
+    }
+    if (name === "legacy") {
+      return `<path ${common} d="M3 4h10v9H3z"/><path ${common} d="M5 6h6M5 8h6M5 10h3"/>`;
+    }
+    if (name === "pattern") {
+      return `<path ${common} d="M2.5 11.5c2-5 5-7 11-7"/><path ${common} d="M2.5 6.5c3 0 4 3 6 3s2.8-2 5-2"/><circle cx="4" cy="11" r="1" fill="currentColor"/><circle cx="12" cy="4.8" r="1" fill="currentColor"/>`;
+    }
+    if (name === "service") {
+      return `<rect ${common} x="3" y="3.5" width="10" height="8" rx="2"/><path ${common} d="M5 6h6M5.5 12.5l-1 1M11.5 12.5l1 1"/><circle cx="5.6" cy="9.5" r="0.8" fill="currentColor"/><circle cx="10.4" cy="9.5" r="0.8" fill="currentColor"/>`;
+    }
+    if (name === "direction") {
+      return `<path ${common} d="M3 8h9"/><path ${common} d="m9 4 4 4-4 4"/><path ${common} d="M4.5 4.5a5 5 0 0 1 7 0"/>`;
+    }
+    if (name === "distance") {
+      return `<path ${common} d="M3 12c1.5-5.5 8-3 10-8"/><circle cx="3" cy="12" r="1.2" fill="currentColor"/><circle cx="13" cy="4" r="1.2" fill="currentColor"/>`;
+    }
+    if (name === "userEvent") {
+      return `<path ${common} d="M4 4.5h8v7H7l-3 2v-2z"/><path ${common} d="M6 7h4M6 9h2.5"/>`;
+    }
+    if (name === "stops") {
+      return `<path ${common} d="M3 8h10"/><circle cx="4" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12" cy="8" r="1.4" fill="currentColor"/>`;
+    }
+    if (name === "via") {
+      return `<path ${common} d="M3 12V6a2 2 0 0 1 2-2h3"/><path ${common} d="M8 4h3a2 2 0 0 1 2 2v6"/><path ${common} d="m10.5 9.5 2.5 2.5 2.5-2.5"/>`;
+    }
+    return `<path ${common} d="M4 3.5h6l2 2v8H4z"/><path ${common} d="M10 3.5V6h2M6 8h5M6 10.5h4"/>`;
+  })();
+  return `<svg viewBox="0 0 16 16" aria-hidden="true" class="rail-graph-html-badge-icon">${body}</svg>`;
+};
+
+export function railGraphBadgeHtml(args: {
+  icon: RailGraphBadgeIcon;
+  value: string | number;
+  tone?: RailGraphBadgeTone;
+  label?: string;
+  title?: string;
+  className?: string;
+}) {
+  const tone = args.tone ?? "slate";
+  const label = args.label
+    ? `<span class="rail-graph-html-badge-label">${escapeHtml(args.label)}</span>`
+    : "";
+  const title = args.title ? ` title="${escapeHtml(args.title)}"` : "";
+  return `<span class="rail-graph-html-badge ${htmlToneClasses[tone]} ${escapeHtml(args.className ?? "")}"${title}>${railGraphSymbolHtml(args.icon)}${label}<span class="rail-graph-html-badge-value">${escapeHtml(args.value)}</span></span>`;
+}
 
 export const railGraphEventTone = (type: string): RailGraphBadgeTone => {
   if (type === "departure" || type === "arrival") return "emerald";
@@ -271,6 +396,37 @@ export const RailGraphBadge: React.FC<{
     <span className="truncate">{value}</span>
   </span>
 );
+
+export const RailGraphRunBadges: React.FC<{
+  meta: RailGraphRunMeta;
+  badgeClassName?: string;
+  patternClassName?: string;
+  showLabels?: boolean;
+}> = ({ meta, badgeClassName = "rounded bg-white", patternClassName = "max-w-[10rem]", showLabels = false }) => {
+  const { t } = useTranslation();
+  const labelForIcon = (icon: RailGraphBadgeIcon) => {
+    if (!showLabels) return undefined;
+    if (icon === "service") return t("mileageEvents.inspector.service", "Service");
+    if (icon === "direction") return t("mileageEvents.inspector.direction", "Direction");
+    if (icon === "pattern") return t("mileageEvents.inspector.pattern", "Pattern");
+    return undefined;
+  };
+  return (
+    <>
+      {railGraphRunBadgeItems(meta, t).map((item) => (
+        <RailGraphBadge
+          key={`${item.icon}:${item.value}`}
+          icon={item.icon}
+          label={labelForIcon(item.icon)}
+          value={item.value}
+          tone={item.tone}
+          title={item.title}
+          className={`${badgeClassName} ${item.icon === "pattern" ? patternClassName : "max-w-[8rem]"}`}
+        />
+      ))}
+    </>
+  );
+};
 
 export const RailGraphEventPill: React.FC<{
   type: string;

@@ -205,26 +205,18 @@
     "eventCenter": {
       "summary": "{{count}} 个事件",
       "filteredCount": "显示 {{count}} 个",
-      "railGraphCount": "{{count}} 个 rail graph",
-      "geoJsonCount": "{{count}} 个 GeoJSON",
       "noEvents": "没有里程事件",
       "trip": "行程",
       "lines": "线路",
-      "projectionSource": "投影来源",
-      "railGraphProjectionHint": "用户事件按本次行程已保存的 rail-graph 运行快照排序。",
-      "geoJsonProjectionHint": "用户事件按当前 GeoJSON app-line 里程轴排序。",
-      "add": "添加事件",
-      "addOnMap": "在地图添加",
-      "copy": "复制摘要",
+      "snapshotAxis": "已保存快照轴",
+      "geoJsonAxis": "GeoJSON 里程轴",
       "empty": "本次行程没有事件",
       "replay": "行程回放",
       "sortedByMileage": "按行程里程排序",
       "departure": "出发",
       "transfer": "换乘",
       "arrival": "到达",
-      "openMapEditor": "打开地图编辑器",
-      "exportJson": "导出事件 JSON",
-      "exportMdx": "导出事件 MDX"
+      "openMapEditor": "打开地图编辑器"
     },
     "eventFilters": {
       "title": "行程事件筛选",
@@ -544,7 +536,6 @@
     "tags": "标签",
     "tagsPlaceholder": "标签，用逗号分隔",
     "mediaPlaceholder": "照片 URL 或附件占位",
-    "routeDraftTitle": "线路事件",
     "linkedTrip": "关联行程",
     "noLinkedTrip": "未关联行程",
     "trip": "行程",
@@ -568,15 +559,19 @@
     "markerClusterWithSource": "{{count}} 个事件 · {{source}}",
     "markerSingleWithSource": "{{title}} · {{source}}",
     "useMapCenter": "使用地图中心",
-    "sourceCountRailGraph": "Rail graph {{count}}",
-    "sourceCountLegacy": "GeoJSON {{count}}",
     "sourceRailGraph": "Rail graph 快照",
     "sourceLegacy": "GeoJSON 轴",
     "sourceMixed": "混合来源",
     "selectedLine": "选中线路",
     "noLineLoaded": "未加载线路",
     "axisEventCount": "轴上 {{count}} 个",
-    "axisSourceHint": "rail-graph 行程事件从已保存运行快照投影；GeoJSON 事件继续保留在 app-line 里程轴上。",
+    "selectedRoute": "选中线路段",
+    "selectedEvent": "选中事件",
+    "selectedAxis": "选中里程轴",
+    "geometrySavedSnapshot": "已保存几何",
+    "geometryGeoJson": "GeoJSON 几何",
+    "geometryFallback": "回退几何",
+    "snapshotAxisSearchHint": "地点和时间搜索使用 GeoJSON 里程轴；快照线路事件保留在当前选中线路段上。",
     "noLineData": "请先加载 GeoJSON 线路数据再创建里程事件。已保存 rail-graph 行程事件会在快照可投影时显示。",
     "unknown": "未知",
     "deleteConfirm": "删除这个里程事件？",
@@ -604,6 +599,27 @@
       "map": "地图",
       "mileage": "里程",
       "trip": "行程"
+    },
+    "createSourceHint": {
+      "station": "将事件贴到选中里程轴上的车站。",
+      "map": "把当前地图点投影到里程轴。",
+      "mileage": "用精确公里值放置事件。",
+      "trip": "把事件绑定到已保存行程区间上的位置。"
+    },
+    "sourceTarget": {
+      "geoJsonAxis": "GeoJSON 轴",
+      "noAxis": "未加载轴",
+      "railGraphTrip": "已保存快照",
+      "legacyTrip": "旧行程",
+      "noProjectableTrip": "无可投影区间",
+      "noTrip": "未选择行程"
+    },
+    "disabledReason": {
+      "noTrip": "请先添加行程，再从行程位置创建事件。",
+      "noTripSegment": "选中的行程没有可接收里程事件的区间。",
+      "noLineAxis": "请先加载 GeoJSON 线路数据，再在这个轴上创建事件。",
+      "noStation": "请先选择车站。",
+      "noMapPoint": "请先点击地图或使用地图中心。"
     },
     "action": {
       "create": "创建事件",
@@ -643,6 +659,7 @@
     "source": {
       "station": "车站",
       "mileage": "里程",
+      "edge": "路线边",
       "map_point": "地图点",
       "trip_position": "行程位置"
     },
@@ -743,6 +760,13 @@
     "title": "导出路线预览",
     "preview": "预览",
     "loading": "正在计算路线数据...",
+    "errors": {
+      "missingLine": "导出无法解析所选线路中的某一条。",
+      "missingStation": "导出无法解析所选路线上的一个或多个车站。",
+      "notFound": "导出无法为所选车站找到可连通路线。",
+      "noSegments": "这个行程没有可导出的路线区段。",
+      "computeFailed": "路线计算失败。"
+    },
     "railGraphSource": "Rail graph 快照",
     "legacySource": "旧 GeoJSON 路线",
     "legacySourceDesc": "预览会根据当前 GeoJSON 线路数据计算。",

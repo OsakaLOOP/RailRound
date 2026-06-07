@@ -88,9 +88,9 @@ export const LineSelector: React.FC<Props> = ({ isOpen, onClose, onSelect, allow
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
-                        className={`flex-1 py-3 text-sm font-bold transition-colors border-b-2 relative ${activeTab === tab ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}
+                        className={`relative min-w-0 flex-1 border-b-2 px-1 py-3 text-sm font-bold transition-colors ${activeTab === tab ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}
                     >
-                        <span>{tab === 'JR' ? t('lineSel.jr', 'JR 集団') : tab === 'Private' ? t('lineSel.private', '私鉄・第三セクター') : t('lineSel.subway', '地下鉄・新交通')}</span>
+                        <span className="block truncate">{tab === 'JR' ? t('lineSel.jr', 'JR 集団') : tab === 'Private' ? t('lineSel.private', '私鉄・第三セクター') : t('lineSel.subway', '地下鉄・新交通')}</span>
                         {tab === 'City' && (
                             <div className="absolute -top-1 right-1/2 translate-x-1/2 -translate-y-full">
                                 <div className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded-full shadow-lg animate-bounce-subtle whitespace-nowrap ring-2 ring-white">
@@ -149,40 +149,46 @@ export const LineSelector: React.FC<Props> = ({ isOpen, onClose, onSelect, allow
                             <div className="p-4 grid gap-4">
                                 {region.companies.map(company => (
                                     <div key={company.name} className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex min-w-0 items-center gap-2">
                                             {company.logo ? (
-                                                <img src={company.logo} alt="" className="company-logo-sm h-5 w-auto" draggable={false} />
+                                                <img src={company.logo} alt="" className="company-logo-sm h-5 w-auto shrink-0" draggable={false} />
                                             ) : (
-                                                <Building2 size={16} className="text-gray-400" />
+                                                <Building2 size={16} className="shrink-0 text-gray-400" />
                                             )}
-                                            <span className="font-bold text-sm text-gray-700">{company.name}</span>
+                                            <span className="min-w-0 truncate text-sm font-bold text-gray-700" title={company.name}>{company.name}</span>
                                         </div>
                                         <div className="divide-y divide-gray-50">
                                             {company.lines.map(line => (
                                                 <button
                                                     key={line.key}
                                                     onClick={() => { onSelect(line.key); onClose(); }}
-                                                    className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors flex items-center gap-3 text-sm text-gray-700 group"
+                                                    className="group flex w-full min-w-0 items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 transition-colors hover:bg-blue-50"
+                                                    title={line.displayName !== line.key ? line.key : undefined}
                                                 >
                                                     {line.icon ? (
-                                                        <LineLogo src={line.icon!} companyIcon={line.companyIcon} recolor={line.recolor} color={line.color} className="line-icon" />
+                                                        <LineLogo src={line.icon!} companyIcon={line.companyIcon} recolor={line.recolor} color={line.color} className="line-icon shrink-0" />
                                                     ) : (
                                                         company.logo ?
-                                                            <img src={company.logo} alt="" className="line-icon opacity-50 grayscale" draggable={false} /> :
-                                                            <Train size={14} className="text-gray-300 group-hover:text-blue-400" />
+                                                            <img src={company.logo} alt="" className="line-icon shrink-0 opacity-50 grayscale" draggable={false} /> :
+                                                            <Train size={14} className="shrink-0 text-gray-300 group-hover:text-blue-400" />
                                                     )}
-                                                    {line.displayName}
+                                                    <span className="min-w-0 truncate">{line.displayName}</span>
                                                 </button>
                                             ))}
                                         </div>
                                         {!!company.systems?.length && (
                                             <div className="px-3 py-2 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center gap-1.5">
                                                 <span className="text-[10px] font-semibold text-gray-500">{t('lineSel.systemsLabel', 'Systems')}</span>
-                                                {company.systems.map((systemName) => (
+                                                {company.systems.slice(0, 4).map((systemName) => (
                                                     <span key={`${company.name}_${systemName}`} className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-gray-200 text-gray-600">
                                                         {systemName}
                                                     </span>
                                                 ))}
+                                                {company.systems.length > 4 && (
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-gray-200 text-gray-500">
+                                                        +{company.systems.length - 4}
+                                                    </span>
+                                                )}
                                             </div>
                                         )}
                                     </div>

@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { isMobile } from 'react-device-detect';
 import railBg from './../assets/rail_bg.png'
 import { LineLogo } from './LineLogo';
+import { lineLabel } from '../utils/mileageUserEvents';
 
 const McSlotSvg = ({ className = "" }) => (
     <svg
@@ -85,7 +86,8 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                     companyIcon: lineData.meta.companyIcon,
                     recolor: lineData.meta.recolor,
                     color: lineData.meta.color,
-                    company: lineData.meta.company
+                    company: lineData.meta.company,
+                    displayName: lineLabel(key)
                 });
             }
         });
@@ -186,7 +188,7 @@ const StationMenu = ({ position, stationData, railwayData, onClose }) => {
                                         {/* Tooltip on Hover - Desktop Only */}
                                         {!isMobile && (
                                             <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#100010] border-2 border-[#2a007a] text-white text-[10px] px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 pixel-font">
-                                                {line.lineKey.split(':')[1] || line.lineKey}
+                                                {line.displayName}
                                             </div>
                                         )}
                                     </div>

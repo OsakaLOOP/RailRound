@@ -28,6 +28,7 @@
   - rail graph 阶段验收与最终成品总结: docs/rail-graph-v1-plan/13-阶段变更验收与最终成品总结.md
   - rail graph 70% 推进与用户端 90% 执行计划: docs/rail-graph-v1-plan/14-70-percent-user-90-execution-plan.md
   - rail graph 主应用数据与交互流程: docs/rail-graph-v1-plan/15-main-app-data-and-interaction-flow.md
+  - rail graph 主应用 UI / selection 流程: docs/rail-graph-main-app-ui-flow.md
   - mileage-centric UserEvent 接入文档: docs/rail-graph-v1/user-event-mileage-layer.md
 - rail graph MVP 工作台:
   - standalone HTML: rail-graph-mvp.html
@@ -205,6 +206,7 @@
   - src/services/railGraphDeploymentLoader.ts
   - src/utils/appRoutePlanner.ts
   - src/utils/mileageUserEvents.ts
+  - src/utils/railGraphSelection.ts (shared activeRailGraphSelection conversion/builders for Map route click, TripPage, Search, Inspector, and MileageEventsPanel bridge events)
 - product consumers:
   - src/core/tripCalculator.js
   - src/components/Chest.jsx

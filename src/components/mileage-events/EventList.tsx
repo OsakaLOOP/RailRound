@@ -13,7 +13,7 @@ import {
   eventVisibilityLabel,
   timestampLabel,
 } from "./display";
-import { RailGraphBadge, RailGraphEventPill } from "../rail-graph/RailGraphBadges";
+import { RailGraphBadge, RailGraphEventPill, RailGraphRunBadges } from "../rail-graph/RailGraphBadges";
 
 export interface MileageEventListEntry {
   bound: BoundMileageEvent;
@@ -25,6 +25,10 @@ interface Props {
   selectedId?: string | null;
   emptyLabel?: string;
   showLine?: boolean;
+  showSource?: boolean;
+  showTimestamp?: boolean;
+  showVisibility?: boolean;
+  showRunContext?: boolean;
   compact?: boolean;
   onSelect?: (entry: MileageEventListEntry) => void;
   onViewMap?: (entry: MileageEventListEntry) => void;
@@ -36,12 +40,18 @@ export const EventList: React.FC<Props> = ({
   selectedId,
   emptyLabel,
   showLine = true,
+  showSource = true,
+  showTimestamp,
+  showVisibility,
+  showRunContext = true,
   compact = false,
   onSelect,
   onViewMap,
   onDelete,
 }) => {
   const { t } = useTranslation();
+  const shouldShowTimestamp = showTimestamp ?? !compact;
+  const shouldShowVisibility = showVisibility ?? !compact;
 
   if (entries.length === 0) {
     return (
@@ -60,6 +70,12 @@ export const EventList: React.FC<Props> = ({
         const line = eventLineLabel(entry.bound, entry.lineContext);
         const sourceLabel = eventSourceLabel(entry.lineContext, t);
         const sourceIsRailGraph = entry.lineContext?.source === "rail_graph_runtime";
+        const railGraphSegment =
+          entry.lineContext && entry.lineContext.source === "rail_graph_runtime"
+            ? entry.lineContext.segment
+            : null;
+        const timestampText = timestampLabel(entry.bound.timestampInference, entry.bound.timestamp, t);
+        const hasUsefulTimestamp = !!entry.bound.timestamp && entry.bound.timestampInference !== "unknown";
         return (
           <article
             key={`${event.id}:${entry.bound.distanceMetersFromRunStart}`}
@@ -92,6 +108,15 @@ export const EventList: React.FC<Props> = ({
                       tone="slate"
                       className="rounded bg-white"
                     />
+                    {showRunContext && railGraphSegment && (
+                      <RailGraphRunBadges
+                        meta={{
+                          serviceType: railGraphSegment.mileageProfile.serviceType,
+                          direction: railGraphSegment.mileageProfile.direction,
+                          patternRef: railGraphSegment.mileageProfile.patternRef,
+                        }}
+                      />
+                    )}
                     {stationLabel && <span>{stationLabel}</span>}
                     {showLine && line && (
                       <span className="inline-flex items-center gap-1">
@@ -99,19 +124,21 @@ export const EventList: React.FC<Props> = ({
                         {line}
                       </span>
                     )}
-                    <RailGraphBadge
-                      icon={sourceIsRailGraph ? "snapshot" : "legacy"}
-                      value={sourceLabel}
-                      tone={sourceIsRailGraph ? "emerald" : "slate"}
-                      className="rounded bg-white"
-                    />
-                    {!compact && (
+                    {showSource && (
+                      <RailGraphBadge
+                        icon={sourceIsRailGraph ? "snapshot" : "legacy"}
+                        value={sourceLabel}
+                        tone={sourceIsRailGraph ? "emerald" : "slate"}
+                        className="rounded bg-white"
+                      />
+                    )}
+                    {shouldShowTimestamp && hasUsefulTimestamp && (
                       <span className="inline-flex items-center gap-1">
                         <Clock size={12} />
-                        {timestampLabel(entry.bound.timestampInference, entry.bound.timestamp, t)}
+                        {timestampText}
                       </span>
                     )}
-                    {!compact && (
+                    {shouldShowVisibility && (
                       <span>{eventVisibilityLabel(event.visibility, t)}</span>
                     )}
                   </div>
@@ -144,6 +171,7 @@ export const EventList: React.FC<Props> = ({
                         onViewMap(entry);
                       }}
                       title={t("mileageEvents.action.viewMap", "View map")}
+                      aria-label={t("mileageEvents.action.viewMap", "View map")}
                     >
                       <MapPinned size={15} />
                     </button>
@@ -157,6 +185,7 @@ export const EventList: React.FC<Props> = ({
                         onDelete(event.id);
                       }}
                       title={t("mileageEvents.action.delete", "Delete")}
+                      aria-label={t("mileageEvents.action.delete", "Delete")}
                     >
                       <Trash2 size={15} />
                     </button>

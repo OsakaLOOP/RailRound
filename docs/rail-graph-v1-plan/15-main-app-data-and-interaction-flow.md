@@ -62,8 +62,8 @@ rail-graph trip 的用户事件默认绑定当前 trip，同时保留 `systemRef
 |---|---|---|
 | TripEditor 自动规划 | planner 状态、候选列表、pattern/preset/direction、service type、via stations、关键 system events、fallback reason | 搜索后选择候选；选择后写入 trip snapshot；可切回手动编辑并清除 snapshot。 |
 | TripEditor 手动/保存前详情 | 当前 rail-graph snapshot 的只读运行摘要、系统事件摘要、用户标注入口提示 | 不编辑 rail-graph 内容，只保存 trip 与用户字段。 |
-| TripsPage card | pattern/direction/service type 摘要、经由与关键事件、用户事件数量 | 展开 event center 查看 trip replay、添加用户事件、导出用户事件。 |
-| TripsPage event center | departure/arrival/transfer/scenic/user event 默认展示；stop/pass/viaStations 折叠在详情中 | 添加、查看、定位、复制、导出用户事件。 |
+| TripsPage card | pattern/direction/service type 摘要、经由与关键事件、用户事件数量 | 展开 event center 查看只读概要、里程 replay，并跳转地图编辑。 |
+| TripsPage event center | departure/arrival/transfer/scenic/user event 默认展示；stop/pass/viaStations 折叠在详情中 | 只负责查看、定位和跳转 MapView；不创建、不编辑、不复制/导出用户事件。 |
 | Map / Stats / Search / Export | 通过产品投影读取 saved snapshot 的 geometry、里程、线路、站点、事件 | legacy 与 rail-graph 共存。异常或导出详情才强调 fallback/source。 |
 
 视觉口径：主应用是工作型记录工具。rail-graph 信息应紧凑、可扫描、可比较；不使用大面积装饰性卡片或营销式说明。
@@ -93,8 +93,8 @@ legacy GeoJSON 不是临时兼容层，而是主应用仍需支持的数据源�
 ### PR21 · TripsPage rail-graph 详情接入
 
 - trip card 从 source badge 升级为运行摘要：pattern/direction/service type、via、关键 system events、用户事件数量。
-- event center 使用 detail model 合并 system events 与 projected user events。
-- user event composer 默认绑定当前 trip，legacy trip 继续使用旧 context。
+- event center 使用 detail model 合并 system events 与 projected user events，但保持只读。
+- 用户事件创建和编辑移动到 MapView / MileageEventsPanel；TripPage 只保留 map jump 和 mileage replay。
 - 保持旧 GeoJSON trip 的现有展示与事件投影。
 
 ### PR22 · 其他主应用消费面收敛
@@ -125,3 +125,60 @@ legacy GeoJSON 不是临时兼容层，而是主应用仍需支持的数据源�
 - The event panel preserves selected event inspection even when no GeoJSON line axis is currently available; creation is still guarded until a usable line axis exists.
 
 这些改动不改变数据模型，不降低旧 GeoJSON 行程、旧 `app-line:*` 用户事件和 direct GeoJSON 加载的兼容性。
+
+## 10. 2026-06-05 Main App UI Realignment
+
+当前主应用 UI 口径已重构为 MapView-first：
+
+- MapView / MileageEventsPanel 是用户标注的唯一主编辑面。路线点击只选择 active route / active axis 并打开面板；用户显式点击 Create 后才进入创建。
+- TripsPage 是只读概要面。它可以展示 saved snapshot、pattern/service/direction、事件数量、里程 replay，并把 route 或 event selection 带到 MapView；它不提供创建、编辑、复制 JSON/MDX 或批量事件操作。
+- `activeRailGraphSelection` 是 MapView、MileageEventsPanel、TripsPage jump、GlobalSearch 和 EventInspector 的共享 UI selection。它不持久化，不进入用户数据。
+- 用户可见层级优先展示 pattern/service/direction/source/geometry/user-event 的可读 badge。raw `systemRef` / `lineRef` / `patternRef` 只进入 tooltip、title 或详情，不作为列表主文案。
+- 事件列表和详情必须避免重复显示标题、时间和 source。标题用于识别事件；pattern/source/run context 用 badge；时间只在它能帮助用户定位时出现。
+
+按当前工作树评估，主应用 rail-graph UI/交互目标约为 65%-68%：
+
+| 维度 | 当前 | 目标 | 缺口 |
+|---|---:|---:|---|
+| 数据/投影接入 | 80% | 85% | legacy GeoJSON 已兼容，仍需 UI smoke 证明实际点击流。 |
+| selection / map wiring | 70% | 90% | shared selection 已覆盖 Map route click、Map event marker click、TripPage、Search、Inspector，仍需减少 window bridge 与 store selection 双写并补组件级 QA。 |
+| MapView 编辑体验 | 55% | 90% | 路线选择和面板打开已接上，仍需 route hover/touch、pin create、selected/dimmed 视觉 QA。 |
+| MileageEventsPanel | 65% | 90% | header/source cards 已改，仍需事件列表信息层级、窄屏与 disabled reason 打磨。 |
+| TripsPage | 70% | 90% | 已转向只读，仍需顶层 trip card 运行摘要和 replay 视觉精简。 |
+| Search / Inspector / Export / TripEditor | 66% | 85% | map jump selection 已固化到 helper，仍需 raw ref、重复元数据和视觉一致性 QA。 |
+| visual system | 55% | 85% | React badge 与 Leaflet HTML badge 已有，仍需统一 event/pattern representative SVG/badge 组件和配色审计。 |
+
+后续 PR 应按用户可感知链路排序，而不是按文件大小排序：
+
+1. PR UI-A: selection state hardening
+   - store `activeRailGraphSelection` 成为主状态。
+   - `railGraphSelection.ts` 统一 ProductTripSegment、event projection context、Map route item 与 bridge projection source 到 active selection 的转换。
+   - Map event marker click 已携带 trip id、segment index、route item id，并在 bridge handler 中尽量还原为富 selection。
+   - MileageEventsPanel open/select handler 已避免把同一路线 `kind="route"` selection 覆盖成普通 axis，从而保留 route-click create 所需 anchor。
+   - window bridge 只保留 Leaflet/native event 边界。
+   - 已有 focused tests 覆盖 rail-graph/legacy product segment、event projection context、source override 和 bridge conversion；后续补 route click、TripPage event jump、Search/Inspector jump 的组件级行为测试。
+
+2. PR UI-B: MapView route and event editing loop
+   - 完成 selected route / dimmed route / selected event marker / hover route metadata 的视觉层级。
+   - 触控设备补 metadata 入口，不能只依赖 hover。
+   - 修复 pin create 与 route selection create 的一致性：都明确显示目标 axis/source 和创建结果。
+
+3. PR UI-C: MileageEventsPanel information architecture
+   - 事件列表不重复标题、时间、source；顶部显示当前 axis/run context，行内只显示识别事件、里程、车站和必要 badge。
+   - create area 复用 source cards；不可用状态必须给原因。
+   - legacy GeoJSON 和 saved snapshot 的 place/time/create 行为分开解释，避免 snapshot 误套 GeoJSON 查询。
+
+4. PR UI-D: TripsPage read-only replay polish
+   - trip card 顶层提升 pattern/service/direction/source/run summary。
+   - event center 只读，里程 replay 支持选中 event/route 后跳 MapView。
+   - 删除或移动残留事件管理/导出文案。
+
+5. PR UI-E: Shared visual asset and badge layer
+   - 在一个 React 组件文件中集中 pattern type、run event、user event、source、geometry 的 SVG symbol / badge mapping。
+   - Leaflet HTML badge 与 React badge 共用同一语义表。
+   - 做配色审计，避免一片 emerald/slate；warning、operation、service、direction、legacy、snapshot 有稳定区分。
+
+6. PR UI-F: Visual QA and gates
+   - desktop/mobile 检查 MapView、MileageEventsPanel、TripsPage、GlobalSearch、TripEditor、ExportRouteModal。
+   - 修复 overflow、按钮文字、tooltip 遮挡、触控不可达和 raw id 主展示。
+   - 保留 legacy GeoJSON / `app-line:*` / old trip 兼容测试。

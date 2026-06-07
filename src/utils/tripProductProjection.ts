@@ -6,6 +6,8 @@ import { lineLabel } from "./mileageUserEvents";
 import type { ManualSegmentInput } from "./routeSerializer";
 import type { RouteSliceData } from "./routeExportTypes";
 
+const UNKNOWN_STATION_NAME = "Unknown";
+
 export interface ProductTripSegment {
   id: string;
   lineKey: string;
@@ -86,14 +88,14 @@ export function tripToRouteSliceData(trip: Trip, railwayData?: RailwayMap): Rout
   const stations = segments.flatMap((segment, index) => {
     const from = {
       id: segment.fromId,
-      name_ja: segment.fromName,
+      name_ja: displayStationName(segment.fromName),
       lat: segment.geometry?.[0]?.[0] ?? 0,
       lng: segment.geometry?.[0]?.[1] ?? 0,
     };
     const toCoords = segment.geometry?.[segment.geometry.length - 1];
     const to = {
       id: segment.toId,
-      name_ja: segment.toName,
+      name_ja: displayStationName(segment.toName),
       lat: toCoords?.[0] ?? from.lat,
       lng: toCoords?.[1] ?? from.lng,
     };
@@ -135,8 +137,8 @@ export function tripToRouteSliceData(trip: Trip, railwayData?: RailwayMap): Rout
       lineKey: segment.lineKey,
       fromId: segment.fromId,
       toId: segment.toId,
-      fromName: segment.fromName,
-      toName: segment.toName,
+      fromName: displayStationName(segment.fromName),
+      toName: displayStationName(segment.toName),
     })),
   };
 }
@@ -147,14 +149,19 @@ export function tripToKmlPathItems(trip: Trip, railwayData?: RailwayMap): Array<
   lineKey: string;
 }> {
   if (trip.isWalk) return [];
-  const tripName = `${trip.date} - Trip ${trip.id}`;
+  const summary = tripLineSummary(trip, railwayData);
+  const tripName = summary === UNKNOWN_STATION_NAME ? trip.date : `${trip.date} - ${summary}`;
   return tripToProductSegments(trip, railwayData)
     .filter((segment) => segment.geometry?.length)
     .map((segment, index) => ({
-      name: `${tripName} Segment ${index + 1}`,
+      name: `${tripName} - Segment ${index + 1}`,
       coordinates: (segment.geometry ?? []).map(([lat, lng]) => `${lng},${lat},0`).join(" "),
       lineKey: segment.lineKey,
     }));
+}
+
+function displayStationName(name?: string): string {
+  return name?.trim() || UNKNOWN_STATION_NAME;
 }
 
 function stationsForSegment(segment: ProductTripSegment) {
@@ -162,12 +169,12 @@ function stationsForSegment(segment: ProductTripSegment) {
   const last = segment.geometry?.[segment.geometry.length - 1];
   return [{
     id: segment.fromId,
-    name_ja: segment.fromName,
+    name_ja: displayStationName(segment.fromName),
     lat: first?.[0] ?? 0,
     lng: first?.[1] ?? 0,
   }, {
     id: segment.toId,
-    name_ja: segment.toName,
+    name_ja: displayStationName(segment.toName),
     lat: last?.[0] ?? first?.[0] ?? 0,
     lng: last?.[1] ?? first?.[1] ?? 0,
   }];
@@ -229,8 +236,8 @@ function legacySegmentToProductSegment(
     lineLabel: segment.lineKey ? lineLabel(segment.lineKey) : "",
     fromId: segment.fromId || "",
     toId: segment.toId || "",
-    fromName: from?.name_ja || segment.fromId || "",
-    toName: to?.name_ja || segment.toId || "",
+    fromName: from?.name_ja || "",
+    toName: to?.name_ja || "",
     company: line?.meta?.company,
     displayColor: line?.meta?.color || undefined,
     loopVia: segment.loopVia,

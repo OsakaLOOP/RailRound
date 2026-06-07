@@ -14,7 +14,13 @@ import { buildNetworkDisplayModel } from '../../utils/networkDisplay';
 import { planAppRouteCandidates, type AppRouteCandidate } from '../../utils/appRoutePlanner';
 import { tripResultToLegacyTrip } from '../../utils/railGraphTripAdapter';
 import { buildTripDetailModel, tripDetailKeyEvents } from '../../utils/railGraphTripDetailModel';
-import { RailGraphBadge, RailGraphEventPill } from '../rail-graph/RailGraphBadges';
+import { lineLabel } from '../../utils/mileageUserEvents';
+import {
+    RailGraphBadge,
+    RailGraphEventPill,
+    RailGraphRunBadges,
+    compactRailGraphRef,
+} from '../rail-graph/RailGraphBadges';
 
 type AutoPlanStatus =
     | { kind: 'rail_graph'; count?: number }
@@ -457,15 +463,6 @@ export const TripEditor: React.FC = () => {
                 }
                 : null;
 
-    const directionText = (direction?: string) => {
-        if (!direction) return t('tripEdit.detailUnknown', 'Unknown');
-        if (direction === 'up') return t('tripEdit.direction.up', 'Up');
-        if (direction === 'down') return t('tripEdit.direction.down', 'Down');
-        if (direction === 'clockwise') return t('tripEdit.direction.clockwise', 'Clockwise');
-        if (direction === 'counterclockwise') return t('tripEdit.direction.counterclockwise', 'Counterclockwise');
-        return direction;
-    };
-
     const candidateKindLabel = (candidate: AppRouteCandidate) => {
         if (candidate.candidateKind === 'preset') return t('tripEdit.candidatePreset', 'Preset');
         if (candidate.candidateKind === 'pattern') return t('tripEdit.candidatePattern', 'Pattern');
@@ -487,13 +484,6 @@ export const TripEditor: React.FC = () => {
 
     const formatKm = (value?: number) => t('tripEdit.km', '{{value}} km', { value: Math.max(0, value || 0).toFixed(1) });
     const formatMinutes = (value?: number) => t('tripEdit.minutes', '{{count}} min', { count: Math.max(0, value || 0) });
-    const compactRailGraphRef = (value?: unknown) => {
-        const text = String(value ?? '').trim();
-        if (!text) return '';
-        const cut = Math.max(text.lastIndexOf(':'), text.lastIndexOf('/'), text.lastIndexOf('#'));
-        const label = cut >= 0 ? text.slice(cut + 1) : text;
-        return label || text;
-    };
     const patternCount = railGraphRuntime ? Object.keys(railGraphRuntime.system.graph.indexes.patternById).length : 0;
     const railGraphCandidateCount = autoPlanCandidates.filter(candidate => candidate.source === 'rail_graph').length;
     const legacyCandidateCount = autoPlanCandidates.filter(candidate => candidate.source === 'legacy').length;
@@ -679,17 +669,15 @@ export const TripEditor: React.FC = () => {
                             <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
                                 {candidate.source === 'rail_graph' ? (
                                     <>
-                                        <RailGraphBadge
-                                            icon="service"
-                                            value={candidate.serviceType || t('tripEdit.detailUnknown', 'Unknown')}
-                                            tone="sky"
-                                            className="rounded"
-                                        />
-                                        <RailGraphBadge
-                                            icon="direction"
-                                            value={directionText(candidate.directionLabel || candidate.direction)}
-                                            tone="amber"
-                                            className="rounded"
+                                        <RailGraphRunBadges
+                                            meta={{
+                                                serviceType: candidate.serviceType || t('tripEdit.detailUnknown', 'Unknown'),
+                                                direction: candidate.directionLabel || candidate.direction,
+                                                patternRef: candidate.patternRef,
+                                            }}
+                                            badgeClassName="rounded"
+                                            patternClassName="max-w-[12rem]"
+                                            showLabels
                                         />
                                         <RailGraphBadge
                                             icon="via"
@@ -699,16 +687,6 @@ export const TripEditor: React.FC = () => {
                                         />
                                         <RailGraphBadge icon="duration" value={formatMinutes(candidate.totalTimeMinutes)} tone="slate" className="rounded" />
                                         <RailGraphBadge icon="distance" value={formatKm(candidate.totalDistanceKm)} tone="slate" className="rounded" />
-                                        {candidate.patternRef && (
-                                            <RailGraphBadge
-                                                icon="pattern"
-                                                label={t('tripEdit.candidatePatternRef', 'Pattern ref')}
-                                                value={compactRailGraphRef(candidate.patternRef)}
-                                                tone="indigo"
-                                                className="max-w-[12rem] rounded"
-                                                title={String(candidate.patternRef)}
-                                            />
-                                        )}
                                     </>
                                 ) : (
                                     <>
@@ -810,8 +788,10 @@ export const TripEditor: React.FC = () => {
                             <div className="flex min-w-0 items-center gap-2 text-xs">
                                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: segment.displayColor || '#10b981' }} />
                                 <span className="truncate font-bold text-slate-800">{segment.lineLabel}</span>
-                                <span className="shrink-0 text-slate-400">{directionText(segment.direction)}</span>
-                                {segment.serviceType && <span className="shrink-0 text-slate-400">{segment.serviceType}</span>}
+                                <RailGraphRunBadges
+                                    meta={{ serviceType: segment.serviceType, direction: segment.direction }}
+                                    badgeClassName="rounded bg-white"
+                                />
                             </div>
                             <div className="mt-1 truncate pl-4 text-[11px] text-slate-600">
                                 {segment.fromName} <span className="text-slate-300">→</span> {segment.toName}
@@ -1060,6 +1040,10 @@ export const TripEditor: React.FC = () => {
                                     let currentAllowed: string[] | null = null;
                                     let warning: string | null = null;
                                     let isDisconnected = false;
+                                    const segmentLineLabel = segment.lineKey ? lineLabel(segment.lineKey) : "";
+                                    const segmentLineTitle = segment.lineKey && segmentLineLabel !== segment.lineKey
+                                        ? segment.lineKey
+                                        : undefined;
 
                                     if (prevLineData && prevEndStName && prevEndSt) {
                                         const allKeys = Object.keys(railwayData);
@@ -1097,9 +1081,9 @@ export const TripEditor: React.FC = () => {
                                                     >
                                                         <span className={segment.lineKey ? "text-gray-800" : "text-gray-400"}>
                                                             {segment.lineKey ? (
-                                                                <span className="flex items-center gap-2">
+                                                                <span className="flex min-w-0 items-center gap-2" title={segmentLineTitle}>
                                                                     {railwayData[segment.lineKey]?.meta.icon && <LineLogo src={railwayData[segment.lineKey].meta.icon!} companyIcon={railwayData[segment.lineKey].meta.companyIcon} recolor={railwayData[segment.lineKey]?.meta.recolor} color={railwayData[segment.lineKey]?.meta.color} className="h-4 w-auto" />}
-                                                                    {segment.lineKey}
+                                                                    <span className="truncate">{segmentLineLabel}</span>
                                                                 </span>
                                                             ) : (idx === 0 ? t('tripEdit.selLine', '选择路线...') : t('tripEdit.selTransfer', '选择换乘路线...'))}
                                                         </span>
@@ -1221,23 +1205,23 @@ export const TripEditor: React.FC = () => {
                                 {renderPlannerSourceStrip()}
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 mb-1">{t('tripEdit.start', '出发地')}</label>
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         <div className="flex rounded border bg-white overflow-hidden">
-                                            <button onClick={() => openSelector('autoStart')} className="flex-1 p-2 text-sm text-left text-gray-700 truncate flex items-center gap-1 hover:bg-gray-50 border-r">{autoForm.startLine ? <span>{autoForm.startLine}</span> : <span className="text-gray-400">{t('tripEdit.selLine', '选择线路...')}</span>}</button>
+                                            <button onClick={() => openSelector('autoStart')} className="flex min-w-0 flex-1 items-center gap-1 truncate border-r p-2 text-left text-sm text-gray-700 hover:bg-gray-50" title={autoForm.startLine && lineLabel(autoForm.startLine) !== autoForm.startLine ? autoForm.startLine : undefined}>{autoForm.startLine ? <span className="truncate">{lineLabel(autoForm.startLine)}</span> : <span className="text-gray-400">{t('tripEdit.selLine', '选择线路...')}</span>}</button>
                                             <button onClick={() => openSearch('autoStart')} className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 w-10 shrink-0 flex items-center justify-center"><Search size={16} /></button>
                                         </div>
-                                        <select className="p-2 rounded border text-sm" disabled={!autoForm.startLine} value={autoForm.startStation} onChange={e => setAutoForm({ ...autoForm, startStation: e.target.value })}><option value="">{t('tripEdit.station', '车站...')}</option>{autoForm.startLine && railwayData[autoForm.startLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                        <select className="min-w-0 p-2 rounded border text-sm" disabled={!autoForm.startLine} value={autoForm.startStation} onChange={e => setAutoForm({ ...autoForm, startStation: e.target.value })}><option value="">{t('tripEdit.station', '车站...')}</option>{autoForm.startLine && railwayData[autoForm.startLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
                                     </div>
                                 </div>
                                 <div className="flex justify-center text-blue-300"><ArrowDown className="animate-bounce" size={20} /></div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 mb-1">{t('tripEdit.end', '目的地')}</label>
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         <div className="flex rounded border bg-white overflow-hidden">
-                                            <button onClick={() => openSelector('autoEnd')} className="flex-1 p-2 text-sm text-left text-gray-700 truncate flex items-center gap-1 hover:bg-gray-50 border-r">{autoForm.endLine ? <span>{autoForm.endLine}</span> : <span className="text-gray-400">{t('tripEdit.selLine', '选择线路...')}</span>}</button>
+                                            <button onClick={() => openSelector('autoEnd')} className="flex min-w-0 flex-1 items-center gap-1 truncate border-r p-2 text-left text-sm text-gray-700 hover:bg-gray-50" title={autoForm.endLine && lineLabel(autoForm.endLine) !== autoForm.endLine ? autoForm.endLine : undefined}>{autoForm.endLine ? <span className="truncate">{lineLabel(autoForm.endLine)}</span> : <span className="text-gray-400">{t('tripEdit.selLine', '选择线路...')}</span>}</button>
                                             <button onClick={() => openSearch('autoEnd')} className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 w-10 shrink-0 flex items-center justify-center"><Search size={16} /></button>
                                         </div>
-                                        <select className="p-2 rounded border text-sm" disabled={!autoForm.endLine} value={autoForm.endStation} onChange={e => setAutoForm({ ...autoForm, endStation: e.target.value })}><option value="">{t('tripEdit.station', '车站...')}</option>{autoForm.endLine && railwayData[autoForm.endLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
+                                        <select className="min-w-0 p-2 rounded border text-sm" disabled={!autoForm.endLine} value={autoForm.endStation} onChange={e => setAutoForm({ ...autoForm, endStation: e.target.value })}><option value="">{t('tripEdit.station', '车站...')}</option>{autoForm.endLine && railwayData[autoForm.endLine]?.stations.map(s => <option key={s.id} value={s.id}>{s.name_ja}</option>)}</select>
                                     </div>
                                 </div>
                             </div>

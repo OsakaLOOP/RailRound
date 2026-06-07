@@ -17,6 +17,7 @@ import {
 } from "../../utils/lineSelectorBuilder";
 import { useTranslation } from "react-i18next";
 import { LineLogo } from "../LineLogo";
+import { lineLabel } from "../../utils/mileageUserEvents";
 
 export type SearchModalMode = "line" | "search";
 
@@ -121,9 +122,7 @@ export const StationLineSearchModal: React.FC<Props> = ({
     const matchedLines: any[] = [];
     const matchedStations: any[] = [];
     Object.entries(railwayData).forEach(([lineKey, lineData]) => {
-      const displayName = lineKey.includes(":")
-        ? lineKey.split(":").slice(1).join(":")
-        : lineKey;
+      const displayName = lineLabel(lineKey);
       if (
         lineKey.toLowerCase().includes(lowerQuery) ||
         displayName.toLowerCase().includes(lowerQuery)

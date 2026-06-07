@@ -101,6 +101,32 @@ describe("rail-graph trip detail model", () => {
       label: "Legacy stop note",
     });
   });
+
+  it("uses readable fallback labels for unresolved legacy boundary events", () => {
+    const trip: Trip = {
+      id: "trip:legacy:missing-station",
+      date: "2026-01-03",
+      cost: 0,
+      segments: [{
+        id: "legacy:segment:missing",
+        lineKey: "manual:line:test",
+        fromId: "manual:station:missing-from",
+        toId: "manual:station:missing-to",
+      }],
+    };
+
+    const detail = buildTripDetailModel({
+      trip,
+      railwayData: fixtureRailwayData(),
+      userEvents: [],
+    });
+
+    const boundaryLabels = detail.events
+      .filter((event) => event.type === "departure" || event.type === "arrival")
+      .map((event) => event.label);
+    expect(boundaryLabels).toEqual(["Unknown", "Unknown"]);
+    expect(boundaryLabels.join(" ")).not.toContain("manual:station");
+  });
 });
 
 function fixtureSavedRailGraphTrip(): Trip {

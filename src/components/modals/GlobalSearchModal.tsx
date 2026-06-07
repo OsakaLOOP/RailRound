@@ -26,9 +26,9 @@ import {
     eventMileageLabel,
     eventStationLabel,
 } from '../mileage-events/display';
-import { tripSearchText, tripToProductSegments } from '../../utils/tripProductProjection';
+import { tripLineSummary, tripSearchText, tripToProductSegments } from '../../utils/tripProductProjection';
 import { buildTripDetailModel } from '../../utils/railGraphTripDetailModel';
-import { RailGraphBadge, RailGraphEventPill } from '../rail-graph/RailGraphBadges';
+import { RailGraphBadge, RailGraphEventPill, RailGraphRunBadges } from '../rail-graph/RailGraphBadges';
 
 interface Props {
     isOpen: boolean;
@@ -59,13 +59,6 @@ export const GlobalSearchModal: React.FC<Props> = ({
     const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
-    const compactRailGraphRef = (value?: unknown) => {
-        const text = String(value ?? '');
-        if (!text) return '';
-        const last = text.split(/[/:#]/).filter(Boolean).pop();
-        return last && last.length < text.length ? last : text;
-    };
-
     useEffect(() => {
         if (isOpen) {
             setQuery('');
@@ -91,7 +84,7 @@ export const GlobalSearchModal: React.FC<Props> = ({
         const normalizedQuery = lowerQuery.replace(/^#/, '');
 
         Object.entries(railwayData).forEach(([lineKey, lineData]) => {
-            const displayName = lineKey.includes(':') ? lineKey.split(':').slice(1).join(':') : lineKey;
+            const displayName = lineLabel(lineKey);
 
             // Check line match
             if (lineKey.toLowerCase().includes(lowerQuery) || displayName.toLowerCase().includes(lowerQuery)) {
@@ -278,8 +271,15 @@ export const GlobalSearchModal: React.FC<Props> = ({
                                             const firstSegment = segments[0];
                                             const detail = buildTripDetailModel({ trip, railwayData, userEvents: mileageUserEvents });
                                             const firstDetailSegment = detail.segments[0];
-                                            const from = firstSegment?.fromName || firstSegment?.fromId || '';
-                                            const to = firstSegment?.toName || firstSegment?.toId || '';
+                                            const lineSummary = firstSegment?.lineLabel || (firstSegment?.lineKey ? lineLabel(firstSegment.lineKey) : '');
+                                            const from = firstSegment?.fromName || '';
+                                            const to = firstSegment?.toName || '';
+                                            const fallbackSummary = tripLineSummary(trip, railwayData);
+                                            const routeSummary = from && to
+                                                ? `${from} → ${to}`
+                                                : fallbackSummary === 'Unknown'
+                                                    ? t('mileageEvents.unknown', 'Unknown')
+                                                    : fallbackSummary;
                                             return (
                                                 <button
                                                     key={`trip-${trip.id}`}
@@ -307,24 +307,20 @@ export const GlobalSearchModal: React.FC<Props> = ({
                                                             )}
                                                         </div>
                                                         <div className="text-xs text-gray-500 truncate">
-                                                            {(firstSegment?.lineLabel || lineLabel(firstSegment?.lineKey || ''))} {from && to ? `${from} → ${to}` : String(trip.id)}
+                                                            {lineSummary ? `${lineSummary} ${routeSummary}` : routeSummary}
                                                             {segments.length > 1 ? ` +${segments.length - 1}` : ''}
                                                         </div>
                                                         {detail.kind === 'rail_graph' && (
                                                             <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-gray-500">
                                                                 <RailGraphBadge icon="snapshot" value={t('search.railGraphSnapshot', 'Saved snapshot')} tone="emerald" className="rounded" />
-                                                                {firstDetailSegment?.direction && (
-                                                                    <RailGraphBadge icon="direction" value={firstDetailSegment.direction} tone="amber" className="rounded" />
-                                                                )}
-                                                                {firstDetailSegment?.patternRef && (
-                                                                    <RailGraphBadge
-                                                                        icon="pattern"
-                                                                        value={compactRailGraphRef(firstDetailSegment.patternRef)}
-                                                                        tone="indigo"
-                                                                        className="max-w-[10rem] rounded"
-                                                                        title={String(firstDetailSegment.patternRef)}
-                                                                    />
-                                                                )}
+                                                                <RailGraphRunBadges
+                                                                    meta={{
+                                                                        serviceType: firstDetailSegment?.serviceType,
+                                                                        direction: firstDetailSegment?.direction,
+                                                                        patternRef: firstDetailSegment?.patternRef,
+                                                                    }}
+                                                                    badgeClassName="rounded"
+                                                                />
                                                                 <RailGraphBadge icon="distance" value={t('search.km', '{{value}} km', { value: detail.overview.totalDistanceKm.toFixed(1) })} tone="slate" className="rounded" />
                                                                 <RailGraphBadge icon="userEvent" value={t('search.userEvents', '{{count}} user events', { count: detail.overview.userEventCount })} tone="violet" className="rounded" />
                                                             </div>

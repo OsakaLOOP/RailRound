@@ -12,6 +12,7 @@ import {
   tripToProductRouteSegments,
   tripToRouteSliceData,
 } from "../utils/tripProductProjection";
+import { TEST_RAILWAY_MAP } from "./fixtures/railwayData";
 
 describe("trip product projection", () => {
   it("uses saved rail-graph product snapshots before stale legacy segments", () => {
@@ -74,10 +75,33 @@ describe("trip product projection", () => {
     expect(routeData?.routeCoords).toEqual([[38, 140], [38.1, 140.1]]);
 
     expect(tripToKmlPathItems(trip)).toEqual([{
-      name: "2026-01-01 - Trip trip:rail:1 Segment 1",
+      name: "2026-01-01 - Local A-B - Segment 1",
       coordinates: "140,38,0 140.1,38.1,0",
       lineKey: "manual:line:test",
     }]);
+  });
+
+  it("keeps unresolved legacy station ids out of display names while preserving search", () => {
+    const trip: Trip = {
+      id: "trip:legacy:missing-station",
+      date: "2026-02-01",
+      segments: [{
+        id: "legacy:missing",
+        lineKey: "JR-East:Yamanote",
+        fromId: "internal:missing:from",
+        toId: "internal:missing:to",
+      }],
+    };
+
+    const [segment] = tripToProductSegments(trip, TEST_RAILWAY_MAP);
+    expect(segment).toMatchObject({
+      fromId: "internal:missing:from",
+      toId: "internal:missing:to",
+      fromName: "",
+      toName: "",
+    });
+    expect(tripLineSummary(trip, TEST_RAILWAY_MAP)).toBe("Yamanote");
+    expect(tripSearchText(trip, TEST_RAILWAY_MAP)).toContain("internal:missing:from");
   });
 });
 

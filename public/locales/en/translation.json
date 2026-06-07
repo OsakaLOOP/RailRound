@@ -205,26 +205,18 @@
     "eventCenter": {
       "summary": "{{count}} events",
       "filteredCount": "{{count}} shown",
-      "railGraphCount": "{{count}} rail graph",
-      "geoJsonCount": "{{count}} GeoJSON",
       "noEvents": "No mileage events",
       "trip": "Trip",
       "lines": "Lines",
-      "projectionSource": "Projection source",
-      "railGraphProjectionHint": "User events are ordered on the saved rail-graph run snapshot for this trip.",
-      "geoJsonProjectionHint": "User events are ordered on the current GeoJSON app-line mileage axis.",
-      "add": "Add event",
-      "addOnMap": "Add on map",
-      "copy": "Copy summary",
+      "snapshotAxis": "Saved snapshot axis",
+      "geoJsonAxis": "GeoJSON mileage axis",
       "empty": "No events on this trip",
       "replay": "Trip replay",
       "sortedByMileage": "Sorted by trip mileage",
       "departure": "Departure",
       "transfer": "Transfer",
       "arrival": "Arrival",
-      "openMapEditor": "Open map editor",
-      "exportJson": "Export event JSON",
-      "exportMdx": "Export event MDX"
+      "openMapEditor": "Open map editor"
     },
     "eventFilters": {
       "title": "Trip event filters",
@@ -544,7 +536,6 @@
     "tags": "Tags",
     "tagsPlaceholder": "Tags, separated by comma",
     "mediaPlaceholder": "Photo URL or attachment placeholder",
-    "routeDraftTitle": "Route event",
     "linkedTrip": "Linked trip",
     "noLinkedTrip": "No linked trip",
     "trip": "Trip",
@@ -568,15 +559,19 @@
     "markerClusterWithSource": "{{count}} events · {{source}}",
     "markerSingleWithSource": "{{title}} · {{source}}",
     "useMapCenter": "Use map center",
-    "sourceCountRailGraph": "Rail graph {{count}}",
-    "sourceCountLegacy": "GeoJSON {{count}}",
     "sourceRailGraph": "Rail graph snapshot",
     "sourceLegacy": "GeoJSON axis",
     "sourceMixed": "Mixed sources",
     "selectedLine": "Selected line",
     "noLineLoaded": "No line loaded",
     "axisEventCount": "{{count}} on axis",
-    "axisSourceHint": "Rail-graph trip events project from saved run snapshots; GeoJSON events remain on app-line mileage axes.",
+    "selectedRoute": "Selected route",
+    "selectedEvent": "Selected event",
+    "selectedAxis": "Selected axis",
+    "geometrySavedSnapshot": "Saved geometry",
+    "geometryGeoJson": "GeoJSON geometry",
+    "geometryFallback": "Fallback geometry",
+    "snapshotAxisSearchHint": "Place and time search use GeoJSON mileage axes; snapshot route events stay on the selected route.",
     "noLineData": "Load GeoJSON line data before creating mileage events. Saved rail-graph trip events will appear when their snapshot can be projected.",
     "unknown": "Unknown",
     "deleteConfirm": "Delete this mileage event?",
@@ -604,6 +599,27 @@
       "map": "Map",
       "mileage": "Mileage",
       "trip": "Trip"
+    },
+    "createSourceHint": {
+      "station": "Snap the event to a station on the selected mileage axis.",
+      "map": "Project the current map point to the mileage axis.",
+      "mileage": "Place the event by an exact kilometer value.",
+      "trip": "Attach the event to a position on a saved trip segment."
+    },
+    "sourceTarget": {
+      "geoJsonAxis": "GeoJSON axis",
+      "noAxis": "No axis loaded",
+      "railGraphTrip": "Saved snapshot",
+      "legacyTrip": "Legacy trip",
+      "noProjectableTrip": "No projectable segment",
+      "noTrip": "No trip selected"
+    },
+    "disabledReason": {
+      "noTrip": "Add a trip before creating an event from trip position.",
+      "noTripSegment": "The selected trip has no segment that can receive a mileage event.",
+      "noLineAxis": "Load GeoJSON line data before creating an event on this axis.",
+      "noStation": "Select a station before creating this event.",
+      "noMapPoint": "Click the map or use the map center before creating this event."
     },
     "action": {
       "create": "Create event",
@@ -643,6 +659,7 @@
     "source": {
       "station": "Station",
       "mileage": "Mileage",
+      "edge": "Route edge",
       "map_point": "Map point",
       "trip_position": "Trip position"
     },
@@ -743,6 +760,13 @@
     "title": "Export Route Preview",
     "preview": "Preview",
     "loading": "Computing route data...",
+    "errors": {
+      "missingLine": "Route export could not resolve one of the selected lines.",
+      "missingStation": "Route export could not resolve one or more stations on the selected route.",
+      "notFound": "Route export could not find a connected route for the selected stations.",
+      "noSegments": "This trip has no route segments to export.",
+      "computeFailed": "Failed to compute route."
+    },
     "railGraphSource": "Rail graph snapshot",
     "legacySource": "Legacy GeoJSON route",
     "legacySourceDesc": "The preview is computed from current GeoJSON line data.",

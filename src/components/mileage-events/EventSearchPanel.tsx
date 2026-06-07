@@ -17,6 +17,10 @@ import { eventKindLabel, eventVisibilityLabel, mileageEventKinds, mileageEventVi
 interface Props {
   events?: readonly UserEventV2[];
   compact?: boolean;
+  showSource?: boolean;
+  showTimestamp?: boolean;
+  showVisibility?: boolean;
+  showRunContext?: boolean;
   selectedId?: string | null;
   onSelect?: (entry: MileageEventListEntry) => void;
   onViewMap?: (entry: MileageEventListEntry) => void;
@@ -25,6 +29,10 @@ interface Props {
 export const EventSearchPanel: React.FC<Props> = ({
   events,
   compact = false,
+  showSource,
+  showTimestamp,
+  showVisibility,
+  showRunContext,
   selectedId,
   onSelect,
   onViewMap,
@@ -106,7 +114,7 @@ export const EventSearchPanel: React.FC<Props> = ({
 
       {advancedOpen && (
         <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-2">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="block text-xs font-medium text-slate-600">
               {t("mileageEvents.type", "Type")}
               <select
@@ -165,7 +173,7 @@ export const EventSearchPanel: React.FC<Props> = ({
               ))}
             </select>
           </label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="block text-xs font-medium text-slate-600">
               {t("mileageEvents.fromKm", "From km")}
               <input
@@ -208,6 +216,10 @@ export const EventSearchPanel: React.FC<Props> = ({
         entries={entries}
         selectedId={selectedId}
         compact={compact}
+        showSource={showSource}
+        showTimestamp={showTimestamp}
+        showVisibility={showVisibility}
+        showRunContext={showRunContext}
         onSelect={onSelect}
         onViewMap={onViewMap}
       />

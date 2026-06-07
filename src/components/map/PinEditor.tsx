@@ -9,11 +9,12 @@ import { openMileageEventsPanel } from '../../utils/mileageEventUiBridge';
 import { findNearestPointOnLine } from '../../core/railwayRouting';
 import { lineLabel } from '../../utils/mileageUserEvents';
 import { RailGraphBadge } from '../rail-graph/RailGraphBadges';
+import { pinMileageEventBridgePayload } from '../../utils/pinEventBridge';
 
 const COLOR_PALETTE = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#64748b'];
 
 export const PinEditor: React.FC = () => {
-    const { editingPin, pinMode, pins, user, trips, folders, badgeSettings, railwayData } = useStore(useShallow(state => ({
+    const { editingPin, pinMode, pins, user, trips, folders, badgeSettings, railwayData, setActiveRailGraphSelection } = useStore(useShallow(state => ({
         editingPin: state.editingPin,
         pinMode: state.pinMode,
         pins: state.pins,
@@ -21,7 +22,8 @@ export const PinEditor: React.FC = () => {
         trips: state.trips,
         folders: state.folders,
         badgeSettings: state.badgeSettings,
-        railwayData: state.railwayData
+        railwayData: state.railwayData,
+        setActiveRailGraphSelection: state.setActiveRailGraphSelection
     })));
     const setEditingPin = useStore(state => state.setEditingPin);
     const setPinMode = useStore(state => state.setPinMode);
@@ -69,19 +71,14 @@ export const PinEditor: React.FC = () => {
 
     const createEventFromPin = () => {
         if (!editingPin || !eventLineKey) return;
-        openMileageEventsPanel({
-            mode: 'create',
+        const bridgePayload = pinMileageEventBridgePayload({
+            pin: editingPin,
             lineKey: eventLineKey,
-            source: 'legacy_app',
-            create: {
-                source: 'map',
-                lineKey: eventLineKey,
-                mapPoint: { lat: editingPin.lat, lng: editingPin.lng },
-                title: editingPin.comment || '',
-                mediaUrl: editingPin.imageUrl || '',
-                tags: ['pin'],
-            },
+            railwayData,
         });
+        if (!bridgePayload) return;
+        setActiveRailGraphSelection(bridgePayload.activeSelection);
+        openMileageEventsPanel(bridgePayload.openDetail);
         setEditingPin(null);
         setPinMode(PinMode.Idle);
     };
@@ -107,7 +104,7 @@ export const PinEditor: React.FC = () => {
             <div className="flex justify-between items-center mb-3 border-b pb-2">
                 <span className="font-bold text-gray-700 flex items-center gap-2">
                     {pinMode === PinMode.Snap ? <Magnet size={16} className="text-indigo-600"/> : <Move size={16} />}
-                    {pinMode === PinMode.Snap ? t('pin.titleSnap', `吸附: {{line}}`, { line: editingPin.lineKey || t('app.unknown', '未知') }) : t('pin.titleFree', '自由位置')}
+                    {pinMode === PinMode.Snap ? t('pin.titleSnap', `吸附: {{line}}`, { line: eventAxisLabel || t('app.unknown', '未知') }) : t('pin.titleFree', '自由位置')}
                 </span>
                 <button onClick={() => { setEditingPin(null); setPinMode(PinMode.Idle); }} className="absolute right-0">
                     <X size={18} className="text-gray-400"/>

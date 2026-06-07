@@ -393,37 +393,40 @@
 .rail-route-line.rail-route-active-mileage {
   filter: drop-shadow(0 0 7px rgba(16, 185, 129, 0.55));
 }
+.leaflet-tooltip.rail-route-tooltip {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  white-space: normal;
+}
+.leaflet-tooltip.rail-route-tooltip::before {
+  display: none;
+}
 .rail-route-popup {
-  min-width: 220px;
-  max-width: 280px;
+  min-width: 230px;
+  max-width: 300px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
   color: #0f172a;
+  padding: 9px;
+  text-align: left;
 }
-.rail-route-popup-source {
-  display: inline-flex;
+.rail-route-popup-head {
+  display: flex;
+  min-width: 0;
   align-items: center;
-  border-radius: 6px;
-  border: 1px solid #d1fae5;
-  background: #ecfdf5;
-  color: #047857;
-  padding: 2px 6px;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.2;
+  gap: 6px;
 }
-.rail-route-popup-legacy .rail-route-popup-source {
-  border-color: #e2e8f0;
-  background: #f8fafc;
-  color: #475569;
-}
-.rail-route-popup-fallback .rail-route-popup-source {
-  border-color: #fed7aa;
-  background: #fff7ed;
-  color: #c2410c;
-}
-.rail-route-popup-transfer .rail-route-popup-source {
-  border-color: #e2e8f0;
-  background: #f1f5f9;
-  color: #64748b;
+.rail-route-popup-color {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.14);
 }
 .rail-route-popup-title {
   margin-top: 6px;
@@ -436,6 +439,75 @@
   font-size: 11px;
   color: #64748b;
   line-height: 1.35;
+}
+.rail-route-popup-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+.rail-graph-html-badge {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid;
+  border-radius: 5px;
+  padding: 2px 5px;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+.rail-graph-html-badge-icon {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+.rail-graph-html-badge-label {
+  flex: 0 0 auto;
+  opacity: 0.72;
+}
+.rail-graph-html-badge-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail-graph-html-badge-emerald {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+.rail-graph-html-badge-indigo {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #4338ca;
+}
+.rail-graph-html-badge-sky {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+  color: #0369a1;
+}
+.rail-graph-html-badge-amber {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+.rail-graph-html-badge-violet {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+.rail-graph-html-badge-rose {
+  border-color: #fecdd3;
+  background: #fff1f2;
+  color: #be123c;
+}
+.rail-graph-html-badge-slate {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
 }
 .rail-route-popup-rows {
   display: grid;

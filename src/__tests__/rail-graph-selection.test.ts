@@ -3,6 +3,8 @@ import type { RailGraphActiveSelection } from "../store";
 import {
   activeAxisFromRailGraphSelection,
   eventProjectionDetailFromPanelEntry,
+  isEventSelection,
+  isRouteSelection,
   openDetailMatchesActiveRouteSelection,
   productSegmentSelectionLineKey,
   projectionDetailFromRailGraphSelection,
@@ -27,6 +29,7 @@ describe("rail graph active UI selection helpers", () => {
 
   it("converts an active rail graph selection back to a mileage axis detail", () => {
     const selection: RailGraphActiveSelection = {
+      state: "routeSelected",
       kind: "route",
       source: "rail_graph_snapshot",
       lineKey: "rail-graph:pattern:local",
@@ -48,6 +51,7 @@ describe("rail graph active UI selection helpers", () => {
   it("converts active selection to panel projection detail", () => {
     expect(
       projectionDetailFromRailGraphSelection({
+        state: "routeSelected",
         kind: "route",
         source: "rail_graph_snapshot",
         lineKey: "rail-graph:pattern:local",
@@ -65,6 +69,7 @@ describe("rail graph active UI selection helpers", () => {
 
     expect(
       projectionDetailFromRailGraphSelection({
+        state: "axisSelected",
         kind: "axis",
         source: "legacy_geojson",
         lineKey: "legacy:line",
@@ -76,6 +81,25 @@ describe("rail graph active UI selection helpers", () => {
       tripSegmentIndex: undefined,
       routeItemId: undefined,
     });
+  });
+
+  it("prefers state over legacy kind aliases when narrowing active selections", () => {
+    expect(isRouteSelection({ state: "routeSelected", kind: "route", source: "legacy_geojson" })).toBe(true);
+    expect(isRouteSelection({ state: "creating", kind: "route", source: "legacy_geojson" })).toBe(false);
+    expect(isEventSelection({
+      state: "eventSelected",
+      kind: "event",
+      source: "legacy_geojson",
+      eventId: "event:1",
+    })).toBe(true);
+    expect(isEventSelection({
+      state: "inspecting",
+      kind: "event",
+      source: "legacy_geojson",
+      eventId: "event:1",
+    })).toBe(false);
+    expect(isRouteSelection({ kind: "route", source: "legacy_geojson" } as any)).toBe(true);
+    expect(isEventSelection({ kind: "event", source: "legacy_geojson", eventId: "event:1" } as any)).toBe(true);
   });
 
   it("builds panel event projection details while inheriting route context", () => {
@@ -134,6 +158,7 @@ describe("rail graph active UI selection helpers", () => {
         routeItemId: "route:1",
       }),
     ).toEqual({
+      state: "eventSelected",
       kind: "event",
       source: "rail_graph_snapshot",
       lineKey: "rail-graph:pattern:local",
@@ -163,6 +188,7 @@ describe("rail graph active UI selection helpers", () => {
 
   it("keeps matching open details from replacing route selections", () => {
     const selection: RailGraphActiveSelection = {
+      state: "routeSelected",
       kind: "route",
       source: "rail_graph_snapshot",
       lineKey: "rail-graph:pattern:local",
@@ -379,6 +405,7 @@ describe("rail graph active UI selection helpers", () => {
 
     expect(payload).toEqual({
       activeSelection: {
+        state: "axisSelected",
         kind: "axis",
         source: "legacy_geojson",
         lineKey: "legacy:line",

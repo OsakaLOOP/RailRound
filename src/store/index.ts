@@ -188,27 +188,66 @@ export interface RailGraphLoadState {
   loadedAt?: string;
 }
 
-export interface RailGraphActiveSelection {
-  kind: 'route' | 'event' | 'axis';
-  source: 'rail_graph_snapshot' | 'legacy_geojson';
+export type RailGraphSelectionSource = 'rail_graph_snapshot' | 'legacy_geojson';
+export type RailGraphGeometrySource = 'saved_snapshot' | 'geojson' | 'fallback';
+
+export interface RailGraphSelectionAnchor {
+  lat?: number;
+  lng?: number;
+  tripRatio?: number;
+}
+
+export interface RailGraphSelectionBase {
+  source: RailGraphSelectionSource;
   lineKey?: string | null;
   tripId?: ID;
   tripSegmentIndex?: number;
   routeItemId?: string;
-  eventId?: string;
   label?: string;
   color?: string;
   patternRef?: string;
   direction?: string;
   serviceType?: string;
-  geometrySource?: 'saved_snapshot' | 'geojson' | 'fallback';
-  anchor?: {
-    lat?: number;
-    lng?: number;
-    tripRatio?: number;
-  };
+  geometrySource?: RailGraphGeometrySource;
+  anchor?: RailGraphSelectionAnchor;
   updatedAt: number;
 }
+
+export type RailGraphActiveSelection =
+  | (RailGraphSelectionBase & {
+      state: 'routeSelected';
+      /** @deprecated Use state === 'routeSelected'. Kept while UI surfaces migrate. */
+      kind: 'route';
+    })
+  | (RailGraphSelectionBase & {
+      state: 'axisSelected';
+      /** @deprecated Use state === 'axisSelected'. Kept while UI surfaces migrate. */
+      kind: 'axis';
+    })
+  | (RailGraphSelectionBase & {
+      state: 'eventSelected';
+      /** @deprecated Use state === 'eventSelected'. Kept while UI surfaces migrate. */
+      kind: 'event';
+      eventId: string;
+    })
+  | (RailGraphSelectionBase & {
+      state: 'creating';
+      kind: 'route' | 'axis';
+      createSource?: 'station' | 'map' | 'mileage' | 'trip';
+    })
+  | (RailGraphSelectionBase & {
+      state: 'inspecting';
+      kind: 'event' | 'route' | 'axis';
+      eventId?: string;
+    })
+  | (Partial<RailGraphSelectionBase> & {
+      state: 'unavailable';
+      kind: 'axis';
+      reason: string;
+      updatedAt: number;
+    });
+
+export type RailGraphSelectionDraft = Omit<RailGraphActiveSelection, 'updatedAt'>;
 
 export interface Pin {
   id: ID;
@@ -357,7 +396,7 @@ export interface GlobalStore {
   leafletReady: boolean;
   setLeafletReady: (ready: boolean) => void;
   activeRailGraphSelection: RailGraphActiveSelection | null;
-  setActiveRailGraphSelection: (selection: Omit<RailGraphActiveSelection, 'updatedAt'> | null) => void;
+  setActiveRailGraphSelection: (selection: RailGraphSelectionDraft | null) => void;
   clearActiveRailGraphSelection: () => void;
 
   isTripEditing: boolean;
@@ -489,7 +528,7 @@ export const useStore = create<GlobalStore>()(
       setLeafletReady: (ready) => set({ leafletReady: ready }),
       activeRailGraphSelection: null,
       setActiveRailGraphSelection: (selection) => set({
-        activeRailGraphSelection: selection ? { ...selection, updatedAt: Date.now() } : null,
+        activeRailGraphSelection: selection ? { ...selection, updatedAt: Date.now() } as RailGraphActiveSelection : null,
       }),
       clearActiveRailGraphSelection: () => set({ activeRailGraphSelection: null }),
 

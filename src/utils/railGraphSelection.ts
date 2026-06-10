@@ -1,4 +1,4 @@
-import type { RailGraphActiveSelection } from "../store";
+import type { RailGraphActiveSelection, RailGraphSelectionDraft } from "../store";
 import {
   lineLabel,
   type MileageLineContextLike,
@@ -11,9 +11,15 @@ import type {
 } from "./mileageEventUiBridge";
 import type { ProductTripSegment } from "./tripProductProjection";
 
-export type RailGraphSelectionDraft = Omit<RailGraphActiveSelection, "updatedAt">;
-
 export type MileageEventsProjectionDetail = Omit<MileageEventSelectDetail, "eventId">;
+
+export type RailGraphSelectionState =
+  | "routeSelected"
+  | "axisSelected"
+  | "eventSelected"
+  | "creating"
+  | "inspecting"
+  | "unavailable";
 
 type ProductSelectionSegment = Pick<
   ProductTripSegment,
@@ -22,6 +28,7 @@ type ProductSelectionSegment = Pick<
 
 export interface ProductSegmentSelectionInput {
   kind?: RailGraphSelectionDraft["kind"];
+  state?: RailGraphSelectionState;
   source?: RailGraphSelectionDraft["source"];
   segment?: ProductSelectionSegment | null;
   lineContext?: MileageLineContextLike | null;
@@ -36,6 +43,43 @@ export interface ProductSegmentSelectionInput {
   direction?: string;
   serviceType?: string;
   geometrySource?: RailGraphSelectionDraft["geometrySource"];
+}
+
+function stateFromKind(
+  kind: RailGraphSelectionDraft["kind"] | undefined,
+  eventId?: string,
+): Extract<RailGraphSelectionState, "routeSelected" | "axisSelected" | "eventSelected"> {
+  if (eventId || kind === "event") return "eventSelected";
+  if (kind === "axis") return "axisSelected";
+  return "routeSelected";
+}
+
+function kindFromState(
+  state: RailGraphSelectionState,
+  fallback: RailGraphSelectionDraft["kind"] = "axis",
+): RailGraphSelectionDraft["kind"] {
+  if (state === "routeSelected") return "route";
+  if (state === "eventSelected") return "event";
+  if (state === "axisSelected" || state === "unavailable") return "axis";
+  return fallback;
+}
+
+export function isRouteSelection(
+  selection?: RailGraphActiveSelection | RailGraphSelectionDraft | null,
+): selection is (RailGraphActiveSelection | RailGraphSelectionDraft) & { kind: "route" } {
+  if (!selection) return false;
+  const state = (selection as { state?: RailGraphSelectionState }).state;
+  if (state) return state === "routeSelected";
+  return (selection as { kind?: RailGraphSelectionDraft["kind"] }).kind === "route";
+}
+
+export function isEventSelection(
+  selection?: RailGraphActiveSelection | RailGraphSelectionDraft | null,
+): selection is (RailGraphActiveSelection | RailGraphSelectionDraft) & { kind: "event"; eventId: string } {
+  if (!selection) return false;
+  const state = (selection as { state?: RailGraphSelectionState }).state;
+  if (state) return state === "eventSelected";
+  return (selection as { kind?: RailGraphSelectionDraft["kind"] }).kind === "event";
 }
 
 export function productSegmentSelectionLineKey(segment?: ProductSelectionSegment | null): string | undefined {
@@ -88,14 +132,19 @@ export function selectionFromProductSegment(
     ? lineContext.segment.mileageProfile.serviceType
     : undefined;
 
+  const state = input.state ?? stateFromKind(input.kind, input.eventId);
+  const kind = input.kind ?? kindFromState(state, input.eventId ? "event" : "route");
+  if (state === "eventSelected" && !input.eventId) return null;
+
   return {
-    kind: input.kind ?? (input.eventId ? "event" : "route"),
+    state,
+    kind,
     source,
     lineKey,
     tripId: input.tripId,
     tripSegmentIndex,
     routeItemId: input.routeItemId ?? segment?.id,
-    eventId: input.eventId,
+    ...(input.eventId ? { eventId: input.eventId } : {}),
     label: input.label ?? segment?.lineLabel ?? lineContextLabel(lineContext) ?? (lineKey ? lineLabel(lineKey) : undefined),
     color: input.color ?? segment?.displayColor ?? lineContextColor(lineContext),
     patternRef: input.patternRef ?? (segment?.patternRef ? String(segment.patternRef) : undefined) ?? (
@@ -105,7 +154,7 @@ export function selectionFromProductSegment(
     serviceType: input.serviceType ?? segment?.serviceType ?? contextServiceType,
     geometrySource: input.geometrySource ?? (source === "rail_graph_snapshot" ? "saved_snapshot" : "geojson"),
     ...extras,
-  };
+  } as RailGraphSelectionDraft;
 }
 
 export function railGraphSelectionSourceFromProjection(
@@ -181,6 +230,7 @@ export function selectionFromMileageEventSelect(
 ): RailGraphSelectionDraft | null {
   if (!detail.eventId) return null;
   return {
+    state: "eventSelected",
     kind: "event",
     source: railGraphSelectionSourceFromProjection(detail.source),
     lineKey: detail.lineKey ?? null,
@@ -189,7 +239,7 @@ export function selectionFromMileageEventSelect(
     routeItemId: detail.routeItemId,
     eventId: detail.eventId,
     ...extras,
-  };
+  } as RailGraphSelectionDraft;
 }
 
 export function selectionFromActiveAxis(
@@ -198,6 +248,7 @@ export function selectionFromActiveAxis(
 ): RailGraphSelectionDraft | null {
   if (!detail.lineKey && !detail.source && detail.tripId === undefined) return null;
   return {
+    state: "axisSelected",
     kind: "axis",
     source: railGraphSelectionSourceFromProjection(detail.source),
     lineKey: detail.lineKey ?? null,
@@ -205,7 +256,7 @@ export function selectionFromActiveAxis(
     tripSegmentIndex: detail.tripSegmentIndex,
     routeItemId: detail.routeItemId,
     ...extras,
-  };
+  } as RailGraphSelectionDraft;
 }
 
 export function selectionFromMileageEventsOpen(
@@ -213,23 +264,25 @@ export function selectionFromMileageEventsOpen(
   extras: Partial<RailGraphSelectionDraft> = {},
 ): RailGraphSelectionDraft | null {
   if (!detail.lineKey && !detail.source && detail.tripId === undefined && !detail.eventId) return null;
+  const state = detail.eventId ? "eventSelected" : "axisSelected";
   return {
+    state,
     kind: detail.eventId ? "event" : "axis",
     source: railGraphSelectionSourceFromProjection(detail.source),
     lineKey: detail.lineKey ?? null,
     tripId: detail.tripId,
     tripSegmentIndex: detail.tripSegmentIndex,
     routeItemId: detail.routeItemId,
-    eventId: detail.eventId,
+    ...(detail.eventId ? { eventId: detail.eventId } : {}),
     ...extras,
-  };
+  } as RailGraphSelectionDraft;
 }
 
 export function openDetailMatchesActiveRouteSelection(
   detail: Partial<MileageEventsOpenDetail>,
   selection?: RailGraphActiveSelection | RailGraphSelectionDraft | null,
 ): boolean {
-  if (detail.eventId || selection?.kind !== "route") return false;
+  if (detail.eventId || !selection || !isRouteSelection(selection)) return false;
   if (detail.source && selection.source !== railGraphSelectionSourceFromProjection(detail.source)) return false;
   if (detail.routeItemId) return selection.routeItemId === detail.routeItemId;
   return (

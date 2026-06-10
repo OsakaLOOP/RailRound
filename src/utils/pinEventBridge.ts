@@ -20,6 +20,7 @@ export function pinMileageEventBridgePayload(args: {
 
   return {
     activeSelection: {
+      state: "axisSelected",
       kind: "axis",
       source: "legacy_geojson",
       lineKey,

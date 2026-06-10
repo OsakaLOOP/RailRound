@@ -579,7 +579,9 @@ export const MapContainer: React.FC<Props> = ({
     map.createPane("mileageEventsPane", overlayPane);
     const mileageEventsPane = map.getPane("mileageEventsPane")!;
     mileageEventsPane.style.zIndex = "430";
-    mileageEventsPane.style.pointerEvents = "auto";
+    // Keep the full-pane overlay transparent to lower map objects; Leaflet
+    // interactive children re-enable pointer events on their own elements.
+    mileageEventsPane.style.pointerEvents = "none";
 
     mapInstance.current = map;
 

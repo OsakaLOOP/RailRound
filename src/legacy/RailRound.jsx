@@ -990,16 +990,16 @@ const RouteSlice = ({ segments, segmentGeometries, railwayData, geoData }) => {
 // --- Updated: Stats Calculation using Shared Helper ---
 
 const GithubCardModal = ({ isOpen, onClose, user, folders, badgeSettings, onUpdateSettings }) => {
-    const [cardKey, setCardKey] = useState(null);
+    const [cardKeys, setCardKeys] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [source, setSource] = useState('global'); // 'global' or folder_id
 
     useEffect(() => {
-        if (isOpen && user && !cardKey) {
+        if (isOpen && user && !cardKeys) {
             setLoading(true);
             api.getOrCreateCardKey(user.token)
-                .then(setCardKey)
+                .then(setCardKeys)
                 .catch(err => setError(err.message))
                 .finally(() => setLoading(false));
         }
@@ -1019,8 +1019,8 @@ const GithubCardModal = ({ isOpen, onClose, user, folders, badgeSettings, onUpda
     if (!isOpen || !user) return null;
 
     let url = "";
-    if (source === 'global' && cardKey) {
-        url = `${window.location.origin}/api/card?key=${cardKey}`;
+    if (source === 'global' && cardKeys) {
+        url = `${window.location.origin}/api/card?key=${cardKeys.key}`;
     } else if (source !== 'global') {
         const f = folders.find(fo => fo.id === source);
         if (f && f.hash) {

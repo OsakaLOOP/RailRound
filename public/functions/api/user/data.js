@@ -40,7 +40,7 @@ export async function onRequest(event) {
 
     if (event.request.method === "POST") {
         const body = await event.request.json();
-        const { trips, pins, latest_5, version, folders, badge_settings } = body;
+        const { trips, pins, latest_5, version, folders, badge_settings, mileage_user_events } = body;
 
         // Fetch existing to preserve other fields (like password, bindings)
         const existingRaw = await DB.get(userKey);
@@ -86,6 +86,9 @@ export async function onRequest(event) {
             ...existing,
             trips: trips || existing.trips || [],
             pins: pins || existing.pins || [],
+            mileage_user_events: Array.isArray(mileage_user_events)
+                ? mileage_user_events
+                : (existing.mileage_user_events || existing.mileageUserEvents || []),
             latest_5: latest_5 || existing.latest_5 || null, // Store the pre-calculated card data
             folders: folders || existing.folders || [],
             badge_settings: badge_settings || existing.badge_settings || { enabled: true },

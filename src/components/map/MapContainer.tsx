@@ -13,33 +13,77 @@ import { syncLeafletLayerGroup } from "../../utils/leafletSync";
 import { cachedTileLayer } from "../../utils/CachedTileLayer";
 import { useShallow } from "zustand/react/shallow";
 import toast from "react-hot-toast";
+import { useAppRouteState } from "../../hooks/useAppRouteState";
+import { boundMileageEventsForRichDisplay } from "../../utils/mileageUserEvents";
+import { tripToProductSegments } from "../../utils/tripProductProjection";
+import {
+  customEventDetail,
+  mileageEventTripId,
+  mileageEventUiEvents,
+  openMileageEventsPanel,
+  selectMileageEventOnMap,
+  setActiveMileageLine,
+  setMileageEventsMapPoint,
+  type MileageEventSelectDetail,
+  type MileageEventsActiveLineDetail,
+  type MileageEventsProjectionSource,
+} from "../../utils/mileageEventUiBridge";
+import {
+  activeAxisFromRailGraphSelection,
+  railGraphSelectionSourceFromProjection,
+  selectionFromActiveAxis,
+  selectionFromMileageEventSelect,
+  selectionFromProductSegment,
+} from "../../utils/railGraphSelection";
+import i18next from "i18next";
 
 // 记录各域名最后一次报错的时间，用于节流
 const lastTileErrorTime: Record<string, number> = {};
 
+type FlyToLocationDetail = {
+  lat: number;
+  lng: number;
+  zoom?: number;
+};
+
+type ActiveMileageAxis = {
+  lineKey: string | null;
+  source?: MileageEventsProjectionSource | null;
+  tripId?: string | number;
+  tripSegmentIndex?: number;
+  routeItemId?: string;
+};
+
 interface Props {
   setStationMenu: (menu: StationMenuData | null) => void;
   isDraggingRef: React.MutableRefObject<boolean>;
+  showDebugZoom?: boolean;
 }
 
 export const MapContainer: React.FC<Props> = ({
   setStationMenu,
   isDraggingRef,
+  showDebugZoom = false,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const pinsLayer = useRef<L.LayerGroup | null>(null);
   const baseLinesLayer = useRef<L.LayerGroup | null>(null);
+  const activeMileageLineLayer = useRef<L.LayerGroup | null>(null);
   const baseStationsLayer = useRef<L.LayerGroup | null>(null);
   const geoDataRef = useRef<CustomFeatureCollection | null>(null);
   const visitedStationsRef = useRef<Set<string>>(new Set());
   const routeLayer = useRef<L.LayerGroup | null>(null);
+  const mileageEventsLayer = useRef<L.LayerGroup | null>(null);
   const railLayerRef = useRef<L.TileLayer | null>(null);
   const rubberBandLayerRef = useRef<L.LayerGroup | null>(null);
+  const pendingFlyToLocationRef = useRef<FlyToLocationDetail | null>(null);
+  const locateFlyingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFittedBoundsRef = useRef<string>("");
 
   // Explicit SVG Renderers for pointer-events passthrough
   const baseLinesRendererRef = useRef<L.Renderer | null>(null);
+  const activeMileageLineRendererRef = useRef<L.Renderer | null>(null);
   const baseStationsRendererRef = useRef<L.Renderer | null>(null);
   const routeRendererRef = useRef<L.Renderer | null>(null);
   const visitedStationsRendererRef = useRef<L.Renderer | null>(null);
@@ -64,6 +108,56 @@ export const MapContainer: React.FC<Props> = ({
   const wasDraggingRef = useRef(false);
 
   const [isMapInitialized, setIsMapInitialized] = React.useState(false);
+  const [selectedMileageEventId, setSelectedMileageEventId] = React.useState<string | null>(null);
+  const [activeMileageAxis, setActiveMileageAxis] = React.useState<ActiveMileageAxis | null>(null);
+  const activeMileageLineKey = activeMileageAxis?.lineKey ?? null;
+  const activeMileageSource = activeMileageAxis?.source ?? null;
+  const hasActiveMileageAxis = !!activeMileageLineKey || !!activeMileageSource;
+  const activeAxisIsRailGraph =
+    activeMileageSource === "rail_graph_runtime" || (activeMileageLineKey?.startsWith("rail-graph:") ?? false);
+  const { tab: activeTab } = useAppRouteState();
+
+  const featureLineKey = (feature: CustomGeoJSONFeature) => {
+    const company = feature.properties.company || feature.properties.operator;
+    const line = feature.properties.line || feature.properties.name;
+    return company && line ? `${company}:${line}` : null;
+  };
+
+  const isActiveRouteItem = (item: { id?: string; lineKey?: string; source?: "rail_graph" | "legacy" | "walk" }) => {
+    if (!hasActiveMileageAxis || item.source === "walk") return false;
+    if (activeMileageAxis?.routeItemId) return item.id === activeMileageAxis.routeItemId;
+    if (item.lineKey && activeMileageLineKey === item.lineKey) return true;
+    return !activeMileageLineKey && activeAxisIsRailGraph && item.source === "rail_graph";
+  };
+
+  const flyToLocation = (detail: Partial<FlyToLocationDetail> | null | undefined) => {
+    if (typeof detail?.lat !== "number" || typeof detail.lng !== "number") return;
+    const next: FlyToLocationDetail = {
+      lat: detail.lat,
+      lng: detail.lng,
+      zoom: typeof detail.zoom === "number" ? detail.zoom : undefined,
+    };
+    const map = mapInstance.current;
+    if (!map) {
+      pendingFlyToLocationRef.current = next;
+      return;
+    }
+
+    if (locateFlyingTimerRef.current) {
+      clearTimeout(locateFlyingTimerRef.current);
+    }
+    (map as any)._isLocateFlying = true;
+    map.flyTo([next.lat, next.lng], next.zoom ?? map.getZoom(), {
+      animate: true,
+      duration: 1,
+    });
+    locateFlyingTimerRef.current = setTimeout(() => {
+      if (mapInstance.current) {
+        (mapInstance.current as any)._isLocateFlying = false;
+      }
+      locateFlyingTimerRef.current = null;
+    }, 1100);
+  };
 
   const animateRubberRetract = (
     polyline: L.Polyline,
@@ -101,7 +195,6 @@ export const MapContainer: React.FC<Props> = ({
     geoData,
     leafletReady,
     tripSegmentsGeometry,
-    activeTab,
     mapZoom,
     setMapZoom,
     setLeafletReady,
@@ -109,6 +202,11 @@ export const MapContainer: React.FC<Props> = ({
     editingPin,
     pinMode,
     railwayData,
+    mileageUserEvents,
+    trips,
+    activeRailGraphSelection,
+    setActiveRailGraphSelection,
+    clearActiveRailGraphSelection,
     setEditingPin,
     setPinMode,
     visitedStations,
@@ -117,7 +215,6 @@ export const MapContainer: React.FC<Props> = ({
       geoData: state.geoData,
       leafletReady: state.leafletReady,
       tripSegmentsGeometry: state.tripSegmentsGeometry,
-      activeTab: state.activeTab,
       mapZoom: state.mapZoom,
       setMapZoom: state.setMapZoom,
       setLeafletReady: state.setLeafletReady,
@@ -125,6 +222,11 @@ export const MapContainer: React.FC<Props> = ({
       editingPin: state.editingPin,
       pinMode: state.pinMode,
       railwayData: state.railwayData,
+      mileageUserEvents: state.mileageUserEvents,
+      trips: state.trips,
+      activeRailGraphSelection: state.activeRailGraphSelection,
+      setActiveRailGraphSelection: state.setActiveRailGraphSelection,
+      clearActiveRailGraphSelection: state.clearActiveRailGraphSelection,
       setEditingPin: state.setEditingPin,
       setPinMode: state.setPinMode,
       visitedStations: state.visitedStations,
@@ -134,6 +236,16 @@ export const MapContainer: React.FC<Props> = ({
   useEffect(() => {
     setLeafletReady(true);
   }, [setLeafletReady]);
+
+  useEffect(() => {
+    if (!activeRailGraphSelection) {
+      setActiveMileageAxis(null);
+      setSelectedMileageEventId(null);
+      return;
+    }
+    setActiveMileageAxis(activeAxisFromRailGraphSelection(activeRailGraphSelection));
+    setSelectedMileageEventId(activeRailGraphSelection.kind === "event" ? activeRailGraphSelection.eventId ?? null : null);
+  }, [activeRailGraphSelection]);
 
   useEffect(() => {
     if (activeTab === "map" && leafletReady) {
@@ -148,8 +260,9 @@ export const MapContainer: React.FC<Props> = ({
     geoDataRef.current = geoData;
     if (isMapInitialized && leafletReady && geoData) {
       renderBaseMap(geoData);
+      renderActiveMileageLine(geoData);
     }
-  }, [geoData, leafletReady, isMapInitialized, railwayData]);
+  }, [geoData, leafletReady, isMapInitialized, railwayData, activeMileageAxis]);
 
   useEffect(() => {
     visitedStationsRef.current = visitedStations;
@@ -162,7 +275,7 @@ export const MapContainer: React.FC<Props> = ({
     if (isMapInitialized && leafletReady && tripSegmentsGeometry) {
       renderTripRoutes();
     }
-  }, [tripSegmentsGeometry, leafletReady, mapZoom, isMapInitialized]);
+  }, [tripSegmentsGeometry, leafletReady, mapZoom, isMapInitialized, activeMileageAxis]);
 
   // 仅在坐标集发生实质变化时缩放适配视口范围 / Fit bounds only when coordinates change
   useEffect(() => {
@@ -226,6 +339,12 @@ export const MapContainer: React.FC<Props> = ({
   }, [pins, editingPin, pinMode, leafletReady, isMapInitialized]);
 
   useEffect(() => {
+    if (isMapInitialized && leafletReady) {
+      renderMileageEvents();
+    }
+  }, [mileageUserEvents, railwayData, trips, mapZoom, selectedMileageEventId, activeMileageAxis, leafletReady, isMapInitialized]);
+
+  useEffect(() => {
     const handleCreateTempPin = () => {
       if (!mapInstance.current) return;
       const c = mapInstance.current.getCenter();
@@ -240,25 +359,57 @@ export const MapContainer: React.FC<Props> = ({
       mapInstance.current.panBy([0, 150]);
     };
 
-    const handleFlyToLocation = (e: Event) => {
+    const handleRequestMapCenter = () => {
       if (!mapInstance.current) return;
-      const customEvent = e as CustomEvent;
-      const { lat, lng, zoom } = customEvent.detail;
+      const center = mapInstance.current.getCenter();
+      setMileageEventsMapPoint({ lat: center.lat, lng: center.lng });
+    };
 
-      // Set a flag on the map instance to distinguish programmatic moves
-      (mapInstance.current as any)._isLocateFlying = true;
-
-      mapInstance.current.flyTo([lat, lng], zoom, {
-        animate: true,
-        duration: 1,
-      });
-
-      // Clear flag after animation
-      setTimeout(() => {
-        if (mapInstance.current) {
-          (mapInstance.current as any)._isLocateFlying = false;
+    const handleMileageEventSelect = (event: Event) => {
+      const detail = customEventDetail<MileageEventSelectDetail>(event);
+      if (detail.eventId) {
+        setSelectedMileageEventId(detail.eventId);
+      }
+      if (detail.lineKey || detail.source || detail.tripId !== undefined) {
+        const trip = detail.tripId !== undefined
+          ? trips.find((candidate) => String(candidate.id) === String(detail.tripId))
+          : null;
+        const productSegments = trip ? tripToProductSegments(trip, railwayData) : [];
+        const productSegment = typeof detail.tripSegmentIndex === "number"
+          ? productSegments[detail.tripSegmentIndex]
+          : undefined;
+        const selection = productSegment
+          ? selectionFromProductSegment({
+              kind: "event",
+              segment: productSegment,
+              source: detail.source ? railGraphSelectionSourceFromProjection(detail.source) : undefined,
+              lineKey: detail.lineKey ?? null,
+              tripId: detail.tripId,
+              tripSegmentIndex: detail.tripSegmentIndex,
+              routeItemId: detail.routeItemId,
+              eventId: detail.eventId,
+            })
+          : selectionFromMileageEventSelect(detail);
+        if (selection) {
+          setActiveRailGraphSelection(selection);
         }
-      }, 1100);
+      }
+    };
+
+    const handleActiveMileageLine = (event: Event) => {
+      const detail = customEventDetail<MileageEventsActiveLineDetail>(event);
+      if (!detail.lineKey && !detail.source) {
+        clearActiveRailGraphSelection();
+        return;
+      }
+      const selection = selectionFromActiveAxis(detail);
+      if (!selection) return;
+      setActiveRailGraphSelection(selection);
+    };
+
+    const handleFlyToLocation = (e: Event) => {
+      const customEvent = e as CustomEvent<FlyToLocationDetail>;
+      flyToLocation(customEvent.detail);
     };
 
       const handleShowNearbyStations = (e: Event) => {
@@ -287,14 +438,20 @@ export const MapContainer: React.FC<Props> = ({
       };
 
     window.addEventListener("map:create-temp-pin", handleCreateTempPin);
+    window.addEventListener(mileageEventUiEvents.requestMapCenter, handleRequestMapCenter);
+    window.addEventListener(mileageEventUiEvents.select, handleMileageEventSelect);
+    window.addEventListener(mileageEventUiEvents.activeLine, handleActiveMileageLine);
     window.addEventListener("map:fly-to-location", handleFlyToLocation);
       window.addEventListener("map:show-nearby-stations", handleShowNearbyStations);
     return () => {
       window.removeEventListener("map:create-temp-pin", handleCreateTempPin);
+      window.removeEventListener(mileageEventUiEvents.requestMapCenter, handleRequestMapCenter);
+      window.removeEventListener(mileageEventUiEvents.select, handleMileageEventSelect);
+      window.removeEventListener(mileageEventUiEvents.activeLine, handleActiveMileageLine);
       window.removeEventListener("map:fly-to-location", handleFlyToLocation);
         window.removeEventListener("map:show-nearby-stations", handleShowNearbyStations);
     };
-  }, [setEditingPin]);
+  }, [clearActiveRailGraphSelection, railwayData, setActiveRailGraphSelection, setEditingPin, trips]);
 
   const initMap = () => {
     if (!mapRef.current || mapInstance.current) return;
@@ -311,27 +468,20 @@ export const MapContainer: React.FC<Props> = ({
         startLng = mapCenterSettings.lng;
       } else if (mapCenterSettings.mode === "latest") {
         const _trips = useStore.getState().trips;
-        if (
-          _trips &&
-          _trips.length > 0 &&
-          _trips[0].segments &&
-          _trips[0].segments.length > 0
-        ) {
-          const lastSegment = _trips[0].segments[_trips[0].segments.length - 1];
-          const geo = useStore.getState().geoData;
-          if (geo && geo.features) {
-            const targetFeature = geo.features.find(
-              (f: any) =>
-                f.properties.name === lastSegment.destination &&
-                f.properties.line === lastSegment.line,
+        if (_trips && _trips.length > 0) {
+          const productSegments = tripToProductSegments(_trips[0], railwayData);
+          const lastSegment = productSegments[productSegments.length - 1];
+          const lastCoords = lastSegment?.geometry?.[lastSegment.geometry.length - 1];
+          if (lastCoords) {
+            startLat = lastCoords[0];
+            startLng = lastCoords[1];
+          } else if (lastSegment) {
+            const endStation = railwayData[lastSegment.lineKey]?.stations.find(
+              (station: any) => station.id === lastSegment.toId,
             );
-            if (
-              targetFeature &&
-              targetFeature.geometry &&
-              targetFeature.geometry.coordinates
-            ) {
-              startLat = targetFeature.geometry.coordinates[1];
-              startLng = targetFeature.geometry.coordinates[0];
+            if (endStation) {
+              startLat = endStation.lat;
+              startLng = endStation.lng;
             }
           }
         }
@@ -392,37 +542,52 @@ export const MapContainer: React.FC<Props> = ({
       )
       .addTo(map);
 
-    map.createPane("baseLinesPane");
+    const overlayPane = map.getPane("overlayPane")!;
+
+    map.createPane("baseLinesPane", overlayPane);
     const baseLinesPane = map.getPane("baseLinesPane")!;
     baseLinesPane.style.zIndex = "390";
     baseLinesPane.style.pointerEvents = "none";
 
-    map.createPane("baseStationsPane");
+    map.createPane("baseStationsPane", overlayPane);
     const baseStationsPane = map.getPane("baseStationsPane")!;
     baseStationsPane.style.zIndex = "400";
     baseStationsPane.style.pointerEvents = "none";
 
-    map.createPane("routePane");
+    map.createPane("routePane", overlayPane);
     const routePane = map.getPane("routePane")!;
     routePane.style.zIndex = "410";
     routePane.style.pointerEvents = "none";
 
-    map.createPane("visitedStationsPane");
+    map.createPane("activeMileageLinePane", overlayPane);
+    const activeMileageLinePane = map.getPane("activeMileageLinePane")!;
+    activeMileageLinePane.style.zIndex = "415";
+    activeMileageLinePane.style.pointerEvents = "none";
+
+    map.createPane("visitedStationsPane", overlayPane);
     const visitedStationsPane = map.getPane("visitedStationsPane")!;
     visitedStationsPane.style.zIndex = "420";
     visitedStationsPane.style.pointerEvents = "none";
 
+    map.createPane("mileageEventsPane", overlayPane);
+    const mileageEventsPane = map.getPane("mileageEventsPane")!;
+    mileageEventsPane.style.zIndex = "430";
+    mileageEventsPane.style.pointerEvents = "auto";
+
     mapInstance.current = map;
 
     baseLinesRendererRef.current = L.svg({ pane: "baseLinesPane" });
+    activeMileageLineRendererRef.current = L.svg({ pane: "activeMileageLinePane" });
     baseStationsRendererRef.current = L.svg({ pane: "baseStationsPane" });
     routeRendererRef.current = L.svg({ pane: "routePane" });
     visitedStationsRendererRef.current = L.svg({ pane: "visitedStationsPane" });
 
     baseLinesLayer.current = L.layerGroup();
+    activeMileageLineLayer.current = L.layerGroup().addTo(map);
     baseStationsLayer.current = L.layerGroup().addTo(map);
     routeLayer.current = L.layerGroup().addTo(map);
     pinsLayer.current = L.layerGroup().addTo(map);
+    mileageEventsLayer.current = L.layerGroup().addTo(map);
     rubberBandLayerRef.current = L.layerGroup().addTo(map);
 
     const updateLayerVisibility = () => {
@@ -449,6 +614,10 @@ export const MapContainer: React.FC<Props> = ({
       const visitedStationsPane = map.getPane("visitedStationsPane");
       if (visitedStationsPane) {
         visitedStationsPane.style.display = z <= 7 ? "none" : "";
+      }
+      const mileageEventsPane = map.getPane("mileageEventsPane");
+      if (mileageEventsPane) {
+        mileageEventsPane.style.display = z <= 7 ? "none" : "";
       }
 
       setMapZoom(z);
@@ -503,6 +672,7 @@ export const MapContainer: React.FC<Props> = ({
         setEditingPin({ ...currentEditingPin, ...newPos });
       } else {
         setStationMenu(null);
+        setMileageEventsMapPoint({ lat: e.latlng.lat, lng: e.latlng.lng });
       }
     });
 
@@ -898,10 +1068,18 @@ export const MapContainer: React.FC<Props> = ({
     };
 
     setIsMapInitialized(true);
+    if (pendingFlyToLocationRef.current) {
+      const pending = pendingFlyToLocationRef.current;
+      pendingFlyToLocationRef.current = null;
+      requestAnimationFrame(() => flyToLocation(pending));
+    }
   };
 
   useEffect(() => {
     return () => {
+      if (locateFlyingTimerRef.current) {
+        clearTimeout(locateFlyingTimerRef.current);
+      }
       if (
         mapInstance.current &&
         (mapInstance.current as any)._customDragCleanup
@@ -920,6 +1098,9 @@ export const MapContainer: React.FC<Props> = ({
       return;
 
     const map = mapInstance.current;
+    if ((map as any)._animatingZoom) {
+      return;
+    }
     const currentZoom = map.getZoom();
 
     // At zoom < 5, strictly provide empty array to clear/hide stations
@@ -1237,12 +1418,52 @@ export const MapContainer: React.FC<Props> = ({
         f.geometry.type === "MultiLineString",
     );
     L.geoJSON(lineFeatures as any, {
-      style: { color: "#475569", weight: 1, opacity: 0.3 },
+      style: (feature) => {
+        const lineKey = feature ? featureLineKey(feature as CustomGeoJSONFeature) : null;
+        const selected = !activeAxisIsRailGraph && !!activeMileageLineKey && lineKey === activeMileageLineKey;
+        const selectedColor =
+          (feature as CustomGeoJSONFeature | undefined)?.properties.stroke ||
+          (lineKey ? railwayData[lineKey]?.meta?.color : null) ||
+          "#0f766e";
+        return {
+          color: selected ? selectedColor : "#475569",
+          weight: selected ? 4 : 1,
+          opacity: selected ? 0.86 : hasActiveMileageAxis ? 0.18 : 0.3,
+          className: selected ? "base-line-active-mileage" : "base-line-muted-mileage",
+        };
+      },
       pane: "baseLinesPane",
       interactive: false,
       // @ts-ignore
       renderer: baseLinesRendererRef.current,
     }).addTo(baseLinesLayer.current);
+  };
+
+  const renderActiveMileageLine = (data: CustomFeatureCollection) => {
+    if (!activeMileageLineLayer.current) return;
+    activeMileageLineLayer.current.clearLayers();
+    if (!activeMileageLineKey || activeAxisIsRailGraph) return;
+
+    const lineFeatures = data.features.filter((feature: CustomGeoJSONFeature) => {
+      if (feature.geometry.type !== "LineString" && feature.geometry.type !== "MultiLineString") return false;
+      return featureLineKey(feature) === activeMileageLineKey;
+    });
+    if (lineFeatures.length === 0) return;
+
+    const lineColor = railwayData[activeMileageLineKey]?.meta?.color || "#0f766e";
+    L.geoJSON(lineFeatures as any, {
+      style: () => ({
+        color: lineColor,
+        weight: 7,
+        opacity: 0.95,
+        lineCap: "round",
+        className: "active-mileage-line-overlay",
+      }),
+      pane: "activeMileageLinePane",
+      interactive: false,
+      // @ts-ignore
+      renderer: activeMileageLineRendererRef.current,
+    }).addTo(activeMileageLineLayer.current);
   };
 
   const renderTripRoutes = () => {
@@ -1258,7 +1479,16 @@ export const MapContainer: React.FC<Props> = ({
       color: string;
       popup: string;
       fallback: boolean;
+      lineKey?: string;
+      source?: "rail_graph" | "legacy" | "walk";
       isTransfer?: boolean;
+      tripId?: string | number;
+      segmentIndex?: number;
+      label?: string;
+      patternRef?: string;
+      direction?: string;
+      serviceType?: string;
+      geometrySource?: "saved_snapshot" | "geojson" | "fallback";
     }
     const routeItems: RouteItem[] = [];
 
@@ -1271,7 +1501,16 @@ export const MapContainer: React.FC<Props> = ({
             color: seg.color,
             popup: seg.popup,
             fallback: seg.fallback,
+            lineKey: seg.lineKey,
+            source: seg.source,
             isTransfer: seg.isTransfer,
+            tripId: seg.tripId,
+            segmentIndex: seg.segmentIndex,
+            label: seg.label,
+            patternRef: seg.patternRef,
+            direction: seg.direction,
+            serviceType: seg.serviceType,
+            geometrySource: seg.geometrySource,
           });
         });
       } else {
@@ -1281,7 +1520,16 @@ export const MapContainer: React.FC<Props> = ({
           color: seg.color,
           popup: seg.popup,
           fallback: seg.fallback,
+          lineKey: seg.lineKey,
+          source: seg.source,
           isTransfer: seg.isTransfer,
+          tripId: seg.tripId,
+          segmentIndex: seg.segmentIndex,
+          label: seg.label,
+          patternRef: seg.patternRef,
+          direction: seg.direction,
+          serviceType: seg.serviceType,
+          geometrySource: seg.geometrySource,
         });
       }
     });
@@ -1296,9 +1544,92 @@ export const MapContainer: React.FC<Props> = ({
           color: t.walkType === "tree" ? "#16a34a" : "#9333ea", // Green vs Purple
           popup: `${t.walkType === "tree" ? "环保/步行" : "UFO/步行"}: ${t.date}`,
           fallback: true, // Forces dashArray '5, 10' later in the sync renderer
+          lineKey: undefined,
+          source: "walk",
         });
       }
     });
+
+    const ratioAtRoutePoint = (item: RouteItem, latlng: L.LatLng) => {
+      if (!mapInstance.current || item.coords.length < 2) return 0;
+      const clickPoint = mapInstance.current.latLngToLayerPoint(latlng);
+      const points = item.coords.map((coord) => mapInstance.current!.latLngToLayerPoint(coord as L.LatLngExpression));
+      let total = 0;
+      const segmentLengths: number[] = [];
+      for (let index = 1; index < points.length; index++) {
+        const length = points[index - 1].distanceTo(points[index]);
+        segmentLengths.push(length);
+        total += length;
+      }
+      if (total <= 0) return 0;
+
+      let bestDistance = Number.POSITIVE_INFINITY;
+      let bestAlong = 0;
+      let cursor = 0;
+      for (let index = 1; index < points.length; index++) {
+        const start = points[index - 1];
+        const end = points[index];
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const lengthSq = dx * dx + dy * dy;
+        const localT = lengthSq <= 0
+          ? 0
+          : Math.max(0, Math.min(1, ((clickPoint.x - start.x) * dx + (clickPoint.y - start.y) * dy) / lengthSq));
+        const projected = L.point(start.x + dx * localT, start.y + dy * localT);
+        const distance = clickPoint.distanceTo(projected);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestAlong = cursor + segmentLengths[index - 1] * localT;
+        }
+        cursor += segmentLengths[index - 1];
+      }
+      return Math.max(0, Math.min(1, bestAlong / total));
+    };
+
+    const activateRouteItem = (item: RouteItem, event: L.LeafletMouseEvent) => {
+      if (item.source === "walk" || item.isTransfer) return;
+      if (event.originalEvent) L.DomEvent.stop(event.originalEvent);
+      mapInstance.current?.closePopup();
+      const projectionSource = item.source === "rail_graph" ? "rail_graph_runtime" : "legacy_app";
+      const mapPoint = { lat: event.latlng.lat, lng: event.latlng.lng };
+      const tripRatio = ratioAtRoutePoint(item, event.latlng);
+      setActiveMileageLine({
+        lineKey: item.lineKey ?? null,
+        source: projectionSource,
+        tripId: item.tripId,
+        tripSegmentIndex: item.segmentIndex,
+        routeItemId: item.id,
+      });
+      const selection = selectionFromProductSegment({
+        kind: "route",
+        source: item.source === "rail_graph" ? "rail_graph_snapshot" : "legacy_geojson",
+        lineKey: item.lineKey ?? null,
+        tripId: item.tripId,
+        tripSegmentIndex: item.segmentIndex,
+        routeItemId: item.id,
+        label: item.label,
+        color: item.color,
+        patternRef: item.patternRef,
+        direction: item.direction,
+        serviceType: item.serviceType,
+        geometrySource: item.geometrySource,
+      }, {
+        anchor: {
+          lat: mapPoint.lat,
+          lng: mapPoint.lng,
+          tripRatio,
+        },
+      });
+      if (selection) setActiveRailGraphSelection(selection);
+      openMileageEventsPanel({
+        mode: "line",
+        lineKey: item.lineKey,
+        source: projectionSource,
+        tripId: item.tripId,
+        tripSegmentIndex: item.segmentIndex,
+        routeItemId: item.id,
+      });
+    };
 
     syncLeafletLayerGroup<RouteItem>(
       routeLayer.current,
@@ -1306,25 +1637,43 @@ export const MapContainer: React.FC<Props> = ({
       (item) => item.id,
       (item) => {
         const isTransfer = item.isTransfer;
+        const activeRoute = isActiveRouteItem(item);
+        const dimRoute = hasActiveMileageAxis && !activeRoute && item.source !== "walk";
+        const targetWeight = activeRoute ? zoomWeight + 4 : zoomWeight;
+        const targetOpacity = activeRoute ? 1 : dimRoute ? 0.24 : isTransfer ? 0.5 : 0.9;
         const options = {
           renderer: routeRendererRef.current,
           color: item.color,
-          weight: zoomWeight,
-          opacity: isTransfer ? 0.5 : 0.9,
+          weight: targetWeight,
+          opacity: targetOpacity,
           lineCap: "round",
           smoothFactor: 0.2,
           dashArray: item.fallback ? "5, 10" : isTransfer ? "4, 8" : undefined,
+          className: `rail-route-line rail-route-${item.source ?? "legacy"}${item.fallback ? " rail-route-fallback" : ""}${activeRoute ? " rail-route-active-mileage" : ""}`,
           pane: "routePane",
         };
         const pl = L.polyline(
           item.coords,
           options as L.PolylineOptions,
-        ).bindPopup(item.popup);
+        ).bindTooltip(item.popup, {
+          className: "rail-route-tooltip",
+          direction: "top",
+          opacity: 1,
+          sticky: true,
+        });
+        if (item.source !== "walk" && !item.isTransfer) {
+          const routeClickHandler = (event: L.LeafletMouseEvent) => activateRouteItem(item, event);
+          pl.on("click", routeClickHandler);
+          (pl as any)._routeClickHandler = routeClickHandler;
+        }
         (pl as any)._cachedCoords = item.coords;
         return pl;
       },
       (layer, item) => {
-        const pl = layer as L.Polyline & { _cachedCoords?: any[] };
+        const pl = layer as L.Polyline & {
+          _cachedCoords?: any[];
+          _routeClickHandler?: (event: L.LeafletMouseEvent) => void;
+        };
 
         // setLatLngs is an extremely expensive operation in Leaflet.
         // Only call it if the coordinates actually changed (reference check).
@@ -1340,29 +1689,53 @@ export const MapContainer: React.FC<Props> = ({
         const currentOpacity = (pl.options as L.PolylineOptions).opacity;
 
         const isTransfer = item.isTransfer;
+        const activeRoute = isActiveRouteItem(item);
+        const dimRoute = hasActiveMileageAxis && !activeRoute && item.source !== "walk";
+        const targetWeight = activeRoute ? zoomWeight + 4 : zoomWeight;
         const targetDash = item.fallback
           ? "5, 10"
           : isTransfer
             ? "4, 8"
             : undefined;
-        const targetOpacity = isTransfer ? 0.5 : 0.9;
+        const targetOpacity = activeRoute ? 1 : dimRoute ? 0.24 : isTransfer ? 0.5 : 0.9;
 
         if (
-          currentWeight !== zoomWeight ||
+          currentWeight !== targetWeight ||
           currentColor !== item.color ||
           currentDash !== targetDash ||
           currentOpacity !== targetOpacity
         ) {
           pl.setStyle({
             color: item.color,
-            weight: zoomWeight,
+            weight: targetWeight,
             dashArray: targetDash,
             opacity: targetOpacity,
           });
         }
 
-        if (pl.getPopup()?.getContent() !== item.popup) {
-          pl.bindPopup(item.popup);
+        const routeElement = pl.getElement();
+        if (routeElement) {
+          routeElement.classList.toggle("rail-route-active-mileage", activeRoute);
+        }
+
+        if (pl.getTooltip()?.getContent() !== item.popup) {
+          pl.unbindTooltip();
+          pl.bindTooltip(item.popup, {
+            className: "rail-route-tooltip",
+            direction: "top",
+            opacity: 1,
+            sticky: true,
+          });
+        }
+
+        if (pl._routeClickHandler) {
+          pl.off("click", pl._routeClickHandler);
+          pl._routeClickHandler = undefined;
+        }
+        if (item.source !== "walk" && !item.isTransfer) {
+          const routeClickHandler = (event: L.LeafletMouseEvent) => activateRouteItem(item, event);
+          pl.on("click", routeClickHandler);
+          pl._routeClickHandler = routeClickHandler;
         }
       },
     );
@@ -1467,5 +1840,297 @@ export const MapContainer: React.FC<Props> = ({
     );
   };
 
-  return <div ref={mapRef} style={{ width: "100%", height: "100%" }} />;
+  const renderMileageEvents = () => {
+    if (!mileageEventsLayer.current || !mapInstance.current) return;
+
+    const map = mapInstance.current;
+    const zoom = map.getZoom() ?? mapZoom;
+    const cellPx = zoom < 9 ? 132 : zoom < 11 ? 104 : zoom < 13 ? 76 : zoom < 15 ? 52 : 1;
+    const projected = boundMileageEventsForRichDisplay(mileageUserEvents, railwayData, trips)
+      .filter((entry) => entry.bound.coordinates);
+
+    type EventMarkerItem = {
+      id: string;
+      lat: number;
+      lng: number;
+      color: string;
+      eventIds: string[];
+      titles: string[];
+      selectionDetails: MileageEventSelectDetail[];
+      lineKeys: Set<string>;
+      sourceKinds: Set<"rail_graph" | "legacy">;
+      selected: boolean;
+      activeLine: boolean;
+      dimmed: boolean;
+      sumLat: number;
+      sumLng: number;
+    };
+
+    const markerMatchesActiveLine = (lineKeys: Set<string>, sourceKinds: Set<"rail_graph" | "legacy">) => {
+      if (!hasActiveMileageAxis) return false;
+      if (activeMileageLineKey && lineKeys.has(activeMileageLineKey)) return true;
+      return !activeMileageLineKey && activeAxisIsRailGraph && sourceKinds.has("rail_graph");
+    };
+    const markerSelectionDetail = (entry: (typeof projected)[number]): MileageEventSelectDetail => {
+      const tripId = entry.trip?.id ?? mileageEventTripId(entry.bound.event.payload?.tripId);
+      const tripSegmentIndex = typeof entry.bound.orderIndex === "number"
+        ? entry.bound.orderIndex
+        : entry.lineContext.source === "rail_graph_runtime"
+          ? entry.lineContext.segmentIndex
+          : undefined;
+      const routeItemId =
+        entry.trip && typeof tripSegmentIndex === "number"
+          ? tripToProductSegments(entry.trip, railwayData)[tripSegmentIndex]?.id
+          : undefined;
+      return {
+        eventId: entry.bound.event.id,
+        lineKey: entry.lineContext.lineKey,
+        source: entry.lineContext.source,
+        tripId,
+        tripSegmentIndex,
+        routeItemId,
+      };
+    };
+
+    const grouped = new Map<string, EventMarkerItem>();
+    projected.forEach((entry) => {
+      const coordinates = entry.bound.coordinates;
+      if (!coordinates) return;
+      const selectionDetail = markerSelectionDetail(entry);
+      const rawColor = entry.lineContext.source === "rail_graph_runtime"
+        ? entry.lineContext.segment.displayColor || "#059669"
+        : entry.lineContext.line.meta.color || "#059669";
+      const lineColor = /^#[0-9a-f]{3,8}$/i.test(rawColor) ? rawColor : "#059669";
+      const sourceKind = entry.lineContext.source === "rail_graph_runtime" ? "rail_graph" : "legacy";
+      const activeLine = markerMatchesActiveLine(new Set([entry.lineContext.lineKey]), new Set([sourceKind]));
+      const layerPoint = map.latLngToLayerPoint([coordinates[1], coordinates[0]]);
+      const key = zoom >= 15
+        ? [
+            "exact",
+            entry.lineContext.lineKey,
+            Math.round(entry.bound.event.mileage.distanceMeters / 10),
+          ].join(":")
+        : [
+            "grid",
+            Math.floor(layerPoint.x / cellPx),
+            Math.floor(layerPoint.y / cellPx),
+          ].join(":");
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.eventIds.push(entry.bound.event.id);
+        existing.titles.push(entry.bound.event.title);
+        existing.selectionDetails.push(selectionDetail);
+        existing.lineKeys.add(entry.lineContext.lineKey);
+        existing.sourceKinds.add(sourceKind);
+        existing.selected = existing.selected || entry.bound.event.id === selectedMileageEventId;
+        existing.activeLine = existing.activeLine || activeLine;
+        existing.dimmed = hasActiveMileageAxis && !existing.activeLine && !existing.selected;
+        existing.sumLat += coordinates[1];
+        existing.sumLng += coordinates[0];
+        existing.lat = existing.sumLat / existing.eventIds.length;
+        existing.lng = existing.sumLng / existing.eventIds.length;
+      } else {
+        grouped.set(key, {
+          id: key,
+          lat: coordinates[1],
+          lng: coordinates[0],
+          color: lineColor,
+          eventIds: [entry.bound.event.id],
+          titles: [entry.bound.event.title],
+          selectionDetails: [selectionDetail],
+          lineKeys: new Set([entry.lineContext.lineKey]),
+          sourceKinds: new Set([sourceKind]),
+          selected: entry.bound.event.id === selectedMileageEventId,
+          activeLine,
+          dimmed: hasActiveMileageAxis && !activeLine && entry.bound.event.id !== selectedMileageEventId,
+          sumLat: coordinates[1],
+          sumLng: coordinates[0],
+        });
+      }
+    });
+
+    syncLeafletLayerGroup<EventMarkerItem>(
+      mileageEventsLayer.current,
+      Array.from(grouped.values()),
+      (item) => item.id,
+      (item) => {
+        const layer = L.marker([item.lat, item.lng], {
+          pane: "mileageEventsPane",
+          icon: createMileageEventIcon(item),
+          zIndexOffset: item.selected ? 1200 : item.activeLine ? 980 : item.eventIds.length > 1 ? 900 : 800,
+        });
+
+        const title = mileageEventMarkerTitle(item);
+        layer.bindTooltip(title, { className: "mileage-event-tooltip", direction: "top", offset: [0, -10] });
+        const markerClickHandler = (event: L.LeafletMouseEvent) => {
+          L.DomEvent.stopPropagation(event);
+          const detail =
+            item.selectionDetails.find((candidate) => candidate.eventId === selectedMileageEventId) ??
+            item.selectionDetails[0];
+          if (!detail) return;
+          setSelectedMileageEventId(detail.eventId);
+          selectMileageEventOnMap(detail);
+        };
+        layer.on("click", markerClickHandler);
+        (layer as any)._markerClickHandler = markerClickHandler;
+        (layer as any)._cachedLat = item.lat;
+        (layer as any)._cachedLng = item.lng;
+        (layer as any)._cachedColor = item.color;
+        (layer as any)._cachedCount = item.eventIds.length;
+        (layer as any)._cachedSelected = item.selected;
+        (layer as any)._cachedMultiLine = item.lineKeys.size > 1;
+        (layer as any)._cachedSourceKey = Array.from(item.sourceKinds).sort().join(":");
+        (layer as any)._cachedTitle = title;
+        return layer;
+      },
+      (layer, item) => {
+        const marker = layer as L.Marker & {
+          _cachedLat?: number;
+          _cachedLng?: number;
+          _cachedColor?: string;
+          _cachedCount?: number;
+          _cachedSelected?: boolean;
+          _cachedActiveLine?: boolean;
+          _cachedDimmed?: boolean;
+          _cachedMultiLine?: boolean;
+          _cachedSourceKey?: string;
+          _cachedTitle?: string;
+          _markerClickHandler?: (event: L.LeafletMouseEvent) => void;
+        };
+        const count = item.eventIds.length;
+        const sourceKey = Array.from(item.sourceKinds).sort().join(":");
+        const title = mileageEventMarkerTitle(item);
+        if (marker._cachedLat !== item.lat || marker._cachedLng !== item.lng) {
+          marker.setLatLng([item.lat, item.lng]);
+          marker._cachedLat = item.lat;
+          marker._cachedLng = item.lng;
+        }
+        if (
+          marker._cachedColor !== item.color ||
+          marker._cachedCount !== count ||
+          marker._cachedSelected !== item.selected ||
+          marker._cachedActiveLine !== item.activeLine ||
+          marker._cachedDimmed !== item.dimmed ||
+          marker._cachedMultiLine !== item.lineKeys.size > 1 ||
+          marker._cachedSourceKey !== sourceKey
+        ) {
+          marker.setIcon(createMileageEventIcon(item));
+          marker.setZIndexOffset(item.selected ? 1200 : item.activeLine ? 980 : count > 1 ? 900 : 800);
+          marker._cachedColor = item.color;
+          marker._cachedCount = count;
+          marker._cachedSelected = item.selected;
+          marker._cachedActiveLine = item.activeLine;
+          marker._cachedDimmed = item.dimmed;
+          marker._cachedMultiLine = item.lineKeys.size > 1;
+          marker._cachedSourceKey = sourceKey;
+        }
+        if (marker._cachedTitle !== title) {
+          marker.unbindTooltip();
+          marker.bindTooltip(title, { className: "mileage-event-tooltip", direction: "top", offset: [0, -10] });
+          marker._cachedTitle = title;
+        }
+        if (marker._markerClickHandler) {
+          marker.off("click", marker._markerClickHandler);
+          marker._markerClickHandler = undefined;
+        }
+        const markerClickHandler = (event: L.LeafletMouseEvent) => {
+          L.DomEvent.stopPropagation(event);
+          const detail =
+            item.selectionDetails.find((candidate) => candidate.eventId === selectedMileageEventId) ??
+            item.selectionDetails[0];
+          if (!detail) return;
+          setSelectedMileageEventId(detail.eventId);
+          selectMileageEventOnMap(detail);
+        };
+        marker.on("click", markerClickHandler);
+        marker._markerClickHandler = markerClickHandler;
+      },
+    );
+  };
+
+  const mileageEventMarkerSourceLabel = (sourceKinds: Set<"rail_graph" | "legacy">) => {
+    if (sourceKinds.size > 1) return i18next.t("mileageEvents.sourceMixed", "Mixed sources");
+    if (sourceKinds.has("rail_graph")) return i18next.t("mileageEvents.sourceRailGraph", "Rail graph snapshot");
+    return i18next.t("mileageEvents.sourceLegacy", "GeoJSON axis");
+  };
+
+  const mileageEventMarkerTitle = (item: {
+    eventIds: string[];
+    titles: string[];
+    sourceKinds: Set<"rail_graph" | "legacy">;
+  }) => {
+    const source = mileageEventMarkerSourceLabel(item.sourceKinds);
+    if (item.eventIds.length > 1) {
+      return i18next.t("mileageEvents.markerClusterWithSource", "{{count}} events · {{source}}", {
+        count: item.eventIds.length,
+        source,
+      });
+    }
+    return i18next.t("mileageEvents.markerSingleWithSource", "{{title}} · {{source}}", {
+      title: item.titles[0],
+      source,
+    });
+  };
+
+  const createMileageEventIcon = (item: {
+    color: string;
+    eventIds: string[];
+    lineKeys: Set<string>;
+    sourceKinds: Set<"rail_graph" | "legacy">;
+    selected: boolean;
+    activeLine: boolean;
+    dimmed: boolean;
+  }) => {
+    const count = item.eventIds.length;
+    const size = item.selected ? 38 : item.activeLine ? 30 : count > 1 ? Math.min(38, 26 + Math.log2(count + 1) * 6) : 24;
+    const clusterClass = count > 1 ? "is-cluster" : "is-single";
+    const selectedClass = item.selected ? "is-selected" : "";
+    const activeClass = item.activeLine ? "is-active-line" : "";
+    const dimmedClass = item.dimmed ? "is-dimmed" : "";
+    const mixedClass = item.lineKeys.size > 1 ? "is-mixed" : "";
+    const sourceClass = item.sourceKinds.size > 1
+      ? "is-source-mixed"
+      : item.sourceKinds.has("rail_graph")
+        ? "is-rail-graph"
+        : "is-legacy";
+    const html = `
+      <div class="mileage-event-marker ${clusterClass} ${selectedClass} ${activeClass} ${dimmedClass} ${mixedClass} ${sourceClass}" style="--event-color:${item.color}; --event-size:${size}px">
+        <span class="mileage-event-marker-core">${count > 1 ? count : ""}</span>
+      </div>
+    `;
+    return L.divIcon({
+      className: "mileage-event-marker-shell",
+      html,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+    });
+  };
+
+  return (
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
+      {showDebugZoom && (
+        <div
+          style={{
+            position: "absolute",
+            top: "12px",
+            left: "12px",
+            zIndex: 1000,
+            backgroundColor: "rgba(15, 23, 42, 0.8)",
+            color: "#f8fafc",
+            padding: "4px 8px",
+            borderRadius: "4px",
+            fontSize: "12px",
+            fontFamily: "monospace",
+            fontWeight: "bold",
+            pointerEvents: "none",
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+          }}
+        >
+          Zoom: {mapZoom}
+        </div>
+      )}
+    </div>
+  );
 };

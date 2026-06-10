@@ -13,7 +13,7 @@ const blog = defineCollection({
 			updatedDate: z.coerce.date().optional(),
 			heroImage: z.optional(image()),
 			// 分类: dev | docs | guide | release
-			category: z.enum(['dev', 'docs', 'guide', 'release']).default('dev'),
+			category: z.enum(['dev', 'docs', 'guide']).default('dev'),
 			// 标签列表
 			tags: z.array(z.string()).default([]),
 			// 对应的 changelog 版本号, 用于 VersionBadge 跳转

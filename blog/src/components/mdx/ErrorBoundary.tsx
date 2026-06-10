@@ -55,7 +55,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 <RotateCcw size={14} /> 刷新页面
               </button>
               <a
-                href="/blog/"
+                href="/blog/zh-cn/"
                 className="flex items-center gap-2 px-5 py-2 bg-white text-slate-600 text-xs font-bold rounded-xl border border-slate-200 transition-all hover:bg-slate-50 active:scale-95 shadow-sm"
               >
                 <Home size={14} /> 返回索引

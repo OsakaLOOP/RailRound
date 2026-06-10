@@ -1,6 +1,6 @@
 # @railloop/route-slice-preview
 
-A lightweight Leaflet-based route preview component for MDX blogs. Powered by [RailleRound / RailLOOP](https://rail.s3xyseia.xyz).
+A lightweight Leaflet-based route preview component for MDX blogs. Powered by [RailLOOP](https://rail.s3xyseia.xyz).
 
 ```bash
 npm install @railloop/route-slice-preview
@@ -30,7 +30,7 @@ import "@railloop/route-slice-preview/styles.css";
 
 ## Generating Route Data
 
-Visit [RailleRound](https://rail.s3xyseia.xyz), create a trip, and use the **Export** button to get pre-computed MDX code with embedded route data.
+Visit [RailLOOP](https://rail.s3xyseia.xyz), create a trip, and click the **Code** button (`</>`) on a trip card to generate pre-computed MDX code with embedded route data.
 
 ## Peer Dependencies
 

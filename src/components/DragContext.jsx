@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { createPortal } from 'react-dom';
 import { isMobile } from 'react-device-detect';
 import railBg from './../assets/rail_bg.png'
+import { lineLabel } from '../utils/mileageUserEvents';
 // --- Global Drag Context ---
 const DragContext = createContext(null);
 
@@ -188,7 +189,7 @@ const DragOverlay = ({ item, pos }) => {
                     />
                 )}
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded whitespace-nowrap font-bold border border-white/20">
-                    {item.name || item.lineKey}
+                    {item.name || (item.lineKey ? lineLabel(item.lineKey) : '')}
                 </div>
             </div>
         </div>,

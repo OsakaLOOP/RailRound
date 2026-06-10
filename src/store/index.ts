@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { db } from '../utils/db';
+import changelog from '../../public/changelog.json';
+import type { TripResult, TripRuntimeArtifacts } from '../rail-graph-v1/user-facing.types';
+import type { UserEventV2 } from '../rail-graph-v1/mileage-event.types';
+import type { DeployedSystem } from '../rail-graph-v1/deployment.types';
+import type { SystemContext } from '../rail-graph-v1/graph.types';
 
 // --- Custom IndexedDB Storage for Zustand ---
 // Because railwayData can easily exceed the 5MB localStorage limit,
@@ -142,6 +147,8 @@ export interface TripSegment {
     lineKey: LineKey;
     fromId: StationId;
     toId: StationId;
+    line?: string;
+    destination?: string;
     direction?: 'up' | 'down';
     loopVia?: 'up' | 'down' | 'auto';
     isAlt?: boolean;
@@ -154,6 +161,10 @@ export interface Trip {
   cost?: number;
   memo?: string;
   segments: TripSegment[];
+  railGraph?: {
+    tripResult: TripResult;
+    runtimeArtifacts?: TripRuntimeArtifacts;
+  };
   suicaData?: any;
   lineKey?: string;
   fromId?: string;
@@ -162,6 +173,81 @@ export interface Trip {
   walkPath?: [number, number][]; // [lat, lng] array for the Bezier curve
   walkType?: 'ufo' | 'tree' | 'normal';
 }
+
+export interface RailGraphRuntimeState {
+  system: SystemContext;
+  deployed: DeployedSystem;
+  source: 'static_bundle' | 'manual' | 'test';
+  loadedAt: string;
+}
+
+export interface RailGraphLoadState {
+  status: 'idle' | 'loading' | 'loaded' | 'not_found' | 'invalid' | 'error';
+  reason?: string;
+  fallbackReason?: string;
+  loadedAt?: string;
+}
+
+export type RailGraphSelectionSource = 'rail_graph_snapshot' | 'legacy_geojson';
+export type RailGraphGeometrySource = 'saved_snapshot' | 'geojson' | 'fallback';
+
+export interface RailGraphSelectionAnchor {
+  lat?: number;
+  lng?: number;
+  tripRatio?: number;
+}
+
+export interface RailGraphSelectionBase {
+  source: RailGraphSelectionSource;
+  lineKey?: string | null;
+  tripId?: ID;
+  tripSegmentIndex?: number;
+  routeItemId?: string;
+  label?: string;
+  color?: string;
+  patternRef?: string;
+  direction?: string;
+  serviceType?: string;
+  geometrySource?: RailGraphGeometrySource;
+  anchor?: RailGraphSelectionAnchor;
+  updatedAt: number;
+}
+
+export type RailGraphActiveSelection =
+  | (RailGraphSelectionBase & {
+      state: 'routeSelected';
+      /** @deprecated Use state === 'routeSelected'. Kept while UI surfaces migrate. */
+      kind: 'route';
+    })
+  | (RailGraphSelectionBase & {
+      state: 'axisSelected';
+      /** @deprecated Use state === 'axisSelected'. Kept while UI surfaces migrate. */
+      kind: 'axis';
+    })
+  | (RailGraphSelectionBase & {
+      state: 'eventSelected';
+      /** @deprecated Use state === 'eventSelected'. Kept while UI surfaces migrate. */
+      kind: 'event';
+      eventId: string;
+    })
+  | (RailGraphSelectionBase & {
+      state: 'creating';
+      kind: 'route' | 'axis';
+      createSource?: 'station' | 'map' | 'mileage' | 'trip';
+    })
+  | (RailGraphSelectionBase & {
+      state: 'inspecting';
+      kind: 'event' | 'route' | 'axis';
+      eventId?: string;
+    })
+  | (Partial<RailGraphSelectionBase> & {
+      state: 'unavailable';
+      kind: 'axis';
+      reason: string;
+      updatedAt: number;
+    });
+
+export type RailGraphSelectionDraft = Omit<RailGraphActiveSelection, 'updatedAt'>;
 
 export interface Pin {
   id: ID;
@@ -185,17 +271,44 @@ export interface Folder {
   hash?: string | null;
 }
 
+export type TierLevel = 'free' | 'premium' | 'permanent';
+
+export interface SubscriptionMonth {
+  year: number;
+  month: number;
+  planName: string;
+  amount: number;
+  orderId: string;
+  lastPayTime: string;
+  status: 'active' | 'cancelled';
+}
+
+export interface SubscriptionHistory {
+  username: string;
+  totalMonths: number;
+  months: SubscriptionMonth[];
+  lastUpdated: string;
+}
+
 export interface UserProfile {
   token: string;
   username: string;
+  tier?: TierLevel;
+  tierVerified?: boolean;
+  tierToken?: string;
+  tierExpiresAt?: string;
+  permanentUpgradedAt?: string;
+  subscriptionMonths?: number;
   bindings?: {
     github?: { login: string; avatar_url: string; id: number; };
+    afdian?: { user_id: string; bound_at: string; };
   };
   badge_settings?: { enabled: boolean; };
 }
 
 export interface BadgeSettings {
   enabled: boolean;
+  /** @deprecated User language preference. The actual display language is derived from the URL via useAppRouteState().lang */
   language?: string;
   defaultMapCenter?: {
     mode: 'fixed' | 'latest';
@@ -213,12 +326,17 @@ export interface StationMenuData {
 export interface GlobalStore {
   // Data Slice
   railwayData: RailwayMap;
+  railGraphRuntime: RailGraphRuntimeState | null;
+  railGraphLoadState: RailGraphLoadState;
   companyDB: CompanyDB;
   geoData: CustomFeatureCollection;
   segmentGeometries: Map<string, any>;
   tripSegmentsGeometry: any[];
   visitedStations: Set<string>;
   setRailwayData: (updater: RailwayMap | ((prev: RailwayMap) => RailwayMap)) => void;
+  setRailGraphRuntime: (runtime: RailGraphRuntimeState | null) => void;
+  setRailGraphLoadState: (loadState: RailGraphLoadState) => void;
+  clearRailGraphRuntime: () => void;
   setCompanyDB: (db: CompanyDB | ((prev: CompanyDB) => CompanyDB)) => void;
   setGeoData: (data: CustomFeatureCollection | ((prev: CustomFeatureCollection) => CustomFeatureCollection)) => void;
   setSegmentGeometries: (data: Map<string, any>) => void;
@@ -231,8 +349,11 @@ export interface GlobalStore {
   isLoggedIn: boolean;
   trips: Trip[];
   pins: Pin[];
+  mileageUserEvents: UserEventV2[];
   folders: Folder[];
   badgeSettings: BadgeSettings;
+  appVersion: string;
+
   isHydrated: boolean;
   setHydrated: (hydrated: boolean) => void;
 
@@ -249,12 +370,20 @@ export interface GlobalStore {
   addPin: (pin: Pin) => void;
   updatePin: (pin: Pin) => void;
   removePin: (id: ID) => void;
+  setMileageUserEvents: (events: UserEventV2[] | ((prev: UserEventV2[]) => UserEventV2[])) => void;
+  addMileageUserEvent: (event: UserEventV2) => void;
+  removeMileageUserEvent: (id: string) => void;
 
   setFolders: (folders: Folder[] | ((prev: Folder[]) => Folder[])) => void;
   setBadgeSettings: (settings: BadgeSettings) => void;
 
+  myFeedbackIds: string[];
+  addMyFeedbackId: (id: string) => void;
+
   // UI Slice
+  // @deprecated Use useAppRouteState().tab instead
   activeTab: 'records' | 'map' | 'stats';
+  // @deprecated Navigation should use useAppNavigation() instead
   setActiveTab: (tab: 'records' | 'map' | 'stats') => void;
 
   isAprilFool: boolean;
@@ -266,6 +395,9 @@ export interface GlobalStore {
   setMapZoom: (zoom: number) => void;
   leafletReady: boolean;
   setLeafletReady: (ready: boolean) => void;
+  activeRailGraphSelection: RailGraphActiveSelection | null;
+  setActiveRailGraphSelection: (selection: RailGraphSelectionDraft | null) => void;
+  clearActiveRailGraphSelection: () => void;
 
   isTripEditing: boolean;
   editingTripId: ID | null;
@@ -304,6 +436,8 @@ export interface GlobalStore {
     exportRouteModalOpen: boolean;
     currentTripForExport: Trip | null;
     githubRegToken: string | null;
+    isSubscribeOpen: boolean;
+    isGlobalSearchOpen: boolean;
   };
   setModalState: (updates: Partial<GlobalStore['modals']>) => void;
 }
@@ -313,6 +447,8 @@ export const useStore = create<GlobalStore>()(
     (set, get) => ({
       // --- Data Slice ---
       railwayData: {},
+      railGraphRuntime: null,
+      railGraphLoadState: { status: 'idle' },
       companyDB: {},
       geoData: { type: 'FeatureCollection', features: [] },
       segmentGeometries: new Map(),
@@ -320,6 +456,14 @@ export const useStore = create<GlobalStore>()(
       visitedStations: new Set<string>(),
 
       setRailwayData: (input) => set((state) => ({ railwayData: typeof input === 'function' ? input(state.railwayData) : input })),
+      setRailGraphRuntime: (runtime) => set({
+        railGraphRuntime: runtime,
+        railGraphLoadState: runtime
+          ? { status: 'loaded', loadedAt: runtime.loadedAt }
+          : { status: 'idle' },
+      }),
+      setRailGraphLoadState: (loadState) => set({ railGraphLoadState: loadState }),
+      clearRailGraphRuntime: () => set({ railGraphRuntime: null, railGraphLoadState: { status: 'idle' } }),
       setCompanyDB: (input) => set((state) => ({ companyDB: typeof input === 'function' ? input(state.companyDB) : input })),
       setGeoData: (input) => set((state) => ({ geoData: typeof input === 'function' ? input(state.geoData) : input })),
       setSegmentGeometries: (data) => set({ segmentGeometries: data }),
@@ -332,11 +476,13 @@ export const useStore = create<GlobalStore>()(
       isLoggedIn: false,
       trips: [],
       pins: [],
+      mileageUserEvents: [],
       folders: [],
-      badgeSettings: { 
-        enabled: true, 
-        language: (typeof localStorage !== 'undefined' && localStorage.getItem('i18nextLng')) || 'zh-CN', 
-        defaultMapCenter: { mode: 'fixed', lat: 35.6812, lng: 139.7671 } 
+      appVersion: changelog.meta.currentVersion || '0.0.0',
+      badgeSettings: {
+        enabled: true,
+        language: (typeof localStorage !== 'undefined' && localStorage.getItem('i18nextLng')) || 'zh-CN',
+        defaultMapCenter: { mode: 'fixed', lat: 35.6812, lng: 139.7671 }
       },
       isHydrated: false,
       setHydrated: (hydrated) => set({ isHydrated: hydrated }),
@@ -354,9 +500,18 @@ export const useStore = create<GlobalStore>()(
       addPin: (pin) => set((state) => ({ pins: [...state.pins, pin] })),
       updatePin: (pin) => set((state) => ({ pins: state.pins.map(p => p.id === pin.id ? pin : p) })),
       removePin: (id) => set((state) => ({ pins: state.pins.filter(p => p.id !== id) })),
+      setMileageUserEvents: (input) => set((state) => ({ mileageUserEvents: typeof input === 'function' ? input(state.mileageUserEvents) : input })),
+      addMileageUserEvent: (event) => set((state) => ({ mileageUserEvents: [...state.mileageUserEvents, event] })),
+      removeMileageUserEvent: (id) => set((state) => ({ mileageUserEvents: state.mileageUserEvents.filter(event => event.id !== id) })),
 
       setFolders: (input) => set((state) => ({ folders: typeof input === 'function' ? input(state.folders) : input })),
       setBadgeSettings: (settings) => set({ badgeSettings: settings }),
+
+      myFeedbackIds: [],
+      addMyFeedbackId: (id) => set((state) => {
+        if (state.myFeedbackIds.includes(id)) return state;
+        return { myFeedbackIds: [id, ...state.myFeedbackIds].slice(0, 200) };
+      }),
 
       // --- UI Slice ---
       activeTab: 'records',
@@ -371,6 +526,11 @@ export const useStore = create<GlobalStore>()(
       setMapZoom: (zoom) => set({ mapZoom: zoom }),
       leafletReady: false,
       setLeafletReady: (ready) => set({ leafletReady: ready }),
+      activeRailGraphSelection: null,
+      setActiveRailGraphSelection: (selection) => set({
+        activeRailGraphSelection: selection ? { ...selection, updatedAt: Date.now() } as RailGraphActiveSelection : null,
+      }),
+      clearActiveRailGraphSelection: () => set({ activeRailGraphSelection: null }),
 
       isTripEditing: false,
       editingTripId: null,
@@ -444,6 +604,8 @@ export const useStore = create<GlobalStore>()(
         exportRouteModalOpen: false,
         currentTripForExport: null,
         githubRegToken: null,
+        isSubscribeOpen: false,
+        isGlobalSearchOpen: false,
       },
       setModalState: (updates) => set((state) => ({ modals: { ...state.modals, ...updates } })),
     }),
@@ -455,8 +617,10 @@ export const useStore = create<GlobalStore>()(
         isLoggedIn: state.isLoggedIn,
         trips: state.trips,
         pins: state.pins,
+        mileageUserEvents: state.mileageUserEvents,
         folders: state.folders,
-        badgeSettings: state.badgeSettings
+        badgeSettings: state.badgeSettings,
+        myFeedbackIds: state.myFeedbackIds,
       }),
       onRehydrateStorage: (state) => {
         return () => {

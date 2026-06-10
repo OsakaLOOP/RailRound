@@ -34,22 +34,30 @@ export async function onRequest(event) {
     const dataRaw = await DB.get(userKey);
     const data = dataRaw ? JSON.parse(dataRaw) : {};
 
-    // Check if key exists
-    if (data.card_key) {
-        return new Response(JSON.stringify({ key: data.card_key }), { status: 200, headers });
+    let needsSave = false;
+
+    // Check if read-only card key exists (for public badge)
+    if (!data.card_key) {
+      data.card_key = crypto.randomUUID();
+      await DB.put(`card_key:${data.card_key}`, username);
+      needsSave = true;
     }
 
-    // Generate new key
-    const newKey = crypto.randomUUID();
+    // Check if write key exists (for bot operations, private)
+    if (!data.card_write_key) {
+      data.card_write_key = crypto.randomUUID();
+      await DB.put(`card_write_key:${data.card_write_key}`, username);
+      needsSave = true;
+    }
 
-    // Update User Data
-    data.card_key = newKey;
-    await DB.put(userKey, JSON.stringify(data));
+    if (needsSave) {
+      await DB.put(userKey, JSON.stringify(data));
+    }
 
-    // Create Reverse Index
-    await DB.put(`card_key:${newKey}`, username);
-
-    return new Response(JSON.stringify({ key: newKey }), { status: 200, headers });
+    return new Response(JSON.stringify({
+      key: data.card_key,
+      write_key: data.card_write_key
+    }), { status: 200, headers });
 
   } catch (e) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers });

@@ -29,10 +29,22 @@ export async function onRequest(event) {
 
   try {
     const body = await event.request.json();
-    const { username, password } = body;
+    let { username, password } = body;
+
+    username = String(username || "").trim();
+    password = String(password || "");
 
     if (!username || !password) {
       return new Response(JSON.stringify({ error: "Missing username or password" }), { status: 400, headers });
+    }
+    if (username.length < 3 || username.length > 32) {
+      return new Response(JSON.stringify({ error: "Username must be 3-32 characters" }), { status: 400, headers });
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+      return new Response(JSON.stringify({ error: "Username can only contain letters, numbers, hyphens, and underscores" }), { status: 400, headers });
+    }
+    if (password.length < 8 || password.length > 128) {
+      return new Response(JSON.stringify({ error: "Password must be 8-128 characters" }), { status: 400, headers });
     }
 
     const key = `user:${username}`;

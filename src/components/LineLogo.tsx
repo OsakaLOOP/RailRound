@@ -68,7 +68,7 @@ export const LineLogo: React.FC<LineLogoProps> = ({
   alt = "",
 }) => {
   const iconSrc = companyIcon || src;
-  const safeColor = getSafeColor(color);
+  const safeColor = getSafeColor(color ?? null);
   const shouldRecolor = !!recolor && !!safeColor;
   const stableClassName = `${className} shrink-0 block`.trim();
 

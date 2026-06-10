@@ -1,23 +1,28 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { X, Copy, Download, CheckCircle2, Loader2 } from "lucide-react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { X, Copy, Download, CheckCircle2, Loader2, Moon, Sun } from "lucide-react";
 import { useStore } from "../../store";
 import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
-import { computeAndSerializeRoute } from "../../utils/routeSerializer";
+import { computeAndSerializeRoute, ROUTE_EXPORT_ERRORS } from "../../utils/routeSerializer";
 import { generateRouteMdx } from "../../utils/codeGenerator";
 import type { RouteSliceData } from "../../utils/routeExportTypes";
 import { RouteSlicePreview } from "@blog-src/components/mdx/RouteSlicePreviewStatic";
+import { tripToProductRouteSegments, tripToRouteSliceData } from "../../utils/tripProductProjection";
+import { buildTripDetailModel, tripDetailKeyEvents } from "../../utils/railGraphTripDetailModel";
+import { RailGraphBadge, RailGraphEventPill, RailGraphRunBadges } from "../rail-graph/RailGraphBadges";
 
 const LOCALES = ["en", "ja", "zh-cn", "zh-tw"] as const;
 const HEIGHTS = ["300px", "400px", "500px", "600px"] as const;
+const NO_TRIP_SEGMENTS_ERROR = "No segments found in this trip";
 
 export const ExportRouteModal: React.FC = () => {
-  const { isOpen, trip, railwayData, geoData } = useStore(
+  const { isOpen, trip, railwayData, geoData, mileageUserEvents } = useStore(
     useShallow((state) => ({
       isOpen: state.modals.exportRouteModalOpen,
       trip: state.modals.currentTripForExport,
       railwayData: state.railwayData,
       geoData: state.geoData,
+      mileageUserEvents: state.mileageUserEvents,
     })),
   );
   const setModalState = useStore((state) => state.setModalState);
@@ -33,10 +38,31 @@ export const ExportRouteModal: React.FC = () => {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [routeMode, setRouteMode] = useState<"manual" | "auto">("manual");
   const [copied, setCopied] = useState(false);
+  const tripDetail = useMemo(() => {
+    if (!trip) return null;
+    return buildTripDetailModel({ trip, railwayData, userEvents: mileageUserEvents });
+  }, [trip, railwayData, mileageUserEvents]);
+  const isRailGraphExport = tripDetail?.kind === "rail_graph";
 
   const onClose = useCallback(() => {
     setModalState({ exportRouteModalOpen: false, currentTripForExport: null });
   }, [setModalState]);
+
+  const routeErrorMessage = useCallback((message?: string) => {
+    if (message === ROUTE_EXPORT_ERRORS.missingLine) {
+      return t("exportRoute.errors.missingLine", ROUTE_EXPORT_ERRORS.missingLine);
+    }
+    if (message === ROUTE_EXPORT_ERRORS.missingStation) {
+      return t("exportRoute.errors.missingStation", ROUTE_EXPORT_ERRORS.missingStation);
+    }
+    if (message === ROUTE_EXPORT_ERRORS.notFound) {
+      return t("exportRoute.errors.notFound", ROUTE_EXPORT_ERRORS.notFound);
+    }
+    if (message === NO_TRIP_SEGMENTS_ERROR) {
+      return t("exportRoute.errors.noSegments", "This trip has no route segments to export.");
+    }
+    return t("exportRoute.errors.computeFailed", "Failed to compute route.");
+  }, [t]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -58,12 +84,16 @@ export const ExportRouteModal: React.FC = () => {
 
   useEffect(() => {
     if (!isOpen || !trip) return;
-    const hasSegments = Array.isArray(trip.segments) && trip.segments.length > 0;
+    if (trip.railGraph?.tripResult) {
+      setRouteMode("manual");
+      return;
+    }
+    const hasSegments = tripToProductRouteSegments(trip, railwayData).length > 0;
     setRouteMode(hasSegments ? "manual" : "auto");
-  }, [isOpen, trip]);
+  }, [isOpen, trip, railwayData]);
 
   useEffect(() => {
-    if (!isOpen || !trip || !railwayData || !geoData) return;
+    if (!isOpen || !trip || !railwayData) return;
 
     let cancelled = false;
     setLoading(true);
@@ -72,11 +102,23 @@ export const ExportRouteModal: React.FC = () => {
 
     const compute = async () => {
       try {
-        const segments =
-          trip.segments?.filter(
-            (seg: any) => seg?.lineKey && seg?.fromId && seg?.toId,
-          ) || [];
-        if (segments.length === 0) throw new Error("No segments found in this trip");
+        const productRouteData = tripToRouteSliceData(trip, railwayData);
+        if (productRouteData) {
+          if (!cancelled) setRouteData(productRouteData);
+          return;
+        }
+
+        const segments = tripToProductRouteSegments(trip, railwayData);
+        if (segments.length === 0) throw new Error(NO_TRIP_SEGMENTS_ERROR);
+        const firstSegment = segments[0];
+        const lastSegment = segments[segments.length - 1];
+        const startLineKey = firstSegment.lineKey;
+        const startStationId = firstSegment.fromId;
+        const endLineKey = lastSegment.lineKey;
+        const endStationId = lastSegment.toId;
+        if (!startLineKey || !startStationId || !endLineKey || !endStationId) {
+          throw new Error(NO_TRIP_SEGMENTS_ERROR);
+        }
 
         const result =
           routeMode === "manual"
@@ -93,17 +135,17 @@ export const ExportRouteModal: React.FC = () => {
               })
             : await computeAndSerializeRoute({
                 mode: "auto",
-                startLineKey: segments[0].lineKey,
-                startStationId: segments[0].fromId,
-                endLineKey: segments[segments.length - 1].lineKey,
-                endStationId: segments[segments.length - 1].toId,
+                startLineKey,
+                startStationId,
+                endLineKey,
+                endStationId,
                 railwayData,
                 geoData,
               });
 
         if (!cancelled) setRouteData(result);
       } catch (e: any) {
-        if (!cancelled) setError(e.message || "Failed to compute route");
+        if (!cancelled) setError(routeErrorMessage(e.message));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -111,11 +153,11 @@ export const ExportRouteModal: React.FC = () => {
 
     compute();
     return () => { cancelled = true; };
-  }, [isOpen, trip, railwayData, geoData, routeMode]);
+  }, [isOpen, trip, railwayData, geoData, routeMode, routeErrorMessage]);
 
   const handleCopy = async () => {
     if (!routeData) return;
-    const code = generateRouteMdx(routeData, { locale, height, showPromo, packageSource });
+    const code = generateRouteMdx(routeData, { locale, height, theme, showPromo, packageSource });
     await navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -123,7 +165,7 @@ export const ExportRouteModal: React.FC = () => {
 
   const handleDownload = () => {
     if (!routeData) return;
-    const code = generateRouteMdx(routeData, { locale, height, showPromo, packageSource });
+    const code = generateRouteMdx(routeData, { locale, height, theme, showPromo, packageSource });
     const blob = new Blob([code], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -146,6 +188,75 @@ export const ExportRouteModal: React.FC = () => {
     return "English";
   };
 
+  const renderSourceSummary = () => {
+    if (!tripDetail) return null;
+    if (tripDetail.kind === "rail_graph") {
+      const firstSegment = tripDetail.segments[0];
+      const keyEvents = tripDetailKeyEvents(tripDetail, 3);
+      return (
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                <RailGraphBadge
+                  icon="snapshot"
+                  value={t("exportRoute.railGraphSource", "Rail graph snapshot")}
+                  tone="emerald"
+                  className="rounded"
+                />
+              </div>
+              <div className="mt-1 truncate text-sm font-semibold text-slate-800">
+                {tripDetail.overview.title}
+              </div>
+            </div>
+            <div className="shrink-0 text-right text-[11px] text-slate-500">
+              <div>{t("exportRoute.km", "{{value}} km", { value: tripDetail.overview.totalDistanceKm.toFixed(1) })}</div>
+              {tripDetail.overview.totalTimeMinutes !== undefined && (
+                <div>{t("exportRoute.minutes", "{{count}} min", { count: tripDetail.overview.totalTimeMinutes })}</div>
+              )}
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
+            <RailGraphRunBadges
+              meta={{
+                serviceType: firstSegment?.serviceType,
+                direction: firstSegment?.direction,
+                patternRef: firstSegment?.patternRef,
+              }}
+              patternClassName="max-w-[12rem]"
+              showLabels
+            />
+            <RailGraphBadge icon="distance" value={t("exportRoute.geoSourceRailGraph", "Saved geometry")} tone="slate" className="rounded bg-white" />
+            <RailGraphBadge
+              icon="userEvent"
+              value={t("exportRoute.userEvents", "{{count}} user events", { count: tripDetail.overview.userEventCount })}
+              tone="violet"
+              className="rounded bg-white"
+            />
+          </div>
+          {keyEvents.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {keyEvents.map((event) => (
+                <RailGraphEventPill key={event.id} type={event.type} label={event.label} title={event.label} />
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+          <RailGraphBadge icon="legacy" value={t("exportRoute.legacySource", "Legacy GeoJSON route")} tone="slate" className="rounded" />
+        </div>
+        <div className="mt-1 text-[11px] text-slate-500">
+          {t("exportRoute.legacySourceDesc", "The preview is computed from current GeoJSON line data.")}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto mx-4 flex flex-col">
@@ -162,6 +273,8 @@ export const ExportRouteModal: React.FC = () => {
         </div>
 
         <div className="p-6 space-y-5">
+          {renderSourceSummary()}
+
           {loading && (
             <div className="flex items-center justify-center py-12 text-slate-500 gap-2">
               <Loader2 size={20} className="animate-spin" />
@@ -200,18 +313,24 @@ export const ExportRouteModal: React.FC = () => {
                 <label className="text-[10px] text-slate-500 mb-1 block">
                   {t("exportRoute.pathMode", "Path Mode")}
                 </label>
-                <select
-                  value={routeMode}
-                  onChange={(e) => setRouteMode(e.target.value as "manual" | "auto")}
-                  className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                >
-                  <option value="manual">
-                    {t("exportRoute.pathModeManual", "Manual (Exact Segments)")}
-                  </option>
-                  <option value="auto">
-                    {t("exportRoute.pathModeAuto", "Auto Search")}
-                  </option>
-                </select>
+                {isRailGraphExport ? (
+                  <div className="w-full rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700">
+                    {t("exportRoute.pathModeRailGraph", "Saved rail graph")}
+                  </div>
+                ) : (
+                  <select
+                    value={routeMode}
+                    onChange={(e) => setRouteMode(e.target.value as "manual" | "auto")}
+                    className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  >
+                    <option value="manual">
+                      {t("exportRoute.pathModeManual", "Manual (Exact Segments)")}
+                    </option>
+                    <option value="auto">
+                      {t("exportRoute.pathModeAuto", "Auto Search")}
+                    </option>
+                  </select>
+                )}
               </div>
 
               <div>
@@ -265,7 +384,7 @@ export const ExportRouteModal: React.FC = () => {
                       onChange={() => setTheme("light")}
                       className="sr-only"
                     />
-                    ☀️ {t("exportRoute.themeLight", "Light")}
+                    <Sun size={13} /> {t("exportRoute.themeLight", "Light")}
                   </label>
                   <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer border transition-colors ${theme === "dark" ? "bg-slate-800 text-white border-slate-600 shadow-sm" : "bg-slate-50 text-slate-400 border-slate-200"}`}>
                     <input
@@ -276,7 +395,7 @@ export const ExportRouteModal: React.FC = () => {
                       onChange={() => setTheme("dark")}
                       className="sr-only"
                     />
-                    🌙 {t("exportRoute.themeDark", "Dark")}
+                    <Moon size={13} /> {t("exportRoute.themeDark", "Dark")}
                   </label>
                 </div>
               </div>

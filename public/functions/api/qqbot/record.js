@@ -31,8 +31,8 @@ export async function onRequest(event) {
 
         if (!key) return errorJson("User Key is required");
 
-        // 1. Authenticate user using the key
-        const username = await DB.get(`card_key:${key}`);
+        // 1. Authenticate user using the write key (separate from public card_key)
+        const username = await DB.get(`card_write_key:${key}`);
         if (!username) return errorJson("Invalid Key", 401);
 
         const userKey = `user:${username}`;

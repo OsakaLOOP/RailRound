@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Github, Folder, TrendingUp, Move, MapPin, Map as MapIcon, Globe, MessageSquare, Shield } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { useAppNavigation } from '../hooks/useAppNavigation';
+import { Github, Folder, TrendingUp, Move, MapPin, Map as MapIcon, Globe, MessageSquare, Shield, AlertTriangle, CheckCircle2, MapPinned, Tags, TrainFront, Route, GitMerge } from 'lucide-react';
 import { useStore } from '../store';
 import { calcDist } from '../core/tripCalculator';
 import * as turf from '@turf/turf';
@@ -8,6 +9,11 @@ import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
 import { LineLogo } from '../components/LineLogo';
+import { buildAppPathForLanguage, normalizeAppLang } from '../utils/routes';
+import { mileageEventStats, lineLabel } from '../utils/mileageUserEvents';
+import { tripToProductSegments } from '../utils/tripProductProjection';
+import { eventKindLabel, eventVisibilityLabel } from '../components/mileage-events/display';
+import { buildTripDetailModel } from '../utils/railGraphTripDetailModel';
 
 const CITIES = {
     China: [ // Translations are handled below in rendering
@@ -29,11 +35,11 @@ const CITIES = {
 };
 
 export const StatsPage: React.FC = () => {
-    const navigate = useNavigate();
+    const { goToLanguage } = useAppNavigation();
     const location = useLocation();
 
     const {
-        trips, railwayData, geoData, user, userProfile, segmentGeometries, companyDB, badgeSettings, setBadgeSettings, pins, folders
+        trips, railwayData, geoData, user, userProfile, segmentGeometries, companyDB, badgeSettings, setBadgeSettings, pins, folders, mileageUserEvents
     } = useStore(useShallow(state => ({
         trips: state.trips,
         railwayData: state.railwayData,
@@ -45,7 +51,8 @@ export const StatsPage: React.FC = () => {
         badgeSettings: state.badgeSettings,
         setBadgeSettings: state.setBadgeSettings,
         pins: state.pins,
-        folders: state.folders
+        folders: state.folders,
+        mileageUserEvents: state.mileageUserEvents
     })));
     const setModalState = useStore(state => state.setModalState);
     const { saveData } = useUserData();
@@ -63,13 +70,18 @@ export const StatsPage: React.FC = () => {
             const trip = trips[i];
             _totalCost += (trip.cost || 0);
 
-            const segments = trip.segments || [{ lineKey: trip.lineKey, fromId: trip.fromId, toId: trip.toId }];
+            const segments = tripToProductSegments(trip, railwayData);
             for (let j = 0; j < segments.length; j++) {
                 const seg = segments[j];
                 if (!seg.lineKey) continue;
 
                 uniqueLinesSet.add(seg.lineKey);
                 counts.set(seg.lineKey, (counts.get(seg.lineKey) || 0) + 1);
+
+                if (seg.source === 'rail_graph') {
+                    _totalDist += seg.distanceKm;
+                    continue;
+                }
 
                 if (segmentGeometries && turf) {
                     const key = `${seg.lineKey}_${seg.fromId}_${seg.toId}`;
@@ -125,6 +137,56 @@ export const StatsPage: React.FC = () => {
         return count;
     }, [railwayData]);
 
+    const eventStats = useMemo(
+        () => mileageEventStats(mileageUserEvents, railwayData, trips),
+        [mileageUserEvents, railwayData, trips],
+    );
+
+    const railGraphRunStats = useMemo(() => {
+        const serviceTypes = new Map<string, number>();
+        const directions = new Map<string, number>();
+        const patterns = new Map<string, number>();
+        let railGraphTrips = 0;
+        let legacyTrips = 0;
+        let userEventsOnRailGraph = 0;
+        let railGraphSegments = 0;
+
+        trips.forEach((trip) => {
+            const detail = buildTripDetailModel({ trip, railwayData, userEvents: mileageUserEvents });
+            if (detail.kind !== 'rail_graph') {
+                legacyTrips += 1;
+                return;
+            }
+            railGraphTrips += 1;
+            userEventsOnRailGraph += detail.overview.userEventCount;
+            railGraphSegments += detail.segments.length;
+            detail.segments.forEach((segment) => {
+                const serviceType = segment.serviceType || t('statsPage.railGraph.unknownService', 'Unknown service');
+                const direction = segment.direction || t('statsPage.railGraph.unknownDirection', 'Unknown direction');
+                const pattern = segment.patternRef ? String(segment.patternRef) : t('statsPage.railGraph.unknownPattern', 'Unknown pattern');
+                serviceTypes.set(serviceType, (serviceTypes.get(serviceType) ?? 0) + 1);
+                directions.set(direction, (directions.get(direction) ?? 0) + 1);
+                patterns.set(pattern, (patterns.get(pattern) ?? 0) + 1);
+            });
+        });
+
+        const top = (map: Map<string, number>) => Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        return {
+            railGraphTrips,
+            legacyTrips,
+            userEventsOnRailGraph,
+            railGraphSegments,
+            serviceTypes: top(serviceTypes),
+            directions: top(directions),
+            patterns: top(patterns),
+        };
+    }, [mileageUserEvents, railwayData, trips, t]);
+
+    const qualityIssueCount = eventStats.quality.missingTitle
+        + eventStats.quality.missingTags
+        + eventStats.quality.unlinkedTrip
+        + eventStats.quality.unstableProjection;
+
     return (
         <div id="stats-view-content" className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="flex items-center justify-end gap-2">
@@ -178,6 +240,140 @@ export const StatsPage: React.FC = () => {
                 <div className="bg-white p-4 rounded-xl shadow-sm border text-center hover:scale-102 hover:shadow-md transition-all duration-300 cursor-default"><div className="text-xs text-gray-400 mb-1">{t('statsPage.uniqueLines', '制霸路线')}</div><div className="text-3xl font-bold text-indigo-600">{uniqueLines}</div></div>
             </div>
 
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div className="p-3 border-b bg-slate-50 flex items-center justify-between gap-2">
+                    <div className="font-bold text-sm text-slate-700 flex items-center gap-2">
+                        <TrainFront size={16} className="text-emerald-600" />
+                        {t('statsPage.railGraph.title', 'Rail graph runs in records')}
+                    </div>
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded">
+                        {railGraphRunStats.railGraphTrips}/{totalTrips}
+                    </span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 p-3">
+                    <div className="rounded-lg bg-emerald-50 p-3">
+                        <div className="text-[11px] text-emerald-700 mb-1">{t('statsPage.railGraph.savedSnapshots', 'Saved snapshots')}</div>
+                        <div className="text-2xl font-bold text-emerald-800">{railGraphRunStats.railGraphTrips}</div>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-3">
+                        <div className="text-[11px] text-slate-400 mb-1">{t('statsPage.railGraph.legacyTrips', 'Legacy GeoJSON')}</div>
+                        <div className="text-2xl font-bold text-slate-800">{railGraphRunStats.legacyTrips}</div>
+                    </div>
+                    <div className="rounded-lg bg-sky-50 p-3">
+                        <div className="text-[11px] text-sky-700 mb-1">{t('statsPage.railGraph.eventsOnSnapshots', 'User events')}</div>
+                        <div className="text-2xl font-bold text-sky-800">{railGraphRunStats.userEventsOnRailGraph}</div>
+                    </div>
+                </div>
+                {railGraphRunStats.railGraphTrips === 0 ? (
+                    <div className="px-3 pb-3 text-xs text-slate-500">
+                        {t('statsPage.railGraph.noRailGraphTrips', 'No saved rail-graph snapshots yet. Legacy GeoJSON trips remain fully supported.')}
+                    </div>
+                ) : (
+                    <div className="grid gap-3 border-t border-slate-100 p-3 md:grid-cols-3">
+                        <RailGraphStatsList
+                            icon={<Route size={14} />}
+                            title={t('statsPage.railGraph.patterns', 'Patterns')}
+                            rows={railGraphRunStats.patterns}
+                        />
+                        <RailGraphStatsList
+                            icon={<GitMerge size={14} />}
+                            title={t('statsPage.railGraph.directions', 'Directions')}
+                            rows={railGraphRunStats.directions}
+                        />
+                        <RailGraphStatsList
+                            icon={<TrainFront size={14} />}
+                            title={t('statsPage.railGraph.serviceTypes', 'Service types')}
+                            rows={railGraphRunStats.serviceTypes}
+                        />
+                    </div>
+                )}
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div className="p-3 border-b bg-slate-50 flex items-center justify-between gap-2">
+                    <div className="font-bold text-sm text-slate-700 flex items-center gap-2">
+                        <MapPinned size={16} className="text-emerald-600" />
+                        {t('statsPage.eventStats.title', 'Mileage event stats')}
+                    </div>
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded">
+                        {eventStats.total}
+                    </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 p-3">
+                    <div className="rounded-lg bg-slate-50 p-3">
+                        <div className="text-[11px] text-slate-400 mb-1">{t('statsPage.eventStats.total', 'Events')}</div>
+                        <div className="text-2xl font-bold text-slate-800">{eventStats.total}</div>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-3">
+                        <div className="text-[11px] text-slate-400 mb-1">{t('statsPage.eventStats.quality', 'Quality issues')}</div>
+                        <div className={`text-2xl font-bold ${qualityIssueCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{qualityIssueCount}</div>
+                    </div>
+                </div>
+                <div className="grid gap-3 p-3 pt-0 md:grid-cols-2">
+                    <div className="rounded-lg border border-slate-100 p-3">
+                        <div className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-500">
+                            <Tags size={14} /> {t('statsPage.eventStats.tags', 'Tags')}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                            {eventStats.tags.slice(0, 8).length > 0 ? eventStats.tags.slice(0, 8).map(([tag, count]) => (
+                                <span key={tag} className="rounded bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
+                                    {tag} · {count}
+                                </span>
+                            )) : (
+                                <span className="text-xs text-slate-400">{t('statsPage.eventStats.noTags', 'No tags yet')}</span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="rounded-lg border border-slate-100 p-3">
+                        <div className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-500">
+                            <MapIcon size={14} /> {t('statsPage.eventStats.topPlaces', 'Common lines')}
+                        </div>
+                        <div className="space-y-1">
+                            {eventStats.byLine.slice(0, 4).length > 0 ? eventStats.byLine.slice(0, 4).map(([line, count]) => (
+                                <div key={line} className="flex items-center justify-between gap-3 text-xs text-slate-600">
+                                    <span className="truncate">{lineLabel(line)}</span>
+                                    <span className="font-bold text-slate-400">{count}</span>
+                                </div>
+                            )) : (
+                                <span className="text-xs text-slate-400">{t('statsPage.eventStats.noLines', 'No line-bound events')}</span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <div className="grid gap-3 border-t border-slate-100 p-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                        <div className="text-xs font-bold text-slate-500">{t('statsPage.eventStats.types', 'Types')}</div>
+                        {eventStats.byKind.map(([kind, count]) => (
+                            <div key={kind} className="flex items-center justify-between text-xs text-slate-600">
+                                <span>{eventKindLabel(kind, t)}</span>
+                                <span className="font-bold text-slate-400">{count}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="space-y-1">
+                        <div className="text-xs font-bold text-slate-500">{t('statsPage.eventStats.visibility', 'Visibility')}</div>
+                        {eventStats.byVisibility.map(([visibility, count]) => (
+                            <div key={visibility} className="flex items-center justify-between text-xs text-slate-600">
+                                <span>{eventVisibilityLabel(visibility, t)}</span>
+                                <span className="font-bold text-slate-400">{count}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div className="border-t border-slate-100 p-3">
+                    <div className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-500">
+                        {qualityIssueCount > 0 ? <AlertTriangle size={14} className="text-amber-500" /> : <CheckCircle2 size={14} className="text-emerald-600" />}
+                        {t('statsPage.eventStats.qualityHints', 'Record quality hints')}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
+                        <span>{t('statsPage.eventStats.noTagsCount', 'No tags')}: {eventStats.quality.missingTags}</span>
+                        <span>{t('statsPage.eventStats.unlinkedTripCount', 'No trip link')}: {eventStats.quality.unlinkedTrip}</span>
+                        <span>{t('statsPage.eventStats.estimatedTimeCount', 'Estimated time')}: {eventStats.quality.estimatedTime}</span>
+                        <span>{t('statsPage.eventStats.unstableProjectionCount', 'Projection issue')}: {eventStats.quality.unstableProjection}</span>
+                    </div>
+                </div>
+            </div>
+
             <div className="space-y-4">
                 <button onClick={() => setModalState({ folderManagerOpen: true })} className="w-full bg-white p-4 rounded-xl shadow-sm border flex items-center justify-between group hover:bg-gray-50 transition-colors">
                     <div className="flex items-center gap-3">
@@ -210,14 +406,7 @@ export const StatsPage: React.FC = () => {
                                         setBadgeSettings(newSettings);
                                         if (user) saveData(user.token, trips, pins, folders, newSettings).catch(console.error);
 
-                                        // Update URL to match new language while preserving current path (excluding old lang prefix)
-                                        const parts = location.pathname.split('/');
-                                        if (parts.length > 1 && ['zh-cn', 'en', 'ja-jp', 'zh-tw'].includes(parts[1].toLowerCase())) {
-                                            parts[1] = newLang.toLowerCase();
-                                        } else {
-                                            parts.splice(1, 0, newLang.toLowerCase());
-                                        }
-                                        navigate(parts.join('/') + location.search, { replace: true });
+                                        goToLanguage(newLang);
                                     }}
                                 >
                                     <option value="zh-CN">简体中文</option>
@@ -336,3 +525,26 @@ export const StatsPage: React.FC = () => {
         </div>
     );
 };
+
+const RailGraphStatsList: React.FC<{
+    icon: React.ReactNode;
+    title: string;
+    rows: Array<[string, number]>;
+}> = ({ icon, title, rows }) => (
+    <div className="rounded-lg border border-slate-100 p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-500">
+            {icon}
+            {title}
+        </div>
+        <div className="space-y-1">
+            {rows.length > 0 ? rows.map(([label, count]) => (
+                <div key={label} className="flex items-center justify-between gap-3 text-xs text-slate-600">
+                    <span className="truncate">{label}</span>
+                    <span className="font-bold text-slate-400">{count}</span>
+                </div>
+            )) : (
+                <span className="text-xs text-slate-400">-</span>
+            )}
+        </div>
+    </div>
+);

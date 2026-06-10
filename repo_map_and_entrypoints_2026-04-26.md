@@ -1,4 +1,4 @@
-﻿# RailRound Repo Map & Co-Change Entry Points (2026-04-26)
+# RailRound Repo Map & Co-Change Entry Points (2026-04-26)
 
 ## 1) Functional blocks
 
@@ -22,6 +22,52 @@
 - packages/route-slice-preview/: 可复用包（与 blog 组件联动）
 - docs/: 方案、审计与发布流程文档
   - geo worker 字段契约: docs/geo_worker_geojson_contract_2026-04-27.md
+  - rail graph v1 设计参考: docs/rail-graph-v1/
+  - rail graph v1 实施计划: docs/rail-graph-v1-plan/11-完全集成实施计划.md
+  - rail graph 产品契约偏离审计: docs/rail-graph-v1-plan/12-原始设计偏离审计与产品接入修正.md
+  - rail graph 阶段验收与最终成品总结: docs/rail-graph-v1-plan/13-阶段变更验收与最终成品总结.md
+  - rail graph 70% 推进与用户端 90% 执行计划: docs/rail-graph-v1-plan/14-70-percent-user-90-execution-plan.md
+  - rail graph 主应用数据与交互流程: docs/rail-graph-v1-plan/15-main-app-data-and-interaction-flow.md
+  - rail graph 主应用 UI / selection 流程: docs/rail-graph-main-app-ui-flow.md
+  - mileage-centric UserEvent 接入文档: docs/rail-graph-v1/user-event-mileage-layer.md
+- rail graph MVP 工作台:
+  - standalone HTML: rail-graph-mvp.html
+  - browser shell/engine adapter: src/rail-graph-v1-mvp/app.ts
+  - map/list interaction: src/rail-graph-v1-mvp/map-view.ts, src/rail-graph-v1-mvp/list-view.ts
+  - local pipeline model/API client: src/rail-graph-v1-mvp/pipeline.ts
+  - Vite dev local task API: scripts/rail-graph-mvp-server.js + vite.config.js plugin
+- rail graph aggregate 工作台:
+  - standalone HTML: rail-graph-aggregate.html
+  - browser shell: src/rail-graph-aggregate/app.ts
+  - aggregate storage/import boundary: src/rail-graph-aggregate/aggregate-state.ts, src/rail-graph-aggregate/storage.ts
+  - ServicePattern / Cross-Pattern / UserEvent modules: src/rail-graph-aggregate/{service-pattern,cross-pattern,user-event}/
+  - verify scripts: npm run rail:aggregate:verify:{patterns,compiled-topology,cross-pf,events}
+  - full integration gate: npm run rail:integration:verify (scripts/verify-rail-graph-integration.mjs)
+- mileage-centric UserEvent 层:
+  - public types/API: src/rail-graph-v1/mileage-event.types.ts, src/rail-graph-v1/mileage-events.ts
+  - aggregate compatibility: src/rail-graph-aggregate/user-event/mileage-*.ts
+  - user app entry: src/components/map/MileageEventsPanel.tsx, src/utils/mileageUserEvents.ts
+  - verify: npm run rail:events:mileage-verify
+
+### Routing / SEO / EdgeOne entry points
+
+- Canonical app route helper: src/utils/routes.js
+  - canonical app pages: /:lang/records, /:lang/map, /:lang/stats
+  - supported lang: zh-cn, en, ja-jp, zh-tw
+  - shared builders for app tabs, blog base, feedback GitHub callback, title/description metadata
+- App route consumers:
+  - src/AppLayout.tsx (language/tab canonical replace, active tab sync, runtime Helmet SEO)
+  - src/components/layout/BottomNav.tsx (tab navigation)
+  - src/components/VersionBadge.jsx and src/components/common/ErrorBoundary.tsx (blog links)
+  - src/components/modals/FeedbackModal.tsx and src/pages/FeedbackGithubCallbackPage.tsx (feedback callback)
+- Static app SEO output:
+  - scripts/postbuild.js generates dist/:lang/:tab/index.html, dist/:lang/feedback/github/callback/index.html, compatibility noindex entries, app-sitemap.xml, root sitemap.xml, robots.txt, and dist/edgeone.json.
+- Blog routing/SEO:
+  - blog/src/utils/blogRouting.ts (blog canonical/hreflang helpers)
+  - blog/src/components/BaseHead.astro (canonical, hreflang, OG/Twitter)
+  - blog/src/components/RedirectPage.astro (compat redirect noindex + canonical target)
+- EdgeOne Pages config:
+  - edgeone.json and public/edgeone.json intentionally contain headers only; SPA rewrites are not used.
 
 ## 2) High-frequency co-change entry points
 
@@ -59,6 +105,8 @@
   - blog/src/content/blog/{zh-cn,en,ja-jp,zh-tw}/
   - blog/src/components/mdx/i18n.ts
   - blog/src/utils/blogRouting.ts (version->slug)
+  - blog/src/components/BaseHead.astro (canonical/hreflang SEO for /blog/:lang/...)
+  - blog/src/components/RedirectPage.astro (noindex redirects for compatibility paths)
 
 ### D. Rail data ingestion / map data update
 
@@ -70,6 +118,141 @@
   - src/utils/fetchAndParseData.ts
   - src/core/bot/botDataBuilder.ts
   - docs/api/bot-integration-guide.md
+
+### D2. Rail Graph MVP local pipeline / workspace
+
+- primary:
+  - src/rail-graph-v1-mvp/app.ts
+  - src/rail-graph-v1-mvp/pipeline.ts
+  - scripts/rail-graph-mvp-server.js
+  - vite.config.js
+- external tools:
+  - D:\GIS\scripts\*.py (PBF extraction, matching, batch decisions, overrides)
+- companion:
+  - docs/rail-graph-v1/\*
+  - rail-graph-mvp.html
+
+### D2b. Rail Graph Aggregate workspace / ServicePattern
+
+- primary:
+  - rail-graph-aggregate.html
+  - src/rail-graph-aggregate/app.ts
+  - src/rail-graph-aggregate/aggregate-state.ts
+  - src/rail-graph-aggregate/storage.ts
+  - scripts/rail-graph-mvp-server.js
+  - vite.config.js
+- ServicePattern:
+  - src/rail-graph-aggregate/service-pattern/store.ts
+  - src/rail-graph-aggregate/service-pattern/chain-editor.ts
+  - src/rail-graph-aggregate/service-pattern/adapter.ts
+  - src/rail-graph-aggregate/service-pattern/render-plan.ts
+- Cross-pattern route query:
+  - src/rail-graph-aggregate/cross-pattern/transfer-graph.ts
+  - src/rail-graph-aggregate/cross-pattern/resolver.ts
+  - src/rail-graph-aggregate/cross-pattern/types.ts
+- UserEvent L4:
+  - src/rail-graph-aggregate/user-event/types.ts
+  - src/rail-graph-aggregate/user-event/store.ts
+  - src/rail-graph-aggregate/user-event/aggregation.ts
+- docs / verification:
+  - docs/rail-graph-aggregate/notes.md
+  - src/rail-graph-v1-mvp/verify-aggregate-patterns.ts
+  - src/rail-graph-v1-mvp/verify-aggregate-compiled-topology.ts
+  - src/rail-graph-v1-mvp/verify-cross-pattern-pathfinding.ts
+  - src/rail-graph-v1-mvp/verify-event-aggregation.ts
+
+### D3. Mileage UserEvent / user-facing event layer
+
+- primary:
+  - src/rail-graph-v1/mileage-event.types.ts
+  - src/rail-graph-v1/mileage-events.ts
+  - docs/rail-graph-v1/user-event-mileage-layer.md
+- aggregate compatibility:
+  - src/rail-graph-aggregate/user-event/mileage-adapter.ts
+  - src/rail-graph-aggregate/user-event/mileage-integration.ts
+  - src/rail-graph-aggregate/user-event/mileage-query.ts
+  - src/rail-graph-aggregate/user-event/mileage-store.ts
+- user-facing app:
+  - src/components/map/MileageEventsPanel.tsx
+  - src/utils/mileageUserEvents.ts
+  - src/store/index.ts
+  - src/hooks/useUserData.ts
+  - src/services/api.js
+  - public/functions/api/user/data.js
+- i18n companion:
+  - public/locales/en/translation.json
+  - public/locales/ja-JP/translation.json
+  - public/locales/zh-CN/translation.json
+  - public/locales/zh-TW/translation.json
+- verification:
+  - src/rail-graph-v1-mvp/verify-mileage-user-events.ts
+  - npm run rail:events:mileage-verify
+  - full rail-graph gate: scripts/verify-rail-graph-integration.mjs + npm run rail:integration:verify
+
+### D4. Rail Graph product trip contract
+
+- product-facing trip schema:
+  - src/rail-graph-v1/user-facing.types.ts
+  - src/rail-graph-v1/deployment.types.ts
+  - src/rail-graph-v1/trip-planner.ts
+  - src/rail-graph-v1/transfer-scorer.ts
+- app/runtime bridge:
+  - src/AppLayout.tsx (default deployment load + railGraphLoadState)
+  - src/store/index.ts (railGraphRuntime / railGraphLoadState)
+  - src/utils/railGraphTripAdapter.ts
+  - src/utils/railGraphTripPersistence.ts
+  - src/utils/railGraphTripDetailModel.ts
+  - src/utils/tripProductProjection.ts
+  - src/services/railGraphDeploymentLoader.ts
+  - src/utils/appRoutePlanner.ts
+  - src/utils/mileageUserEvents.ts
+  - src/utils/railGraphSelection.ts (shared activeRailGraphSelection conversion/builders for Map route click, TripPage, Search, Inspector, and MileageEventsPanel bridge events)
+- product consumers:
+  - src/core/tripCalculator.js
+  - src/components/Chest.jsx
+  - src/components/map/MapContainer.tsx
+  - src/pages/TripsPage.tsx
+  - src/pages/StatsPage.tsx
+  - src/components/mileage-events/EventComposer.tsx
+  - src/components/mileage-events/EventInspector.tsx
+  - src/components/mileage-events/EventSearchPanel.tsx
+  - src/components/modals/GlobalSearchModal.tsx
+  - src/components/modals/ExportRouteModal.tsx
+- deployment publishing:
+  - scripts/build-rail-graph-deployment-bundle.ts
+  - npm run rail:deployment:build -- --aggregate-key <key>
+  - production build requires aggregate mode compiled-topology; use --allow-no-direction-verify only for .verify bundles
+  - scripts/build-minimal-rail-graph-deployment.ts
+  - npm run rail:deployment:build:minimal
+  - default app bundle: public/rail-graph/deployed-system.json
+  - default app bundle metadata: public/rail-graph/deployed-system.meta.json
+  - scripts/assert-rail-graph-deployment.mjs
+  - npm run rail:deployment:assert
+  - scripts/export-rail-graph-deployment.mjs
+  - npm run rail:deployment:export -- --input <bundle.json>
+  - scripts/smoke-rail-graph-export-load.ts
+  - npm run rail:exports:load-smoke
+- app auto-route consumers:
+  - src/AppLayout.tsx
+  - src/components/modals/TripEditor.tsx
+  - src/components/Chest.jsx
+- contract audit:
+  - docs/rail-graph-v1-plan/12-原始设计偏离审计与产品接入修正.md
+- stage acceptance:
+  - docs/rail-graph-v1-plan/13-阶段变更验收与最终成品总结.md
+- 70% / user-facing 90% execution plan:
+  - docs/rail-graph-v1-plan/14-70-percent-user-90-execution-plan.md
+- main app data and interaction flow:
+  - docs/rail-graph-v1-plan/15-main-app-data-and-interaction-flow.md
+- tests:
+  - src/__tests__/rail-graph-trip-planner.test.ts
+  - src/__tests__/rail-graph-app-route-planner.test.ts (default bundle + current GeoJSON app planner smoke; load state)
+  - src/__tests__/rail-graph-trip-detail-model.test.ts
+  - src/__tests__/rail-graph-saved-trip-roundtrip.test.ts
+  - src/__tests__/rail-graph-export-load-smoke.test.ts
+  - src/__tests__/rail-graph-deployment-export-script.test.ts
+  - src/__tests__/mileage-events-runtime-adapter.test.ts (rail-graph TripResult and legacy direct GeoJSON app-line regression)
+  - src/__tests__/trip-product-projection.test.ts
 
 ### E. API contract related updates
 

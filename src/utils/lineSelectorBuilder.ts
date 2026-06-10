@@ -1,5 +1,6 @@
 import { RailwayMap } from '../store';
 import { getLineSystems } from './networkDisplay';
+import { lineLabel } from './mileageUserEvents';
 
 export interface SelectableLine {
     key: string;
@@ -70,7 +71,7 @@ export const buildLineSelectorGroups = (
             };
         }
 
-        const displayName = key.includes(':') ? key.split(':').slice(1).join(':') : key;
+        const displayName = lineLabel(key);
         rawGroups[category][normRegion][companyName].lines.push({
             key,
             displayName,

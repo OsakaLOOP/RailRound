@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { X, Github, Eye, EyeOff, Lock, Loader2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { api } from '../../services/api';
@@ -7,9 +8,10 @@ import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import { useTranslation } from 'react-i18next';
 import { showAlert } from '../../utils/alerts';
+import { buildAppPathForLanguage, normalizeAppLang } from '../../utils/routes';
 
 export const GithubCardModal: React.FC = () => {
-    const navigate = useNavigate();
+    const { goToLanguage } = useAppNavigation();
     const location = useLocation();
 
     const { isOpen, user, folders, badgeSettings } = useStore(useShallow(state => ({
@@ -26,7 +28,7 @@ export const GithubCardModal: React.FC = () => {
     const { saveData } = useUserData();
     const { t } = useTranslation();
 
-    const [cardKey, setCardKey] = useState<string | null>(null);
+    const [cardKeys, setCardKeys] = useState<{ key: string; write_key: string } | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [source, setSource] = useState('global'); // 'global' or folder_id
@@ -34,14 +36,14 @@ export const GithubCardModal: React.FC = () => {
     const onClose = () => setModalState({ cardModalUser: null });
 
     useEffect(() => {
-        if (isOpen && user && !cardKey) {
+        if (isOpen && user && !cardKeys) {
             setLoading(true);
             api.getOrCreateCardKey(user.token)
-                .then(setCardKey)
+                .then(setCardKeys)
                 .catch((err: any) => setError(err.message))
                 .finally(() => setLoading(false));
         }
-    }, [isOpen, user, cardKey]);
+    }, [isOpen, user, cardKeys]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -55,8 +57,8 @@ export const GithubCardModal: React.FC = () => {
     if (!isOpen || !user) return null;
 
     let url = "";
-    if (source === 'global' && cardKey) {
-        url = `${window.location.origin}/api/card?key=${cardKey}`;
+    if (source === 'global' && cardKeys) {
+        url = `${window.location.origin}/api/card?key=${cardKeys.key}`;
     } else if (source !== 'global') {
         const f = folders.find(fo => fo.id === source);
         if (f && f.hash) {
@@ -74,13 +76,7 @@ export const GithubCardModal: React.FC = () => {
             saveData(user.token, trips, pins, folders, s).catch((e: any) => showAlert(t('app.saveFail', "保存失败: ") + e.message, '', 'error'));
         }
         if (langChanged) {
-            const parts = location.pathname.split('/');
-            if (parts.length > 1 && ['zh-cn', 'en', 'ja-jp', 'zh-tw'].includes(parts[1].toLowerCase())) {
-                parts[1] = s.language.toLowerCase();
-            } else {
-                parts.splice(1, 0, s.language.toLowerCase());
-            }
-            navigate(parts.join('/') + location.search, { replace: true });
+            goToLanguage(s.language);
         }
     };
 

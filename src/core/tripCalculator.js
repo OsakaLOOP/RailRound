@@ -158,6 +158,50 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) =>
 };
 
 // --- Shared Helper: Calculate Visualization Data ---
+const getLineLabelFallback = (lineKey) => {
+    if (!lineKey) return 'Unknown';
+    return String(lineKey).split(':').pop() || String(lineKey);
+};
+
+const railGraphGeometryToLeafletCoords = (geometry) => {
+    if (!geometry || !Array.isArray(geometry.coordinates)) return [];
+    if (geometry.type === 'LineString') {
+        return geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+    }
+    if (geometry.type === 'MultiLineString') {
+        return geometry.coordinates.map(line => line.map(([lng, lat]) => [lat, lng]));
+    }
+    return [];
+};
+
+const getTripStatsSegments = (trip) => {
+    const railGraphSegments = trip?.railGraph?.tripResult?.segments;
+    if (Array.isArray(railGraphSegments) && railGraphSegments.length > 0) {
+        return railGraphSegments.map((segment, index) => {
+            const mileageProfile = segment.mileageProfile || {};
+            const lineKey = String(mileageProfile.lineRef ?? mileageProfile.patternRef ?? segment.segmentId ?? '');
+            return {
+                id: segment.segmentId || `rail-graph:${index}`,
+                lineKey,
+                lineLabel: segment.lineLabel || getLineLabelFallback(lineKey),
+                fromId: String(segment.fromStation?.stationRef ?? ''),
+                toId: String(segment.toStation?.stationRef ?? ''),
+                distanceKm: Number(segment.distanceKm) || 0,
+                geometry: railGraphGeometryToLeafletCoords(segment.geometry),
+                color: segment.displayColor,
+                source: 'rail_graph'
+            };
+        });
+    }
+    if (Array.isArray(trip?.segments) && trip.segments.length > 0) return trip.segments;
+    return [{ lineKey: trip?.lineKey, fromId: trip?.fromId, toId: trip?.toId }];
+};
+
+const getStatsLineTitle = (segments) => {
+    const labels = segments.map(seg => seg.lineLabel || getLineLabelFallback(seg.lineKey)).filter(Boolean);
+    return labels.length > 0 ? labels.join(' → ') : 'Unknown';
+};
+
 export const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData) => {
     let totalDist = 0;
     const allCoords = [];
@@ -211,6 +255,37 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
     };
 
     segments.forEach(seg => {
+        if (seg?.source === 'rail_graph' || Array.isArray(seg?.geometry)) {
+            const coords = seg.geometry;
+            const color = seg.color || '#94a3b8';
+            const hasProductDistance = Number.isFinite(seg.distanceKm);
+
+            if (Array.isArray(coords) && coords.length > 0) {
+                const isMulti = Array.isArray(coords[0]) && Array.isArray(coords[0][0]);
+                if (isMulti) {
+                    coords.forEach(c => {
+                        allCoords.push({ coords: c, color });
+                    });
+                } else {
+                    allCoords.push({ coords, color });
+                }
+            }
+
+            if (hasProductDistance) {
+                totalDist += seg.distanceKm;
+            } else if (Array.isArray(coords) && coords.length > 0 && turf) {
+                const isMulti = Array.isArray(coords[0]) && Array.isArray(coords[0][0]);
+                if (isMulti) {
+                    coords.forEach(c => {
+                        totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
+                    });
+                } else {
+                    totalDist += turf.length(turf.lineString(coords.map(p => [p[1], p[0]])));
+                }
+            }
+            return;
+        }
+
         const geom = getGeometry(seg);
         if (geom && geom.coords) {
             if (geom.isMulti) {
@@ -324,7 +399,7 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
 export const calculateLatestStats = (trips, segmentGeometries, railwayData, geoData) => {
     // 1. Basic Stats
     const totalTrips = trips.length;
-    const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
+    const allSegments = trips.flatMap(t => getTripStatsSegments(t));
     const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
 
     // Calc total distance using helper (aggregating cached or on-the-fly)
@@ -332,8 +407,8 @@ export const calculateLatestStats = (trips, segmentGeometries, railwayData, geoD
 
     // 2. Latest 5
     const latest = trips.slice(0, 5).map(t => {
-        const segs = t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }];
-        const lineNames = segs.map(s => s.lineKey.split(':').pop()).join(' → '); // Simplified Title
+        const segs = getTripStatsSegments(t);
+        const lineNames = getStatsLineTitle(segs);
 
         const { totalDist, visualPaths } = getRouteVisualData(segs, segmentGeometries, railwayData, geoData);
 

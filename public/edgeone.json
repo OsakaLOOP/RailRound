@@ -1,0 +1,59 @@
+{
+  "headers": [
+    {
+      "source": "/*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "max-age=86400"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/bundle/*",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/blog/*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "src": "/blog/(.*)",
+      "dest": "/blog/$1"
+    }
+  ]
+}

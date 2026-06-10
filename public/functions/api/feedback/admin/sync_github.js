@@ -3,13 +3,25 @@ import {
   json,
   getKV,
   assertAdmin,
+  getAllFeedbackIds,
   clipText
 } from "../_shared.js";
 
 const headers = withMethodHeaders("POST, OPTIONS");
-const MAX_SCAN_ROUNDS = 20;
-const PAGE_SIZE = 200;
-const CONCURRENCY = 5;
+const CONCURRENCY = 3;
+const SYNC_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes between re-fetches
+
+function isRateLimitError(err) {
+  const msg = String(err?.message || "").toLowerCase();
+  return msg.includes("rate limit") || msg.includes("insufficient fetch quota") || msg.includes("secondary rate limit");
+}
+
+function shouldSkipSync(hook) {
+  if (!hook?.issue_updated_at) return false;
+  const lastSync = Date.parse(String(hook.issue_updated_at));
+  if (!Number.isFinite(lastSync)) return false;
+  return (Date.now() - lastSync) < SYNC_COOLDOWN_MS;
+}
 
 function getGitHubConfig(env) {
   const token = String(env?.GITHUB_FEEDBACK_TOKEN || "").trim();
@@ -52,11 +64,7 @@ function toCommentPreview(commentPayload) {
   const createdAt = String(commentPayload?.created_at || "").trim();
   const body = String(commentPayload?.body || "").trim();
   if (!author || !createdAt || !body) return null;
-  return {
-    author,
-    created_at: createdAt,
-    body_preview: clipText(body, 300)
-  };
+  return { author, created_at: createdAt, body_preview: clipText(body, 300) };
 }
 
 async function fetchLatestComment(cfg, issueNumber) {
@@ -72,7 +80,6 @@ function normalizeHookFromIssue(issue, lastComment) {
         .map((label) => (typeof label === "string" ? label : String(label?.name || "")))
         .filter(Boolean)
     : [];
-
   return {
     issue_state: issue?.state === "closed" ? "closed" : "open",
     issue_title: issue?.title ? String(issue.title) : null,
@@ -91,6 +98,12 @@ async function syncOne(DB, key, row, cfg) {
   }
 
   const currentHook = row?.hook || {};
+
+  // Skip if we fetched this issue less than 5 minutes ago
+  if (shouldSkipSync(currentHook)) {
+    return { status: "skipped" };
+  }
+
   let issue;
   try {
     issue = await fetchGitHubJson(
@@ -98,7 +111,9 @@ async function syncOne(DB, key, row, cfg) {
       cfg
     );
   } catch (err) {
-    if (Number(err?.status) === 404) {
+    const errStatus = Number(err?.status);
+    const errMsg = String(err?.message || "");
+    if (errStatus === 404 || errStatus === 410 || /deleted|gone/i.test(errMsg)) {
       const next = {
         ...row,
         hook: {
@@ -108,13 +123,17 @@ async function syncOne(DB, key, row, cfg) {
           issue_state: "deleted",
           issue_title: null,
           issue_labels: [],
-          issue_updated_at: null,
+          issue_updated_at: new Date().toISOString(),
           last_comment: null,
           error: null
         }
       };
       await DB.put(key, JSON.stringify(next));
       return { status: "updated" };
+    }
+    // Don't persist transient rate-limit errors
+    if (isRateLimitError(err)) {
+      return { status: "skipped" };
     }
     const next = {
       ...row,
@@ -133,7 +152,10 @@ async function syncOne(DB, key, row, cfg) {
   try {
     lastComment = await fetchLatestComment(cfg, issueNumber);
   } catch (err) {
-    commentError = clipText(err?.message ? String(err.message) : String(err), 500);
+    // Don't persist transient rate-limit errors for comments either
+    if (!isRateLimitError(err)) {
+      commentError = clipText(err?.message ? String(err.message) : String(err), 500);
+    }
   }
 
   const next = {
@@ -166,12 +188,8 @@ async function runConcurrent(items, worker, concurrency) {
 }
 
 export async function onRequest(event) {
-  if (event.request.method === "OPTIONS") {
-    return new Response(null, { headers });
-  }
-  if (event.request.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405, headers);
-  }
+  if (event.request.method === "OPTIONS") return new Response(null, { headers });
+  if (event.request.method !== "POST") return json({ error: "Method not allowed" }, 405, headers);
 
   try {
     const DB = getKV();
@@ -181,49 +199,27 @@ export async function onRequest(event) {
     if (!isAdmin) return json({ error: "Forbidden" }, 403, headers);
 
     const cfg = getGitHubConfig(event.env);
-    if (!cfg) {
-      return json({ error: "GitHub feedback hook not configured" }, 400, headers);
-    }
+    if (!cfg) return json({ error: "GitHub feedback hook not configured" }, 400, headers);
 
+    const allIds = await getAllFeedbackIds(DB);
     const candidates = [];
-    let cursor = undefined;
-    let rounds = 0;
-    let scanned = 0;
-    let listComplete = false;
 
-    while (!listComplete && rounds < MAX_SCAN_ROUNDS) {
-      rounds += 1;
-      const page = await DB.list({
-        prefix: "feedback:",
-        limit: PAGE_SIZE,
-        ...(cursor ? { cursor } : {})
-      });
-
-      cursor = page.cursor;
-      listComplete = Boolean(page.list_complete);
-      const pageRows = await Promise.all(
-        (page.keys || []).map(async (keyInfo) => {
-          const raw = await DB.get(keyInfo.name);
-          if (!raw) return null;
-          try {
-            const row = typeof raw === "string" ? JSON.parse(raw) : raw;
-            return { key: keyInfo.name, row };
-          } catch {
-            return null;
-          }
-        })
-      );
-
-      for (const item of pageRows) {
-        if (!item || !item.row || !item.row.id) continue;
-        scanned += 1;
-        const hook = item.row.hook || {};
+    for (const id of allIds) {
+      const key = `feedback:${id}`;
+      const raw = await DB.get(key);
+      if (!raw) continue;
+      try {
+        const row = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (!row || !row.id) continue;
+        const hook = row.hook || {};
         if (hook.provider !== "github_issue") continue;
         const issueNumber = Number(hook.issue_number);
         if (!Number.isFinite(issueNumber) || issueNumber <= 0) continue;
-        candidates.push(item);
-      }
+        candidates.push({ key, row });
+      } catch { /* skip */ }
     }
+
+    const scanned = candidates.length;
 
     const syncResults = await runConcurrent(
       candidates,
@@ -233,35 +229,21 @@ export async function onRequest(event) {
 
     let updated = 0;
     let failed = 0;
-    let skipped = scanned - candidates.length;
+    let skipped = 0;
     const errors = [];
     for (let i = 0; i < syncResults.length; i += 1) {
       const result = syncResults[i];
-      if (result?.status === "updated") {
-        updated += 1;
-      } else if (result?.status === "failed") {
+      if (result?.status === "updated") updated += 1;
+      else if (result?.status === "failed") {
         failed += 1;
-        errors.push({
-          id: candidates[i]?.row?.id || "unknown",
-          error: result.error || "sync failed"
-        });
+        errors.push({ id: candidates[i]?.row?.id || "unknown", error: result.error || "sync failed" });
       } else {
         skipped += 1;
       }
     }
 
-    return json(
-      {
-        scanned,
-        updated,
-        failed,
-        skipped,
-        errors
-      },
-      200,
-      headers
-    );
+    return json({ scanned, updated, failed, skipped, errors }, 200, headers);
   } catch (err) {
-    return json({ error: err?.message || "Failed to sync feedback github status" }, 500, headers);
+    return json({ error: err?.message || "Failed to sync" }, 500, headers);
   }
 }

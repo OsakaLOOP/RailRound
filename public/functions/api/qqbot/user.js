@@ -44,8 +44,8 @@ export async function onRequest(event) {
                 }
             }
         } else if (key) {
-            // Global Badge Mode
-            username = await DB.get(`card_key:${key}`);
+            // Global Badge Mode — uses write_key for detailed data
+            username = await DB.get(`card_write_key:${key}`);
             if (!username) return errorJson("Invalid Key", 404);
         }
 

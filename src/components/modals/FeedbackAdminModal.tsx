@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X, Loader2, RefreshCw } from 'lucide-react';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -85,17 +85,30 @@ export const FeedbackAdminModal: React.FC = () => {
   const setModalState = useStore((state) => state.setModalState);
   const { t } = useTranslation();
 
-  const [items, setItems] = useState<FeedbackSummary[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingList, setLoadingList] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
+  // Full list loaded from server (accumulated across pages)
+  const [allItems, setAllItems] = useState<FeedbackSummary[]>([]);
+  const [loadingAll, setLoadingAll] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [loadingSync, setLoadingSync] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<FeedbackDetail | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'error' | 'suggestion'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'success' | 'failed'>('all');
+
+  // Client-side filtering (instant, no network call)
+  const filteredItems = useMemo(() => {
+    return allItems.filter((item) => {
+      if (categoryFilter !== 'all' && item.category !== categoryFilter) return false;
+      const rowStatus = item.hook?.status || 'pending';
+      if (statusFilter !== 'all' && rowStatus !== statusFilter) return false;
+      return true;
+    });
+  }, [allItems, categoryFilter, statusFilter]);
+
+  const selectedItem = useMemo(
+    () => allItems.find((item) => item.id === selectedId) || null,
+    [allItems, selectedId]
+  );
 
   const getErrorModuleLabel = (moduleName?: string | null) => {
     if (!moduleName) return '-';
@@ -106,65 +119,62 @@ export const FeedbackAdminModal: React.FC = () => {
     return translated === key ? ERROR_MODULE_LABEL_FALLBACK[module] : translated;
   };
 
-  const onClose = () => setModalState({ feedbackAdminModalOpen: false });
-  const selectedItem = useMemo(() => items.find((item) => item.id === selectedId) || null, [items, selectedId]);
+  const onClose = useCallback(() => setModalState({ feedbackAdminModalOpen: false }), [setModalState]);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
-  const loadList = async (reset = true) => {
+  // Load ALL items from server (paginate to exhaustion)
+  const loadAllItems = useCallback(async () => {
     if (!user?.token) return;
-    if (reset) {
-      setLoadingList(true);
-    } else {
-      setLoadingMore(true);
-    }
-
+    setLoadingAll(true);
     try {
-      const res = await api.getFeedbackAdminList({
-        cursor: reset ? undefined : cursor || undefined,
-        limit: 20,
-        category: categoryFilter === 'all' ? undefined : categoryFilter,
-        status: statusFilter === 'all' ? undefined : statusFilter
-      }, user.token);
-      const nextItems = Array.isArray(res.items) ? res.items : [];
-      if (reset) {
-        setItems(nextItems);
-        setSelectedId(nextItems[0]?.id || null);
-        setDetail(null);
-      } else {
-        setItems((prev) => {
-          const existing = new Set(prev.map((i) => i.id));
-          const merged = [...prev];
-          nextItems.forEach((i: FeedbackSummary) => {
-            if (!existing.has(i.id)) merged.push(i);
-          });
-          return merged;
-        });
+      const accumulated: FeedbackSummary[] = [];
+      let cursor: number | null = 0;
+      const seen = new Set<string>();
+
+      while (cursor !== null) {
+        const res: any = await api.getFeedbackAdminList({
+          cursor,
+          limit: 50,
+          // No category/status filter — fetch everything, filter client-side
+        }, user.token);
+
+        const batch = Array.isArray(res.items) ? res.items : [];
+        for (const item of batch) {
+          if (!seen.has(item.id)) {
+            seen.add(item.id);
+            accumulated.push(item);
+          }
+        }
+
+        cursor = res.cursor ?? null;
+        if (cursor === null || !res.has_more) break;
       }
-      setCursor(res.cursor || null);
-      setHasMore(Boolean(res.has_more && res.cursor));
+
+      accumulated.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+      setAllItems(accumulated);
+      if (!selectedId || !accumulated.find((i) => i.id === selectedId)) {
+        setSelectedId(accumulated[0]?.id || null);
+      }
     } catch (err: any) {
       toast.error(err?.message || t('feedback.adminLoadListFail', 'Failed to load feedback list'));
     } finally {
-      setLoadingList(false);
-      setLoadingMore(false);
+      setLoadingAll(false);
     }
-  };
+  }, [user?.token, t, selectedId]);
 
-  const syncAndLoadList = async (reset = true) => {
+  const handleRefresh = useCallback(async () => {
     if (!user?.token) return;
-    if (reset) {
-      setLoadingSync(true);
-    }
+    setLoadingSync(true);
     try {
       await api.syncFeedbackGithub(user.token);
     } catch (err: any) {
       toast.error(err?.message || t('feedback.adminSyncGithubFail', 'GitHub sync failed'));
     } finally {
-      if (reset) {
-        setLoadingSync(false);
-      }
+      setLoadingSync(false);
     }
-    await loadList(reset);
-  };
+    await loadAllItems();
+  }, [user?.token, t, loadAllItems]);
 
   const loadDetail = async (id: string) => {
     if (!user?.token || !id) return;
@@ -179,33 +189,37 @@ export const FeedbackAdminModal: React.FC = () => {
     }
   };
 
+  // Modal open/close lifecycle
   useEffect(() => {
     if (!isOpen) {
-      setItems([]);
-      setCursor(null);
-      setHasMore(false);
+      setAllItems([]);
       setSelectedId(null);
       setDetail(null);
+      setCategoryFilter('all');
+      setStatusFilter('all');
       return;
     }
-    if (!user || user.username !== 'admin') {
+    const devBypass = import.meta.env.DEV;
+    if (!user || (!devBypass && user.username !== 'admin')) {
       toast.error(t('feedback.adminForbidden', 'Admin only'));
       setModalState({ feedbackAdminModalOpen: false });
       return;
     }
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, onClose, setModalState, t, user]);
+  }, [isOpen, setModalState, t, user]);
 
+  // Load all items once when modal opens (independent of filters)
   useEffect(() => {
     if (isOpen) {
-      syncAndLoadList(true).catch(() => undefined);
+      loadAllItems().catch(() => undefined);
     }
-  }, [categoryFilter, isOpen, statusFilter]);
+  }, [isOpen, loadAllItems]);
 
+  // Load detail when selection changes
   useEffect(() => {
     if (!isOpen || !selectedId) return;
     loadDetail(selectedId).catch(() => undefined);
@@ -217,7 +231,12 @@ export const FeedbackAdminModal: React.FC = () => {
     <div className="fixed inset-0 z-[1000] bg-black/50 p-4 animate-fade-in" onClick={onClose}>
       <div className="bg-white w-full max-w-6xl mx-auto h-[90vh] rounded-2xl shadow-2xl animate-slide-up flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-4 border-b flex items-center justify-between">
-          <div className="font-bold text-lg text-gray-800">{t('feedback.adminTitle', 'Feedback Admin')}</div>
+          <div className="font-bold text-lg text-gray-800">
+            {t('feedback.adminTitle', 'Feedback Admin')}
+            {allItems.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-400">({filteredItems.length}/{allItems.length})</span>
+            )}
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={18} />
           </button>
@@ -244,33 +263,33 @@ export const FeedbackAdminModal: React.FC = () => {
             <option value="failed">failed</option>
           </select>
           <button
-            onClick={() => syncAndLoadList(true)}
+            onClick={handleRefresh}
             className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-100 flex items-center gap-1"
-            disabled={loadingList || loadingSync}
+            disabled={loadingAll || loadingSync}
           >
-            {loadingList || loadingSync ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {loadingAll || loadingSync ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             {t('common.refresh', 'Refresh')}
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 flex flex-col md:flex-row">
-          <div className="md:w-[42%] border-r min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col sm:flex-row">
+          <div className="sm:w-[45%] border-r min-h-0 flex flex-col">
             <div className="flex-1 overflow-y-auto">
-              {loadingList ? (
+              {loadingAll ? (
                 <div className="h-full flex items-center justify-center text-gray-500">
                   <Loader2 size={18} className="animate-spin mr-2" />
                   {t('feedback.loadingList', 'Loading...')}
                 </div>
-              ) : items.length === 0 ? (
+              ) : filteredItems.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-gray-400 text-sm">
                   {t('feedback.noData', 'No data')}
                 </div>
               ) : (
-                items.map((item) => (
+                filteredItems.map((item) => (
                   <button
                     key={item.id}
                     onClick={() => setSelectedId(item.id)}
-                    className={`w-full text-left p-3 border-b hover:bg-gray-50 ${item.id === selectedId ? 'bg-blue-50' : 'bg-white'}`}
+                    className={`w-full text-left p-3 border-b hover:bg-gray-50 cursor-pointer transition-colors ${item.id === selectedId ? 'bg-blue-50' : 'bg-white'}`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <span className="text-xs font-bold text-gray-700">{item.category === 'error' ? t('feedback.error', 'Error') : t('feedback.suggestion', 'Suggestion')}</span>
@@ -288,15 +307,6 @@ export const FeedbackAdminModal: React.FC = () => {
                 ))
               )}
             </div>
-            {hasMore && (
-              <button
-                onClick={() => loadList(false)}
-                disabled={loadingMore}
-                className="m-3 px-3 py-2 rounded-lg border text-sm hover:bg-gray-50 disabled:opacity-60"
-              >
-                {loadingMore ? t('feedback.loadingMore', 'Loading...') : t('feedback.loadMore', 'Load more')}
-              </button>
-            )}
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto p-4">

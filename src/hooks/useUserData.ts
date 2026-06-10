@@ -11,11 +11,19 @@ const CURRENT_VERSION = meta["currentVersion"] || "1.0.0";
 // Refactored to not be a custom hook that calls useStore() inside it,
 // to completely prevent any potential React re-render loops due to useShallow/missing dependencies.
 export const useUserData = () => {
-    const saveData = async (token: string, currentTrips: any[], currentPins: any[], currentFolders: any[], currentBadgeSettings: any) => {
+    const saveData = async (
+        token: string,
+        currentTrips: any[],
+        currentPins: any[],
+        currentFolders: any[],
+        currentBadgeSettings: any,
+        currentMileageUserEvents: any[] | null = null,
+    ) => {
         try {
             const state = useStore.getState();
+            const mileageUserEvents = currentMileageUserEvents ?? state.mileageUserEvents;
             const latest5 = calculateLatestStats(currentTrips, state.segmentGeometries, state.railwayData, state.geoData);
-            await api.saveData(token, currentTrips, currentPins, latest5, CURRENT_VERSION, currentFolders, currentBadgeSettings);
+            await api.saveData(token, currentTrips, currentPins, latest5, CURRENT_VERSION, currentFolders, currentBadgeSettings, mileageUserEvents);
         } catch (e: any) {
             console.error('Failed to save user data:', e);
             throw e;
@@ -27,14 +35,18 @@ export const useUserData = () => {
             const cloudData = await api.getData(token);
             const state = useStore.getState();
 
-            state.setUserProfile(cloudData);
+            state.setUserProfile({
+                ...cloudData,
+                subscriptionMonths: cloudData._subscriptionMonths || cloudData.subscriptionMonths || 0,
+            } as any);
 
             let newTrips = cloudData.trips || [];
             let newPins = cloudData.pins || [];
             let newFolders = cloudData.folders || [];
+            let newMileageUserEvents = cloudData.mileage_user_events || cloudData.mileageUserEvents || [];
             let newBadgeSettings = cloudData.badge_settings || { enabled: true };
 
-            if (isInteractive && (state.trips.length > 0 || state.pins.length > 0 || state.folders.length > 0 || state.badgeSettings?.defaultMapCenter)) {
+            if (isInteractive && (state.trips.length > 0 || state.pins.length > 0 || state.folders.length > 0 || state.mileageUserEvents.length > 0 || state.badgeSettings?.defaultMapCenter)) {
                 if (await showConfirm(
                     i18next.t('app.mergeConfirmTitle', '数据冲突'),
                     i18next.t('app.mergeConfirm', "检测到本地有数据或个人配置，是否保留并与云端数据合并？\n\n点击【确定】合并 (Keep Local)\n点击【取消】仅使用云端数据 (Overwrite Local)")
@@ -54,6 +66,11 @@ export const useUserData = () => {
                     state.folders.forEach((f: any) => folderMap.set(f.id, f));
                     newFolders = Array.from(folderMap.values());
 
+                    const eventMap = new Map();
+                    newMileageUserEvents.forEach((e: any) => eventMap.set(e.id, e));
+                    state.mileageUserEvents.forEach((e: any) => eventMap.set(e.id, e));
+                    newMileageUserEvents = Array.from(eventMap.values());
+
                     // Merge badge settings: Cloud > Local > Default
                     newBadgeSettings = {
                         ...state.badgeSettings,
@@ -63,20 +80,21 @@ export const useUserData = () => {
                     };
 
                     if (token) {
-                        saveData(token, newTrips, newPins, newFolders, newBadgeSettings).catch(e => console.error("Auto sync failed after merge", e));
+                        saveData(token, newTrips, newPins, newFolders, newBadgeSettings, newMileageUserEvents).catch(e => console.error("Auto sync failed after merge", e));
                     }
                 }
             } else if (!isInteractive) {
                 // Background sync merge fallback for missing remote settings
                 if (!cloudData.badge_settings?.defaultMapCenter && state.badgeSettings?.defaultMapCenter) {
                      newBadgeSettings.defaultMapCenter = state.badgeSettings.defaultMapCenter;
-                     saveData(token, newTrips, newPins, newFolders, newBadgeSettings).catch(e => console.error("Auto sync settings failed", e));
+                     saveData(token, newTrips, newPins, newFolders, newBadgeSettings, newMileageUserEvents).catch(e => console.error("Auto sync settings failed", e));
                 }
             }
 
             state.setTrips(newTrips.sort((a: any, b: any) => b.date.localeCompare(a.date)));
             state.setPins(newPins);
             state.setFolders(newFolders);
+            state.setMileageUserEvents(newMileageUserEvents);
             
             // Merge settings: Cloud > Local
             const mergedBadgeSettings = {

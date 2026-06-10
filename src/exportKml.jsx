@@ -24,7 +24,18 @@ const handleExportKML = async () => {
             // 循环所有行程，切割 GeoJSON 以获取准确坐标
             trips.forEach(t => {
                 if (t.isWalk) return; // Exclude walk trips
-                const tripName = `${t.date} - Trip ${t.id}`;
+                const lineNames = Array.from(new Set(
+                    (t.segments || [])
+                        .map(seg => {
+                            const parts = String(seg.lineKey || '').split(':');
+                            return parts.slice(1).join(':') || seg.lineKey || '';
+                        })
+                        .filter(Boolean)
+                ));
+                const lineSummary = lineNames.length > 2
+                    ? `${lineNames.slice(0, 2).join(' / ')} +${lineNames.length - 2}`
+                    : lineNames.join(' / ');
+                const tripName = lineSummary ? `${t.date} - ${lineSummary}` : t.date;
                 t.segments.forEach((seg, segIndex) => {
                     const line = railwayData[seg.lineKey];
                     if (!line) return;

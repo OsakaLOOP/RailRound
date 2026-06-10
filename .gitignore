@@ -27,8 +27,13 @@ dist-ssr
 *.json
 !package.json
 !tsconfig.json
+!edgeone.json
+!public/edgeone.json
 !public/changelog.json
 !public/company_data.json
+!public/rail-graph/
+!public/rail-graph/deployed-system.json
+!public/rail-graph/deployed-system.meta.json
 !public/locales/**/*.json
 *.geojson
 
@@ -46,6 +51,9 @@ public/assets/geojson_logos/*
 # Package generated sources
 packages/route-slice-preview/src/*
 !packages/route-slice-preview/src/index.ts
+
+# Rail graph MVP verification reports
+src/rail-graph-v1-mvp/.verify/
 
 # CDN bundle
 public/bundle/

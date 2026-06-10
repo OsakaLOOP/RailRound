@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Clock, GitCommit, Loader2, AlertCircle, MapPin, ChevronDown, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-
-const getBlogBase = (langRaw) => {
-    const lang = (langRaw || 'zh-CN').toLowerCase();
-    return lang === 'zh-cn' ? '/blog/' : `/blog/${lang}/`;
-};
+import { getCanonicalBlogBase } from '../utils/routes';
 
 const VersionBadge = ({ version: currentVersion }) => {
     const { t, i18n } = useTranslation();
-    const blogBase = getBlogBase(i18n.language);
+    const blogBase = getCanonicalBlogBase(i18n.language);
     const [isHovered, setIsHovered] = useState(false);
     const [showDot, setShowDot] = useState(false);
     const [show, setShow] = useState(false);

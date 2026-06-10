@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "rail-graph-default-deployment-meta-v1",
+  "sourceMode": "compiled-topology",
+  "source": "public/geojson/WILLER TRAINS.geojson",
+  "generatedAt": "2026-06-04T00:46:31.047Z",
+  "contentHash": "08b4646a3e73d2a67400fc4f76716ed050b60314d85d337a2547d0a1ec16f1d0",
+  "graphId": "ad3fb97707454acc16ed5d031c81fe985eabbe11af0c8351fcdeee9c13b52297",
+  "systemId": "railround:minimal:system:willer",
+  "coverage": {
+    "status": "minimal",
+    "note": "Minimal direction-aware deployment bundle for app integration smoke. It is intentionally not full network coverage.",
+    "lineKey": "WILLER TRAINS:宮津線",
+    "stationCount": 4,
+    "presetCount": 1
+  }
+}

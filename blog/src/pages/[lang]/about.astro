@@ -1,7 +1,7 @@
 ---
 import BaseHead from '../../components/BaseHead.astro';
 import Header from '../../components/Header.astro';
-import { APP_URL, SITE_TITLE } from '../../consts';
+import { SITE_TITLE } from '../../consts';
 import { BLOG_LANGS, DEFAULT_BLOG_LANG, isBlogLang } from '../../utils/blogRouting';
 
 export async function getStaticPaths() {
@@ -13,6 +13,7 @@ if (!isBlogLang(langParam)) {
   return Astro.redirect(`/blog/${DEFAULT_BLOG_LANG}/about/`, 302);
 }
 const lang = langParam;
+const appUrl = `/${lang}/records`;
 
 const labels: Record<string, any> = {
   'zh-cn': {
@@ -73,7 +74,7 @@ const t = labels[lang] || labels.en;
     </p>
 
     <div style="margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border)">
-      <a href={APP_URL} class="app-return-link" style="color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:0.4rem">
+      <a href={appUrl} class="app-return-link" style="color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:0.4rem">
         {t.back}
       </a>
     </div>

@@ -72,6 +72,19 @@ export const MileageEventsPanel: React.FC = () => {
   const { importEvents } = useMileageEventActions();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const actionsMenuRef = useRef<HTMLDivElement>(null);
+  const edgeHandleDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    opened: boolean;
+  } | null>(null);
+  const panelDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    closed: boolean;
+  } | null>(null);
+  const skipEdgeHandleClickRef = useRef(false);
 
   const lineKeys = useMemo(() => Object.keys(railwayData).sort(), [railwayData]);
   const [open, setOpen] = useState(false);
@@ -509,12 +522,87 @@ export const MileageEventsPanel: React.FC = () => {
     setOpen(true);
   };
 
+  const beginEdgeHandleDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === "mouse") return;
+    edgeHandleDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      opened: false,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const updateEdgeHandleDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = edgeHandleDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || drag.opened) return;
+    const dx = drag.startX - event.clientX;
+    const dy = Math.abs(event.clientY - drag.startY);
+    if (dx > 34 && dx > dy * 0.7) {
+      drag.opened = true;
+      skipEdgeHandleClickRef.current = true;
+      setOpen(true);
+      window.setTimeout(() => {
+        skipEdgeHandleClickRef.current = false;
+      }, 350);
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+    }
+  };
+
+  const endEdgeHandleDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (edgeHandleDragRef.current?.pointerId === event.pointerId) {
+      edgeHandleDragRef.current = null;
+    }
+  };
+
+  const beginPanelDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerType === "mouse") return;
+    const target = event.target as HTMLElement;
+    if (target.closest("button,input,select,textarea,a,[role='menuitem']")) return;
+    panelDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      closed: false,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const updatePanelDrag = (event: React.PointerEvent<HTMLElement>) => {
+    const drag = panelDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || drag.closed) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    if (dx > 72 || dy > 86) {
+      drag.closed = true;
+      setActionsOpen(false);
+      setOpen(false);
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+    }
+  };
+
+  const endPanelDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (panelDragRef.current?.pointerId === event.pointerId) {
+      panelDragRef.current = null;
+    }
+  };
+
   if (!open) {
     return (
       <button
         className="rl-focus group absolute right-0 top-1/2 z-[520] flex h-28 w-6 -translate-y-1/2 items-center overflow-hidden rounded-l-md border border-r-0 border-slate-200/80 bg-white/70 text-slate-700 shadow-lg shadow-slate-900/10 backdrop-blur-md transition-[width,background-color,opacity,transform] duration-200 hover:w-44 hover:bg-white/95 focus-visible:w-44 focus-visible:bg-white/95 active:scale-[0.98]"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          if (skipEdgeHandleClickRef.current) {
+            skipEdgeHandleClickRef.current = false;
+            return;
+          }
+          setOpen(true);
+        }}
         onPointerEnter={openFromEdgeHandle}
+        onPointerDown={beginEdgeHandleDrag}
+        onPointerMove={updateEdgeHandleDrag}
+        onPointerUp={endEdgeHandleDrag}
+        onPointerCancel={endEdgeHandleDrag}
         title={t("mileageEvents.open", "Mileage events")}
         aria-label={t("mileageEvents.open", "Mileage events")}
       >
@@ -537,7 +625,13 @@ export const MileageEventsPanel: React.FC = () => {
 
   return (
     <section className="rl-modal-panel absolute inset-x-2 bottom-3 z-[520] flex max-h-[82dvh] flex-col overflow-hidden backdrop-blur-xl md:inset-y-4 md:left-auto md:right-4 md:max-h-none md:w-[min(24rem,calc(100vw-2rem))]">
-      <header className="rl-modal-header flex items-start justify-between gap-3 px-4 py-3">
+      <header
+        className="rl-modal-header flex touch-pan-y items-start justify-between gap-3 px-4 py-3"
+        onPointerDown={beginPanelDrag}
+        onPointerMove={updatePanelDrag}
+        onPointerUp={endPanelDrag}
+        onPointerCancel={endPanelDrag}
+      >
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start gap-2">
             <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-teal-100">

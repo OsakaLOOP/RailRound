@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import * as L from "leaflet";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createScenicVisibilityLayer,
   updateScenicVisibilityLayer,
@@ -57,5 +57,29 @@ describe("scenic visibility Leaflet layer", () => {
     expect((rayAfter as L.Polyline).options.weight).toBe(3);
     expect((originAfter as L.CircleMarker).getLatLng().lat).toBeCloseTo(35.7);
     expect((originAfter as L.CircleMarker).getLatLng().lng).toBeCloseTo(139.8);
+  });
+
+  it("adds draggable edit handles only for selected editable scenic items", () => {
+    const onEdit = vi.fn();
+    const layer = createScenicVisibilityLayer(item({
+      selected: true,
+      editable: true,
+      onEdit,
+    })) as L.LayerGroup;
+
+    const layers = layer.getLayers();
+    expect(layers).toHaveLength(6);
+    expect(layers.slice(3).every((candidate) => candidate instanceof L.Marker)).toBe(true);
+
+    const targetHandle = layers[3] as L.Marker;
+    targetHandle.setLatLng([35.68, 139.79]);
+    targetHandle.fire("dragend");
+    expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({
+      bearingDegrees: expect.any(Number),
+      distanceMeters: expect.any(Number),
+    }));
+
+    updateScenicVisibilityLayer(layer, item({ selected: false }));
+    expect(layer.getLayers()).toHaveLength(3);
   });
 });

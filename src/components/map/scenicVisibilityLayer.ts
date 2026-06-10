@@ -13,12 +13,23 @@ export type ScenicVisibilityMapItem = {
   distanceMeters?: number;
   selected: boolean;
   dimmed: boolean;
+  editable?: boolean;
+  onEdit?: (change: ScenicVisibilityEdit) => void;
+};
+
+export type ScenicVisibilityEdit = {
+  bearingDegrees?: number;
+  angleToleranceDegrees?: number;
+  distanceMeters?: number;
 };
 
 type ScenicLayerCache = L.LayerGroup & {
   _fan?: L.Polygon;
   _ray?: L.Polyline;
   _origin?: L.CircleMarker;
+  _targetHandle?: L.Marker;
+  _leftHandle?: L.Marker;
+  _rightHandle?: L.Marker;
 };
 
 const EARTH_RADIUS_METERS = 6371008.8;
@@ -33,6 +44,11 @@ function clamp(value: number, min: number, max: number): number {
 
 function normalizeDegrees(value: number): number {
   return ((value % 360) + 360) % 360;
+}
+
+function normalizeSignedDegrees(value: number): number {
+  const normalized = normalizeDegrees(value);
+  return normalized > 180 ? normalized - 360 : normalized;
 }
 
 function destinationLatLng(lat: number, lng: number, bearingDegrees: number, distanceMeters: number): L.LatLngTuple {
@@ -87,6 +103,16 @@ function rayLatLngs(item: ScenicVisibilityMapItem): L.LatLngExpression[] {
   ];
 }
 
+function editHandleLatLng(item: ScenicVisibilityMapItem, handle: "target" | "left" | "right"): L.LatLngTuple {
+  const tolerance = scenicToleranceDegrees(item);
+  const bearing = handle === "left"
+    ? item.bearingDegrees - tolerance
+    : handle === "right"
+      ? item.bearingDegrees + tolerance
+      : item.bearingDegrees;
+  return destinationLatLng(item.lat, item.lng, bearing, scenicDistanceMeters(item));
+}
+
 function statusColor(status: ScenicVisibilityStatus): string {
   switch (status) {
     case "visible":
@@ -133,6 +159,99 @@ function originStyle(item: ScenicVisibilityMapItem): L.CircleMarkerOptions {
   };
 }
 
+function editable(item: ScenicVisibilityMapItem): boolean {
+  return !!item.selected && !!item.editable && !!item.onEdit;
+}
+
+function handleIcon(handle: "target" | "left" | "right"): L.DivIcon {
+  const label = handle === "target" ? "B" : handle === "left" ? "L" : "R";
+  return L.divIcon({
+    className: `scenic-visibility-handle scenic-visibility-handle-${handle}`,
+    html: `<span>${label}</span>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+function bearingFromOrigin(item: ScenicVisibilityMapItem, latLng: L.LatLng): number {
+  const fromLat = item.lat * Math.PI / 180;
+  const toLat = latLng.lat * Math.PI / 180;
+  const deltaLng = (latLng.lng - item.lng) * Math.PI / 180;
+  const y = Math.sin(deltaLng) * Math.cos(toLat);
+  const x = Math.cos(fromLat) * Math.sin(toLat)
+    - Math.sin(fromLat) * Math.cos(toLat) * Math.cos(deltaLng);
+  return normalizeDegrees(Math.atan2(y, x) * 180 / Math.PI);
+}
+
+function distanceFromOrigin(item: ScenicVisibilityMapItem, latLng: L.LatLng): number {
+  const lat1 = item.lat * Math.PI / 180;
+  const lat2 = latLng.lat * Math.PI / 180;
+  const dLat = lat2 - lat1;
+  const dLng = (latLng.lng - item.lng) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function updateEditHandle(
+  group: ScenicLayerCache,
+  item: ScenicVisibilityMapItem,
+  handle: "target" | "left" | "right",
+): void {
+  const property = handle === "target" ? "_targetHandle" : handle === "left" ? "_leftHandle" : "_rightHandle";
+  const current = group[property];
+  const latLng = editHandleLatLng(item, handle);
+  const onEdit = item.onEdit;
+
+  if (!editable(item) || !onEdit) {
+    if (current) {
+      group.removeLayer(current);
+      group[property] = undefined;
+    }
+    return;
+  }
+
+  const marker = current ?? L.marker(latLng, {
+    pane: "mileageEventsPane",
+    draggable: true,
+    interactive: true,
+    keyboard: false,
+    icon: handleIcon(handle),
+    zIndexOffset: 1300,
+  });
+  if (!current) {
+    group.addLayer(marker);
+    group[property] = marker;
+  } else {
+    marker.setLatLng(latLng);
+    marker.setIcon(handleIcon(handle));
+  }
+
+  marker.off("dragend");
+  marker.on("dragend", () => {
+    const nextLatLng = marker.getLatLng();
+    const nextBearing = bearingFromOrigin(item, nextLatLng);
+    const nextDistance = clamp(distanceFromOrigin(item, nextLatLng), 250, 5000);
+    if (handle === "target") {
+      onEdit({
+        bearingDegrees: nextBearing,
+        distanceMeters: nextDistance,
+      });
+      return;
+    }
+    onEdit({
+      angleToleranceDegrees: clamp(Math.abs(normalizeSignedDegrees(nextBearing - item.bearingDegrees)), 5, 90),
+      distanceMeters: nextDistance,
+    });
+  });
+}
+
+function updateEditHandles(group: ScenicLayerCache, item: ScenicVisibilityMapItem): void {
+  updateEditHandle(group, item, "target");
+  updateEditHandle(group, item, "left");
+  updateEditHandle(group, item, "right");
+}
+
 export function createScenicVisibilityLayer(item: ScenicVisibilityMapItem): L.Layer {
   const style = scenicLayerStyle(item);
   const fan = L.polygon(fanLatLngs(item), {
@@ -158,6 +277,7 @@ export function createScenicVisibilityLayer(item: ScenicVisibilityMapItem): L.La
   group._fan = fan;
   group._ray = ray;
   group._origin = origin;
+  updateEditHandles(group, item);
   return group;
 }
 
@@ -185,4 +305,5 @@ export function updateScenicVisibilityLayer(layer: L.Layer, item: ScenicVisibili
 
   group._origin?.setLatLng([item.lat, item.lng]);
   group._origin?.setStyle(originStyle(item));
+  updateEditHandles(group, item);
 }

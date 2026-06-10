@@ -3,6 +3,8 @@ import type {
   MileagePlaceQuery,
   MileageProjectionContext,
   MileageRunPathLike,
+  ScenicFacing,
+  ScenicViewpointPayload,
   MileageUserEventKind,
   MileageUserEventVisibility,
   UserEventV2,
@@ -58,6 +60,14 @@ export interface MileageEventDraft {
   mediaUrl?: string;
   tripId?: string | number;
   lineKey?: string;
+  scenicViewpoint?: ScenicViewpointDraft | null;
+}
+
+export interface ScenicViewpointDraft {
+  facing?: ScenicFacing;
+  targetBearingDegrees?: number;
+  angleToleranceDegrees?: number;
+  distanceMeters?: number;
 }
 
 export interface MileageEventSearchFilters {
@@ -214,6 +224,7 @@ export function createMileageEventFromStation(args: {
   tags?: string[];
   mediaUrl?: string;
   tripId?: string | number;
+  scenicViewpoint?: ScenicViewpointDraft | null;
 }): UserEventV2 | null {
   const stationRef = stationRefForContext(args.lineContext, args.stationId);
   const station = args.lineContext.context.stationMileage[stationRef];
@@ -241,6 +252,7 @@ export function createMileageEventAtDistance(args: {
   tags?: string[];
   mediaUrl?: string;
   tripId?: string | number;
+  scenicViewpoint?: ScenicViewpointDraft | null;
 }): UserEventV2 {
   return createMileageEventAtResolvedDistance({
     lineContext: args.lineContext,
@@ -263,6 +275,7 @@ export function createMileageEventFromCoordinates(args: {
   tags?: string[];
   mediaUrl?: string;
   tripId?: string | number;
+  scenicViewpoint?: ScenicViewpointDraft | null;
 }): UserEventV2 | null {
   const resolved = resolvePlaceToMileage({ coordinates: args.coordinates }, args.lineContext.context);
   if (!resolved) return null;
@@ -291,6 +304,7 @@ export function createMileageEventFromPlace(args: {
   tags?: string[];
   mediaUrl?: string;
   tripId?: string | number;
+  scenicViewpoint?: ScenicViewpointDraft | null;
 }): UserEventV2 | null {
   const resolved = resolvePlaceToMileage(args.place, args.lineContext.context);
   if (!resolved) return null;
@@ -323,6 +337,7 @@ export function createMileageEventFromTripPosition(args: {
   visibility?: MileageUserEventVisibility;
   tags?: string[];
   mediaUrl?: string;
+  scenicViewpoint?: ScenicViewpointDraft | null;
 }): UserEventV2 | null {
   const railGraphTrip = getTripRailGraphSnapshot(args.trip)?.tripResult;
   if (railGraphTrip) {
@@ -377,6 +392,7 @@ export function createMileageEventFromTripPosition(args: {
 }
 
 export function updateMileageEventFromDraft(event: UserEventV2, draft: MileageEventDraft): UserEventV2 {
+  const nextKind = draft.kind ?? event.kind;
   const nextPayload = {
     ...(event.payload ?? {}),
     ...(draft.mediaUrl ? { mediaUrl: draft.mediaUrl.trim() } : {}),
@@ -384,9 +400,16 @@ export function updateMileageEventFromDraft(event: UserEventV2, draft: MileageEv
   };
   if (draft.mediaUrl !== undefined && draft.mediaUrl.trim() === "") delete nextPayload.mediaUrl;
   if (draft.tripId === null || draft.tripId === "") delete nextPayload.tripId;
+  if (nextKind === "scenic") {
+    const nextViewpoint = mergeScenicViewpointDraft(event.payload?.viewpoint, draft.scenicViewpoint);
+    if (nextViewpoint) nextPayload.viewpoint = nextViewpoint;
+    else delete nextPayload.viewpoint;
+  } else {
+    delete nextPayload.viewpoint;
+  }
   return {
     ...event,
-    kind: draft.kind ?? event.kind,
+    kind: nextKind,
     title: cleanTitle(draft.title ?? event.title),
     body: cleanOptional(draft.body) ?? undefined,
     visibility: draft.visibility ?? event.visibility,
@@ -920,15 +943,19 @@ function createMileageEventAtResolvedDistance(args: {
     ...(mediaUrl ? { mediaUrl } : {}),
     ...(tripId !== undefined && tripId !== "" ? { tripId } : {}),
   };
-  const viewpoint = kind === "scenic"
+  const inferredViewpoint = kind === "scenic"
     ? inferScenicViewpointPayload({
       context: args.lineContext.context,
       distanceMeters: args.distanceMeters,
       targetCoordinates: Array.isArray(basePayload.targetCoordinates)
         ? basePayload.targetCoordinates as [number, number]
         : undefined,
+      explicitFacing: args.draft.scenicViewpoint?.facing,
       source: args.lineContext.source === "rail_graph_runtime" ? "inferred_from_route" : "inferred_from_geojson",
     })
+    : undefined;
+  const viewpoint = kind === "scenic"
+    ? mergeScenicViewpointDraft(inferredViewpoint, args.draft.scenicViewpoint)
     : undefined;
   return {
     schemaVersion: "mileage-user-event-v1",
@@ -965,6 +992,82 @@ function cleanTitle(value: string | undefined): string {
 function cleanOptional(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed || undefined;
+}
+
+function mergeScenicViewpointDraft(
+  base: ScenicViewpointPayload | undefined,
+  draft: ScenicViewpointDraft | null | undefined,
+): ScenicViewpointPayload | undefined {
+  if (draft === null) return undefined;
+  const hasDraft =
+    draft !== undefined &&
+    (
+      draft.facing !== undefined ||
+      finiteNumber(draft.targetBearingDegrees) !== undefined ||
+      finiteNumber(draft.angleToleranceDegrees) !== undefined ||
+      finiteNumber(draft.distanceMeters) !== undefined
+    );
+  if (!base && !hasDraft) return undefined;
+
+  const facing = isScenicFacing(draft?.facing) ? draft.facing : base?.facing ?? "right";
+  const targetBearing = normalizeDegrees(
+    finiteNumber(draft?.targetBearingDegrees)
+      ?? finiteNumber(base?.targetBearingDegrees)
+      ?? finiteNumber(base?.constraint?.targetBearingDegrees)
+      ?? 90,
+  );
+  const angleTolerance = clampNumber(
+    finiteNumber(draft?.angleToleranceDegrees)
+      ?? finiteNumber(base?.constraint?.angleToleranceDegrees)
+      ?? 30,
+    5,
+    90,
+  );
+  const distanceMeters = clampNumber(
+    finiteNumber(draft?.distanceMeters)
+      ?? finiteNumber(base?.constraint?.distanceMeters)
+      ?? 1500,
+    250,
+    5000,
+  );
+  const visibleBearingRangeDegrees = bearingRangeFromCenter(targetBearing, angleTolerance);
+
+  return {
+    ...(base ?? {}),
+    facing,
+    targetBearingDegrees: targetBearing,
+    visibleBearingRangeDegrees,
+    constraint: {
+      ...(base?.constraint ?? {}),
+      targetBearingDegrees: targetBearing,
+      visibleBearingRangeDegrees,
+      angleToleranceDegrees: angleTolerance,
+      distanceMeters,
+    },
+    source: hasDraft ? "user_explicit" : base?.source ?? "inferred_from_route",
+    confidence: clampNumber(finiteNumber(base?.confidence) ?? (hasDraft ? 0.85 : 0.5), 0, 1),
+    diagnostics: base?.diagnostics ?? [],
+  };
+}
+
+function isScenicFacing(value: unknown): value is ScenicFacing {
+  return value === "left" || value === "right" || value === "front" || value === "back";
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function normalizeDegrees(value: number): number {
+  return ((value % 360) + 360) % 360;
+}
+
+function bearingRangeFromCenter(center: number, halfWidth: number): [number, number] {
+  return [normalizeDegrees(center - halfWidth), normalizeDegrees(center + halfWidth)];
 }
 
 function normalizeTripSegments(trip: Trip): TripSegment[] {

@@ -17,9 +17,11 @@ import { useAppRouteState } from "../../hooks/useAppRouteState";
 import {
   createScenicVisibilityLayer,
   updateScenicVisibilityLayer,
+  type ScenicVisibilityEdit,
   type ScenicVisibilityMapItem,
 } from "./scenicVisibilityLayer";
-import { boundMileageEventsForRichDisplay } from "../../utils/mileageUserEvents";
+import { boundMileageEventsForRichDisplay, updateMileageEventFromDraft } from "../../utils/mileageUserEvents";
+import { useMileageEventActions } from "../mileage-events/useMileageEventActions";
 import { tripToProductSegments } from "../../utils/tripProductProjection";
 import {
   customEventDetail,
@@ -239,6 +241,25 @@ export const MapContainer: React.FC<Props> = ({
       visitedStations: state.visitedStations,
     })),
   );
+  const { updateEvent } = useMileageEventActions();
+
+  const updateScenicViewpointFromMap = (eventId: string, change: ScenicVisibilityEdit) => {
+    const event = mileageUserEvents.find((candidate) => candidate.id === eventId);
+    if (!event || event.kind !== "scenic") return;
+    updateEvent(updateMileageEventFromDraft(event, {
+      kind: "scenic",
+      scenicViewpoint: {
+        facing: event.payload?.viewpoint?.facing,
+        targetBearingDegrees: change.bearingDegrees
+          ?? event.payload?.viewpoint?.targetBearingDegrees
+          ?? event.payload?.viewpoint?.constraint?.targetBearingDegrees,
+        angleToleranceDegrees: change.angleToleranceDegrees
+          ?? event.payload?.viewpoint?.constraint?.angleToleranceDegrees,
+        distanceMeters: change.distanceMeters
+          ?? event.payload?.viewpoint?.constraint?.distanceMeters,
+      },
+    }));
+  };
 
   useEffect(() => {
     setLeafletReady(true);
@@ -1995,6 +2016,8 @@ export const MapContainer: React.FC<Props> = ({
         distanceMeters: viewpoint?.constraint?.distanceMeters,
         selected,
         dimmed: hasActiveMileageAxis && !activeLine && !selected,
+        editable: selected,
+        onEdit: selected ? (change) => updateScenicViewpointFromMap(entry.bound.event.id, change) : undefined,
       }];
     });
 

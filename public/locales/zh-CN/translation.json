@@ -587,6 +587,29 @@
       "shared": "共享",
       "public": "公开"
     },
+    "scenicViewpoint": {
+      "title": "景观视点",
+      "facing": "朝向",
+      "bearing": "方位角",
+      "angleTolerance": "角度",
+      "distance": "范围",
+      "status": "状态",
+      "confidence": "置信度",
+      "auto": "自动",
+      "facingValue": {
+        "left": "左侧",
+        "right": "右侧",
+        "front": "前方",
+        "back": "后方"
+      },
+      "statusValue": {
+        "visible": "可见",
+        "opposite_side": "反侧",
+        "angle_mismatch": "角度不符",
+        "unknown": "未知",
+        "unavailable": "不可用"
+      }
+    },
     "filter": {
       "allLines": "全部线路",
       "source": "来源",

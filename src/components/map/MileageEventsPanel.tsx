@@ -4,6 +4,7 @@ import {
   Download,
   LocateFixed,
   MapPinned,
+  MoreVertical,
   Plus,
   Search,
   Upload,
@@ -45,6 +46,8 @@ import {
 } from "../../utils/mileageEventUiBridge";
 import {
   eventProjectionDetailFromPanelEntry,
+  isEventSelection,
+  isRouteSelection,
   openDetailMatchesActiveRouteSelection,
   projectionDetailFromRailGraphSelection,
   projectionDetailFromMileageEventsOpen,
@@ -68,9 +71,11 @@ export const MileageEventsPanel: React.FC = () => {
   );
   const { importEvents } = useMileageEventActions();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
 
   const lineKeys = useMemo(() => Object.keys(railwayData).sort(), [railwayData]);
   const [open, setOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [lineKey, setLineKey] = useState("");
   const [stationId, setStationId] = useState("");
   const [radiusMeters, setRadiusMeters] = useState(1000);
@@ -118,6 +123,17 @@ export const MileageEventsPanel: React.FC = () => {
     () => boundMileageEventsForRichDisplay(mileageUserEvents, railwayData, trips),
     [mileageUserEvents, railwayData, trips],
   );
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!actionsMenuRef.current?.contains(event.target as Node)) {
+        setActionsOpen(false);
+      }
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, [actionsOpen]);
 
   useEffect(() => {
     if (axisIsRailGraph && (mode === "place" || mode === "time")) {
@@ -308,9 +324,9 @@ export const MileageEventsPanel: React.FC = () => {
     ? t("mileageEvents.sourceRailGraph", "Rail graph snapshot")
     : t("mileageEvents.sourceLegacy", "GeoJSON axis");
   const currentAxisRoleLabel =
-    activeRailGraphSelection?.kind === "route"
+    isRouteSelection(activeRailGraphSelection)
       ? t("mileageEvents.selectedRoute", "Selected route")
-      : activeRailGraphSelection?.kind === "event"
+      : isEventSelection(activeRailGraphSelection)
         ? t("mileageEvents.selectedEvent", "Selected event")
         : t("mileageEvents.selectedAxis", "Selected axis");
   const currentAxisGeometryLabel =
@@ -466,7 +482,7 @@ export const MileageEventsPanel: React.FC = () => {
   };
 
   const switchMode = (nextMode: MileageEventsPanelMode) => {
-    if (nextMode === "create" && activeRailGraphSelection?.kind === "route") {
+    if (nextMode === "create" && isRouteSelection(activeRailGraphSelection)) {
       const anchor = activeRailGraphSelection.anchor;
       if (typeof anchor?.lat === "number" && typeof anchor.lng === "number") {
         setMapPoint({ lat: anchor.lat, lng: anchor.lng });
@@ -488,15 +504,33 @@ export const MileageEventsPanel: React.FC = () => {
     setMode(nextMode);
   };
 
+  const openFromEdgeHandle = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === "touch") return;
+    setOpen(true);
+  };
+
   if (!open) {
     return (
       <button
-        className="rl-map-control rl-focus absolute right-4 top-4 z-[520] flex items-center justify-center transition-all active:scale-95"
+        className="rl-focus group absolute right-0 top-1/2 z-[520] flex h-28 w-6 -translate-y-1/2 items-center overflow-hidden rounded-l-md border border-r-0 border-slate-200/80 bg-white/70 text-slate-700 shadow-lg shadow-slate-900/10 backdrop-blur-md transition-[width,background-color,opacity,transform] duration-200 hover:w-44 hover:bg-white/95 focus-visible:w-44 focus-visible:bg-white/95 active:scale-[0.98]"
         onClick={() => setOpen(true)}
+        onPointerEnter={openFromEdgeHandle}
         title={t("mileageEvents.open", "Mileage events")}
         aria-label={t("mileageEvents.open", "Mileage events")}
       >
-        <MapPinned size={22} />
+        <span className="flex h-full w-6 shrink-0 items-center justify-center border-l-2 border-teal-500/70 bg-teal-500/10">
+          <MapPinned size={15} />
+        </span>
+        <span className="flex min-w-0 flex-1 items-center gap-2 px-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+          <span className="min-w-0">
+            <span className="block truncate text-xs font-semibold text-slate-900">
+              {t("mileageEvents.open", "Mileage events")}
+            </span>
+            <span className="block truncate text-[10px] text-slate-500">
+              {currentAxisLabel}
+            </span>
+          </span>
+        </span>
       </button>
     );
   }
@@ -571,26 +605,54 @@ export const MileageEventsPanel: React.FC = () => {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <button
-            className="rl-close-button !w-8 !h-8"
-            onClick={handleExport}
-            title={t("mileageEvents.action.exportJson", "Export JSON")}
-            aria-label={t("mileageEvents.action.exportJson", "Export JSON")}
-          >
-            <Download size={16} />
-          </button>
-          <button
-            className="rl-close-button !w-8 !h-8"
-            onClick={() => fileInputRef.current?.click()}
-            title={t("mileageEvents.action.importJson", "Import JSON")}
-            aria-label={t("mileageEvents.action.importJson", "Import JSON")}
-          >
-            <Upload size={16} />
-          </button>
+          <div ref={actionsMenuRef} className="relative">
+            <button
+              className="rl-close-button !w-8 !h-8"
+              onClick={() => setActionsOpen((current) => !current)}
+              title={`${t("mileageEvents.action.exportJson", "Export JSON")} / ${t("mileageEvents.action.importJson", "Import JSON")}`}
+              aria-label={`${t("mileageEvents.action.exportJson", "Export JSON")} / ${t("mileageEvents.action.importJson", "Import JSON")}`}
+              aria-haspopup="menu"
+              aria-expanded={actionsOpen}
+            >
+              <MoreVertical size={17} />
+            </button>
+            {actionsOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 top-9 z-10 w-40 overflow-hidden rounded-md border border-slate-200 bg-white py-1 text-xs font-semibold text-slate-700 shadow-xl shadow-slate-900/10"
+              >
+                <button
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-50"
+                  onClick={() => {
+                    setActionsOpen(false);
+                    handleExport();
+                  }}
+                >
+                  <Download size={14} />
+                  <span>{t("mileageEvents.action.exportJson", "Export JSON")}</span>
+                </button>
+                <button
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-50"
+                  onClick={() => {
+                    setActionsOpen(false);
+                    fileInputRef.current?.click();
+                  }}
+                >
+                  <Upload size={14} />
+                  <span>{t("mileageEvents.action.importJson", "Import JSON")}</span>
+                </button>
+              </div>
+            )}
+          </div>
           <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
           <button
             className="rl-close-button !w-8 !h-8"
-            onClick={() => setOpen(false)}
+            onClick={() => {
+              setActionsOpen(false);
+              setOpen(false);
+            }}
             title={t("common.close", "Close")}
             aria-label={t("common.close", "Close")}
           >

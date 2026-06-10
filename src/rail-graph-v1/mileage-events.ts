@@ -17,6 +17,9 @@ import type {
   MileageTimeQuery,
   MileageTimelinePoint,
   ResolvedMileagePlace,
+  ScenicFacing,
+  ScenicViewpointPayload,
+  ScenicVisibilityResolution,
   UserEventV2,
 } from "./mileage-event.types";
 import type { EntityRef } from "./primitives";
@@ -119,6 +122,12 @@ export function projectEventToRunPath(
   const nearest = nearestPathEntity(eventStart, runPath, context);
   const time = interpolateTimestamp(eventStart, context);
 
+  const scenicVisibility = resolveScenicVisibility(event, {
+    context,
+    edgeRef: nearest.edgeRef,
+    eventCoordinates: nearest.coordinates,
+  });
+
   return {
     event,
     distanceMetersFromRunStart: Math.max(0, distanceMetersFromRunStart),
@@ -129,6 +138,7 @@ export function projectEventToRunPath(
     timestamp: time.timestamp,
     timestampInference: time.inference,
     diagnostics: time.diagnostics,
+    ...(scenicVisibility ? { scenicVisibility } : {}),
   };
 }
 
@@ -254,11 +264,124 @@ export function validateUserEventV2(value: unknown): UserEventV2 {
   }
   return {
     ...event,
+    payload: normalizeUserEventPayload(event),
     mileage: {
       ...event.mileage,
       distanceMeters: Math.max(0, event.mileage.distanceMeters),
     },
     range: event.range ? normalizeMileageRange(event.range.startMeters, event.range.endMeters) : undefined,
+  };
+}
+
+export function inferScenicViewpointPayload(args: {
+  context: MileageProjectionContext;
+  distanceMeters: number;
+  targetCoordinates?: GeoJSONPosition;
+  explicitFacing?: ScenicFacing;
+  source?: ScenicViewpointPayload["source"];
+}): ScenicViewpointPayload {
+  const nearest = nearestPathEntity(args.distanceMeters, contextToRunPath(args.context), args.context);
+  const runBearing = nearest.edgeRef ? edgeBearingDegrees(args.context.edgeMileage[nearest.edgeRef]) : undefined;
+  const measuredTargetBearing = args.targetCoordinates && nearest.coordinates
+    ? bearingDegrees(nearest.coordinates, args.targetCoordinates)
+    : undefined;
+  const facing = args.explicitFacing ?? facingFromBearings(runBearing, measuredTargetBearing) ?? "right";
+  const targetBearing = measuredTargetBearing ?? bearingFromFacing(runBearing, facing);
+  const confidence = typeof runBearing === "number" && typeof measuredTargetBearing === "number"
+    ? 0.75
+    : typeof runBearing === "number"
+      ? 0.45
+      : 0.25;
+  const diagnostics: Diagnostic[] = [];
+  if (typeof runBearing !== "number") {
+    diagnostics.push(diagnostic("warn", "SCENIC_RUN_BEARING_UNKNOWN", "Route bearing could not be inferred for scenic viewpoint."));
+  }
+  if (typeof targetBearing !== "number") {
+    diagnostics.push(diagnostic("info", "SCENIC_TARGET_BEARING_INFERRED", "Scenic target bearing is provisional until the user adjusts it."));
+  }
+  return {
+    facing,
+    ...(args.targetCoordinates ? { coordinates: args.targetCoordinates } : {}),
+    ...(typeof targetBearing === "number" ? {
+      targetBearingDegrees: targetBearing,
+      visibleBearingRangeDegrees: bearingRange(targetBearing, 30),
+      constraint: {
+        targetBearingDegrees: targetBearing,
+        visibleBearingRangeDegrees: bearingRange(targetBearing, 30),
+        angleToleranceDegrees: 30,
+      },
+    } : {}),
+    source: args.source ?? "inferred_from_route",
+    confidence,
+    diagnostics,
+  };
+}
+
+export function resolveScenicVisibility(
+  event: UserEventV2,
+  args: {
+    context: MileageProjectionContext;
+    edgeRef?: EntityRef;
+    eventCoordinates?: GeoJSONPosition;
+  },
+): ScenicVisibilityResolution | null {
+  const viewpoint = event.payload?.viewpoint;
+  if (event.kind !== "scenic" && !viewpoint) return null;
+  if (!viewpoint?.facing) {
+    return {
+      status: "unknown",
+      confidence: 0,
+      diagnostics: [diagnostic("warn", "SCENIC_VIEWPOINT_MISSING", "Scenic event has no viewpoint payload.")],
+    };
+  }
+
+  const runBearing = args.edgeRef ? edgeBearingDegrees(args.context.edgeMileage[args.edgeRef]) : undefined;
+  const targetBearing = viewpoint.targetBearingDegrees
+    ?? (viewpoint.coordinates && args.eventCoordinates ? bearingDegrees(args.eventCoordinates, viewpoint.coordinates) : undefined);
+  const relativeBearing = typeof runBearing === "number" && typeof targetBearing === "number"
+    ? normalizeSignedBearing(targetBearing - runBearing)
+    : undefined;
+  const expectedFacing = typeof relativeBearing === "number" ? facingFromRelativeBearing(relativeBearing) : undefined;
+  const diagnostics: Diagnostic[] = [...(viewpoint.diagnostics ?? [])];
+
+  if (typeof runBearing !== "number") {
+    diagnostics.push(diagnostic("warn", "SCENIC_RUN_BEARING_UNKNOWN", "Route bearing is unavailable for scenic visibility."));
+    return {
+      status: "unknown",
+      facing: viewpoint.facing,
+      targetBearingDegrees: targetBearing,
+      confidence: Math.min(viewpoint.confidence ?? 0.5, 0.4),
+      diagnostics,
+    };
+  }
+  if (typeof targetBearing !== "number" || typeof relativeBearing !== "number" || !expectedFacing) {
+    diagnostics.push(diagnostic("info", "SCENIC_TARGET_BEARING_UNKNOWN", "Scenic target bearing is unavailable."));
+    return {
+      status: "unknown",
+      facing: viewpoint.facing,
+      runDirectionBearingDegrees: runBearing,
+      confidence: Math.min(viewpoint.confidence ?? 0.5, 0.5),
+      diagnostics,
+    };
+  }
+
+  const angleTolerance = viewpoint.constraint?.angleToleranceDegrees ?? 45;
+  const status = expectedFacing !== viewpoint.facing
+    ? oppositeFacing(expectedFacing, viewpoint.facing)
+      ? "opposite_side"
+      : "angle_mismatch"
+    : Math.abs(relativeBearingForFacing(viewpoint.facing, relativeBearing)) > angleTolerance
+      ? "angle_mismatch"
+      : "visible";
+
+  return {
+    status,
+    facing: viewpoint.facing,
+    runDirectionBearingDegrees: runBearing,
+    targetBearingDegrees: targetBearing,
+    relativeBearingDegrees: relativeBearing,
+    confidence: viewpoint.confidence ?? 0.75,
+    diagnostics,
   };
 }
 
@@ -590,6 +713,93 @@ function projectPointToPolyline(point: GeoJSONPosition, span: MileageEdgeSpan): 
     walked += segLen;
   }
   return best;
+}
+
+function normalizeUserEventPayload(event: UserEventV2): UserEventV2["payload"] {
+  const payload = event.payload;
+  if (!payload || typeof payload !== "object") return payload;
+  const viewpoint = payload.viewpoint;
+  if (event.kind !== "scenic" || !viewpoint || typeof viewpoint !== "object") return payload;
+  const candidate = viewpoint as ScenicViewpointPayload;
+  if (!candidate.facing) return payload;
+  return {
+    ...payload,
+    viewpoint: {
+      ...candidate,
+      source: candidate.source ?? "user_explicit",
+      confidence: typeof candidate.confidence === "number" ? Math.max(0, Math.min(1, candidate.confidence)) : undefined,
+      diagnostics: candidate.diagnostics ?? [],
+    },
+  };
+}
+
+function edgeBearingDegrees(span: MileageEdgeSpan | undefined): number | undefined {
+  const coords = span?.coordinates;
+  if (!coords || coords.length < 2) return undefined;
+  return bearingDegrees(coords[0], coords[coords.length - 1]);
+}
+
+function bearingDegrees(from: GeoJSONPosition, to: GeoJSONPosition): number {
+  const fromLat = toRadians(from[1]);
+  const toLat = toRadians(to[1]);
+  const deltaLng = toRadians(to[0] - from[0]);
+  const y = Math.sin(deltaLng) * Math.cos(toLat);
+  const x = Math.cos(fromLat) * Math.sin(toLat)
+    - Math.sin(fromLat) * Math.cos(toLat) * Math.cos(deltaLng);
+  return normalizeBearing(Math.atan2(y, x) * 180 / Math.PI);
+}
+
+function normalizeBearing(value: number): number {
+  return ((value % 360) + 360) % 360;
+}
+
+function normalizeSignedBearing(value: number): number {
+  const normalized = normalizeBearing(value);
+  return normalized > 180 ? normalized - 360 : normalized;
+}
+
+function bearingRange(center: number, halfWidth: number): [number, number] {
+  return [normalizeBearing(center - halfWidth), normalizeBearing(center + halfWidth)];
+}
+
+function facingFromBearings(runBearing?: number, targetBearing?: number): ScenicFacing | undefined {
+  if (typeof runBearing !== "number" || typeof targetBearing !== "number") return undefined;
+  return facingFromRelativeBearing(normalizeSignedBearing(targetBearing - runBearing));
+}
+
+function bearingFromFacing(runBearing: number | undefined, facing: ScenicFacing): number | undefined {
+  if (typeof runBearing !== "number") return undefined;
+  switch (facing) {
+    case "front":
+      return normalizeBearing(runBearing);
+    case "right":
+      return normalizeBearing(runBearing + 90);
+    case "back":
+      return normalizeBearing(runBearing + 180);
+    case "left":
+      return normalizeBearing(runBearing - 90);
+  }
+}
+
+function facingFromRelativeBearing(relativeBearing: number): ScenicFacing {
+  const absolute = Math.abs(relativeBearing);
+  if (absolute <= 45) return "front";
+  if (absolute >= 135) return "back";
+  return relativeBearing > 0 ? "right" : "left";
+}
+
+function oppositeFacing(expected: ScenicFacing, actual: ScenicFacing): boolean {
+  return (expected === "left" && actual === "right")
+    || (expected === "right" && actual === "left")
+    || (expected === "front" && actual === "back")
+    || (expected === "back" && actual === "front");
+}
+
+function relativeBearingForFacing(facing: ScenicFacing, relativeBearing: number): number {
+  if (facing === "front") return relativeBearing;
+  if (facing === "back") return Math.abs(relativeBearing) - 180;
+  if (facing === "right") return relativeBearing - 90;
+  return relativeBearing + 90;
 }
 
 function interpolateOnSpan(span: MileageEdgeSpan, measure: number): GeoJSONPosition | undefined {

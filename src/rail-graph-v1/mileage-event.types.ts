@@ -17,6 +17,51 @@ export type MileageUserEventVisibility = "private" | "shared" | "public";
 
 export type MileageTimestampInference = "timeline" | "linear" | "unknown";
 
+export type ScenicFacing = "left" | "right" | "front" | "back";
+export type ScenicViewpointSource =
+  | "system_anchor"
+  | "user_explicit"
+  | "inferred_from_route"
+  | "inferred_from_geojson";
+export type ScenicVisibilityStatus =
+  | "visible"
+  | "opposite_side"
+  | "angle_mismatch"
+  | "unknown"
+  | "unavailable";
+
+export interface ScenicVisibilityConstraint {
+  targetBearingDegrees?: number;
+  visibleBearingRangeDegrees?: [number, number];
+  angleToleranceDegrees?: number;
+  distanceMeters?: number;
+}
+
+export interface ScenicViewpointPayload {
+  facing: ScenicFacing;
+  coordinates?: GeoJSONPosition;
+  targetBearingDegrees?: number;
+  visibleBearingRangeDegrees?: [number, number];
+  constraint?: ScenicVisibilityConstraint;
+  source: ScenicViewpointSource;
+  confidence?: number;
+  diagnostics?: Diagnostic[];
+}
+
+export interface ScenicVisibilityResolution {
+  status: ScenicVisibilityStatus;
+  facing?: ScenicFacing;
+  runDirectionBearingDegrees?: number;
+  targetBearingDegrees?: number;
+  relativeBearingDegrees?: number;
+  confidence: number;
+  diagnostics: Diagnostic[];
+}
+
+export interface UserEventV2Payload extends Record<string, unknown> {
+  viewpoint?: ScenicViewpointPayload;
+}
+
 export interface MileageRef {
   systemRef: EntityRef;
   lineRef?: EntityRef;
@@ -41,7 +86,7 @@ export interface UserEventV2 {
   range?: MileageRange;
   visibility: MileageUserEventVisibility;
   tags?: string[];
-  payload?: Record<string, unknown>;
+  payload?: UserEventV2Payload;
   createdAt?: ISODateTime;
   updatedAt?: ISODateTime;
 }
@@ -57,6 +102,7 @@ export interface BoundMileageEvent {
   edgeRef?: EntityRef;
   coordinates?: GeoJSONPosition;
   diagnostics: Diagnostic[];
+  scenicVisibility?: ScenicVisibilityResolution;
 }
 
 export interface MileageEdgeSpan {

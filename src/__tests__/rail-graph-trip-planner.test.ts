@@ -42,6 +42,15 @@ describe("rail-graph trip planner", () => {
       "note",
     ]));
     expect(result.trip.segments[0].events.filter((event) => event.type === "stop")).toHaveLength(2);
+    const scenic = result.trip.segments[0].events.find((event) => event.type === "scenic");
+    expect(scenic).toMatchObject({
+      type: "scenic",
+      viewSide: "right",
+      viewpoint: {
+        facing: "right",
+        source: "system_anchor",
+      },
+    });
     expect(result.trip.segments[0].mileageProfile).toMatchObject({
       systemRef: "manual:system:test",
       lineRef: "manual:line:test",

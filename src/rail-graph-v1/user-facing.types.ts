@@ -9,6 +9,8 @@ import type {
   MileageEdgeSpan,
   MileageStationPoint,
   MileageTimelinePoint,
+  ScenicFacing,
+  ScenicViewpointPayload,
 } from "./mileage-event.types";
 import type { DirectionLabel, EntityRef } from "./primitives";
 import type { ResolvedGeoJsonPath, RunPath } from "./runtime.types";
@@ -163,7 +165,8 @@ export interface TripScenicEvent {
   title?: string;
   description?: string;
   imageUrls?: string[];
-  viewSide?: "left" | "right" | "front" | "back";
+  viewSide?: ScenicFacing;
+  viewpoint?: ScenicViewpointPayload;
 }
 
 export interface TripNoteEvent {

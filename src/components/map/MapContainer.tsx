@@ -14,6 +14,11 @@ import { cachedTileLayer } from "../../utils/CachedTileLayer";
 import { useShallow } from "zustand/react/shallow";
 import toast from "react-hot-toast";
 import { useAppRouteState } from "../../hooks/useAppRouteState";
+import {
+  createScenicVisibilityLayer,
+  updateScenicVisibilityLayer,
+  type ScenicVisibilityMapItem,
+} from "./scenicVisibilityLayer";
 import { boundMileageEventsForRichDisplay } from "../../utils/mileageUserEvents";
 import { tripToProductSegments } from "../../utils/tripProductProjection";
 import {
@@ -30,6 +35,7 @@ import {
 } from "../../utils/mileageEventUiBridge";
 import {
   activeAxisFromRailGraphSelection,
+  isEventSelection,
   railGraphSelectionSourceFromProjection,
   selectionFromActiveAxis,
   selectionFromMileageEventSelect,
@@ -75,6 +81,7 @@ export const MapContainer: React.FC<Props> = ({
   const visitedStationsRef = useRef<Set<string>>(new Set());
   const routeLayer = useRef<L.LayerGroup | null>(null);
   const mileageEventsLayer = useRef<L.LayerGroup | null>(null);
+  const scenicVisibilityLayer = useRef<L.LayerGroup | null>(null);
   const railLayerRef = useRef<L.TileLayer | null>(null);
   const rubberBandLayerRef = useRef<L.LayerGroup | null>(null);
   const pendingFlyToLocationRef = useRef<FlyToLocationDetail | null>(null);
@@ -244,7 +251,7 @@ export const MapContainer: React.FC<Props> = ({
       return;
     }
     setActiveMileageAxis(activeAxisFromRailGraphSelection(activeRailGraphSelection));
-    setSelectedMileageEventId(activeRailGraphSelection.kind === "event" ? activeRailGraphSelection.eventId ?? null : null);
+    setSelectedMileageEventId(isEventSelection(activeRailGraphSelection) ? activeRailGraphSelection.eventId ?? null : null);
   }, [activeRailGraphSelection]);
 
   useEffect(() => {
@@ -538,7 +545,7 @@ export const MapContainer: React.FC<Props> = ({
       .layers(
         { "标准 (light)": light, "暗色 (Dark)": dark },
         { "详细配线图 (OpenRailwayMap)": rail },
-        { position: "topright" },
+        { position: "topleft" },
       )
       .addTo(map);
 
@@ -587,6 +594,7 @@ export const MapContainer: React.FC<Props> = ({
     baseStationsLayer.current = L.layerGroup().addTo(map);
     routeLayer.current = L.layerGroup().addTo(map);
     pinsLayer.current = L.layerGroup().addTo(map);
+    scenicVisibilityLayer.current = L.layerGroup().addTo(map);
     mileageEventsLayer.current = L.layerGroup().addTo(map);
     rubberBandLayerRef.current = L.layerGroup().addTo(map);
 
@@ -1859,6 +1867,8 @@ export const MapContainer: React.FC<Props> = ({
       selectionDetails: MileageEventSelectDetail[];
       lineKeys: Set<string>;
       sourceKinds: Set<"rail_graph" | "legacy">;
+      scenic: boolean;
+      scenicStatuses: Set<string>;
       selected: boolean;
       activeLine: boolean;
       dimmed: boolean;
@@ -1903,6 +1913,8 @@ export const MapContainer: React.FC<Props> = ({
       const lineColor = /^#[0-9a-f]{3,8}$/i.test(rawColor) ? rawColor : "#059669";
       const sourceKind = entry.lineContext.source === "rail_graph_runtime" ? "rail_graph" : "legacy";
       const activeLine = markerMatchesActiveLine(new Set([entry.lineContext.lineKey]), new Set([sourceKind]));
+      const scenic = entry.bound.event.kind === "scenic";
+      const scenicStatus = entry.bound.scenicVisibility?.status;
       const layerPoint = map.latLngToLayerPoint([coordinates[1], coordinates[0]]);
       const key = zoom >= 15
         ? [
@@ -1922,6 +1934,8 @@ export const MapContainer: React.FC<Props> = ({
         existing.selectionDetails.push(selectionDetail);
         existing.lineKeys.add(entry.lineContext.lineKey);
         existing.sourceKinds.add(sourceKind);
+        existing.scenic = existing.scenic || scenic;
+        if (scenicStatus) existing.scenicStatuses.add(scenicStatus);
         existing.selected = existing.selected || entry.bound.event.id === selectedMileageEventId;
         existing.activeLine = existing.activeLine || activeLine;
         existing.dimmed = hasActiveMileageAxis && !existing.activeLine && !existing.selected;
@@ -1940,6 +1954,8 @@ export const MapContainer: React.FC<Props> = ({
           selectionDetails: [selectionDetail],
           lineKeys: new Set([entry.lineContext.lineKey]),
           sourceKinds: new Set([sourceKind]),
+          scenic,
+          scenicStatuses: new Set(scenicStatus ? [scenicStatus] : []),
           selected: entry.bound.event.id === selectedMileageEventId,
           activeLine,
           dimmed: hasActiveMileageAxis && !activeLine && entry.bound.event.id !== selectedMileageEventId,
@@ -1948,6 +1964,47 @@ export const MapContainer: React.FC<Props> = ({
         });
       }
     });
+
+    const scenicItems: ScenicVisibilityMapItem[] = projected.flatMap((entry) => {
+      if (entry.bound.event.kind !== "scenic") return [];
+      const coordinates = entry.bound.coordinates;
+      if (!coordinates) return [];
+      const viewpoint = entry.bound.event.payload?.viewpoint;
+      const bearingDegrees = entry.bound.scenicVisibility?.targetBearingDegrees ?? viewpoint?.targetBearingDegrees;
+      if (typeof bearingDegrees !== "number") return [];
+      const rawColor = entry.lineContext.source === "rail_graph_runtime"
+        ? entry.lineContext.segment.displayColor || "#0ea5e9"
+        : entry.lineContext.line.meta.color || "#0ea5e9";
+      const color = /^#[0-9a-f]{3,8}$/i.test(rawColor) ? rawColor : "#0ea5e9";
+      const activeLine = markerMatchesActiveLine(
+        new Set([entry.lineContext.lineKey]),
+        new Set([entry.lineContext.source === "rail_graph_runtime" ? "rail_graph" : "legacy"]),
+      );
+      const selected = entry.bound.event.id === selectedMileageEventId;
+      return [{
+        id: `scenic:${entry.bound.event.id}`,
+        lat: coordinates[1],
+        lng: coordinates[0],
+        color,
+        title: entry.bound.event.title,
+        status: entry.bound.scenicVisibility?.status ?? "unknown",
+        bearingDegrees,
+        angleToleranceDegrees: viewpoint?.constraint?.angleToleranceDegrees ?? 30,
+        distanceMeters: viewpoint?.constraint?.distanceMeters,
+        selected,
+        dimmed: hasActiveMileageAxis && !activeLine && !selected,
+      }];
+    });
+
+    if (scenicVisibilityLayer.current) {
+      syncLeafletLayerGroup<ScenicVisibilityMapItem>(
+        scenicVisibilityLayer.current,
+        scenicItems,
+        (item) => item.id,
+        (item) => createScenicVisibilityLayer(item),
+        (layer, item) => updateScenicVisibilityLayer(layer, item),
+      );
+    }
 
     syncLeafletLayerGroup<EventMarkerItem>(
       mileageEventsLayer.current,
@@ -1978,8 +2035,12 @@ export const MapContainer: React.FC<Props> = ({
         (layer as any)._cachedColor = item.color;
         (layer as any)._cachedCount = item.eventIds.length;
         (layer as any)._cachedSelected = item.selected;
+        (layer as any)._cachedActiveLine = item.activeLine;
+        (layer as any)._cachedDimmed = item.dimmed;
         (layer as any)._cachedMultiLine = item.lineKeys.size > 1;
         (layer as any)._cachedSourceKey = Array.from(item.sourceKinds).sort().join(":");
+        (layer as any)._cachedScenic = item.scenic;
+        (layer as any)._cachedScenicStatusKey = Array.from(item.scenicStatuses).sort().join(":");
         (layer as any)._cachedTitle = title;
         return layer;
       },
@@ -1994,11 +2055,14 @@ export const MapContainer: React.FC<Props> = ({
           _cachedDimmed?: boolean;
           _cachedMultiLine?: boolean;
           _cachedSourceKey?: string;
+          _cachedScenic?: boolean;
+          _cachedScenicStatusKey?: string;
           _cachedTitle?: string;
           _markerClickHandler?: (event: L.LeafletMouseEvent) => void;
         };
         const count = item.eventIds.length;
         const sourceKey = Array.from(item.sourceKinds).sort().join(":");
+        const scenicStatusKey = Array.from(item.scenicStatuses).sort().join(":");
         const title = mileageEventMarkerTitle(item);
         if (marker._cachedLat !== item.lat || marker._cachedLng !== item.lng) {
           marker.setLatLng([item.lat, item.lng]);
@@ -2012,7 +2076,9 @@ export const MapContainer: React.FC<Props> = ({
           marker._cachedActiveLine !== item.activeLine ||
           marker._cachedDimmed !== item.dimmed ||
           marker._cachedMultiLine !== item.lineKeys.size > 1 ||
-          marker._cachedSourceKey !== sourceKey
+          marker._cachedSourceKey !== sourceKey ||
+          marker._cachedScenic !== item.scenic ||
+          marker._cachedScenicStatusKey !== scenicStatusKey
         ) {
           marker.setIcon(createMileageEventIcon(item));
           marker.setZIndexOffset(item.selected ? 1200 : item.activeLine ? 980 : count > 1 ? 900 : 800);
@@ -2023,6 +2089,8 @@ export const MapContainer: React.FC<Props> = ({
           marker._cachedDimmed = item.dimmed;
           marker._cachedMultiLine = item.lineKeys.size > 1;
           marker._cachedSourceKey = sourceKey;
+          marker._cachedScenic = item.scenic;
+          marker._cachedScenicStatusKey = scenicStatusKey;
         }
         if (marker._cachedTitle !== title) {
           marker.unbindTooltip();
@@ -2080,6 +2148,8 @@ export const MapContainer: React.FC<Props> = ({
     selected: boolean;
     activeLine: boolean;
     dimmed: boolean;
+    scenic: boolean;
+    scenicStatuses: Set<string>;
   }) => {
     const count = item.eventIds.length;
     const size = item.selected ? 38 : item.activeLine ? 30 : count > 1 ? Math.min(38, 26 + Math.log2(count + 1) * 6) : 24;
@@ -2093,8 +2163,17 @@ export const MapContainer: React.FC<Props> = ({
       : item.sourceKinds.has("rail_graph")
         ? "is-rail-graph"
         : "is-legacy";
+    const scenicStatuses = Array.from(item.scenicStatuses);
+    const scenicClass = item.scenic ? "is-scenic" : "";
+    const scenicStatusClass = item.scenic
+      ? scenicStatuses.length > 1
+        ? "is-scenic-status-mixed"
+        : scenicStatuses[0]
+          ? `is-scenic-status-${scenicStatuses[0].replace(/[^a-z_]/g, "")}`
+          : "is-scenic-status-unknown"
+      : "";
     const html = `
-      <div class="mileage-event-marker ${clusterClass} ${selectedClass} ${activeClass} ${dimmedClass} ${mixedClass} ${sourceClass}" style="--event-color:${item.color}; --event-size:${size}px">
+      <div class="mileage-event-marker ${clusterClass} ${selectedClass} ${activeClass} ${dimmedClass} ${mixedClass} ${sourceClass} ${scenicClass} ${scenicStatusClass}" style="--event-color:${item.color}; --event-size:${size}px">
         <span class="mileage-event-marker-core">${count > 1 ? count : ""}</span>
       </div>
     `;

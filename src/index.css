@@ -678,6 +678,54 @@
     0 0 0 1px rgba(15,23,42,0.08);
 }
 
+.mileage-event-marker.is-scenic {
+  --scenic-status-color: #64748b;
+  border-radius: 9px 9px 9px 3px;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255,255,255,0.92), transparent 30%),
+    linear-gradient(135deg, color-mix(in srgb, var(--event-color) 86%, #0f766e), color-mix(in srgb, var(--event-color) 64%, #0f172a));
+}
+
+.mileage-event-marker.is-scenic.is-single .mileage-event-marker-core {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: #fff;
+  transform: rotate(45deg);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.4);
+}
+
+.mileage-event-marker.is-scenic::after {
+  inset: auto -4px -4px auto;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,0.96);
+  background: var(--scenic-status-color);
+  box-shadow: 0 2px 8px rgba(15,23,42,0.22);
+  opacity: 1;
+}
+
+.mileage-event-marker.is-scenic-status-visible {
+  --scenic-status-color: #0f766e;
+}
+
+.mileage-event-marker.is-scenic-status-opposite_side {
+  --scenic-status-color: #d97706;
+}
+
+.mileage-event-marker.is-scenic-status-angle_mismatch {
+  --scenic-status-color: #e11d48;
+}
+
+.mileage-event-marker.is-scenic-status-unavailable {
+  --scenic-status-color: #475569;
+}
+
+.mileage-event-marker.is-scenic-status-mixed {
+  --scenic-status-color: #7c3aed;
+}
+
 .mileage-event-marker.is-selected {
   transform: translateZ(0) scale(1.18);
   box-shadow:

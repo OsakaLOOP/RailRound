@@ -21,6 +21,8 @@ import {
   createMileageEventFromTripPosition,
   mileageEventProjectionStatus,
   nearestStationNameForEvent,
+  pointAtMileageDistance,
+  projectCoordinatesToMileage,
   projectEventsToTrip,
   queryEventsByMileage,
   queryEventsByText,
@@ -102,6 +104,40 @@ describe("mileage events runtime adapter", () => {
       edgeRef: "manual:edge:e2",
       timestampInference: "timeline",
     });
+  });
+
+  it("projects map drag coordinates onto runtime mileage geometry", () => {
+    const trip = fixtureTripResult();
+    const lineContext = buildRailGraphMileageLineContext(trip)!;
+
+    const projected = projectCoordinatesToMileage(lineContext, [140.00105, 38.0005]);
+
+    expect(projected).toMatchObject({
+      edgeRef: "manual:edge:e2",
+      snappedToStation: false,
+    });
+    expect(projected?.distanceMeters).toBeCloseTo(200, 0);
+    expect(projected?.coordinates[0]).toBeCloseTo(140.001, 5);
+    expect(projected?.coordinates[1]).toBeCloseTo(38.0005, 5);
+    expect(projected?.bearingDegrees).toBeCloseTo(0, 0);
+  });
+
+  it("snaps map drag coordinates to the nearest station by mileage when requested", () => {
+    const trip = fixtureTripResult();
+    const lineContext = buildRailGraphMileageLineContext(trip)!;
+
+    const snapped = projectCoordinatesToMileage(lineContext, [140.00104, 38.00072], { snapToStation: true });
+    const midpoint = pointAtMileageDistance(lineContext, 200);
+
+    expect(snapped).toMatchObject({
+      stationRef: "manual:station:c",
+      stationName: "C",
+      snappedToStation: true,
+      distanceMeters: 300,
+    });
+    expect(snapped?.coordinates).toEqual([140.001, 38.001]);
+    expect(midpoint?.coordinates[0]).toBeCloseTo(140.001, 5);
+    expect(midpoint?.coordinates[1]).toBeCloseTo(38.0005, 5);
   });
 
   it("projects saved app trips from their rail-graph product snapshot before legacy segments", () => {

@@ -20,7 +20,14 @@ import {
   type ScenicVisibilityEdit,
   type ScenicVisibilityMapItem,
 } from "./scenicVisibilityLayer";
-import { boundMileageEventsForRichDisplay, updateMileageEventFromDraft } from "../../utils/mileageUserEvents";
+import {
+  boundMileageEventsForRichDisplay,
+  pointAtMileageDistance,
+  projectCoordinatesToMileage,
+  updateMileageEventFromDraft,
+  type MileageLineContextLike,
+  type MileageMapProjection,
+} from "../../utils/mileageUserEvents";
 import { useMileageEventActions } from "../mileage-events/useMileageEventActions";
 import { tripToProductSegments } from "../../utils/tripProductProjection";
 import {
@@ -36,6 +43,7 @@ import {
 import {
   activeAxisFromRailGraphSelection,
   isEventSelection,
+  selectionFromActiveAxis,
   selectionFromMileageEventSelect,
   selectionFromProductSegment,
 } from "../../utils/railGraphSelection";
@@ -79,12 +87,14 @@ export const MapContainer: React.FC<Props> = ({
   const visitedStationsRef = useRef<Set<string>>(new Set());
   const routeLayer = useRef<L.LayerGroup | null>(null);
   const mileageEventsLayer = useRef<L.LayerGroup | null>(null);
+  const mileageEventHandlesLayer = useRef<L.LayerGroup | null>(null);
   const scenicVisibilityLayer = useRef<L.LayerGroup | null>(null);
   const railLayerRef = useRef<L.TileLayer | null>(null);
   const rubberBandLayerRef = useRef<L.LayerGroup | null>(null);
   const pendingFlyToLocationRef = useRef<FlyToLocationDetail | null>(null);
   const locateFlyingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFittedBoundsRef = useRef<string>("");
+  const shiftSnapRef = useRef(false);
 
   // Explicit SVG Renderers for pointer-events passthrough
   const baseLinesRendererRef = useRef<L.Renderer | null>(null);
@@ -257,9 +267,71 @@ export const MapContainer: React.FC<Props> = ({
     }));
   };
 
+  const moveMileageEventFromMap = (
+    eventId: string,
+    lineContext: MileageLineContextLike,
+    projection: MileageMapProjection,
+  ) => {
+    const event = mileageUserEvents.find((candidate) => candidate.id === eventId);
+    if (!event) return;
+    const totalMeters = Math.max(0, lineContext.totalMeters);
+    const distanceMeters = Math.min(totalMeters, Math.max(0, projection.distanceMeters));
+    const deltaMeters = distanceMeters - event.mileage.distanceMeters;
+    const payload: Record<string, unknown> = {
+      ...(event.payload ?? {}),
+      lineKey: lineContext.lineKey,
+      contextSource: lineContext.source ?? "legacy_app",
+    };
+    if (projection.stationRef) {
+      payload.createdFrom = "station";
+      payload.stationRef = projection.stationRef;
+      payload.stationId = String(projection.stationRef).split(":").pop();
+    } else {
+      if (payload.createdFrom === "station") payload.createdFrom = "mileage";
+      delete payload.stationRef;
+      delete payload.stationId;
+    }
+    updateEvent({
+      ...event,
+      mileage: {
+        ...event.mileage,
+        systemRef: lineContext.context.systemRef,
+        lineRef: lineContext.context.lineRef,
+        patternRef: lineContext.context.patternRef,
+        direction: lineContext.context.direction,
+        distanceMeters,
+      },
+      range: event.range
+        ? {
+          startMeters: Math.min(totalMeters, Math.max(0, event.range.startMeters + deltaMeters)),
+          endMeters: Math.min(totalMeters, Math.max(0, event.range.endMeters + deltaMeters)),
+        }
+        : undefined,
+      payload,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   useEffect(() => {
     setLeafletReady(true);
   }, [setLeafletReady]);
+
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Shift") shiftSnapRef.current = event.type === "keydown";
+    };
+    const clearShift = () => {
+      shiftSnapRef.current = false;
+    };
+    window.addEventListener("keydown", handleKey);
+    window.addEventListener("keyup", handleKey);
+    window.addEventListener("blur", clearShift);
+    return () => {
+      window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("keyup", handleKey);
+      window.removeEventListener("blur", clearShift);
+    };
+  }, []);
 
   useEffect(() => {
     if (!activeRailGraphSelection) {
@@ -578,6 +650,7 @@ export const MapContainer: React.FC<Props> = ({
     pinsLayer.current = L.layerGroup().addTo(map);
     scenicVisibilityLayer.current = L.layerGroup().addTo(map);
     mileageEventsLayer.current = L.layerGroup().addTo(map);
+    mileageEventHandlesLayer.current = L.layerGroup().addTo(map);
     rubberBandLayerRef.current = L.layerGroup().addTo(map);
 
     const updateLayerVisibility = () => {
@@ -1824,7 +1897,7 @@ export const MapContainer: React.FC<Props> = ({
   };
 
   const renderMileageEvents = () => {
-    if (!mileageEventsLayer.current || !mapInstance.current) return;
+    if (!mileageEventsLayer.current || !mileageEventHandlesLayer.current || !mapInstance.current) return;
 
     const map = mapInstance.current;
     const zoom = map.getZoom() ?? mapZoom;
@@ -1849,6 +1922,18 @@ export const MapContainer: React.FC<Props> = ({
       dimmed: boolean;
       sumLat: number;
       sumLng: number;
+    };
+
+    type EventDragHandleItem = {
+      id: string;
+      eventId: string;
+      lat: number;
+      lng: number;
+      color: string;
+      title: string;
+      bearingDegrees?: number;
+      lineContext: MileageLineContextLike;
+      selectionDetail: MileageEventSelectDetail;
     };
 
     const markerMatchesActiveLine = (lineKeys: Set<string>, sourceKinds: Set<"rail_graph" | "legacy">) => {
@@ -1983,6 +2068,109 @@ export const MapContainer: React.FC<Props> = ({
       );
     }
 
+    const dragHandleItems: EventDragHandleItem[] = projected.flatMap((entry) => {
+      if (entry.bound.event.id !== selectedMileageEventId) return [];
+      const sourceKind = entry.lineContext.source === "rail_graph_runtime" ? "rail_graph" : "legacy";
+      const activeLine = markerMatchesActiveLine(new Set([entry.lineContext.lineKey]), new Set([sourceKind]));
+      if (!activeLine) return [];
+      const point = pointAtMileageDistance(entry.lineContext, entry.bound.event.mileage.distanceMeters);
+      const coordinates = point?.coordinates ?? entry.bound.coordinates;
+      if (!coordinates) return [];
+      const rawColor = entry.lineContext.source === "rail_graph_runtime"
+        ? entry.lineContext.segment.displayColor || "#059669"
+        : entry.lineContext.line.meta.color || "#059669";
+      const color = /^#[0-9a-f]{3,8}$/i.test(rawColor) ? rawColor : "#059669";
+      return [{
+        id: `event-drag:${entry.bound.event.id}:${entry.lineContext.lineKey}`,
+        eventId: entry.bound.event.id,
+        lat: coordinates[1],
+        lng: coordinates[0],
+        color,
+        title: entry.bound.event.title,
+        bearingDegrees: point?.bearingDegrees,
+        lineContext: entry.lineContext,
+        selectionDetail: markerSelectionDetail(entry),
+      }];
+    });
+
+    const handleMileageEventMarkerClick = (item: EventMarkerItem, event: L.LeafletMouseEvent) => {
+      L.DomEvent.stopPropagation(event);
+      if (!item.activeLine) return;
+      const selectedDetail = selectedMileageEventId
+        ? item.selectionDetails.find((candidate) => candidate.eventId === selectedMileageEventId)
+        : undefined;
+      if (selectedDetail) {
+        setSelectedMileageEventId(null);
+        const axisSelection = selectionFromActiveAxis(selectedDetail);
+        if (axisSelection) setActiveRailGraphSelection(axisSelection);
+        openMileageEventsPanel({
+          mode: "line",
+          lineKey: selectedDetail.lineKey,
+          source: selectedDetail.source,
+          tripId: selectedDetail.tripId,
+          tripSegmentIndex: selectedDetail.tripSegmentIndex,
+          routeItemId: selectedDetail.routeItemId,
+        });
+        return;
+      }
+      const detail = item.selectionDetails[0];
+      if (!detail) return;
+      setSelectedMileageEventId(detail.eventId);
+      const selection = selectionFromMileageEventSelect(detail);
+      if (selection) setActiveRailGraphSelection(selection);
+      selectMileageEventOnMap(detail);
+    };
+
+    syncLeafletLayerGroup<EventDragHandleItem>(
+      mileageEventHandlesLayer.current,
+      dragHandleItems,
+      (item) => item.id,
+      (item) => {
+        const layer = L.marker([item.lat, item.lng], {
+          pane: "mileageEventsPane",
+          icon: createMileageEventDragHandleIcon(item),
+          draggable: true,
+          keyboard: false,
+          zIndexOffset: 1500,
+        });
+        bindMileageEventDragHandle(layer, item);
+        (layer as any)._cachedLat = item.lat;
+        (layer as any)._cachedLng = item.lng;
+        (layer as any)._cachedColor = item.color;
+        (layer as any)._cachedBearing = item.bearingDegrees;
+        (layer as any)._cachedTitle = item.title;
+        return layer;
+      },
+      (layer, item) => {
+        const marker = layer as L.Marker & {
+          _cachedLat?: number;
+          _cachedLng?: number;
+          _cachedColor?: string;
+          _cachedBearing?: number;
+          _cachedTitle?: string;
+          _dragHandleHandlers?: Array<[string, (...args: any[]) => void]>;
+          _lastProjection?: MileageMapProjection;
+        };
+        if (marker._cachedLat !== item.lat || marker._cachedLng !== item.lng) {
+          marker.setLatLng([item.lat, item.lng]);
+          marker._cachedLat = item.lat;
+          marker._cachedLng = item.lng;
+        }
+        if (
+          marker._cachedColor !== item.color ||
+          marker._cachedBearing !== item.bearingDegrees ||
+          marker._cachedTitle !== item.title
+        ) {
+          marker.setIcon(createMileageEventDragHandleIcon(item));
+          marker._cachedColor = item.color;
+          marker._cachedBearing = item.bearingDegrees;
+          marker._cachedTitle = item.title;
+        }
+        unbindMileageEventDragHandle(marker);
+        bindMileageEventDragHandle(marker, item);
+      },
+    );
+
     syncLeafletLayerGroup<EventMarkerItem>(
       mileageEventsLayer.current,
       Array.from(grouped.values()),
@@ -1996,17 +2184,7 @@ export const MapContainer: React.FC<Props> = ({
 
         const title = mileageEventMarkerTitle(item);
         layer.bindTooltip(title, { className: "mileage-event-tooltip", direction: "top", offset: [0, -10] });
-        const markerClickHandler = (event: L.LeafletMouseEvent) => {
-          L.DomEvent.stopPropagation(event);
-          const detail =
-            item.selectionDetails.find((candidate) => candidate.eventId === selectedMileageEventId) ??
-            item.selectionDetails[0];
-          if (!detail) return;
-          setSelectedMileageEventId(detail.eventId);
-          const selection = selectionFromMileageEventSelect(detail);
-          if (selection) setActiveRailGraphSelection(selection);
-          selectMileageEventOnMap(detail);
-        };
+        const markerClickHandler = (event: L.LeafletMouseEvent) => handleMileageEventMarkerClick(item, event);
         layer.on("click", markerClickHandler);
         (layer as any)._markerClickHandler = markerClickHandler;
         (layer as any)._cachedLat = item.lat;
@@ -2080,17 +2258,7 @@ export const MapContainer: React.FC<Props> = ({
           marker.off("click", marker._markerClickHandler);
           marker._markerClickHandler = undefined;
         }
-        const markerClickHandler = (event: L.LeafletMouseEvent) => {
-          L.DomEvent.stopPropagation(event);
-          const detail =
-            item.selectionDetails.find((candidate) => candidate.eventId === selectedMileageEventId) ??
-            item.selectionDetails[0];
-          if (!detail) return;
-          setSelectedMileageEventId(detail.eventId);
-          const selection = selectionFromMileageEventSelect(detail);
-          if (selection) setActiveRailGraphSelection(selection);
-          selectMileageEventOnMap(detail);
-        };
+        const markerClickHandler = (event: L.LeafletMouseEvent) => handleMileageEventMarkerClick(item, event);
         marker.on("click", markerClickHandler);
         marker._markerClickHandler = markerClickHandler;
       },
@@ -2164,6 +2332,100 @@ export const MapContainer: React.FC<Props> = ({
       iconSize: [size, size],
       iconAnchor: [size / 2, size / 2],
     });
+  };
+
+  const createMileageEventDragHandleIcon = (
+    item: { color: string; bearingDegrees?: number },
+    state: { dragging?: boolean; snapped?: boolean } = {},
+  ) => {
+    const rotation = (typeof item.bearingDegrees === "number" ? item.bearingDegrees : 90) - 90;
+    const draggingClass = state.dragging ? "is-dragging" : "";
+    const snappedClass = state.snapped ? "is-snapped" : "";
+    const html = `
+      <div class="mileage-event-drag-handle ${draggingClass} ${snappedClass}" style="--event-color:${item.color}; --handle-rotation:${rotation}deg">
+        <span>&#8596;</span>
+      </div>
+    `;
+    return L.divIcon({
+      className: "mileage-event-drag-handle-shell",
+      html,
+      iconSize: [46, 46],
+      iconAnchor: [23, 23],
+    });
+  };
+
+  const unbindMileageEventDragHandle = (marker: L.Marker & {
+    _dragHandleHandlers?: Array<[string, (...args: any[]) => void]>;
+  }) => {
+    marker._dragHandleHandlers?.forEach(([type, handler]) => marker.off(type, handler));
+    marker._dragHandleHandlers = undefined;
+  };
+
+  const bindMileageEventDragHandle = (
+    marker: L.Marker & {
+      _dragHandleHandlers?: Array<[string, (...args: any[]) => void]>;
+      _lastProjection?: MileageMapProjection;
+    },
+    item: {
+      eventId: string;
+      color: string;
+      bearingDegrees?: number;
+      lineContext: MileageLineContextLike;
+      selectionDetail: MileageEventSelectDetail;
+    },
+  ) => {
+    const stopOriginalEvent = (event: L.LeafletEvent) => {
+      const originalEvent = (event as L.LeafletEvent & { originalEvent?: Event }).originalEvent;
+      if (originalEvent) L.DomEvent.stop(originalEvent);
+    };
+    const snapMarkerToMileage = (dragging: boolean): MileageMapProjection | null => {
+      const latLng = marker.getLatLng();
+      const projection = projectCoordinatesToMileage(
+        item.lineContext,
+        [latLng.lng, latLng.lat],
+        { snapToStation: shiftSnapRef.current },
+      );
+      if (!projection) return null;
+      marker._lastProjection = projection;
+      marker.setLatLng([projection.coordinates[1], projection.coordinates[0]]);
+      marker.setIcon(createMileageEventDragHandleIcon({
+        color: item.color,
+        bearingDegrees: projection.bearingDegrees ?? item.bearingDegrees,
+      }, {
+        dragging,
+        snapped: projection.snappedToStation,
+      }));
+      return projection;
+    };
+    const handleDragStart = (event: L.LeafletEvent) => {
+      stopOriginalEvent(event);
+      mapInstance.current?.dragging.disable();
+      isDraggingRef.current = true;
+      marker.closeTooltip();
+      marker.setIcon(createMileageEventDragHandleIcon(item, { dragging: true }));
+    };
+    const handleDrag = (event: L.LeafletEvent) => {
+      stopOriginalEvent(event);
+      snapMarkerToMileage(true);
+    };
+    const handleDragEnd = (event: L.LeafletEvent) => {
+      stopOriginalEvent(event);
+      mapInstance.current?.dragging.enable();
+      isDraggingRef.current = false;
+      const projection = snapMarkerToMileage(false) ?? marker._lastProjection;
+      if (!projection) return;
+      moveMileageEventFromMap(item.eventId, item.lineContext, projection);
+      setSelectedMileageEventId(item.eventId);
+      selectMileageEventOnMap(item.selectionDetail);
+    };
+    marker.on("dragstart", handleDragStart);
+    marker.on("drag", handleDrag);
+    marker.on("dragend", handleDragEnd);
+    marker._dragHandleHandlers = [
+      ["dragstart", handleDragStart],
+      ["drag", handleDrag],
+      ["dragend", handleDragEnd],
+    ];
   };
 
   return (

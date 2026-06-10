@@ -726,6 +726,63 @@
   --scenic-status-color: #7c3aed;
 }
 
+.mileage-event-drag-handle-shell {
+  background: transparent;
+  border: 0;
+}
+
+.mileage-event-drag-handle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  width: 38px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255,255,255,0.95);
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--event-color) 78%, #0f172a), var(--event-color));
+  color: #fff;
+  cursor: grab;
+  opacity: 0.94;
+  box-shadow:
+    0 8px 18px rgba(15,23,42,0.24),
+    0 0 0 1px rgba(15,23,42,0.12);
+  transform: translate(-50%, -34px) rotate(var(--handle-rotation));
+  transform-origin: center;
+  transition: opacity 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mileage-event-drag-handle span {
+  display: block;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.mileage-event-drag-handle.is-dragging {
+  cursor: grabbing;
+  opacity: 1;
+  box-shadow:
+    0 12px 24px rgba(15,23,42,0.3),
+    0 0 0 3px rgba(14,165,233,0.22),
+    0 0 0 1px rgba(255,255,255,0.95);
+}
+
+.mileage-event-drag-handle.is-snapped {
+  background:
+    linear-gradient(135deg, #f59e0b, color-mix(in srgb, var(--event-color) 76%, #0f172a));
+  box-shadow:
+    0 12px 24px rgba(15,23,42,0.28),
+    0 0 0 4px rgba(245,158,11,0.26),
+    0 0 0 1px rgba(255,255,255,0.95);
+}
+
 .scenic-visibility-handle {
   width: 22px !important;
   height: 22px !important;

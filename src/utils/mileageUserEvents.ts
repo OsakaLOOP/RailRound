@@ -1,14 +1,17 @@
 import type {
   BoundMileageEvent,
+  MileageEdgeSpan,
   MileagePlaceQuery,
   MileageProjectionContext,
   MileageRunPathLike,
+  MileageStationPoint,
   ScenicFacing,
   ScenicViewpointPayload,
   MileageUserEventKind,
   MileageUserEventVisibility,
   UserEventV2,
 } from "../rail-graph-v1/mileage-event.types";
+import type { GeoJSONPosition } from "../rail-graph-v1/geojson";
 import type { EntityRef } from "../rail-graph-v1/primitives";
 import type { TripResult as RailGraphTripResult, TripResultSegment } from "../rail-graph-v1/user-facing.types";
 import {
@@ -49,6 +52,17 @@ export interface DisplayMileageEventProjection {
   bound: BoundMileageEvent;
   lineContext: MileageLineContextLike;
   trip?: Trip;
+}
+
+export interface MileageMapProjection {
+  distanceMeters: number;
+  coordinates: GeoJSONPosition;
+  bearingDegrees?: number;
+  edgeRef?: EntityRef;
+  stationRef?: EntityRef;
+  stationName?: string;
+  snappedToStation: boolean;
+  distanceToPathMeters: number;
 }
 
 export interface MileageEventDraft {
@@ -212,6 +226,68 @@ export function buildRailGraphMileageSegmentContext(
     },
     totalMeters: segment.mileageProfile.totalDistanceMeters,
   };
+}
+
+export function projectCoordinatesToMileage(
+  lineContext: MileageLineContextLike,
+  coordinates: GeoJSONPosition,
+  options: { snapToStation?: boolean } = {},
+): MileageMapProjection | null {
+  const projected = projectCoordinatesToMileagePath(lineContext, coordinates);
+  if (!projected) return null;
+  if (!options.snapToStation) return projected;
+
+  const station = nearestMileageStation(lineContext, projected.distanceMeters);
+  if (!station) return projected;
+  const stationPoint = station.coordinates
+    ? mileagePointFromStation(lineContext, station, projected.distanceToPathMeters)
+    : pointAtMileageDistance(lineContext, station.distanceMeters, projected.distanceToPathMeters);
+  if (!stationPoint) return projected;
+
+  return {
+    ...stationPoint,
+    stationRef: station.stationRef,
+    stationName: station.name,
+    snappedToStation: true,
+  };
+}
+
+export function pointAtMileageDistance(
+  lineContext: MileageLineContextLike,
+  distanceMeters: number,
+  fallbackDistanceToPathMeters = 0,
+): MileageMapProjection | null {
+  const spans = sortedMileageSpans(lineContext.context);
+  if (spans.length === 0) return null;
+  const distance = clampNumber(distanceMeters, 0, Math.max(0, lineContext.totalMeters));
+
+  for (const span of spans) {
+    if (distance < span.startMeters || distance > span.endMeters) continue;
+    const point = interpolateSpanCoordinates(span, distance);
+    if (point) {
+      return {
+        distanceMeters: distance,
+        coordinates: point.coordinates,
+        bearingDegrees: point.bearingDegrees,
+        edgeRef: span.edgeRef,
+        snappedToStation: false,
+        distanceToPathMeters: fallbackDistanceToPathMeters,
+      };
+    }
+  }
+
+  const last = spans[spans.length - 1];
+  const point = interpolateSpanCoordinates(last, distance);
+  return point
+    ? {
+      distanceMeters: distance,
+      coordinates: point.coordinates,
+      bearingDegrees: point.bearingDegrees,
+      edgeRef: last.edgeRef,
+      snappedToStation: false,
+      distanceToPathMeters: fallbackDistanceToPathMeters,
+    }
+    : null;
 }
 
 export function createMileageEventFromStation(args: {
@@ -1168,6 +1244,199 @@ function stationRefForContext(lineContext: MileageLineContextLike, stationId: st
     return (exact ?? stationId) as EntityRef;
   }
   return appStationRef(lineContext.lineKey, stationId);
+}
+
+function projectCoordinatesToMileagePath(
+  lineContext: MileageLineContextLike,
+  coordinates: GeoJSONPosition,
+): MileageMapProjection | null {
+  let best: MileageMapProjection | null = null;
+  for (const span of sortedMileageSpans(lineContext.context)) {
+    const candidate = projectCoordinatesToSpan(lineContext, coordinates, span);
+    if (!candidate) continue;
+    if (!best || candidate.distanceToPathMeters < best.distanceToPathMeters) best = candidate;
+  }
+  if (best) return best;
+
+  const station = nearestCoordinateStation(lineContext, coordinates);
+  if (!station) return null;
+  return mileagePointFromStation(lineContext, station, 0);
+}
+
+function projectCoordinatesToSpan(
+  lineContext: MileageLineContextLike,
+  point: GeoJSONPosition,
+  span: MileageEdgeSpan,
+): MileageMapProjection | null {
+  const coords = span.coordinates;
+  if (!coords || coords.length < 2) return null;
+
+  const totalPolylineMeters = polylineMeters(coords);
+  if (totalPolylineMeters <= 0) return null;
+
+  let walked = 0;
+  let best: MileageMapProjection | null = null;
+  for (let index = 1; index < coords.length; index += 1) {
+    const start = coords[index - 1];
+    const end = coords[index];
+    const segmentMeters = coordinateDistanceMeters(start, end);
+    const projection = projectLngLatToSegment(point, start, end);
+    const distanceToPathMeters = coordinateDistanceMeters(point, projection.coordinates);
+    const segmentAlongMeters = walked + segmentMeters * projection.t;
+    const spanRatio = clampNumber(segmentAlongMeters / totalPolylineMeters, 0, 1);
+    const distanceMeters = clampNumber(
+      span.startMeters + (span.endMeters - span.startMeters) * spanRatio,
+      0,
+      Math.max(0, lineContext.totalMeters),
+    );
+    const candidate: MileageMapProjection = {
+      distanceMeters,
+      coordinates: projection.coordinates,
+      bearingDegrees: bearingDegreesBetween(start, end),
+      edgeRef: span.edgeRef,
+      snappedToStation: false,
+      distanceToPathMeters,
+    };
+    if (!best || candidate.distanceToPathMeters < best.distanceToPathMeters) best = candidate;
+    walked += segmentMeters;
+  }
+  return best;
+}
+
+function sortedMileageSpans(context: MileageProjectionContext): MileageEdgeSpan[] {
+  return Object.values(context.edgeMileage).sort((left, right) => left.startMeters - right.startMeters);
+}
+
+function nearestMileageStation(
+  lineContext: MileageLineContextLike,
+  distanceMeters: number,
+): MileageStationPoint | null {
+  let best: MileageStationPoint | null = null;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  for (const station of Object.values(lineContext.context.stationMileage)) {
+    if (typeof station.distanceMeters !== "number" || !Number.isFinite(station.distanceMeters)) continue;
+    const delta = Math.abs(station.distanceMeters - distanceMeters);
+    if (delta < bestDelta) {
+      best = station;
+      bestDelta = delta;
+    }
+  }
+  return best;
+}
+
+function nearestCoordinateStation(
+  lineContext: MileageLineContextLike,
+  coordinates: GeoJSONPosition,
+): MileageStationPoint | null {
+  let best: MileageStationPoint | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const station of Object.values(lineContext.context.stationMileage)) {
+    if (!station.coordinates) continue;
+    const distance = coordinateDistanceMeters(coordinates, station.coordinates);
+    if (distance < bestDistance) {
+      best = station;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function mileagePointFromStation(
+  lineContext: MileageLineContextLike,
+  station: MileageStationPoint,
+  distanceToPathMeters: number,
+): MileageMapProjection | null {
+  const point = pointAtMileageDistance(lineContext, station.distanceMeters, distanceToPathMeters);
+  const coordinates = point?.coordinates ?? station.coordinates;
+  if (!coordinates) return null;
+  return {
+    distanceMeters: clampNumber(station.distanceMeters, 0, Math.max(0, lineContext.totalMeters)),
+    coordinates,
+    bearingDegrees: point?.bearingDegrees,
+    edgeRef: point?.edgeRef,
+    stationRef: station.stationRef,
+    stationName: station.name,
+    snappedToStation: true,
+    distanceToPathMeters,
+  };
+}
+
+function interpolateSpanCoordinates(
+  span: MileageEdgeSpan,
+  distanceMeters: number,
+): { coordinates: GeoJSONPosition; bearingDegrees?: number } | null {
+  const coords = span.coordinates;
+  if (!coords || coords.length === 0) return null;
+  if (coords.length === 1) return { coordinates: coords[0] };
+  const totalPolylineMeters = polylineMeters(coords);
+  if (totalPolylineMeters <= 0) return { coordinates: coords[0] };
+  const spanMeters = Math.max(1, span.endMeters - span.startMeters);
+  const targetAlongMeters = clampNumber((distanceMeters - span.startMeters) / spanMeters, 0, 1) * totalPolylineMeters;
+  let walked = 0;
+  for (let index = 1; index < coords.length; index += 1) {
+    const start = coords[index - 1];
+    const end = coords[index];
+    const segmentMeters = coordinateDistanceMeters(start, end);
+    if (walked + segmentMeters >= targetAlongMeters) {
+      const t = clampNumber((targetAlongMeters - walked) / Math.max(1, segmentMeters), 0, 1);
+      return {
+        coordinates: [
+          start[0] + (end[0] - start[0]) * t,
+          start[1] + (end[1] - start[1]) * t,
+        ],
+        bearingDegrees: bearingDegreesBetween(start, end),
+      };
+    }
+    walked += segmentMeters;
+  }
+  const last = coords[coords.length - 1];
+  const prev = coords[coords.length - 2];
+  return {
+    coordinates: last,
+    bearingDegrees: bearingDegreesBetween(prev, last),
+  };
+}
+
+function projectLngLatToSegment(
+  point: GeoJSONPosition,
+  start: GeoJSONPosition,
+  end: GeoJSONPosition,
+): { coordinates: GeoJSONPosition; t: number } {
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  const denom = dx * dx + dy * dy;
+  const t = denom <= 0
+    ? 0
+    : clampNumber(((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / denom, 0, 1);
+  return {
+    t,
+    coordinates: [
+      start[0] + dx * t,
+      start[1] + dy * t,
+    ],
+  };
+}
+
+function polylineMeters(coordinates: readonly GeoJSONPosition[]): number {
+  let total = 0;
+  for (let index = 1; index < coordinates.length; index += 1) {
+    total += coordinateDistanceMeters(coordinates[index - 1], coordinates[index]);
+  }
+  return total;
+}
+
+function coordinateDistanceMeters(left: GeoJSONPosition, right: GeoJSONPosition): number {
+  return haversineKm(left[1], left[0], right[1], right[0]) * 1000;
+}
+
+function bearingDegreesBetween(from: GeoJSONPosition, to: GeoJSONPosition): number {
+  const fromLat = toRadians(from[1]);
+  const toLat = toRadians(to[1]);
+  const deltaLng = toRadians(to[0] - from[0]);
+  const y = Math.sin(deltaLng) * Math.cos(toLat);
+  const x = Math.cos(fromLat) * Math.sin(toLat)
+    - Math.sin(fromLat) * Math.cos(toLat) * Math.cos(deltaLng);
+  return normalizeDegrees(Math.atan2(y, x) * 180 / Math.PI);
 }
 
 function isRailGraphTripResult(value: RailwayMap | RailGraphTripResult): value is RailGraphTripResult {

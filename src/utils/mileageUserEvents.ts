@@ -11,6 +11,7 @@ import type { EntityRef } from "../rail-graph-v1/primitives";
 import type { TripResult as RailGraphTripResult, TripResultSegment } from "../rail-graph-v1/user-facing.types";
 import {
   compareBoundMileageEvents,
+  inferScenicViewpointPayload,
   projectEventToRunPath,
   queryEventsByMileage as queryCoreEventsByMileage,
   queryEventsByTime as queryCoreEventsByTime,
@@ -272,6 +273,7 @@ export function createMileageEventFromCoordinates(args: {
     draft: args,
     payload: {
       createdFrom: "map_point",
+      targetCoordinates: args.coordinates,
       projectedCoordinates: resolved.coordinates,
       projectionMethod: resolved.method,
       projectionDiagnostics: resolved.diagnostics,
@@ -302,6 +304,7 @@ export function createMileageEventFromPlace(args: {
       createdFrom,
       projectionMethod: resolved.method,
       projectionDiagnostics: resolved.diagnostics,
+      ...(args.place.coordinates ? { targetCoordinates: args.place.coordinates } : {}),
       ...(resolved.coordinates ? { projectedCoordinates: resolved.coordinates } : {}),
       ...(resolved.stationRef ? { stationRef: resolved.stationRef, stationId: stationIdFromRef(resolved.stationRef) } : {}),
       ...(resolved.edgeRef ? { edgeRef: resolved.edgeRef } : {}),
@@ -909,10 +912,28 @@ function createMileageEventAtResolvedDistance(args: {
   const now = new Date().toISOString();
   const mediaUrl = args.draft.mediaUrl?.trim();
   const tripId = args.draft.tripId;
+  const kind = args.draft.kind ?? "user_note";
+  const basePayload: Record<string, unknown> = {
+    ...(args.payload ?? {}),
+    lineKey: args.lineContext.lineKey,
+    contextSource: args.lineContext.source ?? "legacy_app",
+    ...(mediaUrl ? { mediaUrl } : {}),
+    ...(tripId !== undefined && tripId !== "" ? { tripId } : {}),
+  };
+  const viewpoint = kind === "scenic"
+    ? inferScenicViewpointPayload({
+      context: args.lineContext.context,
+      distanceMeters: args.distanceMeters,
+      targetCoordinates: Array.isArray(basePayload.targetCoordinates)
+        ? basePayload.targetCoordinates as [number, number]
+        : undefined,
+      source: args.lineContext.source === "rail_graph_runtime" ? "inferred_from_route" : "inferred_from_geojson",
+    })
+    : undefined;
   return {
     schemaVersion: "mileage-user-event-v1",
     id: args.id,
-    kind: args.draft.kind ?? "user_note",
+    kind,
     title: cleanTitle(args.draft.title),
     body: cleanOptional(args.draft.body),
     mileage: {
@@ -925,11 +946,8 @@ function createMileageEventAtResolvedDistance(args: {
     visibility: args.draft.visibility ?? "private",
     tags: normalizeTags(args.draft.tags),
     payload: {
-      ...(args.payload ?? {}),
-      lineKey: args.lineContext.lineKey,
-      contextSource: args.lineContext.source ?? "legacy_app",
-      ...(mediaUrl ? { mediaUrl } : {}),
-      ...(tripId !== undefined && tripId !== "" ? { tripId } : {}),
+      ...basePayload,
+      ...(viewpoint ? { viewpoint } : {}),
     },
     createdAt: now,
     updatedAt: now,

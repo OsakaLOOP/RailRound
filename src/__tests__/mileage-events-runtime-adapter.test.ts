@@ -234,6 +234,60 @@ describe("mileage events runtime adapter", () => {
     expect(projected).toHaveLength(1);
     expect(projected[0].timestampInference).toBe("linear");
   });
+
+  it("infers scenic viewpoint data on legacy GeoJSON axes without blocking projection", () => {
+    const lineKey = "app:test-scenic-line";
+    const railwayData: RailwayMap = {
+      [lineKey]: {
+        meta: {
+          company: "Test Railway",
+          region: "test",
+          type: "fixture",
+          logo: null,
+          color: "#0f766e",
+        },
+        stations: [
+          { id: "a", name_ja: "Alpha", lat: 35.0, lng: 139.0, transfers: [], distToNext: 5 },
+          { id: "b", name_ja: "Beta", lat: 35.0, lng: 139.05, transfers: [] },
+        ],
+      },
+    };
+    const lineContext = buildAppMileageLineContext(railwayData, lineKey)!;
+    const event = createMileageEventFromPlace({
+      lineContext,
+      place: { coordinates: [139.04, 35.01] },
+      title: "Window view",
+      kind: "scenic",
+    })!;
+
+    expect(event.payload?.viewpoint).toMatchObject({
+      facing: "left",
+      source: "inferred_from_geojson",
+      coordinates: [139.04, 35.01],
+    });
+    expect(event.payload?.targetCoordinates).toEqual([139.04, 35.01]);
+    expect(typeof event.payload?.viewpoint?.targetBearingDegrees).toBe("number");
+
+    const display = boundMileageEventForDisplay(event, railwayData);
+    expect(display?.bound.scenicVisibility?.status).not.toBe("unavailable");
+    expect(display?.bound.scenicVisibility?.facing).toBe("left");
+    expect(display?.bound.scenicVisibility?.confidence).toBeGreaterThan(0);
+
+    const stationEvent = createMileageEventFromStation({
+      lineContext,
+      stationId: "a",
+      title: "Default side view",
+      kind: "scenic",
+    })!;
+    expect(stationEvent.payload).not.toHaveProperty("targetCoordinates");
+    expect(stationEvent.payload?.viewpoint).toMatchObject({
+      facing: "right",
+      source: "inferred_from_geojson",
+    });
+    expect(stationEvent.payload?.viewpoint?.coordinates).toBeUndefined();
+    expect(stationEvent.payload?.viewpoint?.targetBearingDegrees).toBeGreaterThan(150);
+    expect(stationEvent.payload?.viewpoint?.targetBearingDegrees).toBeLessThan(210);
+  });
 });
 
 function loadWillerRailwayData(): RailwayMap {

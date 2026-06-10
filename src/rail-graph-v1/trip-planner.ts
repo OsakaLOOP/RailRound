@@ -5,6 +5,7 @@
 import type { DeployedSystem, PathPreset, PlanTripResult, TripPlanRequest } from "./deployment.types";
 import type { RunEvent } from "./event.types";
 import type { RunContext, SystemContext } from "./graph.types";
+import type { ScenicFacing, ScenicViewpointPayload } from "./mileage-event.types";
 import type { EntityRef } from "./primitives";
 import type { RunSpec } from "./runtime.types";
 import type { ServicePattern, ServiceTraceEntry } from "./service-template.types";
@@ -539,6 +540,7 @@ function tripEventFromRunEvent(system: SystemContext, event: RunEvent): TripEven
         label: "Scenic view",
         timestamp: event.timestamp,
         viewSide: vehicleViewSide(event),
+        viewpoint: scenicViewpointFromRunEvent(event),
       }];
     case "user_defined":
       return [{
@@ -722,7 +724,45 @@ function mileageProfileFromResolvedPath(args: {
   };
 }
 
-function vehicleViewSide(event: RunEvent): "left" | "right" | "front" | "back" | undefined {
+function vehicleViewSide(event: RunEvent): ScenicFacing | undefined {
   const side = (event.payload?.vehicleView as { side?: unknown } | undefined)?.side;
   return side === "left" || side === "right" || side === "front" || side === "back" ? side : undefined;
+}
+
+function scenicViewpointFromRunEvent(event: RunEvent): ScenicViewpointPayload | undefined {
+  const vehicleView = event.payload?.vehicleView as {
+    side?: unknown;
+    relativeBearingDegrees?: unknown;
+    runDirectionBearingDegrees?: unknown;
+  } | undefined;
+  const facing = vehicleViewSide(event);
+  if (!facing) return undefined;
+  const runBearing = typeof vehicleView?.runDirectionBearingDegrees === "number"
+    ? vehicleView.runDirectionBearingDegrees
+    : undefined;
+  const relativeBearing = typeof vehicleView?.relativeBearingDegrees === "number"
+    ? vehicleView.relativeBearingDegrees
+    : undefined;
+  const targetBearing = typeof runBearing === "number" && typeof relativeBearing === "number"
+    ? normalizeBearing(runBearing + relativeBearing)
+    : undefined;
+  return {
+    facing,
+    ...(typeof targetBearing === "number" ? {
+      targetBearingDegrees: targetBearing,
+      visibleBearingRangeDegrees: [normalizeBearing(targetBearing - 45), normalizeBearing(targetBearing + 45)] as [number, number],
+      constraint: {
+        targetBearingDegrees: targetBearing,
+        visibleBearingRangeDegrees: [normalizeBearing(targetBearing - 45), normalizeBearing(targetBearing + 45)] as [number, number],
+        angleToleranceDegrees: 45,
+      },
+    } : {}),
+    source: "system_anchor",
+    confidence: typeof targetBearing === "number" ? 0.9 : 0.6,
+    diagnostics: [],
+  };
+}
+
+function normalizeBearing(value: number): number {
+  return ((value % 360) + 360) % 360;
 }

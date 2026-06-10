@@ -9,6 +9,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as turf from '@turf/turf';
 import { isMobile } from 'react-device-detect';
+import { calcPolylineDist } from './core/tripCalculator';
 
 // Quick import-time log to ensure the module loads when Vite imports it.
 try { console.log('[icon] module loaded'); } catch { }
@@ -1380,9 +1381,9 @@ const StatsView = ({ trips, railwayData, geoData, user, userProfile, segmentGeom
             const geom = segmentGeometries.get(key);
             if (geom && geom.coords) {
                 if (geom.isMulti) {
-                    geom.coords.forEach(c => totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]]))));
+                    geom.coords.forEach(c => totalDist += calcPolylineDist(c));
                 } else {
-                    totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                    totalDist += calcPolylineDist(geom.coords);
                 }
             } else {
                 // Fallback (Approx)

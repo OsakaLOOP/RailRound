@@ -4,6 +4,8 @@
 
 本文定义主应用的实现口径。早期 `rail-graph-v1-plan` 文档仍作为设计背景，但当前 UI、数据流和测试以本文与代码为准。
 
+> 2026-06-10 更新：当前权威口径以 `docs/rail-graph-main-app-flow.md` 与 `docs/rail-graph-main-app-ui-flow.md` 为准。后续实现必须遵循其中的 `activeRailGraphSelection.state` 判别联合、Scenic/Viewpoint 共享 payload、legacy GeoJSON 一等兼容、Map chrome 贴边手柄与 Leaflet 控件避让规则。本文保留 PR19-PR22 背景和历史摘要，不再单独分叉新的交互契约。
+
 ## 1. 术语
 
 | 术语 | 主应用含义 |

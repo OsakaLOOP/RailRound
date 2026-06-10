@@ -45,8 +45,6 @@ export interface MileageEventsActiveAxisDetail {
   routeItemId?: string;
 }
 
-export type MileageEventsActiveLineDetail = MileageEventsActiveAxisDetail;
-
 export interface MileageEventsMapPointDetail {
   lat: number;
   lng: number;
@@ -55,7 +53,6 @@ export interface MileageEventsMapPointDetail {
 export const mileageEventUiEvents = {
   open: "mileage-events:open",
   select: "mileage-event:select",
-  activeLine: "mileage-events:active-line",
   mapPoint: "mileage-events:map-point",
   requestMapCenter: "mileage-events:request-map-center",
 } as const;
@@ -74,10 +71,6 @@ export function openMileageEventsPanel(detail: MileageEventsOpenDetail) {
 
 export function selectMileageEventOnMap(detail: MileageEventSelectDetail) {
   window.dispatchEvent(new CustomEvent(mileageEventUiEvents.select, { detail }));
-}
-
-export function setActiveMileageLine(detail: MileageEventsActiveAxisDetail) {
-  window.dispatchEvent(new CustomEvent(mileageEventUiEvents.activeLine, { detail }));
 }
 
 export function setMileageEventsMapPoint(detail: MileageEventsMapPointDetail) {

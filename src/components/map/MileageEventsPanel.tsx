@@ -36,7 +36,6 @@ import {
   mileageEventUiEvents,
   requestMileageEventsMapCenter,
   selectMileageEventOnMap,
-  setActiveMileageLine,
   type MileageEventSelectDetail,
   type MileageEventsComposerSource,
   type MileageEventsMapPointDetail,
@@ -51,10 +50,9 @@ import {
   openDetailMatchesActiveRouteSelection,
   projectionDetailFromRailGraphSelection,
   projectionDetailFromMileageEventsOpen,
-  railGraphSelectionSourceFromProjection,
-  selectionFromMileageEventSelect,
+  projectionDetailMatchesActiveSelection,
+  selectionFromActiveAxis,
   selectionFromMileageEventsOpen,
-  selectionFromProductSegment,
 } from "../../utils/railGraphSelection";
 
 export const MileageEventsPanel: React.FC = () => {
@@ -167,31 +165,9 @@ export const MileageEventsPanel: React.FC = () => {
         tripSegmentIndex: detail.tripSegmentIndex,
         routeItemId: detail.routeItemId,
       });
-      const trip = detail.tripId !== undefined
-        ? trips.find((candidate) => String(candidate.id) === String(detail.tripId))
-        : null;
-      const productSegments = trip ? tripToProductSegments(trip, railwayData) : [];
-      const productSegment = typeof detail.tripSegmentIndex === "number"
-        ? productSegments[detail.tripSegmentIndex]
-        : undefined;
-      const selection = productSegment
-        ? selectionFromProductSegment({
-            kind: "event",
-            segment: productSegment,
-            source: detail.source ? railGraphSelectionSourceFromProjection(detail.source) : undefined,
-            lineKey: detail.lineKey ?? null,
-            tripId: detail.tripId,
-            tripSegmentIndex: detail.tripSegmentIndex,
-            routeItemId: detail.routeItemId,
-            eventId: detail.eventId,
-          })
-        : selectionFromMileageEventSelect(detail);
-      if (selection) setActiveRailGraphSelection(selection);
       if (detail.lineKey && lineKeys.includes(detail.lineKey)) {
         setLineKey(detail.lineKey);
         setMode("line");
-      } else if (detail.source === "rail_graph_runtime") {
-        setActiveMileageLine({ lineKey: detail.lineKey ?? null, source: detail.source });
       }
     };
     const handleOpen = (event: Event) => {
@@ -376,28 +352,37 @@ export const MileageEventsPanel: React.FC = () => {
 
   useEffect(() => {
     if (!open) {
-      setActiveMileageLine({ lineKey: null });
       clearActiveRailGraphSelection();
       return;
     }
-    if (selectedProjection?.source === "rail_graph_runtime") {
-      setActiveMileageLine({
+    const axisDetail = selectedProjection?.source === "rail_graph_runtime"
+      ? {
         lineKey: selectedProjection.lineKey ?? null,
         source: selectedProjection.source,
         tripId: selectedProjection.tripId,
         tripSegmentIndex: selectedProjection.tripSegmentIndex,
         routeItemId: selectedProjection.routeItemId,
-      });
-      return;
-    }
-    setActiveMileageLine({
-      lineKey: lineContext ? effectiveLineKey : null,
-      source: selectedProjection?.source,
-      tripId: selectedProjection?.tripId,
-      tripSegmentIndex: selectedProjection?.tripSegmentIndex,
-      routeItemId: selectedProjection?.routeItemId,
-    });
-  }, [clearActiveRailGraphSelection, effectiveLineKey, lineContext, open, selectedProjection]);
+      }
+      : {
+        lineKey: lineContext ? effectiveLineKey : null,
+        source: selectedProjection?.source,
+        tripId: selectedProjection?.tripId,
+        tripSegmentIndex: selectedProjection?.tripSegmentIndex,
+        routeItemId: selectedProjection?.routeItemId,
+      };
+    if (projectionDetailMatchesActiveSelection(axisDetail, activeRailGraphSelection, selectedEventId)) return;
+    const selection = selectionFromActiveAxis(axisDetail);
+    if (selection) setActiveRailGraphSelection(selection);
+  }, [
+    activeRailGraphSelection,
+    clearActiveRailGraphSelection,
+    effectiveLineKey,
+    lineContext,
+    open,
+    selectedEventId,
+    selectedProjection,
+    setActiveRailGraphSelection,
+  ]);
 
   const selectEvent = (eventId: string, entry?: MileageEventListEntry) => {
     const inheritedProjection = selectedProjection ?? projectionDetailFromRailGraphSelection(activeRailGraphSelection);
@@ -412,6 +397,15 @@ export const MileageEventsPanel: React.FC = () => {
         : inheritedProjection;
     setSelectedEventId(eventId);
     setSelectedProjection(eventProjection ?? null);
+    const selection = selectionFromMileageEventsOpen({
+      eventId,
+      lineKey: eventProjection?.lineKey,
+      source: eventProjection?.source,
+      tripId: eventProjection?.tripId,
+      tripSegmentIndex: eventProjection?.tripSegmentIndex,
+      routeItemId: eventProjection?.routeItemId,
+    });
+    if (selection) setActiveRailGraphSelection(selection);
     selectMileageEventOnMap({
       eventId,
       lineKey: eventProjection?.lineKey,
@@ -426,6 +420,15 @@ export const MileageEventsPanel: React.FC = () => {
     const inheritedProjection = selectedProjection ?? projectionDetailFromRailGraphSelection(activeRailGraphSelection);
     if (composerDraft.source === "trip" && inheritedProjection?.source === "rail_graph_runtime") {
       setSelectedEventId(event.id);
+      const selection = selectionFromMileageEventsOpen({
+        eventId: event.id,
+        lineKey: inheritedProjection.lineKey,
+        source: inheritedProjection.source,
+        tripId: inheritedProjection.tripId,
+        tripSegmentIndex: inheritedProjection.tripSegmentIndex,
+        routeItemId: inheritedProjection.routeItemId,
+      });
+      if (selection) setActiveRailGraphSelection(selection);
       selectMileageEventOnMap({
         eventId: event.id,
         lineKey: inheritedProjection.lineKey,

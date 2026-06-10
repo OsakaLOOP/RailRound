@@ -175,6 +175,7 @@ Done:
 - `activeRailGraphSelection` is the shared non-persistent UI selection across Map route click, TripPage jump, GlobalSearch event jump, EventInspector map jump, and MileageEventsPanel.
 - Map event marker clicks preserve trip id, segment index, and route context when projection data is available.
 - `railGraphSelection.ts` centralizes bridge source conversion plus ProductTripSegment / event projection context / Map route item selection payloads, including legacy GeoJSON compatibility and explicit rail-graph source overrides.
+- `mileage-events:active-line` bridge state has been removed; active axes now derive from `activeRailGraphSelection`, while window events remain for Leaflet/DOM selection, open, fly-to, and map-point boundaries.
 - Scenic payload now flows through system events, user events, projection, and MapView rendering as a shared viewpoint/visibility contract instead of a plain event category.
 - MapView renders scenic visibility as a first-class Leaflet layer with status-colored fan/ray/origin geometry, plus distinct scenic marker styling.
 - Selected scenic user events expose explicit viewpoint controls in EventComposer/EventInspector and draggable MapView handles for bearing, angle tolerance, and range.
@@ -185,7 +186,6 @@ Done:
 
 Still incomplete:
 
-- Window bridge events and store `activeRailGraphSelection` still coexist; the bridge should shrink further to native Leaflet / DOM event boundaries.
 - Map selected route, selected event marker, dimmed routes, hover metadata, and touch metadata still need visual QA.
 - EventComposer and MileageEventsPanel need more narrow-screen visual QA and disabled-reason QA.
 - TripPage still needs replay/route visualization simplification and more top-level run summary polish.

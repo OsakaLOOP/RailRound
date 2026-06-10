@@ -291,3 +291,22 @@ export function openDetailMatchesActiveRouteSelection(
     selection.tripSegmentIndex === detail.tripSegmentIndex
   );
 }
+
+export function projectionDetailMatchesActiveSelection(
+  detail: Partial<Omit<MileageEventsProjectionDetail, "lineKey">> & { lineKey?: string | null },
+  selection?: RailGraphActiveSelection | RailGraphSelectionDraft | null,
+  eventId?: string | null,
+): boolean {
+  if (!selection) return false;
+  if (eventId && isEventSelection(selection) && selection.eventId === eventId) return true;
+  const source = detail.source ? railGraphSelectionSourceFromProjection(detail.source) : undefined;
+  if (source && selection.source !== source) return false;
+  if (detail.routeItemId) return selection.routeItemId === detail.routeItemId;
+  if (detail.tripId !== undefined) {
+    return (
+      String(selection.tripId) === String(detail.tripId) &&
+      selection.tripSegmentIndex === detail.tripSegmentIndex
+    );
+  }
+  return !!detail.lineKey && selection.lineKey === detail.lineKey;
+}

@@ -143,7 +143,7 @@ legacy GeoJSON 不是临时兼容层，而是主应用仍需支持的数据源�
 | 维度 | 当前 | 目标 | 缺口 |
 |---|---:|---:|---|
 | 数据/投影接入 | 80% | 85% | legacy GeoJSON 已兼容，仍需 UI smoke 证明实际点击流。 |
-| selection / map wiring | 70% | 90% | shared selection 已覆盖 Map route click、Map event marker click、TripPage、Search、Inspector，仍需减少 window bridge 与 store selection 双写并补组件级 QA。 |
+| selection / map wiring | 70% | 90% | shared selection 已覆盖 Map route click、Map event marker click、TripPage、Search、Inspector；`mileage-events:active-line` 双写已移除，仍需补组件级 QA。 |
 | MapView 编辑体验 | 55% | 90% | 路线选择和面板打开已接上，仍需 route hover/touch、pin create、selected/dimmed 视觉 QA。 |
 | MileageEventsPanel | 65% | 90% | header/source cards 已改，仍需事件列表信息层级、窄屏与 disabled reason 打磨。 |
 | TripsPage | 70% | 90% | 已转向只读，仍需顶层 trip card 运行摘要和 replay 视觉精简。 |
@@ -157,7 +157,7 @@ legacy GeoJSON 不是临时兼容层，而是主应用仍需支持的数据源�
    - `railGraphSelection.ts` 统一 ProductTripSegment、event projection context、Map route item 与 bridge projection source 到 active selection 的转换。
    - Map event marker click 已携带 trip id、segment index、route item id，并在 bridge handler 中尽量还原为富 selection。
    - MileageEventsPanel open/select handler 已避免把同一路线 `kind="route"` selection 覆盖成普通 axis，从而保留 route-click create 所需 anchor。
-   - window bridge 只保留 Leaflet/native event 边界。
+   - window bridge 已移除 active axis 双写，只保留 Leaflet/native event 边界。
    - 已有 focused tests 覆盖 rail-graph/legacy product segment、event projection context、source override 和 bridge conversion；后续补 route click、TripPage event jump、Search/Inspector jump 的组件级行为测试。
 
 2. PR UI-B: MapView route and event editing loop

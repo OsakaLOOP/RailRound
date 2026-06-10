@@ -182,13 +182,14 @@ Done:
 - MileageEventsPanel closed state is a right-edge translucent handle that opens on pointer hover for mouse/pen, tap/click for touch, and drag-to-open/drag-to-close on touch/pen.
 - MileageEventsPanel header import/export controls are grouped under a compact action menu instead of two permanent header buttons.
 - TripPage event center has moved toward read-only overview and map jump instead of competing event editing/export tooling.
+- TripPage event center now renders through `TripEventCenter`, using `TripDetailModel.events` as the replay source so departure / arrival / transfer / scenic / user events share one read-only event model while stop/pass details stay out of the top replay.
 - Route metadata uses the shared badge visual language in React surfaces and Leaflet HTML.
 
 Still incomplete:
 
 - Map selected route, selected event marker, dimmed routes, hover metadata, and touch metadata still need visual QA.
 - EventComposer and MileageEventsPanel need more narrow-screen visual QA and disabled-reason QA.
-- TripPage still needs replay/route visualization simplification and more top-level run summary polish.
+- TripPage still needs browser-level desktop/mobile visual QA for the new event center and route slice layout.
 - Visual QA for mobile/desktop has not been completed.
 
 ## 8. PR Plan

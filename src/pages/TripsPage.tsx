@@ -12,8 +12,6 @@ import {
   ChevronUp,
   Eye,
   Filter,
-  MapPinned,
-  Route,
   Tag,
 } from "lucide-react";
 import { useStore } from "../store";
@@ -31,18 +29,16 @@ import {
 } from "../utils/networkDisplay";
 import type { MileageUserEventKind, MileageUserEventVisibility } from "../rail-graph-v1/mileage-event.types";
 import {
-  appStationRef,
   boundMileageEventForDisplay,
   buildRailGraphMileageLineContext,
-  buildAppMileageLineContext,
-  formatKm,
   lineLabel,
   projectEventsToTrip,
   searchMileageEvents,
   tagsFromInput,
 } from "../utils/mileageUserEvents";
 import type { MileageEventListEntry } from "../components/mileage-events/EventList";
-import { eventKindLabel, eventLineLabel, eventSourceLabel, eventStationLabel, eventVisibilityLabel, mileageEventKinds, mileageEventVisibilities } from "../components/mileage-events/display";
+import { eventKindLabel, eventVisibilityLabel, mileageEventKinds, mileageEventVisibilities } from "../components/mileage-events/display";
+import { TripEventCenter } from "../components/trips/TripEventCenter";
 import {
   tripLineSummary as productTripLineSummary,
   tripToProductSegments,
@@ -53,14 +49,10 @@ import {
 } from "../utils/railGraphSelection";
 import {
   buildTripDetailModel,
-  tripDetailKeyEvents,
-  type TripDetailModel,
 } from "../utils/railGraphTripDetailModel";
 import { mileageEventTripId, openMileageEventsPanel, selectMileageEventOnMap } from "../utils/mileageEventUiBridge";
 import {
   RailGraphBadge,
-  RailGraphEventPill,
-  RailGraphRunBadges,
   RailGraphSymbol,
   compactRailGraphRef,
   railGraphDirectionLabel as formatRailGraphDirection,
@@ -688,24 +680,6 @@ export const TripsPage: React.FC = () => {
     return formatRailGraphDirection(direction, t) || t("tripsPage.railGraph.unknown", "Unknown");
   };
 
-  const railGraphEventTypeLabel = (type: string) => {
-    if (type === "departure") return t("tripsPage.railGraph.event.departure", "Departure");
-    if (type === "arrival") return t("tripsPage.railGraph.event.arrival", "Arrival");
-    if (type === "transfer") return t("tripsPage.railGraph.event.transfer", "Transfer");
-    if (type === "scenic") return t("tripsPage.railGraph.event.scenic", "Scenic");
-    if (type === "stop") return t("tripsPage.railGraph.event.stop", "Stop");
-    if (type === "pass") return t("tripsPage.railGraph.event.pass", "Pass");
-    if (type === "user_event") return t("tripsPage.railGraph.event.user", "User event");
-    if (type === "note") return t("tripsPage.railGraph.event.note", "Note");
-    return type;
-  };
-
-  const formatDistanceKm = (km: number) =>
-    t("tripsPage.railGraph.km", "{{value}} km", { value: Math.max(0, km).toFixed(1) });
-
-  const formatMinutes = (minutes?: number) =>
-    t("tripsPage.railGraph.minutes", "{{count}} min", { count: Math.max(0, minutes || 0) });
-
   const railGraphChipValue = (values: Array<string | undefined>, maxItems = 2) => {
     const unique = Array.from(new Set(values.filter((value): value is string => !!value?.trim())));
     if (unique.length === 0) return "";
@@ -713,393 +687,25 @@ export const TripsPage: React.FC = () => {
     return unique.length > maxItems ? `${visible} +${unique.length - maxItems}` : visible;
   };
 
-  const renderRailGraphRunSummary = (detail: TripDetailModel, compact = false) => {
-    if (detail.kind !== "rail_graph") return null;
-    const keyEvents = tripDetailKeyEvents(detail, compact ? 3 : 5);
-    const firstSegment = detail.segments[0];
-    return (
-      <div className="mt-3 border-t border-emerald-100 pt-3">
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
-          <RailGraphBadge
-            icon="snapshot"
-            value={t("tripsPage.railGraph.run", "Rail graph run")}
-            tone="emerald"
-            className="rounded"
-          />
-          <RailGraphRunBadges
-            meta={{
-              serviceType: firstSegment?.serviceType,
-              direction: firstSegment?.direction,
-              patternRef: firstSegment?.patternRef,
-            }}
-            badgeClassName="rounded"
-            patternClassName="max-w-[12rem]"
-          />
-          <RailGraphBadge icon="distance" value={formatDistanceKm(detail.overview.totalDistanceKm)} tone="slate" className="rounded" />
-          {detail.overview.totalTimeMinutes !== undefined && (
-            <RailGraphBadge icon="duration" value={formatMinutes(detail.overview.totalTimeMinutes)} tone="slate" className="rounded" />
-          )}
-          <RailGraphBadge
-            icon="userEvent"
-            value={t("tripsPage.railGraph.userEvents", "{{count}} user events", { count: detail.overview.userEventCount })}
-            tone="violet"
-            className="rounded"
-          />
-        </div>
-
-        {!compact && (
-          <div className="mt-2 space-y-1.5">
-            {detail.segments.map((segment) => (
-              <div key={segment.id} className="grid grid-cols-[0.75rem_minmax(0,1fr)] gap-2 text-[11px] text-slate-600">
-                <span className="mt-1 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: segment.displayColor || "#10b981" }} />
-                <div className="min-w-0">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="truncate font-semibold text-slate-800">{segment.lineLabel}</span>
-                    <RailGraphRunBadges
-                      meta={{ serviceType: segment.serviceType, direction: segment.direction }}
-                      badgeClassName="rounded"
-                    />
-                  </div>
-                  <div className="truncate">
-                    {segment.fromName} <span className="text-slate-300">→</span> {segment.toName}
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-slate-500">
-                    <RailGraphBadge
-                      icon="stops"
-                      value={t("tripsPage.railGraph.stopPass", "{{stops}} stops / {{passes}} pass", { stops: segment.stopCount, passes: segment.passCount })}
-                      tone="slate"
-                      className="rounded"
-                    />
-                    <RailGraphBadge
-                      icon="via"
-                      value={t("tripsPage.railGraph.via", "{{count}} via", { count: segment.viaStationCount })}
-                      tone="slate"
-                      className="rounded"
-                    />
-                    <RailGraphRunBadges
-                      meta={{ patternRef: segment.patternRef }}
-                      badgeClassName="rounded"
-                      patternClassName="max-w-[12rem]"
-                      showLabels
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {keyEvents.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {keyEvents.map((event) => (
-              <RailGraphEventPill
-                key={event.id}
-                type={event.type}
-                label={`${railGraphEventTypeLabel(event.type)} · ${event.label}`}
-                title={event.label}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const tripReplayItems = (trip: (typeof trips)[number], entries: MileageEventListEntry[]) => {
-    const segments = tripToProductSegments(trip, railwayData);
-    const items: Array<
-      | {
-          id: string;
-          kind: "boundary";
-          role: "departure" | "transfer" | "arrival";
-          distanceMeters: number;
-          stationName: string;
-          lineName: string;
-        }
-      | {
-          id: string;
-          kind: "event";
-          distanceMeters: number;
-          entry: MileageEventListEntry;
-        }
-    > = [];
-    let cursor = 0;
-
-    segments.forEach((segment: any, index: number) => {
-      const lineName = segment.lineLabel || (segment.lineKey ? lineLabel(segment.lineKey) : "-");
-      const fromName = segment.fromName || t("mileageEvents.unknown", "Unknown");
-      const toName = segment.toName || t("mileageEvents.unknown", "Unknown");
-      const lineContext = segment.lineKey ? buildAppMileageLineContext(railwayData, segment.lineKey) : null;
-      const fromMileage = lineContext?.context.stationMileage[appStationRef(segment.lineKey, segment.fromId)];
-      const toMileage = lineContext?.context.stationMileage[appStationRef(segment.lineKey, segment.toId)];
-      const segmentMeters = fromMileage && toMileage
-        ? Math.abs(toMileage.distanceMeters - fromMileage.distanceMeters)
-        : Math.round((segment.distanceKm || 0) * 1000);
-
-      items.push({
-        id: `boundary:${index}:start`,
-        kind: "boundary",
-        role: index === 0 ? "departure" : "transfer",
-        distanceMeters: cursor,
-        stationName: fromName,
-        lineName,
-      });
-
-      cursor += segmentMeters;
-
-      if (index === segments.length - 1) {
-        items.push({
-          id: `boundary:${index}:end`,
-          kind: "boundary",
-          role: "arrival",
-          distanceMeters: cursor,
-          stationName: toName,
-          lineName,
-        });
-      }
-    });
-
-    entries.forEach((entry) => {
-      items.push({
-        id: `event:${entry.bound.event.id}`,
-        kind: "event",
-        distanceMeters: entry.bound.distanceMetersFromRunStart,
-        entry,
-      });
-    });
-
-    const order = { departure: 0, transfer: 1, event: 2, arrival: 3 };
-    return items.sort((left, right) => {
-      const leftOrder = left.kind === "boundary" ? order[left.role] : order.event;
-      const rightOrder = right.kind === "boundary" ? order[right.role] : order.event;
-      return left.distanceMeters - right.distanceMeters || leftOrder - rightOrder || left.id.localeCompare(right.id);
-    });
-  };
-
-  const boundaryRoleLabel = (role: "departure" | "transfer" | "arrival") => {
-    if (role === "departure") return t("tripsPage.eventCenter.departure", "Departure");
-    if (role === "arrival") return t("tripsPage.eventCenter.arrival", "Arrival");
-    return t("tripsPage.eventCenter.transfer", "Transfer");
-  };
-
   const renderTripEventCenter = (trip: (typeof trips)[number]) => {
     const tripId = String(trip.id);
     const entries = tripEventEntries(trip);
     const allEntries = tripEventEntriesMap.get(tripId) ?? [];
-    const replayItems = tripReplayItems(trip, entries);
     const detail = buildTripDetailModel({ trip, railwayData, userEvents: mileageUserEvents });
     const isExpanded = expandedTripId === tripId;
 
     return (
-      <div className="mt-3 border-t border-gray-100 pt-3" onClick={(event) => event.stopPropagation()}>
-        <button
-          type="button"
-          className="flex w-full items-center justify-between gap-3 rounded-md bg-slate-50 px-2 py-2 text-left hover:bg-slate-100"
-          onClick={() => setExpandedTripId(isExpanded ? null : tripId)}
-        >
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-              <MapPinned size={14} className="text-emerald-600" />
-              {t("tripsPage.eventCenter.summary", "{{count}} events", { count: allEntries.length })}
-              <RailGraphBadge
-                icon={detail.kind === "rail_graph" ? "snapshot" : "legacy"}
-                value={
-                  detail.kind === "rail_graph"
-                    ? t("tripsPage.eventCenter.snapshotAxis", "Saved snapshot axis")
-                    : t("tripsPage.eventCenter.geoJsonAxis", "GeoJSON mileage axis")
-                }
-                tone={detail.kind === "rail_graph" ? "emerald" : "slate"}
-                className="rounded bg-white"
-              />
-              {filteredEventIds && allEntries.length !== entries.length && (
-                <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700">
-                  {t("tripsPage.eventCenter.filteredCount", "{{count}} shown", { count: entries.length })}
-                </span>
-              )}
-            </div>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {entries.slice(0, 3).map((entry) => (
-                <span
-                  key={entry.bound.event.id}
-                  className="inline-flex max-w-[14rem] items-center gap-1 rounded bg-white px-1 py-0.5"
-                >
-                  <RailGraphBadge icon="distance" value={formatKm(entry.bound.distanceMetersFromRunStart)} tone="slate" className="rounded" />
-                  <RailGraphEventPill
-                    type={entry.bound.event.kind}
-                    label={entry.bound.event.title}
-                    title={entry.bound.event.title}
-                    className="max-w-[9rem]"
-                  />
-                </span>
-              ))}
-              {entries.length === 0 && (
-                <span className="text-[11px] text-slate-400">
-                  {t("tripsPage.eventCenter.noEvents", "No mileage events")}
-                </span>
-              )}
-            </div>
-          </div>
-          {isExpanded ? <ChevronUp size={16} className="shrink-0 text-slate-400" /> : <ChevronDown size={16} className="shrink-0 text-slate-400" />}
-        </button>
-
-        {isExpanded && (
-          <div className="mt-3 space-y-3 rounded-md border border-slate-200 bg-white p-3">
-            {renderRailGraphRunSummary(detail)}
-
-            <div className="space-y-1">
-              {tripToProductSegments(trip, railwayData).map((segment: any, index: number) => {
-                const from = segment.fromName || t("mileageEvents.unknown", "Unknown");
-                const to = segment.toName || t("mileageEvents.unknown", "Unknown");
-                const lineName = segment.lineLabel || (segment.lineKey ? lineLabel(segment.lineKey) : "-");
-                return (
-                  <div key={`${segment.lineKey}_${segment.fromId}_${segment.toId}_${index}`} className="grid grid-cols-[0.5rem_minmax(0,1fr)] gap-2 text-[11px] text-slate-500">
-                    <span className="mt-1.5 h-2 w-2 rounded-full bg-emerald-500" />
-                    <div className="min-w-0">
-                      <div className="truncate font-semibold text-slate-600" title={lineName}>{lineName}</div>
-                      <div className="truncate" title={`${from} -> ${to}`}>
-                        {from} <span className="text-slate-300">→</span> {to}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50/70 p-2">
-              <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
-                <RailGraphBadge
-                  icon={detail.kind === "rail_graph" ? "snapshot" : "legacy"}
-                  value={
-                    detail.kind === "rail_graph"
-                      ? t("tripsPage.eventCenter.snapshotAxis", "Saved snapshot axis")
-                      : t("tripsPage.eventCenter.geoJsonAxis", "GeoJSON mileage axis")
-                  }
-                  tone={detail.kind === "rail_graph" ? "emerald" : "slate"}
-                  className="rounded bg-white"
-                />
-              </div>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                onClick={() => openTripEventMapEditor(trip)}
-                title={t("tripsPage.eventCenter.openMapEditor", "Open map editor")}
-                aria-label={t("tripsPage.eventCenter.openMapEditor", "Open map editor")}
-              >
-                <MapPinned size={13} />
-                {t("tripsPage.eventCenter.openMapEditor", "Open map editor")}
-              </button>
-            </div>
-
-            <div className="rounded-md border border-slate-200 bg-slate-50/60 p-2">
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs">
-                <div className="font-semibold text-slate-700">
-                  {t("tripsPage.eventCenter.replay", "Trip replay")}
-                </div>
-                <div className="text-[11px] text-slate-400">
-                  {t("tripsPage.eventCenter.sortedByMileage", "Sorted by trip mileage")}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                {replayItems.map((item) => {
-                  if (item.kind === "boundary") {
-                    return (
-                      <div key={item.id} className="grid grid-cols-[4.5rem_1rem_minmax(0,1fr)] gap-2 text-xs">
-                        <div className="pt-1 text-right font-mono text-[11px] text-slate-400">
-                          {formatKm(item.distanceMeters)}
-                        </div>
-                        <div className="flex justify-center pt-1">
-                          <span className="h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm" />
-                        </div>
-                        <div className="rounded-md border border-slate-200 bg-white px-2 py-1.5">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                              {boundaryRoleLabel(item.role)}
-                            </span>
-                            <span className="truncate font-semibold text-slate-700">{item.stationName}</span>
-                          </div>
-                          <div className="mt-0.5 truncate text-[11px] text-slate-400">{item.lineName}</div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  const event = item.entry.bound.event;
-                  const selected = selectedTripEventId === event.id;
-                  const eventLine = eventLineLabel(item.entry.bound, item.entry.lineContext);
-                  const eventStation = eventStationLabel(item.entry.bound, item.entry.lineContext);
-                  const sourceIsRailGraph = item.entry.lineContext?.source === "rail_graph_runtime";
-                  return (
-                    <div key={item.id} className="grid grid-cols-[4.5rem_1rem_minmax(0,1fr)] gap-2 text-xs">
-                      <div className="pt-2 text-right font-mono text-[11px] text-slate-500">
-                        {formatKm(item.distanceMeters)}
-                      </div>
-                      <div className="flex justify-center pt-2">
-                        <span className={`h-2.5 w-2.5 rounded-full border-2 border-white shadow-sm ${selected ? "bg-emerald-600" : "bg-slate-400"}`} />
-                      </div>
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        className={`min-w-0 rounded-md border px-2 py-1.5 text-left transition ${
-                          selected
-                            ? "border-emerald-300 bg-emerald-50"
-                            : "border-slate-200 bg-white hover:border-slate-300"
-                        }`}
-                        onClick={() => focusTripEventOnMap(trip, item.entry)}
-                        onKeyDown={(keyEvent) => {
-                          if (keyEvent.key === "Enter" || keyEvent.key === " ") {
-                            keyEvent.preventDefault();
-                            focusTripEventOnMap(trip, item.entry);
-                          }
-                        }}
-                      >
-                        <div className="flex min-w-0 items-center gap-2">
-                          <RailGraphEventPill type={event.kind} label={eventKindLabel(event.kind, t)} className="max-w-[8rem]" />
-                          <span className="truncate font-semibold text-slate-800">{event.title}</span>
-                          <button
-                            type="button"
-                            className="ml-auto shrink-0 rounded p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-700"
-                            onClick={(clickEvent) => {
-                              clickEvent.stopPropagation();
-                              focusTripEventOnMap(trip, item.entry);
-                            }}
-                            title={t("mileageEvents.action.viewMap", "View map")}
-                            aria-label={t("mileageEvents.action.viewMap", "View map")}
-                          >
-                            <MapPinned size={13} />
-                          </button>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
-                          <RailGraphBadge
-                            icon={sourceIsRailGraph ? "snapshot" : "legacy"}
-                            value={eventSourceLabel(item.entry.lineContext, t)}
-                            tone={sourceIsRailGraph ? "emerald" : "slate"}
-                            className="rounded"
-                          />
-                          {eventLine && (
-                            <span className="inline-flex max-w-[12rem] items-center gap-1 truncate">
-                              <Route size={12} className="shrink-0 text-slate-400" />
-                              <span className="truncate">{eventLine}</span>
-                            </span>
-                          )}
-                          {eventStation && <span className="max-w-[10rem] truncate">{eventStation}</span>}
-                          {event.tags?.slice(0, 3).map((tag) => (
-                            <span key={tag} className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
-                              <Tag size={10} />
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                        {event.body && <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-slate-600">{event.body}</p>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-          </div>
-        )}
-      </div>
+      <TripEventCenter
+        detail={detail}
+        entries={entries}
+        allEntryCount={allEntries.length}
+        filtered={!!filteredEventIds}
+        isExpanded={isExpanded}
+        selectedEventId={selectedTripEventId}
+        onToggle={() => setExpandedTripId(isExpanded ? null : tripId)}
+        onOpenMapView={() => openTripEventMapEditor(trip)}
+        onFocusEvent={(entry) => focusTripEventOnMap(trip, entry)}
+      />
     );
   };
 
@@ -1608,7 +1214,6 @@ export const TripsPage: React.FC = () => {
           </div>
           <RouteSlice segments={segments} />
         </div>
-        {renderRailGraphRunSummary(detail, true)}
         {trip.memo && (
           <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded mt-3">
             {trip.memo}

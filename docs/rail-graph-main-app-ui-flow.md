@@ -73,7 +73,7 @@ activeRailGraphSelection
 - Panel open / close 写入或清除 active axis。
 - `src/utils/railGraphSelection.ts` 统一 bridge projection source、product segment、event projection context 与 `activeRailGraphSelection` 的转换，避免 MapContainer / MileageEventsPanel / TripPage / Search / Inspector 各自手写 rail-graph vs legacy selection payload。
 - Create 模式会继承当前 route selection 的 `anchor`，把 rail-graph route 写为 trip-position source，把 legacy route 写为 map source。
-- TripPage replay / map editor jump、GlobalSearch event jump、EventInspector map jump 和 Map route click 会写入同一 selection，并尽量带上 `routeItemId`、segment index、label、color、pattern/service/direction metadata。
+- TripPage replay / MapView jump、GlobalSearch event jump、EventInspector map jump 和 Map route click 会写入同一 selection，并尽量带上 `routeItemId`、segment index、label、color、pattern/service/direction metadata。
 - PinEditor 从图钉创建用户事件前会写入 legacy GeoJSON active axis，并把 pin 坐标作为 create map source 传给 MileageEventsPanel。
 - MileageEventsPanel 在 rail-graph snapshot axis 下直接读取 rich projection 的当前 route events；GeoJSON place/time 查询不会误套到 snapshot route 上。
 
@@ -117,7 +117,7 @@ TripPage 的 event center 是只读概要：
 
 - 顶层展示 event count、snapshot / GeoJSON axis badge、运行摘要。
 - 展开后展示 line slices 与 mileage replay。
-- 主操作只有打开地图编辑器。
+- 主操作只有打开 MapView。
 - event row 可以跳转地图并选中事件。
 - 不提供 copy / JSON / MDX 事件工具；这些应放在地图事件面板或独立导出入口。
 
@@ -190,7 +190,7 @@ Current scenic implementation state:
 - 全局拖拽 overlay 的 line fallback 使用 `lineLabel()`，避免无 name 的拖拽项显示 raw lineKey。
 - StationSearchModal / GlobalSearchModal 的线路搜索结果使用同一 `lineLabel()` 口径；raw lineKey 仍可参与搜索匹配，但不作为结果主文案。
 - `lineSelectorBuilder` 也使用 `lineLabel()` 生成分类线路列表 displayName，LineSelector / StationSearchModal 分类页与搜索页保持一致。
-- 已增加 focused tests 覆盖 projection source 映射、event select、axis/open 转换、active axis 派生、panel projection detail、open-detail route match、rail-graph/legacy product segment selection、event projection context、Map route explicit source override 和 pin create bridge payload；EventComposer 已有 jsdom smoke 覆盖 source card 可见 target、disabled reason、map center 请求入口和 linked trip 文案；GlobalSearch 已有 jsdom smoke 覆盖 trip id 可搜索但不作为结果主文案；route serializer 覆盖导出失败时不把内部 line/station id 暴露为错误主文案，ExportRouteModal 会把这些错误映射到四语 i18next 文案。后续补组件级测试验证 route click / TripPage jump 的 DOM/Leaflet 行为。
+- 已增加 focused tests 覆盖 projection source 映射、event select、axis/open 转换、active axis 派生、panel projection detail、open-detail route match、rail-graph/legacy product segment selection、event projection context、Map route explicit source override 和 pin create bridge payload；EventComposer 已有 jsdom smoke 覆盖 source card 可见 target、disabled reason、map center 请求入口和 linked trip 文案；GlobalSearch 已有 jsdom smoke 覆盖 trip id 可搜索但不作为结果主文案；TripEventCenter 已有 jsdom smoke 覆盖 detail-model replay、scenic/user event 展示、raw trip/pattern ref 不作主文案、MapView jump 回调和旧 map-editor 文案移除；route serializer 覆盖导出失败时不把内部 line/station id 暴露为错误主文案，ExportRouteModal 会把这些错误映射到四语 i18next 文案。后续补组件级测试验证 route click / TripPage jump 的 DOM/Leaflet 行为。
 
 ### PR UI-2 - MileageEventsPanel redesign
 
@@ -210,6 +210,13 @@ Current scenic implementation state:
 
 - ExportRouteModal 已不再把 geoData 缺失作为 saved rail-graph snapshot 导出预览的前置阻断；如果 snapshot 自带 route geometry，可直接生成 route slice preview。
 - 导出失败错误按 missing line / missing station / disconnected route / empty trip / unknown failure 映射为 i18next 文案，未知异常不直接透传内部 id 或堆栈式信息到 UI。
+
+### PR UI-4.5 - TripPage event center polish
+
+- TripPage event center 已抽成 `TripEventCenter`，页面只负责传入 `TripDetailModel`、筛选后的 mileage user events 和 MapView selection 回调。
+- Replay 改由 `TripDetailModel.events` 驱动，默认展示 departure / arrival / transfer / scenic / user event；stop/pass 只作为 run summary 的统计/详情，不在主 replay 中重复刷屏。
+- 展开态移除了重复的 route segment 列表和 snapshot source 条，保留单一 run summary、单一 replay 和 `Open in MapView` 跳转；TripPage 不再显示 `Open map editor` 语义。
+- 四语 i18next 已补 `systemEvents`、`moreSegments`、`openMapView` key。
 
 ### PR UI-5 - Visual QA
 

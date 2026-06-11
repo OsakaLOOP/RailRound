@@ -13,6 +13,21 @@ export const calcDist = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
+// ⚡ Bolt Performance Optimization:
+// To calculate path distances efficiently over `[lat, lng]` coordinate arrays,
+// avoid using `turf.length(turf.lineString(...))` as it causes massive overhead
+// from temporary object allocations. This native O(N) utility wraps Haversine `calcDist`.
+export const calcPolylineDist = (coords) => {
+  if (!coords || coords.length < 2) return 0;
+  let total = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p1 = coords[i];
+    const p2 = coords[i + 1];
+    total += calcDist(p1[0], p1[1], p2[0], p2[1]);
+  }
+  return total;
+};
+
 // [New] 路径缝合算法: 将乱序的 MultiLineString 缝合成连续的 LineString
 export const stitchRoutes = (turf, multiCoords, startPt) => {
   let pool = multiCoords.map((coords, i) => {
@@ -216,11 +231,13 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
             if (geom.isMulti) {
                 geom.coords.forEach(c => {
                     allCoords.push({ coords: c, color: geom.color || '#94a3b8' });
-                    if(turf) totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
+                    // ⚡ Bolt Performance Optimization: Replace expensive turf object allocations
+                    totalDist += calcPolylineDist(c);
                 });
             } else {
                 allCoords.push({ coords: geom.coords, color: geom.color || '#94a3b8' });
-                if(turf) totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                // ⚡ Bolt Performance Optimization: Replace expensive turf object allocations
+                totalDist += calcPolylineDist(geom.coords);
             }
         } else {
              // Fallback Distance Approx

@@ -5,3 +5,7 @@
 ## 2024-04-15 - [Avoid O(N log N) Sorting on Massive Geographical Collections]
 **Learning:** In spatial queries like `findNearbyStations` where we scan `railwayData` containing thousands of stations to find the top K nearest points, allocating all elements to an array and running `Array.prototype.sort()` results in massive temporary object allocation and $O(N \log N)$ execution time (taking ~8.5ms in benchmarks).
 **Action:** Replace full array sorts with a bounded Top-K array using a simple $O(K)$ insertion sort during the $O(N)$ iteration phase. This brings the time complexity effectively down to $O(N)$, speeding up operations by ~36x (taking ~0.24ms). Remember to apply a final sort if total elements found are less than $K$.
+
+## 2026-06-11 - [Replaced Turf.js LineString object creation with native O(N) calculation]
+**Learning:** In highly iterated loops processing arrays of coordinates (e.g. `getRouteVisualData`), calling `turf.length(turf.lineString(...))` causes massive performance overhead (taking over a second in tests vs ~790ms for native) purely due to memory allocations from creating large temporary GeoJSON objects and mapping coordinates into `[lng, lat]` format.
+**Action:** Utilize the native `calcPolylineDist(coords)` to sum the Haversine distance iteratively directly over Leaflet's `[lat, lng]` coordinate arrays, completely eliminating O(N) memory allocation per function call.

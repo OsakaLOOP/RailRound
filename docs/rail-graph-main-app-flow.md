@@ -19,15 +19,15 @@
 
 ## 2. Vocabulary
 
-| Term | Meaning |
-| --- | --- |
-| Rail-graph deployment | App 启动时读取的只读运行数据。用于规划、候选、pattern/source metadata。 |
-| Saved run snapshot | 用户选择 rail-graph route 后保存在 trip 上的 `TripResult`。主应用展示、搜索、地图、导出都优先读它。 |
-| Legacy GeoJSON axis | 旧 app 直接加载的线路里程轴。旧 trip、旧标注和自由图钉仍必须可用。 |
-| User event / 标注 | 用户在主应用创建和编辑的 mileage event。地图页是主编辑面。 |
-| System event | rail-graph 运行中生成的 stop / pass / transfer / operation 等只读事件。 |
-| Active axis | 当前地图和面板正在编辑或检查的 mileage axis，可以是 rail-graph snapshot segment，也可以是 legacy GeoJSON line。 |
-| Active route | 当前地图被选中的 trip route segment。它应驱动 active axis，而不是另建一套状态。 |
+| Term                  | Meaning                                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Rail-graph deployment | App 启动时读取的只读运行数据。用于规划、候选、pattern/source metadata。                                         |
+| Saved run snapshot    | 用户选择 rail-graph route 后保存在 trip 上的 `TripResult`。主应用展示、搜索、地图、导出都优先读它。             |
+| Legacy GeoJSON axis   | 旧 app 直接加载的线路里程轴。旧 trip、旧标注和自由图钉仍必须可用。                                              |
+| User event / 标注     | 用户在主应用创建和编辑的 mileage event。地图页是主编辑面。                                                      |
+| System event          | rail-graph 运行中生成的 stop / pass / transfer / operation 等只读事件。                                         |
+| Active axis           | 当前地图和面板正在编辑或检查的 mileage axis，可以是 rail-graph snapshot segment，也可以是 legacy GeoJSON line。 |
+| Active route          | 当前地图被选中的 trip route segment。它应驱动 active axis，而不是另建一套状态。                                 |
 
 ## 3. Invariants
 
@@ -113,16 +113,16 @@ Rail-graph snapshot 使用 run geometry / direction 推断 scenic visibility。L
 
 ## 5. UI Responsibilities
 
-| Surface | Role | Required state |
-| --- | --- | --- |
-| Map route layer | Primary route selection and route-to-event creation | active route, active axis, rail-graph vs legacy source, selected/dimmed route styling |
-| MileageEventsPanel | Primary标注 editor and inspector | current axis, source, event count, projection status, create source, selected event |
-| EventComposer | Create/edit one标注 | source mode, projection target, fallback/disabled state, linked trip |
-| EventInspector | Inspect/edit one标注 | event type, projection context, map/records jump, source metadata |
-| TripsPage | Read-only trip and标注 overview | saved snapshot summary, mileage event preview, map jump, no duplicate editing workflow |
-| GlobalSearch | Fast navigation | source badges, event/trip metadata, map jump for标注 |
-| TripEditor | Route planning and saved snapshot review | candidate source, pattern/service/direction, save semantics, no direct rail-graph mutation |
-| ExportRouteModal | Export truth | saved snapshot vs legacy route, exportable key events, geometry source |
+| Surface            | Role                                                | Required state                                                                             |
+| ------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Map route layer    | Primary route selection and route-to-event creation | active route, active axis, rail-graph vs legacy source, selected/dimmed route styling      |
+| MileageEventsPanel | Primary标注 editor and inspector                    | current axis, source, event count, projection status, create source, selected event        |
+| EventComposer      | Create/edit one标注                                 | source mode, projection target, fallback/disabled state, linked trip                       |
+| EventInspector     | Inspect/edit one标注                                | event type, projection context, map/records jump, source metadata                          |
+| TripsPage          | Read-only trip and标注 overview                     | saved snapshot summary, mileage event preview, map jump, no duplicate editing workflow     |
+| GlobalSearch       | Fast navigation                                     | source badges, event/trip metadata, map jump for标注                                       |
+| TripEditor         | Route planning and saved snapshot review            | candidate source, pattern/service/direction, save semantics, no direct rail-graph mutation |
+| ExportRouteModal   | Export truth                                        | saved snapshot vs legacy route, exportable key events, geometry source                     |
 
 Map route click 的语义顺序固定为：
 

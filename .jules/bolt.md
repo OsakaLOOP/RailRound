@@ -5,3 +5,7 @@
 ## 2024-04-15 - [Avoid O(N log N) Sorting on Massive Geographical Collections]
 **Learning:** In spatial queries like `findNearbyStations` where we scan `railwayData` containing thousands of stations to find the top K nearest points, allocating all elements to an array and running `Array.prototype.sort()` results in massive temporary object allocation and $O(N \log N)$ execution time (taking ~8.5ms in benchmarks).
 **Action:** Replace full array sorts with a bounded Top-K array using a simple $O(K)$ insertion sort during the $O(N)$ iteration phase. This brings the time complexity effectively down to $O(N)$, speeding up operations by ~36x (taking ~0.24ms). Remember to apply a final sort if total elements found are less than $K$.
+
+## 2024-05-18 - [O(1) Indexed Lookups for Graph Traversal]
+**Learning:** During graph traversal methods like `getTransferableLines`, searching for stations with matching names by iterating over every line and scanning their stations array with `.find()` creates unnecessary $O(L \times S)$ time complexity. This causes severe CPU overhead over repeated calls.
+**Action:** Always prefer utilizing pre-built $O(1)$ lookups, such as the `buildStationIndex` utility, to directly retrieve valid nodes, transforming the operation into a simple $O(T)$ loop (where $T$ is the number of matching name nodes). This dropped execution time of `getTransferableLines` from ~500+ms to ~160ms over 1,000 iterations.

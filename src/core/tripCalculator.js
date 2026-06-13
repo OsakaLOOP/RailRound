@@ -216,11 +216,11 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
             if (geom.isMulti) {
                 geom.coords.forEach(c => {
                     allCoords.push({ coords: c, color: geom.color || '#94a3b8' });
-                    if(turf) totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
+                    totalDist += calcPolylineDist(c);
                 });
             } else {
                 allCoords.push({ coords: geom.coords, color: geom.color || '#94a3b8' });
-                if(turf) totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                totalDist += calcPolylineDist(geom.coords);
             }
         } else {
              // Fallback Distance Approx
@@ -355,4 +355,15 @@ export const calculateLatestStats = (trips, segmentGeometries, railwayData, geoD
         dist: grandTotalDist,
         latest: latest
     };
+};
+
+// Native fast polyline distance calculation (O(N) with no extra allocations)
+export const calcPolylineDist = (coords) => {
+  let dist = 0;
+  if (!coords || coords.length < 2) return 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    // assumes coords are [lat, lng]
+    dist += calcDist(coords[i][0], coords[i][1], coords[i+1][0], coords[i+1][1]);
+  }
+  return dist;
 };

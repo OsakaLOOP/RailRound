@@ -3,7 +3,7 @@ import { computeLoopVia } from './railwayRouting';
 
 // 辅助：计算两点间直线距离 (Haversine Formula)
 export const calcDist = (lat1, lon1, lat2, lon2) => {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return 0;
   const R = 6371; // 地球半径 km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -13,6 +13,14 @@ export const calcDist = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
+export const calcPolylineDist = (coords) => {
+    if (!coords || coords.length < 2) return 0;
+    let total = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+        total += calcDist(coords[i][0], coords[i][1], coords[i+1][0], coords[i+1][1]);
+    }
+    return total;
+}
 // [New] 路径缝合算法: 将乱序的 MultiLineString 缝合成连续的 LineString
 export const stitchRoutes = (turf, multiCoords, startPt) => {
   let pool = multiCoords.map((coords, i) => {
@@ -216,11 +224,11 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
             if (geom.isMulti) {
                 geom.coords.forEach(c => {
                     allCoords.push({ coords: c, color: geom.color || '#94a3b8' });
-                    if(turf) totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
+                    totalDist += calcPolylineDist(c);
                 });
             } else {
                 allCoords.push({ coords: geom.coords, color: geom.color || '#94a3b8' });
-                if(turf) totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                totalDist += calcPolylineDist(geom.coords);
             }
         } else {
              // Fallback Distance Approx

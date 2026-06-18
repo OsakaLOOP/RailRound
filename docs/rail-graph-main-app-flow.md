@@ -38,6 +38,8 @@
 5. 时间、名称、source 等信息只在有定位或判断价值时出现；避免同一条目上下重复。
 6. 不提供无意义 batch/bulk UI。列表可以多选用于导航或过滤，但不能包装成用户并不需要的批量操作。
 7. 非方向 / 强制方向 workflow 的导出语义属于 MVP / aggregate 产物加载约束；主应用只消费可加载结果。
+8. legacy GeoJSON 与旧 `app-line:*` 用户事件是一等兼容路径；时间层、scenic 等常规事件可以推断，不因 legacy source 默认禁用。
+9. 只有只读 system event、缺失必要锚点、权限/同步冲突、或无法定位任何 axis 时禁用编辑；低置信度推断显示 diagnostics，不阻断编辑。
 
 ## 4. Data Flow
 
@@ -68,7 +70,22 @@ TripEditor / route planner candidate
 
 Manual segment editing clears stale rail-graph snapshot and returns the trip to legacy GeoJSON segments.
 
-### 4.3 User Event / 标注
+### 4.3 Active Selection
+
+`activeRailGraphSelection` 是主应用唯一非持久 UI selection 真源。window bridge 只保留 Leaflet / DOM 边界，不保存业务状态。
+
+该状态使用 discriminated union：
+
+- `routeSelected`: 地图 route 被选中，并派生 active axis。
+- `axisSelected`: 当前查看或编辑的 rail-graph snapshot segment / legacy GeoJSON axis。
+- `eventSelected`: 当前选中用户事件或可定位事件，必须绑定 route / axis 上下文。
+- `creating`: 正在创建用户标注，继承当前 route / axis anchor。
+- `inspecting`: 正在检查对象，不自动进入创建。
+- `unavailable`: 缺失必要上下文或权限时的显式不可用状态，必须带 reason。
+
+旧 `kind: route | axis | event` 只作为迁移期兼容别名；新逻辑必须以 `state` 为准。
+
+### 4.4 User Event / 标注
 
 ```text
 Map route click / pin / map point / TripPage jump
@@ -83,6 +100,17 @@ Map route click / pin / map point / TripPage jump
 
 TripPage event rows should call map selection/opening APIs; they should not become a competing editor.
 
+### 4.5 Scenic / Viewpoint
+
+Scenic 不再只是 event kind。系统 scenic 与用户 scenic 共享 `ScenicViewpointPayload`：
+
+- 必须有 mileage / anchor 与 `facing: left | right | front | back`。
+- `targetBearingDegrees`、`visibleBearingRangeDegrees`、角度容差可由 projection 推断。
+- projection 必须输出 confidence、diagnostics 和 visibility status。
+- visibility status 固定为 `visible | opposite_side | angle_mismatch | unknown | unavailable`。
+
+Rail-graph snapshot 使用 run geometry / direction 推断 scenic visibility。Legacy GeoJSON 使用线路局部几何和地图点推断 bearing / side，并标记 `inferred_from_geojson`；用户可用地图方向控件修正。
+
 ## 5. UI Responsibilities
 
 | Surface | Role | Required state |
@@ -95,6 +123,19 @@ TripPage event rows should call map selection/opening APIs; they should not beco
 | GlobalSearch | Fast navigation | source badges, event/trip metadata, map jump for标注 |
 | TripEditor | Route planning and saved snapshot review | candidate source, pattern/service/direction, save semantics, no direct rail-graph mutation |
 | ExportRouteModal | Export truth | saved snapshot vs legacy route, exportable key events, geometry source |
+
+Map route click 的语义顺序固定为：
+
+```text
+click route
+  -> state = routeSelected
+  -> derive active axis
+  -> highlight route and dim non-active routes
+  -> expand compact MileageEventsPanel handle
+  -> user explicitly chooses Create
+```
+
+点击 route 不直接创建草稿。
 
 ## 6. Visual Language
 
@@ -110,6 +151,8 @@ Required badge families:
 
 Badges should carry metadata, not repeat surrounding title/time text. Raw refs can appear in tooltip or detail rows, not as the primary label.
 
+Map chrome 使用统一安全区：Leaflet layer / zoom 控件不占 rail-graph 面板右上区域；RailGraph handle 默认是右侧半透明扁长手柄，hover / focus / route select 时展开为摘要入口。移动端使用底部或右侧自适应手柄，并支持 tap / drag 展开和收起。
+
 Current shared entry points:
 
 - `RailGraphRunBadges` for React service / direction / pattern metadata.
@@ -119,7 +162,7 @@ Current shared entry points:
 
 ## 7. Current Progress
 
-Current implementation is approximately 65-68 percent complete for the main-app UI goal.
+Current implementation is approximately 75-78 percent complete for the main-app UI goal.
 
 Done:
 
@@ -132,6 +175,10 @@ Done:
 - `activeRailGraphSelection` is the shared non-persistent UI selection across Map route click, TripPage jump, GlobalSearch event jump, EventInspector map jump, and MileageEventsPanel.
 - Map event marker clicks preserve trip id, segment index, and route context when projection data is available.
 - `railGraphSelection.ts` centralizes bridge source conversion plus ProductTripSegment / event projection context / Map route item selection payloads, including legacy GeoJSON compatibility and explicit rail-graph source overrides.
+- Scenic payload now flows through system events, user events, projection, and MapView rendering as a shared viewpoint/visibility contract instead of a plain event category.
+- MapView renders scenic visibility as a first-class Leaflet layer with status-colored fan/ray/origin geometry, plus distinct scenic marker styling.
+- MileageEventsPanel closed state is a right-edge translucent handle that opens on pointer hover for mouse/pen and still supports tap/click for touch.
+- MileageEventsPanel header import/export controls are grouped under a compact action menu instead of two permanent header buttons.
 - TripPage event center has moved toward read-only overview and map jump instead of competing event editing/export tooling.
 - Route metadata uses the shared badge visual language in React surfaces and Leaflet HTML.
 
@@ -140,6 +187,7 @@ Still incomplete:
 - Window bridge events and store `activeRailGraphSelection` still coexist; the bridge should shrink further to native Leaflet / DOM event boundaries.
 - Map selected route, selected event marker, dimmed routes, hover metadata, and touch metadata still need visual QA.
 - EventComposer and MileageEventsPanel need more narrow-screen polish and disabled-reason QA.
+- Mobile drag-to-open/drag-to-adjust interactions for the edge handle and scenic direction/range controls are not implemented yet.
 - TripPage still needs replay/route visualization simplification and more top-level run summary polish.
 - Visual QA for mobile/desktop has not been completed.
 

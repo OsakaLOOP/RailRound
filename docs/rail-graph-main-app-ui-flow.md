@@ -37,6 +37,7 @@ MVP / aggregate 只要求导出产物可被真实 loader / smoke 读取，不扩
 
 ```text
 activeRailGraphSelection
+  state: routeSelected | axisSelected | eventSelected | creating | inspecting | unavailable
   kind: route | event | axis
   source: rail_graph_snapshot | legacy_geojson
   lineKey
@@ -50,11 +51,21 @@ activeRailGraphSelection
   anchor: lat / lng / tripRatio
 ```
 
-该状态不进入 IndexedDB，不随用户数据同步。它只表示当前 UI 选择，用来对齐 MapView、MileageEventsPanel、TripPage 跳转和 Search 事件定位。
+该状态不进入 IndexedDB，不随用户数据同步。它只表示当前 UI 选择，用来对齐 MapView、MileageEventsPanel、TripPage 跳转和 Search 事件定位。`state` 是判别字段；旧 `kind` 只作为迁移期兼容别名。
+
+状态语义：
+
+- `routeSelected`: route click 后的主状态，驱动 active axis 和 map highlight。
+- `axisSelected`: 当前面板查看/编辑的 mileage axis。
+- `eventSelected`: 当前选中的事件，必须携带 event id 与可恢复的 route / axis context。
+- `creating`: 用户显式进入创建，继承 route / axis anchor。
+- `inspecting`: 只检查 route / event / axis，不自动创建。
+- `unavailable`: 缺少锚点、权限或可投影 axis 时的显式状态，必须显示 reason。
 
 当前实现状态：
 
 - Map route click 写入 `kind="route"`，打开事件面板但不直接进入创建草稿。
+- 当前实现已开始写入 `state="routeSelected" | "axisSelected" | "eventSelected"`，新逻辑以 `state` 为准。
 - MileageEventsPanel open handler 会保留同一路线的 `kind="route"` selection，避免覆盖掉 route click 的 `anchor` / run metadata；只有事件选择或不同 axis 才降级/切换 selection。
 - Map route highlight 优先使用 `routeItemId`，避免同一 pattern / line 的多个 segment 被误认为同一选中对象。
 - Event select 写入 `kind="event"`，地图 marker 与面板 inspector 可以同步。
@@ -81,7 +92,25 @@ click route
 
 这样避免“只是查看路线却进入创建”的误触，同时保留从选中线路快速创建标注的效率。
 
-## 6. TripPage Contract
+## 6. Map Chrome Contract
+
+MapView 使用统一地图控件安全区：
+
+- Leaflet zoom / layer 控件不得占用 rail-graph 面板右上区域。
+- MileageEventsPanel 关闭态是右侧半透明扁长手柄；鼠标不进入时只显示贴边手柄。
+- hover / focus / route select 时，手柄展开成 compact summary，可直接打开面板。
+- 移动端允许 tap 展开、drag 拉出/收起；后续 scenic 方向扇区也必须支持拖动调整。
+
+当前实现状态：
+
+- Leaflet layer control 已从 `topright` 移到 `topleft`，避免与 rail-graph 面板冲突。
+- MileageEventsPanel 关闭态已从右上圆形按钮改为右侧中段贴边手柄，展开时显示当前 axis 摘要。
+
+Current Map chrome implementation state:
+- MileageEventsPanel closed handle opens on mouse/pen pointer enter and tap/click, so desktop route-to-events flow removes one explicit click.
+- Import/export are grouped under a compact header action menu; close remains a dedicated button.
+
+## 7. TripPage Contract
 
 TripPage 的 event center 是只读概要：
 
@@ -91,7 +120,7 @@ TripPage 的 event center 是只读概要：
 - event row 可以跳转地图并选中事件。
 - 不提供 copy / JSON / MDX 事件工具；这些应放在地图事件面板或独立导出入口。
 
-## 7. Visual Language
+## 8. Visual Language
 
 所有 rail-graph / user event 元数据优先使用 React 组件：
 
@@ -130,7 +159,23 @@ EventComposer 当前已经把 station / map / mileage / trip 四种创建来源�
 - 明确 disabled reason，而不是只让 Create 按钮变灰。
 - 当前实现已把不可用原因显示到每张 source card 上，并额外区分“没有 trip”和“选中 trip 没有可投影 segment”；窄视口先单列展示 source card，避免 disabled reason 挤压主要标签。
 
-## 8. Remaining PR Work
+## 9. Scenic / Viewpoint UI
+
+Scenic 标注必须表现为地图可理解的 viewpoint，而不是普通分类：
+
+- 系统 scenic 与用户 scenic 共用 `ScenicViewpointPayload`。
+- 地图显示 scenic marker、视线/扇形可视域、route 绑定和 visibility badge。
+- visibility status 固定为 `visible | opposite_side | angle_mismatch | unknown | unavailable`。
+- 用户创建 scenic 时，默认从 route anchor 的切线方向和地图目标点推断 facing / bearing / range。
+- 编辑控件使用地图内方向盘/扇形控件，拖动调整 bearing/range，旁边用 left/right/front/back segmented control 快速切换。
+- Legacy GeoJSON scenic 使用线路局部几何推断，并标记 `inferred_from_geojson`；低置信度只显示 diagnostics，不禁用编辑。
+
+Current scenic implementation state:
+- System scenic events and user scenic events share `ScenicViewpointPayload`; legacy GeoJSON scenic events infer `facing`, target bearing, and source diagnostics where possible.
+- MapView renders scenic visibility through `scenicVisibilityLayer.ts`: fan polygon, target ray, origin marker, and status-colored scenic marker classes.
+- Remaining gap: direct map drag controls for editing scenic facing/bearing/range are not implemented yet.
+
+## 10. Remaining PR Work
 
 ### PR UI-1 - Active selection hardening
 

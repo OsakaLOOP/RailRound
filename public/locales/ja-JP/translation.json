@@ -216,7 +216,9 @@
       "departure": "出発",
       "transfer": "乗換",
       "arrival": "到着",
-      "openMapEditor": "マップ編集を開く"
+      "systemEvents": "{{count}} 件のシステムイベント",
+      "moreSegments": "+{{count}} 区間",
+      "openMapView": "MapView で開く"
     },
     "eventFilters": {
       "title": "旅程イベントフィルター",

@@ -216,7 +216,9 @@
       "departure": "出發",
       "transfer": "換乘",
       "arrival": "抵達",
-      "openMapEditor": "打開地圖編輯器"
+      "systemEvents": "{{count}} 個系統事件",
+      "moreSegments": "+{{count}} 段",
+      "openMapView": "在地圖中打開"
     },
     "eventFilters": {
       "title": "行程事件篩選",

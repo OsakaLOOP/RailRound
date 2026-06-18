@@ -146,7 +146,7 @@ legacy GeoJSON 不是临时兼容层，而是主应用仍需支持的数据源�
 | selection / map wiring | 70% | 90% | shared selection 已覆盖 Map route click、Map event marker click、TripPage、Search、Inspector；`mileage-events:active-line` 双写已移除，仍需补组件级 QA。 |
 | MapView 编辑体验 | 55% | 90% | 路线选择和面板打开已接上，仍需 route hover/touch、pin create、selected/dimmed 视觉 QA。 |
 | MileageEventsPanel | 65% | 90% | header/source cards 已改，仍需事件列表信息层级、窄屏与 disabled reason 打磨。 |
-| TripsPage | 70% | 90% | 已转向只读，仍需顶层 trip card 运行摘要和 replay 视觉精简。 |
+| TripsPage | 80% | 90% | event center 已抽成 detail-model 驱动的只读 `TripEventCenter`，replay/重复 source 文案已精简；仍需浏览器级桌面/移动视觉 QA。 |
 | Search / Inspector / Export / TripEditor | 66% | 85% | map jump selection 已固化到 helper，仍需 raw ref、重复元数据和视觉一致性 QA。 |
 | visual system | 55% | 85% | React badge 与 Leaflet HTML badge 已有，仍需统一 event/pattern representative SVG/badge 组件和配色审计。 |
 
@@ -171,9 +171,9 @@ legacy GeoJSON 不是临时兼容层，而是主应用仍需支持的数据源�
    - legacy GeoJSON 和 saved snapshot 的 place/time/create 行为分开解释，避免 snapshot 误套 GeoJSON 查询。
 
 4. PR UI-D: TripsPage read-only replay polish
-   - trip card 顶层提升 pattern/service/direction/source/run summary。
-   - event center 只读，里程 replay 支持选中 event/route 后跳 MapView。
-   - 删除或移动残留事件管理/导出文案。
+   - trip card 顶层已保留 pattern/service/direction/source 摘要，expanded event center 使用 `TripEventCenter` 承担 run summary 和 replay。
+   - event center 只读，replay 改读 `TripDetailModel.events`，支持 user event 选中后跳 MapView。
+   - 已删除 `Open map editor` 语义，改为 `Open in MapView`；仍需浏览器级视觉 QA 检查 route slice 与 event center 在窄屏是否拥挤。
 
 5. PR UI-E: Shared visual asset and badge layer
    - 在一个 React 组件文件中集中 pattern type、run event、user event、source、geometry 的 SVG symbol / badge mapping。

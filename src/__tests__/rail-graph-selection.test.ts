@@ -7,6 +7,7 @@ import {
   isRouteSelection,
   openDetailMatchesActiveRouteSelection,
   productSegmentSelectionLineKey,
+  projectionDetailMatchesActiveSelection,
   projectionDetailFromRailGraphSelection,
   projectionDetailFromMileageEventsOpen,
   projectionSourceFromRailGraphSelection,
@@ -230,6 +231,62 @@ describe("rail graph active UI selection helpers", () => {
           tripSegmentIndex: 1,
         },
         selection,
+      ),
+    ).toBe(false);
+  });
+
+  it("recognizes route and event selections that already cover projection details", () => {
+    const routeSelection: RailGraphActiveSelection = {
+      state: "routeSelected",
+      kind: "route",
+      source: "rail_graph_snapshot",
+      lineKey: "rail-graph:pattern:local",
+      tripId: "trip:1",
+      tripSegmentIndex: 1,
+      routeItemId: "route:1",
+      updatedAt: 100,
+    };
+    const eventSelection: RailGraphActiveSelection = {
+      ...routeSelection,
+      state: "eventSelected",
+      kind: "event",
+      eventId: "event:1",
+    };
+
+    expect(
+      projectionDetailMatchesActiveSelection(
+        {
+          source: "rail_graph_runtime",
+          lineKey: "rail-graph:pattern:local",
+          tripId: "trip:1",
+          tripSegmentIndex: 1,
+          routeItemId: "route:1",
+        },
+        routeSelection,
+      ),
+    ).toBe(true);
+    expect(
+      projectionDetailMatchesActiveSelection(
+        {
+          source: "rail_graph_runtime",
+          lineKey: "rail-graph:pattern:local",
+          tripId: "trip:1",
+          tripSegmentIndex: 1,
+          routeItemId: "route:1",
+        },
+        eventSelection,
+        "event:1",
+      ),
+    ).toBe(true);
+    expect(
+      projectionDetailMatchesActiveSelection(
+        {
+          source: "legacy_app",
+          lineKey: "rail-graph:pattern:local",
+          tripId: "trip:1",
+          tripSegmentIndex: 1,
+        },
+        routeSelection,
       ),
     ).toBe(false);
   });

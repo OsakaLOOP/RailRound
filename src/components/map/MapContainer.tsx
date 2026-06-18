@@ -29,17 +29,13 @@ import {
   mileageEventUiEvents,
   openMileageEventsPanel,
   selectMileageEventOnMap,
-  setActiveMileageLine,
   setMileageEventsMapPoint,
   type MileageEventSelectDetail,
-  type MileageEventsActiveLineDetail,
   type MileageEventsProjectionSource,
 } from "../../utils/mileageEventUiBridge";
 import {
   activeAxisFromRailGraphSelection,
   isEventSelection,
-  railGraphSelectionSourceFromProjection,
-  selectionFromActiveAxis,
   selectionFromMileageEventSelect,
   selectionFromProductSegment,
 } from "../../utils/railGraphSelection";
@@ -398,41 +394,6 @@ export const MapContainer: React.FC<Props> = ({
       if (detail.eventId) {
         setSelectedMileageEventId(detail.eventId);
       }
-      if (detail.lineKey || detail.source || detail.tripId !== undefined) {
-        const trip = detail.tripId !== undefined
-          ? trips.find((candidate) => String(candidate.id) === String(detail.tripId))
-          : null;
-        const productSegments = trip ? tripToProductSegments(trip, railwayData) : [];
-        const productSegment = typeof detail.tripSegmentIndex === "number"
-          ? productSegments[detail.tripSegmentIndex]
-          : undefined;
-        const selection = productSegment
-          ? selectionFromProductSegment({
-              kind: "event",
-              segment: productSegment,
-              source: detail.source ? railGraphSelectionSourceFromProjection(detail.source) : undefined,
-              lineKey: detail.lineKey ?? null,
-              tripId: detail.tripId,
-              tripSegmentIndex: detail.tripSegmentIndex,
-              routeItemId: detail.routeItemId,
-              eventId: detail.eventId,
-            })
-          : selectionFromMileageEventSelect(detail);
-        if (selection) {
-          setActiveRailGraphSelection(selection);
-        }
-      }
-    };
-
-    const handleActiveMileageLine = (event: Event) => {
-      const detail = customEventDetail<MileageEventsActiveLineDetail>(event);
-      if (!detail.lineKey && !detail.source) {
-        clearActiveRailGraphSelection();
-        return;
-      }
-      const selection = selectionFromActiveAxis(detail);
-      if (!selection) return;
-      setActiveRailGraphSelection(selection);
     };
 
     const handleFlyToLocation = (e: Event) => {
@@ -468,14 +429,12 @@ export const MapContainer: React.FC<Props> = ({
     window.addEventListener("map:create-temp-pin", handleCreateTempPin);
     window.addEventListener(mileageEventUiEvents.requestMapCenter, handleRequestMapCenter);
     window.addEventListener(mileageEventUiEvents.select, handleMileageEventSelect);
-    window.addEventListener(mileageEventUiEvents.activeLine, handleActiveMileageLine);
     window.addEventListener("map:fly-to-location", handleFlyToLocation);
       window.addEventListener("map:show-nearby-stations", handleShowNearbyStations);
     return () => {
       window.removeEventListener("map:create-temp-pin", handleCreateTempPin);
       window.removeEventListener(mileageEventUiEvents.requestMapCenter, handleRequestMapCenter);
       window.removeEventListener(mileageEventUiEvents.select, handleMileageEventSelect);
-      window.removeEventListener(mileageEventUiEvents.activeLine, handleActiveMileageLine);
       window.removeEventListener("map:fly-to-location", handleFlyToLocation);
         window.removeEventListener("map:show-nearby-stations", handleShowNearbyStations);
     };
@@ -1624,13 +1583,6 @@ export const MapContainer: React.FC<Props> = ({
       const projectionSource = item.source === "rail_graph" ? "rail_graph_runtime" : "legacy_app";
       const mapPoint = { lat: event.latlng.lat, lng: event.latlng.lng };
       const tripRatio = ratioAtRoutePoint(item, event.latlng);
-      setActiveMileageLine({
-        lineKey: item.lineKey ?? null,
-        source: projectionSource,
-        tripId: item.tripId,
-        tripSegmentIndex: item.segmentIndex,
-        routeItemId: item.id,
-      });
       const selection = selectionFromProductSegment({
         kind: "route",
         source: item.source === "rail_graph" ? "rail_graph_snapshot" : "legacy_geojson",
@@ -2051,6 +2003,8 @@ export const MapContainer: React.FC<Props> = ({
             item.selectionDetails[0];
           if (!detail) return;
           setSelectedMileageEventId(detail.eventId);
+          const selection = selectionFromMileageEventSelect(detail);
+          if (selection) setActiveRailGraphSelection(selection);
           selectMileageEventOnMap(detail);
         };
         layer.on("click", markerClickHandler);
@@ -2133,6 +2087,8 @@ export const MapContainer: React.FC<Props> = ({
             item.selectionDetails[0];
           if (!detail) return;
           setSelectedMileageEventId(detail.eventId);
+          const selection = selectionFromMileageEventSelect(detail);
+          if (selection) setActiveRailGraphSelection(selection);
           selectMileageEventOnMap(detail);
         };
         marker.on("click", markerClickHandler);

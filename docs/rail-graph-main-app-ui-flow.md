@@ -181,8 +181,8 @@ Current scenic implementation state:
 
 ### PR UI-1 - Active selection hardening
 
-- `railGraphSelection.ts` 已集中 bridge conversion、ProductTripSegment -> selection、event projection context -> selection、panel projection detail、open-detail route match 和 Map route item source override；MapContainer bridge handler 已减少 active axis 双写，active axis 主要从 store selection 派生。
-- Search、Inspector、TripPage 跳转与 Map route click 已直接写同一状态；后续继续把 window event 桥接限制在 Leaflet / DOM 边界。
+- `railGraphSelection.ts` 已集中 bridge conversion、ProductTripSegment -> selection、event projection context -> selection、panel projection detail、open-detail route match、active projection match 和 Map route item source override；MapContainer 不再通过 `mileage-events:active-line` bridge 写 active axis，active axis 从 store selection 派生。
+- Search、Inspector、TripPage 跳转、MileageEventsPanel event select 与 Map route/event click 已直接写同一状态；window event 桥接保留在 Leaflet / DOM 的 open/select/fly-to/map-point 边界。
 - Map event marker click 已补齐 trip / segment / route context，不再只传 eventId + lineKey。
 - PinEditor 已接入同一 selection，并通过纯 helper 覆盖 pin create -> legacy active axis -> panel map-source create payload。
 - PinEditor 的 snap 标题和事件轴提示使用可读 line label，不把 lineKey 作为主显示文本。

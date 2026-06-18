@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import {
+  Compass,
   Copy,
   Edit2,
   Eye,
@@ -242,6 +243,50 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
     );
   };
 
+  const renderScenicViewpoint = () => {
+    const viewpoint = event.payload?.viewpoint;
+    if (event.kind !== "scenic" && !viewpoint && !bound?.scenicVisibility) return null;
+    const visibility = bound?.scenicVisibility;
+    const status = visibility?.status ?? "unknown";
+    const bearing = visibility?.targetBearingDegrees ?? viewpoint?.targetBearingDegrees ?? viewpoint?.constraint?.targetBearingDegrees;
+    const angleTolerance = viewpoint?.constraint?.angleToleranceDegrees;
+    const distanceMeters = viewpoint?.constraint?.distanceMeters;
+    return (
+      <div className="rounded-md border border-sky-100 bg-sky-50/70 p-2 text-xs text-slate-600">
+        <div className="mb-2 flex items-center gap-1.5 font-semibold text-sky-900">
+          <Compass size={14} />
+          <span>{t("mileageEvents.scenicViewpoint.title", "Scenic viewpoint")}</span>
+        </div>
+        <dl className="grid grid-cols-2 gap-2">
+          <InfoTerm
+            label={t("mileageEvents.scenicViewpoint.status", "Status")}
+            value={t(`mileageEvents.scenicViewpoint.statusValue.${status}`, status)}
+          />
+          <InfoTerm
+            label={t("mileageEvents.scenicViewpoint.facing", "Facing")}
+            value={viewpoint?.facing ? t(`mileageEvents.scenicViewpoint.facingValue.${viewpoint.facing}`, viewpoint.facing) : t("mileageEvents.unknown", "Unknown")}
+          />
+          <InfoTerm
+            label={t("mileageEvents.scenicViewpoint.bearing", "Bearing")}
+            value={formatDegrees(bearing)}
+          />
+          <InfoTerm
+            label={t("mileageEvents.scenicViewpoint.angleTolerance", "Angle")}
+            value={formatDegrees(angleTolerance)}
+          />
+          <InfoTerm
+            label={t("mileageEvents.scenicViewpoint.distance", "Range")}
+            value={formatMeters(distanceMeters)}
+          />
+          <InfoTerm
+            label={t("mileageEvents.scenicViewpoint.confidence", "Confidence")}
+            value={visibility?.confidence !== undefined ? `${Math.round(visibility.confidence * 100)}%` : t("mileageEvents.unknown", "Unknown")}
+          />
+        </dl>
+      </div>
+    );
+  };
+
   if (editing) {
     return (
       <section className="rounded-md border border-slate-200 bg-white p-3">
@@ -299,6 +344,8 @@ export const EventInspector: React.FC<Props> = ({ event, onClose, onDeleted }) =
         </dl>
 
         {renderProjectionContext()}
+
+        {renderScenicViewpoint()}
 
         {projectionStatus && projectionStatus.code !== "projected" && (
           <ProjectionStatusNotice status={projectionStatus} />
@@ -455,3 +502,11 @@ const ActionButton: React.FC<{
     <span className="truncate">{label}</span>
   </button>
 );
+
+function formatDegrees(value: number | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? `${Math.round(value)} deg` : "-";
+}
+
+function formatMeters(value: number | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? `${Math.round(value)} m` : "-";
+}

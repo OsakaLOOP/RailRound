@@ -177,7 +177,8 @@ Done:
 - `railGraphSelection.ts` centralizes bridge source conversion plus ProductTripSegment / event projection context / Map route item selection payloads, including legacy GeoJSON compatibility and explicit rail-graph source overrides.
 - Scenic payload now flows through system events, user events, projection, and MapView rendering as a shared viewpoint/visibility contract instead of a plain event category.
 - MapView renders scenic visibility as a first-class Leaflet layer with status-colored fan/ray/origin geometry, plus distinct scenic marker styling.
-- MileageEventsPanel closed state is a right-edge translucent handle that opens on pointer hover for mouse/pen and still supports tap/click for touch.
+- Selected scenic user events expose explicit viewpoint controls in EventComposer/EventInspector and draggable MapView handles for bearing, angle tolerance, and range.
+- MileageEventsPanel closed state is a right-edge translucent handle that opens on pointer hover for mouse/pen, tap/click for touch, and drag-to-open/drag-to-close on touch/pen.
 - MileageEventsPanel header import/export controls are grouped under a compact action menu instead of two permanent header buttons.
 - TripPage event center has moved toward read-only overview and map jump instead of competing event editing/export tooling.
 - Route metadata uses the shared badge visual language in React surfaces and Leaflet HTML.
@@ -186,8 +187,7 @@ Still incomplete:
 
 - Window bridge events and store `activeRailGraphSelection` still coexist; the bridge should shrink further to native Leaflet / DOM event boundaries.
 - Map selected route, selected event marker, dimmed routes, hover metadata, and touch metadata still need visual QA.
-- EventComposer and MileageEventsPanel need more narrow-screen polish and disabled-reason QA.
-- Mobile drag-to-open/drag-to-adjust interactions for the edge handle and scenic direction/range controls are not implemented yet.
+- EventComposer and MileageEventsPanel need more narrow-screen visual QA and disabled-reason QA.
 - TripPage still needs replay/route visualization simplification and more top-level run summary polish.
 - Visual QA for mobile/desktop has not been completed.
 

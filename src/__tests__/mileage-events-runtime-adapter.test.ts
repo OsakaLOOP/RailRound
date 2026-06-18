@@ -25,6 +25,7 @@ import {
   queryEventsByMileage,
   queryEventsByText,
   queryEventsByTime,
+  updateMileageEventFromDraft,
 } from "../utils/mileageUserEvents";
 import { tripResultToLegacyTrip } from "../utils/railGraphTripAdapter";
 import type { RailwayMap } from "../store";
@@ -287,6 +288,75 @@ describe("mileage events runtime adapter", () => {
     expect(stationEvent.payload?.viewpoint?.coordinates).toBeUndefined();
     expect(stationEvent.payload?.viewpoint?.targetBearingDegrees).toBeGreaterThan(150);
     expect(stationEvent.payload?.viewpoint?.targetBearingDegrees).toBeLessThan(210);
+  });
+
+  it("keeps explicit scenic viewpoint edits in the shared event payload", () => {
+    const lineKey = "app:test-explicit-scenic-line";
+    const railwayData: RailwayMap = {
+      [lineKey]: {
+        meta: {
+          company: "Test Railway",
+          region: "test",
+          type: "fixture",
+          logo: null,
+          color: "#0f766e",
+        },
+        stations: [
+          { id: "a", name_ja: "Alpha", lat: 35.0, lng: 139.0, transfers: [], distToNext: 5 },
+          { id: "b", name_ja: "Beta", lat: 35.0, lng: 139.05, transfers: [] },
+        ],
+      },
+    };
+    const lineContext = buildAppMileageLineContext(railwayData, lineKey)!;
+    const event = createMileageEventFromStation({
+      lineContext,
+      stationId: "a",
+      title: "Explicit window view",
+      kind: "scenic",
+      scenicViewpoint: {
+        facing: "front",
+        targetBearingDegrees: 12,
+        angleToleranceDegrees: 18,
+        distanceMeters: 2200,
+      },
+    });
+
+    expect(event?.payload?.viewpoint).toMatchObject({
+      facing: "front",
+      source: "user_explicit",
+      targetBearingDegrees: 12,
+      constraint: {
+        targetBearingDegrees: 12,
+        angleToleranceDegrees: 18,
+        distanceMeters: 2200,
+      },
+    });
+
+    const updated = updateMileageEventFromDraft(event!, {
+      kind: "scenic",
+      scenicViewpoint: {
+        facing: "left",
+        targetBearingDegrees: 270,
+        angleToleranceDegrees: 44,
+        distanceMeters: 3100,
+      },
+    });
+    expect(updated.payload?.viewpoint).toMatchObject({
+      facing: "left",
+      source: "user_explicit",
+      targetBearingDegrees: 270,
+      constraint: {
+        targetBearingDegrees: 270,
+        angleToleranceDegrees: 44,
+        distanceMeters: 3100,
+      },
+    });
+
+    const display = boundMileageEventForDisplay(updated, railwayData);
+    expect(display?.bound.scenicVisibility?.targetBearingDegrees).toBe(270);
+
+    const nonScenic = updateMileageEventFromDraft(updated, { kind: "user_note" });
+    expect(nonScenic.payload?.viewpoint).toBeUndefined();
   });
 });
 

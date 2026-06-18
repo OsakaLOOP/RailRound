@@ -726,6 +726,42 @@
   --scenic-status-color: #7c3aed;
 }
 
+.scenic-visibility-handle {
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: #0369a1;
+  box-shadow:
+    0 8px 18px rgba(15,23,42,0.28),
+    0 0 0 1px rgba(2,132,199,0.5);
+  color: #fff;
+  cursor: grab;
+}
+
+.scenic-visibility-handle span {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.scenic-visibility-handle-left,
+.scenic-visibility-handle-right {
+  background: #0f766e;
+  box-shadow:
+    0 8px 18px rgba(15,23,42,0.26),
+    0 0 0 1px rgba(15,118,110,0.5);
+}
+
+.scenic-visibility-handle:active {
+  cursor: grabbing;
+}
+
 .mileage-event-marker.is-selected {
   transform: translateZ(0) scale(1.18);
   box-shadow:

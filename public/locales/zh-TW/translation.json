@@ -587,6 +587,29 @@
       "shared": "共享",
       "public": "公開"
     },
+    "scenicViewpoint": {
+      "title": "景觀視點",
+      "facing": "朝向",
+      "bearing": "方位角",
+      "angleTolerance": "角度",
+      "distance": "範圍",
+      "status": "狀態",
+      "confidence": "可信度",
+      "auto": "自動",
+      "facingValue": {
+        "left": "左側",
+        "right": "右側",
+        "front": "前方",
+        "back": "後方"
+      },
+      "statusValue": {
+        "visible": "可見",
+        "opposite_side": "反側",
+        "angle_mismatch": "角度不符",
+        "unknown": "未知",
+        "unavailable": "不可用"
+      }
+    },
     "filter": {
       "allLines": "全部路線",
       "source": "來源",

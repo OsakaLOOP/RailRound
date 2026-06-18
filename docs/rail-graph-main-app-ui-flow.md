@@ -99,7 +99,7 @@ MapView 使用统一地图控件安全区：
 - Leaflet zoom / layer 控件不得占用 rail-graph 面板右上区域。
 - MileageEventsPanel 关闭态是右侧半透明扁长手柄；鼠标不进入时只显示贴边手柄。
 - hover / focus / route select 时，手柄展开成 compact summary，可直接打开面板。
-- 移动端允许 tap 展开、drag 拉出/收起；后续 scenic 方向扇区也必须支持拖动调整。
+- 移动端允许 tap 展开、drag 拉出/收起；scenic 方向扇区支持拖动调整。
 
 当前实现状态：
 
@@ -108,6 +108,7 @@ MapView 使用统一地图控件安全区：
 
 Current Map chrome implementation state:
 - MileageEventsPanel closed handle opens on mouse/pen pointer enter and tap/click, so desktop route-to-events flow removes one explicit click.
+- The closed edge handle supports touch/pen drag-to-open, and the open panel header supports touch/pen drag-to-close.
 - Import/export are grouped under a compact header action menu; close remains a dedicated button.
 
 ## 7. TripPage Contract
@@ -173,7 +174,8 @@ Scenic 标注必须表现为地图可理解的 viewpoint，而不是普通分类
 Current scenic implementation state:
 - System scenic events and user scenic events share `ScenicViewpointPayload`; legacy GeoJSON scenic events infer `facing`, target bearing, and source diagnostics where possible.
 - MapView renders scenic visibility through `scenicVisibilityLayer.ts`: fan polygon, target ray, origin marker, and status-colored scenic marker classes.
-- Remaining gap: direct map drag controls for editing scenic facing/bearing/range are not implemented yet.
+- EventComposer edits scenic `facing`, target bearing, angle tolerance, and display range; EventInspector shows the projected visibility status and viewpoint fields.
+- Selected scenic user events expose draggable MapView handles for bearing/range and fan angle/range edits, writing back to the shared `payload.viewpoint`.
 
 ## 10. Remaining PR Work
 

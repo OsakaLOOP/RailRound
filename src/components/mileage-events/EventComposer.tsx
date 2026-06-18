@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { MapPinned, Navigation, Plus, Route, TrainFront } from "lucide-react";
+import { Compass, MapPinned, Navigation, Plus, Route, TrainFront } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../../store";
 import { useShallow } from "zustand/react/shallow";
-import type { UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
+import type { ScenicFacing, UserEventV2 } from "../../rail-graph-v1/mileage-event.types";
 import { getTripRailGraphSnapshot } from "../../utils/railGraphTripPersistence";
 import { tripLineSummary, tripToProductSegments } from "../../utils/tripProductProjection";
 import {
@@ -18,12 +18,15 @@ import {
   tagsFromInput,
   tagsToInput,
   updateMileageEventFromDraft,
+  type ScenicViewpointDraft,
 } from "../../utils/mileageUserEvents";
 import { eventKindLabel, eventVisibilityLabel, mileageEventKinds, mileageEventVisibilities } from "./display";
 import { useMileageEventActions } from "./useMileageEventActions";
 import { requestMileageEventsMapCenter } from "../../utils/mileageEventUiBridge";
 
 type ComposerSource = "station" | "map" | "mileage" | "trip";
+
+const scenicFacingOptions: ScenicFacing[] = ["left", "right", "front", "back"];
 
 interface Props {
   event?: UserEventV2 | null;
@@ -90,6 +93,22 @@ export const EventComposer: React.FC<Props> = ({
   const [tagsInput, setTagsInput] = useState(event ? tagsToInput(event.tags) : defaultTagsInput);
   const [mediaUrl, setMediaUrl] = useState(String(event?.payload?.mediaUrl ?? defaultMediaUrl));
   const [linkedTripId, setLinkedTripId] = useState<string>(String(event?.payload?.tripId ?? defaultTripId ?? ""));
+  const [scenicFacing, setScenicFacing] = useState<ScenicFacing>(event?.payload?.viewpoint?.facing ?? "right");
+  const [scenicFacingTouched, setScenicFacingTouched] = useState(!!event?.payload?.viewpoint?.facing);
+  const [scenicBearing, setScenicBearing] = useState(
+    optionalNumberInput(event?.payload?.viewpoint?.targetBearingDegrees ?? event?.payload?.viewpoint?.constraint?.targetBearingDegrees),
+  );
+  const [scenicBearingTouched, setScenicBearingTouched] = useState(
+    event?.payload?.viewpoint?.targetBearingDegrees !== undefined || event?.payload?.viewpoint?.constraint?.targetBearingDegrees !== undefined,
+  );
+  const [scenicAngleTolerance, setScenicAngleTolerance] = useState(
+    optionalNumberInput(event?.payload?.viewpoint?.constraint?.angleToleranceDegrees ?? 30),
+  );
+  const [scenicAngleTouched, setScenicAngleTouched] = useState(!!event?.payload?.viewpoint?.constraint?.angleToleranceDegrees);
+  const [scenicDistanceMeters, setScenicDistanceMeters] = useState(
+    optionalNumberInput(event?.payload?.viewpoint?.constraint?.distanceMeters ?? 1500),
+  );
+  const [scenicDistanceTouched, setScenicDistanceTouched] = useState(!!event?.payload?.viewpoint?.constraint?.distanceMeters);
 
   useEffect(() => {
     if (event) {
@@ -101,6 +120,16 @@ export const EventComposer: React.FC<Props> = ({
       setMediaUrl(String(event.payload?.mediaUrl ?? ""));
       setLinkedTripId(String(event.payload?.tripId ?? ""));
       setDistanceKm((event.mileage.distanceMeters / 1000).toFixed(1));
+      setScenicFacing(event.payload?.viewpoint?.facing ?? "right");
+      setScenicFacingTouched(!!event.payload?.viewpoint?.facing);
+      setScenicBearing(optionalNumberInput(event.payload?.viewpoint?.targetBearingDegrees ?? event.payload?.viewpoint?.constraint?.targetBearingDegrees));
+      setScenicBearingTouched(
+        event.payload?.viewpoint?.targetBearingDegrees !== undefined || event.payload?.viewpoint?.constraint?.targetBearingDegrees !== undefined,
+      );
+      setScenicAngleTolerance(optionalNumberInput(event.payload?.viewpoint?.constraint?.angleToleranceDegrees ?? 30));
+      setScenicAngleTouched(!!event.payload?.viewpoint?.constraint?.angleToleranceDegrees);
+      setScenicDistanceMeters(optionalNumberInput(event.payload?.viewpoint?.constraint?.distanceMeters ?? 1500));
+      setScenicDistanceTouched(!!event.payload?.viewpoint?.constraint?.distanceMeters);
       if (eventLineKey) setLineKey(eventLineKey);
     }
   }, [event, eventLineKey]);
@@ -116,6 +145,14 @@ export const EventComposer: React.FC<Props> = ({
     setBody(defaultBody);
     setTagsInput(defaultTagsInput);
     setMediaUrl(defaultMediaUrl);
+    setScenicFacing("right");
+    setScenicFacingTouched(false);
+    setScenicBearing("");
+    setScenicBearingTouched(false);
+    setScenicAngleTolerance("30");
+    setScenicAngleTouched(false);
+    setScenicDistanceMeters("1500");
+    setScenicDistanceTouched(false);
   }, [defaultBody, defaultMediaUrl, defaultTagsInput, defaultTitle, event, resetKey]);
 
   useEffect(() => {
@@ -264,6 +301,19 @@ export const EventComposer: React.FC<Props> = ({
   };
   const createBlockedReason = sourceBlockedReason(source);
   const createDisabled = !event && !!createBlockedReason;
+  const scenicBearingNumber = parseOptionalNumber(scenicBearing);
+  const scenicAngleNumber = parseOptionalNumber(scenicAngleTolerance);
+  const scenicDistanceNumber = parseOptionalNumber(scenicDistanceMeters);
+  const scenicBearingValue = scenicBearingNumber ?? 0;
+  const scenicDraft = (): ScenicViewpointDraft | null | undefined => {
+    if (kind !== "scenic") return null;
+    return {
+      facing: event || scenicFacingTouched ? scenicFacing : undefined,
+      targetBearingDegrees: event || scenicBearingTouched ? scenicBearingNumber : undefined,
+      angleToleranceDegrees: event || scenicAngleTouched ? scenicAngleNumber : undefined,
+      distanceMeters: event || scenicDistanceTouched ? scenicDistanceNumber : undefined,
+    };
+  };
 
   const submit = () => {
     if (event) {
@@ -275,6 +325,7 @@ export const EventComposer: React.FC<Props> = ({
         tags: tagsFromInput(tagsInput),
         mediaUrl,
         tripId: linkedTripId || undefined,
+        scenicViewpoint: scenicDraft(),
       });
       updateEvent(updated);
       onSaved?.(updated);
@@ -289,6 +340,7 @@ export const EventComposer: React.FC<Props> = ({
       tags: tagsFromInput(tagsInput),
       mediaUrl,
       tripId: linkedTripId || undefined,
+      scenicViewpoint: scenicDraft(),
     };
 
     let created: UserEventV2 | null = null;
@@ -569,6 +621,117 @@ export const EventComposer: React.FC<Props> = ({
           </select>
         </label>
       </div>
+      {kind === "scenic" && (
+        <div className="rounded-md border border-sky-100 bg-sky-50/70 p-2">
+          <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-sky-900">
+            <Compass size={14} />
+            <span>{t("mileageEvents.scenicViewpoint.title", "Scenic viewpoint")}</span>
+          </div>
+          <label className="block text-xs font-medium text-slate-600">
+            {t("mileageEvents.scenicViewpoint.facing", "Facing")}
+            <div className="mt-1 grid grid-cols-4 gap-1">
+              {scenicFacingOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={scenicFacing === option}
+                  className={`rounded-md border px-2 py-1.5 text-[11px] font-semibold transition ${
+                    scenicFacing === option
+                      ? "border-sky-500 bg-white text-sky-700 shadow-sm"
+                      : "border-sky-100 bg-white/70 text-slate-500 hover:border-sky-200 hover:text-slate-800"
+                  }`}
+                  onClick={() => {
+                    setScenicFacing(option);
+                    setScenicFacingTouched(true);
+                  }}
+                >
+                  {t(`mileageEvents.scenicViewpoint.facingValue.${option}`, option)}
+                </button>
+              ))}
+            </div>
+          </label>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <label className="block text-xs font-medium text-slate-600">
+              {t("mileageEvents.scenicViewpoint.bearing", "Bearing")}
+              <input
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                value={scenicBearing}
+                inputMode="decimal"
+                placeholder={t("mileageEvents.scenicViewpoint.auto", "Auto")}
+                onChange={(changeEvent) => {
+                  setScenicBearing(changeEvent.target.value);
+                  setScenicBearingTouched(true);
+                }}
+              />
+            </label>
+            <label className="block text-xs font-medium text-slate-600">
+              {t("mileageEvents.scenicViewpoint.angleTolerance", "Angle")}
+              <input
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                value={scenicAngleTolerance}
+                inputMode="decimal"
+                onChange={(changeEvent) => {
+                  setScenicAngleTolerance(changeEvent.target.value);
+                  setScenicAngleTouched(true);
+                }}
+              />
+            </label>
+            <label className="block text-xs font-medium text-slate-600">
+              {t("mileageEvents.scenicViewpoint.distance", "Range")}
+              <input
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                value={scenicDistanceMeters}
+                inputMode="decimal"
+                onChange={(changeEvent) => {
+                  setScenicDistanceMeters(changeEvent.target.value);
+                  setScenicDistanceTouched(true);
+                }}
+              />
+            </label>
+          </div>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <input
+              type="range"
+              min={0}
+              max={359}
+              step={1}
+              value={scenicBearingValue}
+              className="w-full accent-sky-600"
+              aria-label={t("mileageEvents.scenicViewpoint.bearing", "Bearing")}
+              onChange={(changeEvent) => {
+                setScenicBearing(changeEvent.target.value);
+                setScenicBearingTouched(true);
+              }}
+            />
+            <input
+              type="range"
+              min={5}
+              max={90}
+              step={1}
+              value={scenicAngleNumber ?? 30}
+              className="w-full accent-sky-600"
+              aria-label={t("mileageEvents.scenicViewpoint.angleTolerance", "Angle")}
+              onChange={(changeEvent) => {
+                setScenicAngleTolerance(changeEvent.target.value);
+                setScenicAngleTouched(true);
+              }}
+            />
+            <input
+              type="range"
+              min={250}
+              max={5000}
+              step={50}
+              value={scenicDistanceNumber ?? 1500}
+              className="w-full accent-sky-600"
+              aria-label={t("mileageEvents.scenicViewpoint.distance", "Range")}
+              onChange={(changeEvent) => {
+                setScenicDistanceMeters(changeEvent.target.value);
+                setScenicDistanceTouched(true);
+              }}
+            />
+          </div>
+        </div>
+      )}
       <input
         className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
         placeholder={t("mileageEvents.tagsPlaceholder", "Tags, separated by comma")}
@@ -625,3 +788,13 @@ export const EventComposer: React.FC<Props> = ({
     </div>
   );
 };
+
+function optionalNumberInput(value: number | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? String(Math.round(value * 10) / 10) : "";
+}
+
+function parseOptionalNumber(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}

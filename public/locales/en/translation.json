@@ -587,6 +587,29 @@
       "shared": "Shared",
       "public": "Public"
     },
+    "scenicViewpoint": {
+      "title": "Scenic viewpoint",
+      "facing": "Facing",
+      "bearing": "Bearing",
+      "angleTolerance": "Angle",
+      "distance": "Range",
+      "status": "Status",
+      "confidence": "Confidence",
+      "auto": "Auto",
+      "facingValue": {
+        "left": "Left",
+        "right": "Right",
+        "front": "Front",
+        "back": "Back"
+      },
+      "statusValue": {
+        "visible": "Visible",
+        "opposite_side": "Opposite side",
+        "angle_mismatch": "Angle mismatch",
+        "unknown": "Unknown",
+        "unavailable": "Unavailable"
+      }
+    },
     "filter": {
       "allLines": "All lines",
       "source": "Source",

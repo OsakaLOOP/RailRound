@@ -13,6 +13,14 @@ export const calcDist = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
+export const calcPolylineDist = (coords) => {
+  let dist = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    dist += calcDist(coords[i][0], coords[i][1], coords[i+1][0], coords[i+1][1]);
+  }
+  return dist;
+};
+
 // [New] 路径缝合算法: 将乱序的 MultiLineString 缝合成连续的 LineString
 export const stitchRoutes = (turf, multiCoords, startPt) => {
   let pool = multiCoords.map((coords, i) => {
@@ -158,7 +166,7 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) =>
 };
 
 // --- Shared Helper: Calculate Visualization Data ---
-export const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData) => {
+export const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData, skipVisuals = false) => {
     let totalDist = 0;
     const allCoords = [];
 
@@ -210,30 +218,35 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
         return geom;
     };
 
-    segments.forEach(seg => {
+    for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
         const geom = getGeometry(seg);
         if (geom && geom.coords) {
             if (geom.isMulti) {
-                geom.coords.forEach(c => {
-                    allCoords.push({ coords: c, color: geom.color || '#94a3b8' });
-                    if(turf) totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
-                });
+                for (let j = 0; j < geom.coords.length; j++) {
+                    const c = geom.coords[j];
+                    if (!skipVisuals) allCoords.push({ coords: c, color: geom.color || '#94a3b8' });
+                    totalDist += calcPolylineDist(c);
+                }
             } else {
-                allCoords.push({ coords: geom.coords, color: geom.color || '#94a3b8' });
-                if(turf) totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                if (!skipVisuals) allCoords.push({ coords: geom.coords, color: geom.color || '#94a3b8' });
+                totalDist += calcPolylineDist(geom.coords);
             }
         } else {
              // Fallback Distance Approx
             const line = railwayData ? railwayData[seg.lineKey] : null;
             if (line) {
-                const s1 = line.stations.find(st => st.id === seg.fromId);
-                const s2 = line.stations.find(st => st.id === seg.toId);
+                let s1, s2;
+                for (let j = 0; j < line.stations.length; j++) {
+                    if (line.stations[j].id === seg.fromId) s1 = line.stations[j];
+                    if (line.stations[j].id === seg.toId) s2 = line.stations[j];
+                }
                 if (s1 && s2) totalDist += calcDist(s1.lat, s1.lng, s2.lat, s2.lng);
             }
         }
-    });
+    }
 
-    if (allCoords.length === 0) return { totalDist, visualPaths: [] };
+    if (skipVisuals || allCoords.length === 0) return { totalDist, visualPaths: [] };
 
     // PCA & Projection Logic
     let sumLat = 0, sumLng = 0, count = 0;
@@ -324,11 +337,26 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
 export const calculateLatestStats = (trips, segmentGeometries, railwayData, geoData) => {
     // 1. Basic Stats
     const totalTrips = trips.length;
-    const allSegments = trips.flatMap(t => t.segments || [{ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId }]);
-    const uniqueLines = new Set(allSegments.map(s => s.lineKey)).size;
 
-    // Calc total distance using helper (aggregating cached or on-the-fly)
-    const { totalDist: grandTotalDist } = getRouteVisualData(allSegments, segmentGeometries, railwayData, geoData);
+    const allSegments = [];
+    const uniqueLinesSet = new Set();
+
+    for (let i = 0; i < trips.length; i++) {
+        const t = trips[i];
+        if (t.segments) {
+            for (let j = 0; j < t.segments.length; j++) {
+                allSegments.push(t.segments[j]);
+                uniqueLinesSet.add(t.segments[j].lineKey);
+            }
+        } else {
+            allSegments.push({ lineKey: t.lineKey, fromId: t.fromId, toId: t.toId });
+            uniqueLinesSet.add(t.lineKey);
+        }
+    }
+    const uniqueLines = uniqueLinesSet.size;
+
+    // Calc total distance using helper (aggregating cached or on-the-fly), skip visual calculations
+    const { totalDist: grandTotalDist } = getRouteVisualData(allSegments, segmentGeometries, railwayData, geoData, true);
 
     // 2. Latest 5
     const latest = trips.slice(0, 5).map(t => {

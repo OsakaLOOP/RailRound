@@ -376,6 +376,16 @@
 
 /* Leaflet map and marker customizations ported from legacy code */
 .leaflet-container { width: 100%; height: 100%; z-index: 0; background: #222; }
+/* Leaflet objects can receive DOM focus after mouse clicks; hide only that native ring. */
+.leaflet-container :is(
+  .leaflet-marker-icon.leaflet-interactive,
+  .leaflet-image-layer.leaflet-interactive,
+  .leaflet-pane > svg path.leaflet-interactive,
+  svg.leaflet-image-layer.leaflet-interactive path
+):focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
 .leaflet-popup-content-wrapper { border-radius: 8px; font-family: sans-serif; }
 .leaflet-popup-content { margin: 10px 12px; }
 .rail-route-line.rail-route-rail_graph {

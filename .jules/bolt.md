@@ -5,3 +5,7 @@
 ## 2024-04-15 - [Avoid O(N log N) Sorting on Massive Geographical Collections]
 **Learning:** In spatial queries like `findNearbyStations` where we scan `railwayData` containing thousands of stations to find the top K nearest points, allocating all elements to an array and running `Array.prototype.sort()` results in massive temporary object allocation and $O(N \log N)$ execution time (taking ~8.5ms in benchmarks).
 **Action:** Replace full array sorts with a bounded Top-K array using a simple $O(K)$ insertion sort during the $O(N)$ iteration phase. This brings the time complexity effectively down to $O(N)$, speeding up operations by ~36x (taking ~0.24ms). Remember to apply a final sort if total elements found are less than $K$.
+
+## 2024-04-18 - [Optimize Distance Calculation Over Polylines]
+**Learning:** Found an opportunity to replace `turf.length(turf.lineString(c.map(p => [p[1], p[0]])))` with a simple $O(N)$ manual `for` loop wrapping the existing `calcDist` utility when aggregating the distance of multi-coordinate arrays. Calling the `turf.js` function required mapping over arrays and allocating temporary turf geometries, causing large memory allocations and GC pressure, which impacts performance during data-heavy view renders (like on the TripsPage where hundreds of segments might be processed).
+**Action:** Created `calcPolylineDist(coords)` in `tripCalculator.js` to compute path lengths directly on the nested coordinate arrays using a single iteration block. This avoids using turf to build line strings solely for length calculations.

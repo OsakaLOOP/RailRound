@@ -3,7 +3,7 @@ import { computeLoopVia } from './railwayRouting';
 
 // 辅助：计算两点间直线距离 (Haversine Formula)
 export const calcDist = (lat1, lon1, lat2, lon2) => {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return 0;
   const R = 6371; // 地球半径 km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -157,6 +157,16 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) =>
     }
 };
 
+export const calcPolylineDist = (coords) => {
+  let dist = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p1 = coords[i];
+    const p2 = coords[i + 1];
+    dist += calcDist(p1[0], p1[1], p2[0], p2[1]);
+  }
+  return dist;
+};
+
 // --- Shared Helper: Calculate Visualization Data ---
 export const getRouteVisualData = (segments, segmentGeometries, railwayData, geoData) => {
     let totalDist = 0;
@@ -216,11 +226,11 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
             if (geom.isMulti) {
                 geom.coords.forEach(c => {
                     allCoords.push({ coords: c, color: geom.color || '#94a3b8' });
-                    if(turf) totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
+                    totalDist += calcPolylineDist(c);
                 });
             } else {
                 allCoords.push({ coords: geom.coords, color: geom.color || '#94a3b8' });
-                if(turf) totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                totalDist += calcPolylineDist(geom.coords);
             }
         } else {
              // Fallback Distance Approx

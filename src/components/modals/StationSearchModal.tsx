@@ -81,18 +81,37 @@ export const StationLineSearchModal: React.FC<Props> = ({ isOpen, initialMode, o
         const lowerQuery = query.toLowerCase();
         const matchedLines: any[] = [];
         const matchedStations: any[] = [];
-        Object.entries(railwayData).forEach(([lineKey, lineData]) => {
-            const displayName = lineKey.includes(':') ? lineKey.split(':').slice(1).join(':') : lineKey;
-            if (lineKey.toLowerCase().includes(lowerQuery) || displayName.toLowerCase().includes(lowerQuery)) {
-                matchedLines.push({ lineKey, displayName, company: lineData.meta.company || '', logo: lineData.meta.logo || null, icon: lineData.meta.icon || null, companyIcon: lineData.meta.companyIcon || null, recolor: lineData.meta.recolor, color: lineData.meta.color });
-            }
-            lineData.stations.forEach(station => {
-                if (station.name_ja.toLowerCase().includes(lowerQuery)) {
-                    matchedStations.push({ lineKey, lineDisplayName: displayName, stationId: station.id, stationName: station.name_ja, company: lineData.meta.company || '', logo: lineData.meta.logo || null, icon: lineData.meta.icon || null, companyIcon: lineData.meta.companyIcon || null, recolor: lineData.meta.recolor, color: lineData.meta.color });
+
+        for (const lineKey in railwayData) {
+            if (!Object.prototype.hasOwnProperty.call(railwayData, lineKey)) continue;
+
+            // Stop processing if we have enough results for both arrays
+            if (matchedLines.length >= 50 && matchedStations.length >= 100) break;
+
+            const lineData = railwayData[lineKey];
+
+            // Avoid string split/join allocations
+            const colonIndex = lineKey.indexOf(':');
+            const displayName = colonIndex !== -1 ? lineKey.slice(colonIndex + 1) : lineKey;
+
+            if (matchedLines.length < 50) {
+                if (lineKey.toLowerCase().includes(lowerQuery) || displayName.toLowerCase().includes(lowerQuery)) {
+                    matchedLines.push({ lineKey, displayName, company: lineData.meta.company || '', logo: lineData.meta.logo || null, icon: lineData.meta.icon || null, companyIcon: lineData.meta.companyIcon || null, recolor: lineData.meta.recolor, color: lineData.meta.color });
                 }
-            });
-        });
-        return { lines: matchedLines.slice(0, 50), stations: matchedStations.slice(0, 100) };
+            }
+
+            if (matchedStations.length < 100) {
+                for (let i = 0; i < lineData.stations.length; i++) {
+                    const station = lineData.stations[i];
+                    if (station.name_ja.toLowerCase().includes(lowerQuery)) {
+                        matchedStations.push({ lineKey, lineDisplayName: displayName, stationId: station.id, stationName: station.name_ja, company: lineData.meta.company || '', logo: lineData.meta.logo || null, icon: lineData.meta.icon || null, companyIcon: lineData.meta.companyIcon || null, recolor: lineData.meta.recolor, color: lineData.meta.color });
+                        if (matchedStations.length >= 100) break;
+                    }
+                }
+            }
+        }
+
+        return { lines: matchedLines, stations: matchedStations };
     }, [query, railwayData]);
 
     // ==== Global Keyboard ESC ====

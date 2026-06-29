@@ -6,6 +6,7 @@ import { useUserData } from '../../hooks/useUserData';
 import * as turf from '@turf/turf';
 import { useTranslation } from 'react-i18next';
 import { showAlert, showConfirm } from '../../utils/alerts';
+import { calcDist } from '../../core/tripCalculator';
 
 export const WalkTripEditor: React.FC = () => {
     const { t } = useTranslation();
@@ -47,7 +48,7 @@ export const WalkTripEditor: React.FC = () => {
         const line = turf.lineString([startLngLat, endLngLat]);
 
         // Add some random curvature by computing an offset point in the middle
-        const distance = turf.length(line, { units: 'kilometers' });
+        const distance = calcDist(startLngLat[1], startLngLat[0], endLngLat[1], endLngLat[0]);
         const bearing = turf.bearing(startLngLat, endLngLat);
         const midpoint = turf.midpoint(startLngLat, endLngLat);
 

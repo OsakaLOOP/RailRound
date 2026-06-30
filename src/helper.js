@@ -1,3 +1,4 @@
+import { calcPolylineDistTurfFormat } from './core/tripCalculator';
 export const calcDist = (lat1, lon1, lat2, lon2) => {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
   const R = 6371; 
@@ -163,11 +164,11 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng, tu
             resultCoords = sliced.geometry.coordinates;
         } else {
             const sliceDirect = turf.lineSlice(snappedStart, snappedEnd, line);
-            const lenDirect = turf.length(sliceDirect);
+            const lenDirect = calcPolylineDistTurfFormat(sliceDirect.geometry.coordinates);
             
             const sliceToTail = turf.lineSlice(snappedStart, turf.point(lastPt), line);
             const sliceFromHead = turf.lineSlice(turf.point(firstPt), snappedEnd, line);
-            const lenWrap = turf.length(sliceToTail) + turf.length(sliceFromHead);
+            const lenWrap = calcPolylineDistTurfFormat(sliceToTail.geometry.coordinates) + calcPolylineDistTurfFormat(sliceFromHead.geometry.coordinates);
 
             if (lenDirect <= lenWrap) {
                 resultCoords = sliceDirect.geometry.coordinates;

@@ -44,10 +44,8 @@ export const WalkTripEditor: React.FC = () => {
     if (!isOpen) return null;
 
     const generateBezierPath = (startLngLat: [number, number], endLngLat: [number, number]): [number, number][] => {
-        const line = turf.lineString([startLngLat, endLngLat]);
-
         // Add some random curvature by computing an offset point in the middle
-        const distance = turf.length(line, { units: 'kilometers' });
+        const distance = turf.distance(startLngLat, endLngLat, { units: 'kilometers' });
         const bearing = turf.bearing(startLngLat, endLngLat);
         const midpoint = turf.midpoint(startLngLat, endLngLat);
 

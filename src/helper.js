@@ -8,6 +8,14 @@ export const calcDist = (lat1, lon1, lat2, lon2) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+const calcPolylineDistTurfFormat = (coords) => {
+    let dist = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+        dist += calcDist(coords[i][1], coords[i][0], coords[i + 1][1], coords[i + 1][0]);
+    }
+    return dist;
+};
+
 export const isCompanyCompatible = (meta1, meta2) => {
   if (!meta1 || !meta2) return false;
   if (meta1.company === meta2.company && meta1.company !== "上传数据" && meta1.company !== "未知") return true;
@@ -145,10 +153,6 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng, tu
       // 1. 在连续化后的纯净 LineString 上做最终吸附与索引定标
       const snappedStart = turf.nearestPointOnLine(line, startPt);
       const snappedEnd = turf.nearestPointOnLine(line, endPt);
-
-        const startIdx = snappedStart.properties.index;
-        const endIdx = snappedEnd.properties.index;
-        
         // 2. 环线检测
         const coords = line.geometry.coordinates;
         const firstPt = coords[0];
@@ -163,11 +167,11 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng, tu
             resultCoords = sliced.geometry.coordinates;
         } else {
             const sliceDirect = turf.lineSlice(snappedStart, snappedEnd, line);
-            const lenDirect = turf.length(sliceDirect);
+            const lenDirect = calcPolylineDistTurfFormat(sliceDirect.geometry.coordinates);
             
             const sliceToTail = turf.lineSlice(snappedStart, turf.point(lastPt), line);
             const sliceFromHead = turf.lineSlice(turf.point(firstPt), snappedEnd, line);
-            const lenWrap = turf.length(sliceToTail) + turf.length(sliceFromHead);
+            const lenWrap = calcPolylineDistTurfFormat(sliceToTail.geometry.coordinates) + calcPolylineDistTurfFormat(sliceFromHead.geometry.coordinates);
 
             if (lenDirect <= lenWrap) {
                 resultCoords = sliceDirect.geometry.coordinates;
@@ -190,7 +194,7 @@ export const NearestPoint = (railwayData, targetLat, targetLng) => {
   Object.entries(railwayData).forEach(([lineKey, line]) => {
     for (let i = 0; i < line.stations.length - 1; i++) {
       const A = line.stations[i]; const B = line.stations[i+1];
-      const proj = getProjectedPointOnSegment(targetLng, targetLat, A.lng, A.lat, B.lng, B.lat);
+      const proj = projectedPoint(targetLng, targetLat, A.lng, A.lat, B.lng, B.lat);
       const dSq = (targetLat - proj.y) ** 2 + (targetLng - proj.x) ** 2;
       if (dSq < minDistSq) {
         minDistSq = dSq;

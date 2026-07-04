@@ -16,6 +16,14 @@ export const calcDist = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
+const calcPolylineDistTurfFormat = (coords) => {
+    let dist = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+        dist += calcDist(coords[i][1], coords[i][0], coords[i + 1][1], coords[i + 1][0]);
+    }
+    return dist;
+};
+
 // 路径缝合算法 (旧格式 fallback): 将乱序的 MultiLineString 缝合成连续 LineString
 export const stitchRoutes = (turf, multiCoords, startPt) => {
   let pool = multiCoords.map((coords, i) => {
@@ -150,13 +158,11 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) =>
             resultCoords = sliced.geometry.coordinates;
         } else {
             const sliceDirect = turf.lineSlice(snappedStart, snappedEnd, line);
-            const lenDirect = turf.length(sliceDirect);
+            const lenDirect = calcPolylineDistTurfFormat(sliceDirect.geometry.coordinates);
 
             const sliceToTailCoords = safeSliceToTail(line, snappedStart);
             const sliceFromHeadCoords = safeSliceFromHead(line, snappedEnd);
-            const sliceToTailLine = turf.lineString(sliceToTailCoords);
-            const sliceFromHeadLine = turf.lineString(sliceFromHeadCoords);
-            const lenWrap = turf.length(sliceToTailLine) + turf.length(sliceFromHeadLine);
+            const lenWrap = calcPolylineDistTurfFormat(sliceToTailCoords) + calcPolylineDistTurfFormat(sliceFromHeadCoords);
 
             if (lenDirect <= lenWrap) {
                 resultCoords = sliceDirect.geometry.coordinates;

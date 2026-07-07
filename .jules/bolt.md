@@ -5,3 +5,7 @@
 ## 2024-04-15 - [Avoid O(N log N) Sorting on Massive Geographical Collections]
 **Learning:** In spatial queries like `findNearbyStations` where we scan `railwayData` containing thousands of stations to find the top K nearest points, allocating all elements to an array and running `Array.prototype.sort()` results in massive temporary object allocation and $O(N \log N)$ execution time (taking ~8.5ms in benchmarks).
 **Action:** Replace full array sorts with a bounded Top-K array using a simple $O(K)$ insertion sort during the $O(N)$ iteration phase. This brings the time complexity effectively down to $O(N)$, speeding up operations by ~36x (taking ~0.24ms). Remember to apply a final sort if total elements found are less than $K$.
+
+## 2024-07-07 - Replace O(N) nested station scan with O(1) index lookup in getTransferableLines
+**Learning:** In `src/core/railwayRouting.ts`, `getTransferableLines` originally iterated over all lines in `railwayData` and used `.find()` on each line's `stations` array to match station names. This $O(L \times S)$ operation was expensive when frequently calculating transferable lines.
+**Action:** Always prefer using the existing `buildStationIndex(railwayData)` utility to perform $O(1)$ lookups for stations by name, which returns an array of matching stations, to bypass expensive $O(N)$ linear scans when finding routing or transfers.

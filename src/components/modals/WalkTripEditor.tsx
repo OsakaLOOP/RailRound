@@ -4,6 +4,7 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { useUserData } from '../../hooks/useUserData';
 import * as turf from '@turf/turf';
+import { calcPolylineDistTurfFormat } from '../../core/tripCalculator';
 import { useTranslation } from 'react-i18next';
 import { showAlert, showConfirm } from '../../utils/alerts';
 
@@ -47,7 +48,7 @@ export const WalkTripEditor: React.FC = () => {
         const line = turf.lineString([startLngLat, endLngLat]);
 
         // Add some random curvature by computing an offset point in the middle
-        const distance = turf.length(line, { units: 'kilometers' });
+        const distance = calcPolylineDistTurfFormat(line.geometry.coordinates);
         const bearing = turf.bearing(startLngLat, endLngLat);
         const midpoint = turf.midpoint(startLngLat, endLngLat);
 

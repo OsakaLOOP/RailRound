@@ -1,4 +1,5 @@
 import * as turf from '@turf/turf';
+import { calcPolylineDistTurfFormat } from '../core/tripCalculator';
 
 // 内存数据副本
 let railwayData = {};
@@ -150,13 +151,11 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) =>
             resultCoords = sliced.geometry.coordinates;
         } else {
             const sliceDirect = turf.lineSlice(snappedStart, snappedEnd, line);
-            const lenDirect = turf.length(sliceDirect);
+            const lenDirect = calcPolylineDistTurfFormat(sliceDirect.geometry.coordinates);
 
             const sliceToTailCoords = safeSliceToTail(line, snappedStart);
             const sliceFromHeadCoords = safeSliceFromHead(line, snappedEnd);
-            const sliceToTailLine = turf.lineString(sliceToTailCoords);
-            const sliceFromHeadLine = turf.lineString(sliceFromHeadCoords);
-            const lenWrap = turf.length(sliceToTailLine) + turf.length(sliceFromHeadLine);
+            const lenWrap = calcPolylineDistTurfFormat(sliceToTailCoords) + calcPolylineDistTurfFormat(sliceFromHeadCoords);
 
             if (lenDirect <= lenWrap) {
                 resultCoords = sliceDirect.geometry.coordinates;

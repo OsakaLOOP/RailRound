@@ -13,6 +13,23 @@ export const calcDist = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
+
+export const calcPolylineDist = (coords) => {
+    let dist = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+        dist += calcDist(coords[i][0], coords[i][1], coords[i+1][0], coords[i+1][1]);
+    }
+    return dist;
+};
+
+export const calcPolylineDistTurfFormat = (coords) => {
+    let dist = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+        dist += calcDist(coords[i][1], coords[i][0], coords[i+1][1], coords[i+1][0]);
+    }
+    return dist;
+};
+
 // [New] 路径缝合算法: 将乱序的 MultiLineString 缝合成连续的 LineString
 export const stitchRoutes = (turf, multiCoords, startPt) => {
   let pool = multiCoords.map((coords, i) => {
@@ -119,8 +136,7 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) =>
       const snappedStart = turf.nearestPointOnLine(line, startPt);
       const snappedEnd = turf.nearestPointOnLine(line, endPt);
 
-        const startIdx = snappedStart.properties.index;
-        const endIdx = snappedEnd.properties.index;
+
 
         // 2. 环线检测
         const coords = line.geometry.coordinates;
@@ -136,11 +152,11 @@ export const sliceGeoJsonPath = (feature, startLat, startLng, endLat, endLng) =>
             resultCoords = sliced.geometry.coordinates;
         } else {
             const sliceDirect = turf.lineSlice(snappedStart, snappedEnd, line);
-            const lenDirect = turf.length(sliceDirect);
+            const lenDirect = calcPolylineDistTurfFormat(sliceDirect.geometry.coordinates);
 
             const sliceToTail = turf.lineSlice(snappedStart, turf.point(lastPt), line);
             const sliceFromHead = turf.lineSlice(turf.point(firstPt), snappedEnd, line);
-            const lenWrap = turf.length(sliceToTail) + turf.length(sliceFromHead);
+            const lenWrap = calcPolylineDistTurfFormat(sliceToTail.geometry.coordinates) + calcPolylineDistTurfFormat(sliceFromHead.geometry.coordinates);
 
             if (lenDirect <= lenWrap) {
                 resultCoords = sliceDirect.geometry.coordinates;
@@ -216,11 +232,11 @@ export const getRouteVisualData = (segments, segmentGeometries, railwayData, geo
             if (geom.isMulti) {
                 geom.coords.forEach(c => {
                     allCoords.push({ coords: c, color: geom.color || '#94a3b8' });
-                    if(turf) totalDist += turf.length(turf.lineString(c.map(p => [p[1], p[0]])));
+                    totalDist += calcPolylineDist(c);
                 });
             } else {
                 allCoords.push({ coords: geom.coords, color: geom.color || '#94a3b8' });
-                if(turf) totalDist += turf.length(turf.lineString(geom.coords.map(p => [p[1], p[0]])));
+                totalDist += calcPolylineDist(geom.coords);
             }
         } else {
              // Fallback Distance Approx
